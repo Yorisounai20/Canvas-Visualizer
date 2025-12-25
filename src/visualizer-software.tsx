@@ -322,19 +322,32 @@ export default function ThreeDVisualizer() {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    addLog('Initializing Three.js scene...', 'info');
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
-    sceneRef.current = scene;
-    const camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
-    camera.position.z = 15;
-    cameraRef.current = camera;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(960, 540);
-    renderer.setClearColor(0x0a0a14);
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-    addLog('Scene initialized successfully', 'success');
+
+    try {
+      addLog('Initializing Three.js scene...', 'info');
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
+      sceneRef.current = scene;
+      const camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
+      camera.position.z = 15;
+      cameraRef.current = camera;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer.setSize(960, 540);
+      renderer.setClearColor(0x0a0a14);
+
+      if (containerRef.current.children.length > 0) {
+        containerRef.current.removeChild(containerRef.current.children[0]);
+      }
+
+      containerRef.current.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
+      addLog('Scene initialized successfully', 'success');
+    } catch (e) {
+      console.error('Three.js initialization error:', e);
+      addLog(`Three.js error: ${e.message}`, 'error');
+      return;
+    }
 
     const cubes = [];
     for (let i=0; i<8; i++) {
@@ -376,15 +389,23 @@ export default function ThreeDVisualizer() {
     let idleAnimFrame;
     const idleRender = () => {
       idleAnimFrame = requestAnimationFrame(idleRender);
-      renderer.render(scene, camera);
+      if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
     };
-    idleRender();
+    idleAnimFrame = requestAnimationFrame(idleRender);
 
     return () => {
       if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
-      if (renderer) {
-        containerRef.current?.removeChild(renderer.domElement);
-        renderer.dispose();
+      if (rendererRef.current) {
+        try {
+          if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+            containerRef.current.removeChild(rendererRef.current.domElement);
+          }
+          rendererRef.current.dispose();
+        } catch (e) {
+          console.error('Cleanup error:', e);
+        }
       }
     };
   }, []);
