@@ -102,7 +102,7 @@ export default function ThreeDVisualizer() {
           addLog(`Font loading: ${percent}%`, 'info');
         }
       },
-      (error: any) => {
+      (error: Error) => {
         console.error('Font loading error:', error);
         addLog(`Font load failed - upload custom font instead`, 'error');
       }
@@ -184,7 +184,7 @@ export default function ThreeDVisualizer() {
         songNameMeshesRef.current = meshes;
         setShowSongName(true);
         addLog(`Created ${meshes.length} text meshes at visible position`, 'success');
-        console.log('All song name meshes:', scene.children.filter((c: any) => c.userData.isText));
+        console.log('All song name meshes:', scene.children.filter((c: THREE.Object3D) => c.userData.isText));
       } catch (e) {
         const error = e as Error;
         addLog(`Text creation error: ${error.message}`, 'error');
