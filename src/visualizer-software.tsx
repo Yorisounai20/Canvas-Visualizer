@@ -4,6 +4,12 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { Trash2, Plus, Play, Square } from 'lucide-react';
 
+// Default camera settings constants
+const DEFAULT_CAMERA_DISTANCE = 15;
+const DEFAULT_CAMERA_HEIGHT = 0;
+const DEFAULT_CAMERA_ROTATION = 0;
+const DEFAULT_CAMERA_AUTO_ROTATE = true;
+
 export default function ThreeDVisualizer() {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
@@ -32,10 +38,10 @@ export default function ThreeDVisualizer() {
   const [fontLoaded, setFontLoaded] = useState(false);
   const [errorLog, setErrorLog] = useState([]);
   const [customFontName, setCustomFontName] = useState('Helvetiker (Default)');
-  const [cameraDistance, setCameraDistance] = useState(15);
-  const [cameraHeight, setCameraHeight] = useState(0);
-  const [cameraRotation, setCameraRotation] = useState(0);
-  const [cameraAutoRotate, setCameraAutoRotate] = useState(true);
+  const [cameraDistance, setCameraDistance] = useState(DEFAULT_CAMERA_DISTANCE);
+  const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
+  const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
+  const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -46,9 +52,9 @@ export default function ThreeDVisualizer() {
   const [activeTab, setActiveTab] = useState('controls');
   
   const [sections, setSections] = useState([
-    { id: 1, start: 0, end: 20, animation: 'orbit', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true },
-    { id: 2, start: 20, end: 40, animation: 'explosion', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true },
-    { id: 3, start: 40, end: 60, animation: 'chill', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true }
+    { id: 1, start: 0, end: 20, animation: 'orbit', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
+    { id: 2, start: 20, end: 40, animation: 'explosion', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
+    { id: 3, start: 40, end: 60, animation: 'chill', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE }
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
@@ -205,15 +211,22 @@ export default function ThreeDVisualizer() {
       start: last ? last.end : 0, 
       end: (last ? last.end : 0) + 20, 
       animation: 'orbit',
-      cameraDistance: 15,
-      cameraHeight: 0,
-      cameraRotation: 0,
-      cameraAutoRotate: true
+      cameraDistance: DEFAULT_CAMERA_DISTANCE,
+      cameraHeight: DEFAULT_CAMERA_HEIGHT,
+      cameraRotation: DEFAULT_CAMERA_ROTATION,
+      cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE
     }]);
   };
 
   const deleteSection = (id) => setSections(sections.filter(s => s.id !== id));
   const updateSection = (id, f, v) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+
+  const resetCamera = () => {
+    setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+    setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+    setCameraRotation(DEFAULT_CAMERA_ROTATION);
+    setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+  };
 
   const initAudio = async (file) => {
     try {
@@ -1009,7 +1022,7 @@ export default function ThreeDVisualizer() {
                   <label className="text-xs text-gray-400 block mb-1">Rotation Offset: {(cameraRotation * 180 / Math.PI).toFixed(0)}°</label>
                   <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
-                <button onClick={() => { setCameraDistance(15); setCameraHeight(0); setCameraRotation(0); setCameraAutoRotate(true); }} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+                <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
               </div>
             </div>
           </div>
@@ -1045,44 +1058,44 @@ export default function ThreeDVisualizer() {
                         <input 
                           type="checkbox" 
                           id={`autoRotate-${s.id}`} 
-                          checked={s.cameraAutoRotate ?? true} 
+                          checked={s.cameraAutoRotate ?? DEFAULT_CAMERA_AUTO_ROTATE} 
                           onChange={(e) => updateSection(s.id, 'cameraAutoRotate', e.target.checked)} 
                           className="w-3 h-3 cursor-pointer" 
                         />
                         <label htmlFor={`autoRotate-${s.id}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Distance: {s.cameraDistance ?? 15}</label>
+                        <label className="text-xs text-gray-400 block mb-1">Distance: {s.cameraDistance ?? DEFAULT_CAMERA_DISTANCE}</label>
                         <input 
                           type="range" 
                           min="5" 
                           max="50" 
                           step="1" 
-                          value={s.cameraDistance ?? 15} 
+                          value={s.cameraDistance ?? DEFAULT_CAMERA_DISTANCE} 
                           onChange={(e) => updateSection(s.id, 'cameraDistance', Number(e.target.value))} 
                           className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Height: {s.cameraHeight ?? 0}</label>
+                        <label className="text-xs text-gray-400 block mb-1">Height: {s.cameraHeight ?? DEFAULT_CAMERA_HEIGHT}</label>
                         <input 
                           type="range" 
                           min="-10" 
                           max="10" 
                           step="1" 
-                          value={s.cameraHeight ?? 0} 
+                          value={s.cameraHeight ?? DEFAULT_CAMERA_HEIGHT} 
                           onChange={(e) => updateSection(s.id, 'cameraHeight', Number(e.target.value))} 
                           className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Rotation: {((s.cameraRotation ?? 0) * 180 / Math.PI).toFixed(0)}°</label>
+                        <label className="text-xs text-gray-400 block mb-1">Rotation: {((s.cameraRotation ?? DEFAULT_CAMERA_ROTATION) * 180 / Math.PI).toFixed(0)}°</label>
                         <input 
                           type="range" 
                           min="0" 
                           max={Math.PI * 2} 
                           step="0.1" 
-                          value={s.cameraRotation ?? 0} 
+                          value={s.cameraRotation ?? DEFAULT_CAMERA_ROTATION} 
                           onChange={(e) => updateSection(s.id, 'cameraRotation', Number(e.target.value))} 
                           className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
                         />
