@@ -1,25 +1,36 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { Trash2, Plus, Play, Square } from 'lucide-react';
 
+interface LogEntry {
+  message: string;
+  type: string;
+  timestamp: string;
+}
+
 export default function ThreeDVisualizer() {
-  const containerRef = useRef(null);
-  const sceneRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rendererRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const analyserRef = useRef(null);
-  const animationRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationRef = useRef<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
-  const audioBufferRef = useRef(null);
-  const bufferSourceRef = useRef(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const startTimeRef = useRef(0);
   const pauseTimeRef = useRef(0);
   const [audioFileName, setAudioFileName] = useState('');
-  const objectsRef = useRef([]);
+  const objectsRef = useRef<{
+    cubes: THREE.Mesh[];
+    octas: THREE.Mesh[];
+    tetras: THREE.Mesh[];
+    sphere: THREE.Mesh;
+  } | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bassColor, setBassColor] = useState('#8a2be2');
@@ -27,10 +38,10 @@ export default function ThreeDVisualizer() {
   const [highsColor, setHighsColor] = useState('#c8b4ff');
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
-  const songNameMeshesRef = useRef([]);
-  const fontRef = useRef(null);
+  const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
+  const fontRef = useRef<any>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
-  const [errorLog, setErrorLog] = useState([]);
+  const [errorLog, setErrorLog] = useState<LogEntry[]>([]);
   const [customFontName, setCustomFontName] = useState('Helvetiker (Default)');
   const [cameraDistance, setCameraDistance] = useState(15);
   const [cameraHeight, setCameraHeight] = useState(0);
@@ -39,8 +50,8 @@ export default function ThreeDVisualizer() {
   
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
   
   const [sections, setSections] = useState([
     { id: 1, start: 0, end: 20, animation: 'orbit' },
@@ -50,12 +61,12 @@ export default function ThreeDVisualizer() {
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
 
-  const addLog = (message, type = 'info') => {
+  const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
-  const loadCustomFont = async (file) => {
+  const loadCustomFont = async (file: File) => {
     try {
       addLog(`Loading custom font: ${file.name}`, 'info');
       const text = await file.text();
@@ -67,7 +78,8 @@ export default function ThreeDVisualizer() {
       setCustomFontName(file.name);
       addLog(`Custom font "${file.name}" loaded successfully!`, 'success');
     } catch (e) {
-      addLog(`Custom font load error: ${e.message}`, 'error');
+      const error = e as Error;
+      addLog(`Custom font load error: ${error.message}`, 'error');
       console.error('Font load error:', e);
     }
   };
@@ -77,20 +89,20 @@ export default function ThreeDVisualizer() {
     const loader = new FontLoader();
     loader.load(
       'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
-      (font) => {
+      (font: any) => {
         console.log('Font loaded successfully!');
         addLog('Font loaded successfully!', 'success');
         fontRef.current = font;
         setFontLoaded(true);
       },
-      (progress) => {
+      (progress: any) => {
         if (progress.total > 0) {
           const percent = Math.round((progress.loaded / progress.total) * 100);
           console.log('Font loading progress:', percent + '%');
           addLog(`Font loading: ${percent}%`, 'info');
         }
       },
-      (error) => {
+      (error: any) => {
         console.error('Font loading error:', error);
         addLog(`Font load failed - upload custom font instead`, 'error');
       }
@@ -124,7 +136,7 @@ export default function ThreeDVisualizer() {
         const text = customSongName || audioFileName || 'SONG NAME';
         addLog(`Creating 3D text: "${text}"`, 'info');
         const words = text.toUpperCase().split(' ');
-        const meshes = [];
+        const meshes: THREE.Mesh[] = [];
 
         words.forEach((word, wordIndex) => {
           [...word].forEach((char, charIndex) => {
@@ -172,9 +184,10 @@ export default function ThreeDVisualizer() {
         songNameMeshesRef.current = meshes;
         setShowSongName(true);
         addLog(`Created ${meshes.length} text meshes at visible position`, 'success');
-        console.log('All song name meshes:', scene.children.filter(c => c.userData.isText));
+        console.log('All song name meshes:', scene.children.filter((c: any) => c.userData.isText));
       } catch (e) {
-        addLog(`Text creation error: ${e.message}`, 'error');
+        const error = e as Error;
+        addLog(`Text creation error: ${error.message}`, 'error');
       }
     }
   };
@@ -191,8 +204,8 @@ export default function ThreeDVisualizer() {
     { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
   ];
 
-  const formatTime = (s) => `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
-  const parseTime = (t) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
+  const formatTime = (s: number) => `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+  const parseTime = (t: string) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
   const addSection = () => {
@@ -200,14 +213,14 @@ export default function ThreeDVisualizer() {
     setSections([...sections, {id:Date.now(), start:last?last.end:0, end:(last?last.end:0)+20, animation:'orbit'}]);
   };
 
-  const deleteSection = (id) => setSections(sections.filter(s => s.id !== id));
-  const updateSection = (id, f, v) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+  const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
+  const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
 
-  const initAudio = async (file) => {
+  const initAudio = async (file: File) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
       if (audioContextRef.current) audioContextRef.current.close();
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
       const buf = await ctx.decodeAudioData(await file.arrayBuffer());
@@ -219,12 +232,13 @@ export default function ThreeDVisualizer() {
       addLog('Audio loaded successfully!', 'success');
     } catch (e) { 
       console.error(e);
-      addLog(`Audio load error: ${e.message}`, 'error');
+      const error = e as Error;
+      addLog(`Audio load error: ${error.message}`, 'error');
     }
   };
 
   const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current) return;
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
     if (bufferSourceRef.current) bufferSourceRef.current.stop();
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
@@ -246,7 +260,7 @@ export default function ThreeDVisualizer() {
     setIsPlaying(false);
   };
 
-  const seekTo = (t) => {
+  const seekTo = (t: number) => {
     const play = isPlaying;
     if (play) stopAudio();
     pauseTimeRef.current = t;
@@ -256,7 +270,7 @@ export default function ThreeDVisualizer() {
 
   // NEW: Recording functions
   const startRecording = () => {
-    if (!rendererRef.current || !audioContextRef.current) {
+    if (!rendererRef.current || !audioContextRef.current || !analyserRef.current) {
       addLog('Cannot record: scene or audio not ready', 'error');
       return;
     }
@@ -301,7 +315,8 @@ export default function ThreeDVisualizer() {
       setIsRecording(true);
       addLog('Recording started', 'success');
     } catch (e) {
-      addLog(`Recording error: ${e.message}`, 'error');
+      const error = e as Error;
+      addLog(`Recording error: ${error.message}`, 'error');
       console.error('Recording error:', e);
     }
   };
@@ -314,7 +329,7 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const getFreq = (d) => ({
+  const getFreq = (d: Uint8Array) => ({
     bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
     mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
     highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
@@ -323,9 +338,10 @@ export default function ThreeDVisualizer() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    let scene: THREE.Scene;
     try {
       addLog('Initializing Three.js scene...', 'info');
-      const scene = new THREE.Scene();
+      scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
       const camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
@@ -345,11 +361,12 @@ export default function ThreeDVisualizer() {
       addLog('Scene initialized successfully', 'success');
     } catch (e) {
       console.error('Three.js initialization error:', e);
-      addLog(`Three.js error: ${e.message}`, 'error');
+      const error = e as Error;
+      addLog(`Three.js error: ${error.message}`, 'error');
       return;
     }
 
-    const cubes = [];
+    const cubes: THREE.Mesh[] = [];
     for (let i=0; i<8; i++) {
       const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.6}));
       const a = (i/8)*Math.PI*2;
@@ -359,7 +376,7 @@ export default function ThreeDVisualizer() {
       cubes.push(c);
     }
 
-    const octas = [];
+    const octas: THREE.Mesh[] = [];
     for (let r=0; r<3; r++) {
       for (let i=0; i<6+r*4; i++) {
         const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshBasicMaterial({color:0x40e0d0,wireframe:true,transparent:true,opacity:0.5}));
@@ -373,7 +390,7 @@ export default function ThreeDVisualizer() {
       }
     }
 
-    const tetras = [];
+    const tetras: THREE.Mesh[] = [];
     for (let i=0; i<30; i++) {
       const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), new THREE.MeshBasicMaterial({color:0xc8b4ff,transparent:true,opacity:0.7}));
       t.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
@@ -386,7 +403,7 @@ export default function ThreeDVisualizer() {
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
-    let idleAnimFrame;
+    let idleAnimFrame: number;
     const idleRender = () => {
       idleAnimFrame = requestAnimationFrame(idleRender);
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
@@ -413,8 +430,11 @@ export default function ThreeDVisualizer() {
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
-    const analyser = analyserRef.current, data = new Uint8Array(analyser.frequencyBinCount);
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const data = new Uint8Array(analyser.frequencyBinCount);
     const obj = objectsRef.current;
+    if (!obj) return;
 
     const anim = () => {
       if (!isPlaying) return;
@@ -842,24 +862,6 @@ export default function ThreeDVisualizer() {
         obj.sphere.material.opacity = 0;
       }
 
-      obj.tetras.forEach((tr,i) => {
-        const sp = 0.5+i*0.1, rad = 3+f.highs*5;
-        tr.position.set(Math.cos(el*sp+i)*rad, Math.sin(el*sp*1.3+i)*rad, Math.sin(el*sp*0.7+i)*rad);
-        tr.rotation.x += 0.03+f.highs*0.1;
-        tr.rotation.y += 0.02+f.highs*0.08;
-        tr.material.opacity = (0.4+f.highs*0.6) * blend;
-        tr.material.color.setStyle(highsColor);
-      });
-
-      const ss = 1.5+f.bass+f.mids*0.5;
-      obj.sphere.scale.set(ss,ss,ss);
-      obj.sphere.rotation.x += 0.005;
-      obj.sphere.rotation.y += 0.01;
-      obj.sphere.rotation.z = 0;
-      obj.sphere.material.opacity = (0.2+f.bass*0.4) * blend;
-      obj.sphere.material.color.setStyle(bassColor);
-      obj.sphere.material.wireframe = true;
-
       if (showSongName && songNameMeshesRef.current.length > 0) {
         songNameMeshesRef.current.forEach((mesh) => {
           const freqIndex = mesh.userData.freqIndex;
@@ -895,7 +897,7 @@ export default function ThreeDVisualizer() {
           {audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
           <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
             <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection().animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection().animation)?.label}</p>}
+            {getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
           </div>
           {duration > 0 && (
             <div className="absolute bottom-4 left-4 right-4">
@@ -935,7 +937,7 @@ export default function ThreeDVisualizer() {
           <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
           <div className="mb-3 pb-3 border-b border-gray-600">
             <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-            <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
+            <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files?.[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
             <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
           </div>
           <div className="flex gap-2 mb-2">
@@ -957,7 +959,7 @@ export default function ThreeDVisualizer() {
         <div className="flex gap-4 items-start mb-4 flex-wrap">
           <div className="flex-1 min-w-[300px]">
             <label className="text-cyan-400 text-sm font-semibold block mb-2">Audio File</label>
-            <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
+            <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files?.[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
           </div>
           {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-6 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">{isPlaying ? <><Square size={16} /> Stop</> : <><Play size={16} /> Play</>}</button>}
           <button onClick={addSection} className="mt-6 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Section</button>
