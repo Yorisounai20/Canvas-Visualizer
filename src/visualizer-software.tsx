@@ -42,10 +42,13 @@ export default function ThreeDVisualizer() {
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   
+  // NEW: Tab state
+  const [activeTab, setActiveTab] = useState('controls');
+  
   const [sections, setSections] = useState([
-    { id: 1, start: 0, end: 20, animation: 'orbit' },
-    { id: 2, start: 20, end: 40, animation: 'explosion' },
-    { id: 3, start: 40, end: 60, animation: 'chill' }
+    { id: 1, start: 0, end: 20, animation: 'orbit', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true },
+    { id: 2, start: 20, end: 40, animation: 'explosion', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true },
+    { id: 3, start: 40, end: 60, animation: 'chill', cameraDistance: 15, cameraHeight: 0, cameraRotation: 0, cameraAutoRotate: true }
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
@@ -197,7 +200,16 @@ export default function ThreeDVisualizer() {
 
   const addSection = () => {
     const last = sections[sections.length-1];
-    setSections([...sections, {id:Date.now(), start:last?last.end:0, end:(last?last.end:0)+20, animation:'orbit'}]);
+    setSections([...sections, {
+      id: Date.now(), 
+      start: last ? last.end : 0, 
+      end: (last ? last.end : 0) + 20, 
+      animation: 'orbit',
+      cameraDistance: 15,
+      cameraHeight: 0,
+      cameraRotation: 0,
+      cameraAutoRotate: true
+    }]);
   };
 
   const deleteSection = (id) => setSections(sections.filter(s => s.id !== id));
@@ -323,16 +335,18 @@ export default function ThreeDVisualizer() {
   useEffect(() => {
     if (!containerRef.current) return;
 
+    let scene, camera, renderer;
+    
     try {
       addLog('Initializing Three.js scene...', 'info');
-      const scene = new THREE.Scene();
+      scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
-      const camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
 
@@ -426,6 +440,12 @@ export default function ThreeDVisualizer() {
       setCurrentTime(t);
       const sec = sections.find(s => t >= s.start && t < s.end);
       const type = sec ? sec.animation : 'orbit';
+      
+      // Use camera settings from section if available, otherwise use global settings
+      const activeCameraDistance = sec?.cameraDistance ?? cameraDistance;
+      const activeCameraHeight = sec?.cameraHeight ?? cameraHeight;
+      const activeCameraRotation = sec?.cameraRotation ?? cameraRotation;
+      const activeCameraAutoRotate = sec?.cameraAutoRotate ?? cameraAutoRotate;
 
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
@@ -437,9 +457,9 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
-        const r = cameraDistance - f.bass * 5;
-        cam.position.set(Math.cos(rotationSpeed + cameraRotation)*r, 10 + cameraHeight, Math.sin(rotationSpeed + cameraRotation)*r);
+        const rotationSpeed = activeCameraAutoRotate ? el*0.2 : 0;
+        const r = activeCameraDistance - f.bass * 5;
+        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation)*r);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const sunScale = 3 + f.bass * 2;
@@ -522,7 +542,7 @@ export default function ThreeDVisualizer() {
           asteroid.material.wireframe = true;
         });
       } else if (type === 'explosion') {
-        cam.position.set(0, cameraHeight, cameraDistance - f.bass*10);
+        cam.position.set(0, activeCameraHeight, activeCameraDistance - f.bass*10);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const ss = 1.5+f.bass+f.mids*0.5;
@@ -574,7 +594,7 @@ export default function ThreeDVisualizer() {
           tr.material.wireframe = true;
         });
       } else if (type === 'chill') {
-        cam.position.set(0, 5 + cameraHeight, cameraDistance);
+        cam.position.set(0, 5 + activeCameraHeight, activeCameraDistance);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const a = (i/obj.cubes.length)*Math.PI*2;
@@ -598,7 +618,7 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'wave') {
         const pathProgress = el * 2;
-        cam.position.set(Math.sin(pathProgress * 0.3) * 3, Math.cos(pathProgress * 0.4) * 2 + 2 + cameraHeight, cameraDistance - 5);
+        cam.position.set(Math.sin(pathProgress * 0.3) * 3, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight, activeCameraDistance - 5);
         cam.lookAt(Math.sin((pathProgress + 2) * 0.3) * 3, Math.cos((pathProgress + 2) * 0.4) * 2, -10);
         obj.octas.slice(0, 30).forEach((segment, i) => {
           const segmentTime = el * 3 - i * 0.3;
@@ -671,9 +691,9 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
-        const a = rotationSpeed + cameraRotation;
-        cam.position.set(Math.cos(a)*cameraDistance, Math.sin(el*0.2)*5 + cameraHeight, Math.sin(a)*cameraDistance);
+        const rotationSpeed = activeCameraAutoRotate ? el*0.3 : 0;
+        const a = rotationSpeed + activeCameraRotation;
+        cam.position.set(Math.cos(a)*activeCameraDistance, Math.sin(el*0.2)*5 + activeCameraHeight, Math.sin(a)*activeCameraDistance);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const sa = el+i*0.5;
@@ -700,7 +720,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'pulse') {
-        cam.position.set(0, cameraHeight, cameraDistance);
+        cam.position.set(0, activeCameraHeight, activeCameraDistance);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const gridX = (i % 4 - 1.5) * 5;
@@ -727,7 +747,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'vortex') {
-        cam.position.set(0, 15 + cameraHeight, cameraDistance);
+        cam.position.set(0, 15 + activeCameraHeight, activeCameraDistance);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const angle = el * 2 + i * 0.8;
@@ -754,8 +774,8 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
-        cam.position.set(Math.sin(rotationSpeed + cameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + cameraHeight, cameraDistance);
+        const rotationSpeed = activeCameraAutoRotate ? el * 0.3 : 0;
+        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight, activeCameraDistance);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const segmentTime = el * 1.5 - i * 0.6;
@@ -905,93 +925,188 @@ export default function ThreeDVisualizer() {
         </div>
       </div>
 
+      {/* Tab Navigation */}
       <div className="bg-gray-800 rounded-lg p-4">
-        <h2 className="text-xl font-bold text-purple-400 mb-4">Controls</h2>
-        
-        <div className="mb-4 bg-gray-700 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-cyan-400 mb-3">📷 Camera Controls</h3>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <input type="checkbox" id="autoRotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-              <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">Auto-Rotate Camera</label>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Zoom Distance: {cameraDistance}</label>
-              <input type="range" min="5" max="50" step="1" value={cameraDistance} onChange={(e) => setCameraDistance(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Height Offset: {cameraHeight}</label>
-              <input type="range" min="-10" max="10" step="1" value={cameraHeight} onChange={(e) => setCameraHeight(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Rotation Offset: {(cameraRotation * 180 / Math.PI).toFixed(0)}°</label>
-              <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-            </div>
-            <button onClick={() => { setCameraDistance(15); setCameraHeight(0); setCameraRotation(0); setCameraAutoRotate(true); }} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
-          </div>
+        <div className="flex gap-2 mb-4 border-b border-gray-700">
+          <button 
+            onClick={() => setActiveTab('controls')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'controls' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎨 Controls
+          </button>
+          <button 
+            onClick={() => setActiveTab('camera')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'camera' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            📷 Camera Settings
+          </button>
+          <button 
+            onClick={() => setActiveTab('presets')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            ⏱️ Presets
+          </button>
         </div>
 
-        <div className="mb-4 bg-gray-700 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
-          <div className="mb-3 pb-3 border-b border-gray-600">
-            <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-            <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
-            <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
-          </div>
-          <div className="flex gap-2 mb-2">
-            <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
-            <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
-          </div>
-          <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
-        </div>
+        {/* Controls Tab */}
+        {activeTab === 'controls' && (
+          <div>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
+              <div className="mb-3 pb-3 border-b border-gray-600">
+                <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
+                <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
+                <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
+                <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
+              </div>
+              <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
+            </div>
 
-        <div className="mb-4 bg-gray-700 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-            <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-            <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-          </div>
-        </div>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
+              <div className="grid grid-cols-3 gap-3">
+                <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+              </div>
+            </div>
 
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎥 Recording</h3>
+              <div className="flex gap-2">
+                <button onClick={startRecording} disabled={!audioReady || isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!audioReady || isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white`}>⏺️ Start Recording</button>
+                <button onClick={stopRecording} disabled={!isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'} text-white`}>⏹️ Stop & Download</button>
+              </div>
+              {isRecording && <p className="text-red-400 text-xs mt-2 animate-pulse">🔴 Recording in progress...</p>}
+              <p className="text-xs text-gray-400 mt-2">Records canvas + audio as WebM</p>
+            </div>
+          </div>
+        )}
+
+        {/* Camera Settings Tab */}
+        {activeTab === 'camera' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">📷 Global Camera Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">These settings apply when no preset is active, or as defaults for new presets.</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="autoRotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">Auto-Rotate Camera</label>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Zoom Distance: {cameraDistance}</label>
+                  <input type="range" min="5" max="50" step="1" value={cameraDistance} onChange={(e) => setCameraDistance(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Height Offset: {cameraHeight}</label>
+                  <input type="range" min="-10" max="10" step="1" value={cameraHeight} onChange={(e) => setCameraHeight(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Rotation Offset: {(cameraRotation * 180 / Math.PI).toFixed(0)}°</label>
+                  <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+                <button onClick={() => { setCameraDistance(15); setCameraHeight(0); setCameraRotation(0); setCameraAutoRotate(true); }} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Presets Tab */}
+        {activeTab === 'presets' && (
+          <div>
+            <div className="mb-4 flex gap-2">
+              <button onClick={addSection} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Preset</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sections.map((s) => (
+                <div key={s.id} className="bg-gray-700 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
+                    <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div><label className="text-xs text-gray-400">Start</label><input type="text" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">End</label><input type="text" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                  </div>
+                  <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
+                    {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+                  </select>
+                  
+                  {/* Camera Settings for this preset */}
+                  <div className="mt-3 pt-3 border-t border-gray-600">
+                    <p className="text-xs text-cyan-400 font-semibold mb-2">📷 Camera Movement</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          id={`autoRotate-${s.id}`} 
+                          checked={s.cameraAutoRotate ?? true} 
+                          onChange={(e) => updateSection(s.id, 'cameraAutoRotate', e.target.checked)} 
+                          className="w-3 h-3 cursor-pointer" 
+                        />
+                        <label htmlFor={`autoRotate-${s.id}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Distance: {s.cameraDistance ?? 15}</label>
+                        <input 
+                          type="range" 
+                          min="5" 
+                          max="50" 
+                          step="1" 
+                          value={s.cameraDistance ?? 15} 
+                          onChange={(e) => updateSection(s.id, 'cameraDistance', Number(e.target.value))} 
+                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Height: {s.cameraHeight ?? 0}</label>
+                        <input 
+                          type="range" 
+                          min="-10" 
+                          max="10" 
+                          step="1" 
+                          value={s.cameraHeight ?? 0} 
+                          onChange={(e) => updateSection(s.id, 'cameraHeight', Number(e.target.value))} 
+                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Rotation: {((s.cameraRotation ?? 0) * 180 / Math.PI).toFixed(0)}°</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max={Math.PI * 2} 
+                          step="0.1" 
+                          value={s.cameraRotation ?? 0} 
+                          onChange={(e) => updateSection(s.id, 'cameraRotation', Number(e.target.value))} 
+                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Audio Upload and Debugger - Always visible at bottom */}
+      <div className="bg-gray-800 rounded-lg p-4">
         <div className="flex gap-4 items-start mb-4 flex-wrap">
           <div className="flex-1 min-w-[300px]">
             <label className="text-cyan-400 text-sm font-semibold block mb-2">Audio File</label>
             <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
           </div>
           {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-6 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">{isPlaying ? <><Square size={16} /> Stop</> : <><Play size={16} /> Play</>}</button>}
-          <button onClick={addSection} className="mt-6 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Section</button>
         </div>
 
-        <div className="mb-4 bg-gray-700 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎥 Recording</h3>
-          <div className="flex gap-2">
-            <button onClick={startRecording} disabled={!audioReady || isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!audioReady || isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white`}>⏺️ Start Recording</button>
-            <button onClick={stopRecording} disabled={!isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'} text-white`}>⏹️ Stop & Download</button>
-          </div>
-          {isRecording && <p className="text-red-400 text-xs mt-2 animate-pulse">🔴 Recording in progress...</p>}
-          <p className="text-xs text-gray-400 mt-2">Records canvas + audio as WebM</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {sections.map((s) => (
-            <div key={s.id} className="bg-gray-700 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
-                <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div><label className="text-xs text-gray-400">Start</label><input type="text" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                <div><label className="text-xs text-gray-400">End</label><input type="text" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-              </div>
-              <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded">
-                {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 bg-gray-700 rounded-lg p-3">
+        <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
             <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
