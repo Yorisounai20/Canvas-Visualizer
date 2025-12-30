@@ -45,8 +45,9 @@ export default function ThreeDVisualizer() {
   // NEW: Export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportFormat, setExportFormat] = useState('webm');
+  const [exportFormat, setExportFormat] = useState('vp9');
   const exportStartTimeRef = useRef(0);
+  const exportIntervalRef = useRef(null);
   
   const [sections, setSections] = useState([
     { id: 1, start: 0, end: 20, animation: 'orbit' },
@@ -353,9 +354,9 @@ export default function ThreeDVisualizer() {
         ...audioStream.getAudioTracks()
       ]);
       
-      const mimeType = exportFormat === 'webm' 
+      const mimeType = exportFormat === 'vp9' 
         ? 'video/webm;codecs=vp9,opus' 
-        : 'video/webm;codecs=vp8,opus'; // Fallback for MP4 (will still be WebM)
+        : 'video/webm;codecs=vp8,opus';
       
       const recorder = new MediaRecorder(combinedStream, {
         mimeType,
@@ -371,12 +372,16 @@ export default function ThreeDVisualizer() {
       };
       
       recorder.onstop = () => {
+        if (exportIntervalRef.current) {
+          clearInterval(exportIntervalRef.current);
+          exportIntervalRef.current = null;
+        }
+        
         const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const extension = exportFormat === 'webm' ? 'webm' : 'webm'; // Note: MP4 not directly supported
         a.href = url;
-        a.download = `visualizer_export_${Date.now()}.${extension}`;
+        a.download = `visualizer_export_${Date.now()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
         setIsExporting(false);
@@ -401,13 +406,17 @@ export default function ThreeDVisualizer() {
       playAudio();
 
       // Monitor progress and stop when complete
-      const checkProgress = setInterval(() => {
+      exportIntervalRef.current = setInterval(() => {
         const elapsed = (Date.now() - exportStartTimeRef.current) / 1000;
         const progress = Math.min((elapsed / duration) * 100, 100);
         setExportProgress(progress);
 
-        if (elapsed >= duration || !isPlaying) {
-          clearInterval(checkProgress);
+        // Stop when duration is reached
+        if (elapsed >= duration) {
+          if (exportIntervalRef.current) {
+            clearInterval(exportIntervalRef.current);
+            exportIntervalRef.current = null;
+          }
           
           // Stop playback and recording
           if (bufferSourceRef.current) {
@@ -428,6 +437,10 @@ export default function ThreeDVisualizer() {
       }, 100);
 
     } catch (e) {
+      if (exportIntervalRef.current) {
+        clearInterval(exportIntervalRef.current);
+        exportIntervalRef.current = null;
+      }
       addLog(`Export error: ${e.message}`, 'error');
       console.error('Export error:', e);
       setIsExporting(false);
@@ -1095,8 +1108,8 @@ export default function ThreeDVisualizer() {
               disabled={isExporting}
               className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
             >
-              <option value="webm">WebM (VP9)</option>
-              <option value="mp4">WebM (VP8) - MP4 fallback</option>
+              <option value="vp9">WebM (VP9)</option>
+              <option value="vp8">WebM (VP8)</option>
             </select>
           </div>
           <button 
