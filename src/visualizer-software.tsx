@@ -59,6 +59,7 @@ export default function ThreeDVisualizer() {
   const [showTimeDisplay, setShowTimeDisplay] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
+  const [showBorder, setShowBorder] = useState(true);
   
   // NEW: Visual effects controls
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
@@ -79,6 +80,7 @@ export default function ThreeDVisualizer() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
+  const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('controls');
@@ -499,6 +501,21 @@ export default function ThreeDVisualizer() {
       pauseTimeRef.current = 0;
       setCurrentTime(0);
 
+      // Parse export resolution
+      const [exportWidth, exportHeight] = exportResolution.split('x').map(Number);
+      
+      // Store original canvas size
+      const originalWidth = 960;
+      const originalHeight = 540;
+      
+      // Temporarily resize renderer to export resolution
+      rendererRef.current.setSize(exportWidth, exportHeight);
+      if (cameraRef.current) {
+        cameraRef.current.aspect = exportWidth / exportHeight;
+        cameraRef.current.updateProjectionMatrix();
+      }
+      addLog(`Rendering at ${exportResolution} for export`, 'info');
+
       // Set up streams
       const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioDestination = audioContextRef.current.createMediaStreamDestination();
@@ -542,12 +559,21 @@ export default function ThreeDVisualizer() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `visualizer_${Date.now()}.${extension}`;
+        a.download = `visualizer_${exportResolution}_${Date.now()}.${extension}`;
         a.click();
         URL.revokeObjectURL(url);
-        addLog(`Video exported successfully as ${extension.toUpperCase()}!`, 'success');
+        addLog(`Video exported successfully at ${exportResolution} as ${extension.toUpperCase()}!`, 'success');
         setIsExporting(false);
         setExportProgress(100);
+        
+        // Restore original canvas size
+        if (rendererRef.current) {
+          rendererRef.current.setSize(originalWidth, originalHeight);
+        }
+        if (cameraRef.current) {
+          cameraRef.current.aspect = originalWidth / originalHeight;
+          cameraRef.current.updateProjectionMatrix();
+        }
         
         // Reset playback state
         pauseTimeRef.current = 0;
@@ -596,7 +622,7 @@ export default function ThreeDVisualizer() {
         }
       }, 100);
 
-      addLog(`Exporting ${duration.toFixed(1)}s video as ${extension.toUpperCase()}...`, 'info');
+      addLog(`Exporting ${duration.toFixed(1)}s video at ${exportResolution} as ${extension.toUpperCase()}...`, 'info');
 
     } catch (e) {
       const error = e as Error;
@@ -604,6 +630,17 @@ export default function ThreeDVisualizer() {
       console.error('Export error:', e);
       setIsExporting(false);
       setExportProgress(0);
+      
+      // Restore original canvas size on error
+      const originalWidth = 960;
+      const originalHeight = 540;
+      if (rendererRef.current) {
+        rendererRef.current.setSize(originalWidth, originalHeight);
+      }
+      if (cameraRef.current) {
+        cameraRef.current.aspect = originalWidth / originalHeight;
+        cameraRef.current.updateProjectionMatrix();
+      }
     }
   };
 
@@ -1231,22 +1268,22 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
               <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
             </>
           )}
-          {showFilename && audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
           {showTimeDisplay && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
+            <div className="absolute bg-black bg-opacity-70 px-3 py-2 rounded" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, right: '16px'}}>
               <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
               {showPresetDisplay && getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
             </div>
           )}
           {showTimeline && duration > 0 && (
-            <div className="absolute bottom-4 left-4 right-4">
+            <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
               <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
             </div>
           )}
@@ -1316,6 +1353,20 @@ export default function ThreeDVisualizer() {
 
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 Video Export</h3>
+              
+              {/* Resolution Selector */}
+              <div className="mb-3">
+                <label className="text-xs text-gray-400 block mb-1">Export Resolution</label>
+                <select 
+                  value={exportResolution} 
+                  onChange={(e) => setExportResolution(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
+                  <option value="960x540">960x540 (SD)</option>
+                  <option value="1280x720">1280x720 (HD 720p)</option>
+                  <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
+                </select>
+              </div>
               
               {/* Format Selector */}
               <div className="mb-3">
@@ -1406,6 +1457,10 @@ export default function ThreeDVisualizer() {
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showBorder" checked={showBorder} onChange={(e) => setShowBorder(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showBorder" className="text-sm text-white cursor-pointer">Show Canvas Border</label>
                 </div>
               </div>
             </div>

@@ -43,7 +43,7 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 
 **Visual Effects:**
 - Letterbox bars (cinematic black bars top/bottom)
-- Adjustable letterbox size (5-15%)
+- Adjustable letterbox size (0-100px)
 - HUD toggle (show/hide time, title, seekbar)
 
 ### 🎤 **3D Song Name Overlay**
@@ -55,10 +55,15 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 
 ### 🎥 **Recording System**
 - Records canvas + audio simultaneously
-- Exports as WebM video file
+- Exports as WebM or MP4 (if browser supports)
 - 30 FPS capture
 - Includes synchronized audio
 - Downloads automatically when stopped
+- **Selectable export resolution:**
+  - 960x540 (SD) - compact file size
+  - 1280x720 (HD 720p) - good quality
+  - 1920x1080 (Full HD 1080p) - highest quality
+- Canvas displays at 960x540 for optimal performance, but exports at chosen resolution
 
 ---
 
