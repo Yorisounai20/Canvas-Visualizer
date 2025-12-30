@@ -23,6 +23,7 @@ export default function ThreeDVisualizer() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
@@ -53,6 +54,23 @@ export default function ThreeDVisualizer() {
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
   const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
+  // NEW: HUD visibility controls
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [showTimeDisplay, setShowTimeDisplay] = useState(true);
+  const [showPresetDisplay, setShowPresetDisplay] = useState(true);
+  const [showFilename, setShowFilename] = useState(true);
+  
+  // NEW: Visual effects controls
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
+  const [showLetterbox, setShowLetterbox] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
+  const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
+  const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
+  
+  // NEW: Camera shake events
+  const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
+  
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -65,28 +83,17 @@ export default function ThreeDVisualizer() {
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('controls');
   
+  // NEW: Global camera keyframes (independent from presets)
+  const [cameraKeyframes, setCameraKeyframes] = useState([
+    { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+    { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+    { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
+  ]);
+  
   const [sections, setSections] = useState([
-    { 
-      id: 1, start: 0, end: 20, animation: 'orbit',
-      cameraKeyframes: [
-        { time: 0, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true }
-      ]
-    },
-    { 
-      id: 2, start: 20, end: 40, animation: 'explosion',
-      cameraKeyframes: [
-        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true }
-      ]
-    },
-    { 
-      id: 3, start: 40, end: 60, animation: 'chill',
-      cameraKeyframes: [
-        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 60, distance: 15, height: 0, rotation: 0, autoRotate: true }
-      ]
-    }
+    { id: 1, start: 0, end: 20, animation: 'orbit' },
+    { id: 2, start: 20, end: 40, animation: 'explosion' },
+    { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
@@ -242,14 +249,28 @@ export default function ThreeDVisualizer() {
   const parseTime = (t: string) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
+  // Easing functions for smooth transitions
+  const applyEasing = (t: number, easing: string) => {
+    switch(easing) {
+      case 'easeIn':
+        return t * t * t; // Cubic ease in
+      case 'easeOut':
+        return 1 - Math.pow(1 - t, 3); // Cubic ease out
+      case 'easeInOut':
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
+      case 'linear':
+      default:
+        return t; // Linear (no easing)
+    }
+  };
+
   // Interpolate camera values between keyframes
   const interpolateCameraKeyframes = (keyframes, currentTime) => {
     if (!keyframes || keyframes.length === 0) {
       return {
         distance: DEFAULT_CAMERA_DISTANCE,
         height: DEFAULT_CAMERA_HEIGHT,
-        rotation: DEFAULT_CAMERA_ROTATION,
-        autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+        rotation: DEFAULT_CAMERA_ROTATION
       };
     }
 
@@ -273,8 +294,7 @@ export default function ThreeDVisualizer() {
       return {
         distance: sortedKeyframes[0].distance,
         height: sortedKeyframes[0].height,
-        rotation: sortedKeyframes[0].rotation,
-        autoRotate: sortedKeyframes[0].autoRotate
+        rotation: sortedKeyframes[0].rotation
       };
     }
     if (currentTime >= sortedKeyframes[sortedKeyframes.length - 1].time) {
@@ -282,21 +302,22 @@ export default function ThreeDVisualizer() {
       return {
         distance: last.distance,
         height: last.height,
-        rotation: last.rotation,
-        autoRotate: last.autoRotate
+        rotation: last.rotation
       };
     }
 
-    // Linear interpolation between keyframes
+    // Interpolation between keyframes with easing
     const timeDiff = nextKeyframe.time - prevKeyframe.time;
-    const progress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    const linearProgress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    
+    // Apply easing function to the progress
+    const easing = prevKeyframe.easing || 'linear';
+    const easedProgress = applyEasing(linearProgress, easing);
 
     return {
-      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * progress,
-      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * progress,
-      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * progress,
-      // Use the starting keyframe's autoRotate setting throughout the interpolation
-      autoRotate: prevKeyframe.autoRotate
+      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * easedProgress,
+      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * easedProgress,
+      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * easedProgress
     };
   };
 
@@ -308,11 +329,7 @@ export default function ThreeDVisualizer() {
       id: Date.now(), 
       start: startTime, 
       end: endTime, 
-      animation: 'orbit',
-      cameraKeyframes: [
-        { time: startTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
-        { time: endTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE }
-      ]
+      animation: 'orbit'
     }]);
   };
 
@@ -326,72 +343,70 @@ export default function ThreeDVisualizer() {
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
   };
 
-  // Keyframe management functions
-  const addKeyframe = (sectionId) => {
-    setSections(sections.map(s => {
-      if (s.id === sectionId) {
-        const newKeyframes = [...(s.cameraKeyframes || [])];
-        const lastKeyframe = newKeyframes[newKeyframes.length - 1] || {
-          time: s.start,
-          distance: DEFAULT_CAMERA_DISTANCE,
-          height: DEFAULT_CAMERA_HEIGHT,
-          rotation: DEFAULT_CAMERA_ROTATION,
-          autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
-        };
-        
-        // Find the largest gap between keyframes and place new keyframe there
-        let newTime = s.start + (s.end - s.start) / 2;
-        
-        if (newKeyframes.length >= 2) {
-          const sortedKf = [...newKeyframes].sort((a, b) => a.time - b.time);
-          let maxGap = 0;
-          let gapStartTime = s.start;
-          
-          for (let i = 0; i < sortedKf.length - 1; i++) {
-            const gap = sortedKf[i + 1].time - sortedKf[i].time;
-            if (gap > maxGap) {
-              maxGap = gap;
-              gapStartTime = sortedKf[i].time + gap / 2;
-            }
-          }
-          newTime = gapStartTime;
+  // Global keyframe management functions
+  const addKeyframe = () => {
+    const lastKeyframe = cameraKeyframes[cameraKeyframes.length - 1] || {
+      time: 0,
+      distance: DEFAULT_CAMERA_DISTANCE,
+      height: DEFAULT_CAMERA_HEIGHT,
+      rotation: DEFAULT_CAMERA_ROTATION,
+      easing: 'linear'
+    };
+    
+    // Find the largest gap between keyframes and place new keyframe there
+    let newTime = duration > 0 ? duration / 2 : 30;
+    
+    if (cameraKeyframes.length >= 2) {
+      const sortedKf = [...cameraKeyframes].sort((a, b) => a.time - b.time);
+      let maxGap = 0;
+      let gapStartTime = 0;
+      
+      for (let i = 0; i < sortedKf.length - 1; i++) {
+        const gap = sortedKf[i + 1].time - sortedKf[i].time;
+        if (gap > maxGap) {
+          maxGap = gap;
+          gapStartTime = sortedKf[i].time + gap / 2;
         }
-        
-        newKeyframes.push({
-          time: newTime,
-          distance: lastKeyframe.distance,
-          height: lastKeyframe.height,
-          rotation: lastKeyframe.rotation,
-          autoRotate: lastKeyframe.autoRotate
-        });
-        
-        return { ...s, cameraKeyframes: newKeyframes };
       }
-      return s;
-    }));
+      newTime = gapStartTime;
+    }
+    
+    setCameraKeyframes([...cameraKeyframes, {
+      time: newTime,
+      distance: lastKeyframe.distance,
+      height: lastKeyframe.height,
+      rotation: lastKeyframe.rotation,
+      easing: 'linear'
+    }]);
   };
 
-  const deleteKeyframe = (sectionId, keyframeIndex) => {
-    setSections(sections.map(s => {
-      if (s.id === sectionId && s.cameraKeyframes) {
-        const newKeyframes = s.cameraKeyframes.filter((_, i) => i !== keyframeIndex);
-        // Keep at least an empty array instead of undefined
-        return { ...s, cameraKeyframes: newKeyframes.length > 0 ? newKeyframes : [] };
-      }
-      return s;
-    }));
+  const deleteKeyframe = (keyframeIndex) => {
+    // Keep at least one keyframe
+    if (cameraKeyframes.length > 1) {
+      setCameraKeyframes(cameraKeyframes.filter((_, i) => i !== keyframeIndex));
+    }
   };
 
-  const updateKeyframe = (sectionId, keyframeIndex, field, value) => {
-    setSections(sections.map(s => {
-      if (s.id === sectionId && s.cameraKeyframes) {
-        const newKeyframes = s.cameraKeyframes.map((kf, i) => 
-          i === keyframeIndex ? { ...kf, [field]: value } : kf
-        );
-        return { ...s, cameraKeyframes: newKeyframes };
-      }
-      return s;
-    }));
+  const updateKeyframe = (keyframeIndex, field, value) => {
+    setCameraKeyframes(cameraKeyframes.map((kf, i) => 
+      i === keyframeIndex ? { ...kf, [field]: value } : kf
+    ));
+  };
+
+  // Camera shake event management
+  const addCameraShake = () => {
+    const newTime = currentTime > 0 ? currentTime : 0;
+    setCameraShakes([...cameraShakes, { time: newTime, intensity: 5, duration: 0.2 }].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteCameraShake = (index) => {
+    setCameraShakes(cameraShakes.filter((_, i) => i !== index));
+  };
+
+  const updateCameraShake = (index, field, value) => {
+    setCameraShakes(cameraShakes.map((shake, i) => 
+      i === index ? { ...shake, [field]: value } : shake
+    ));
   };
 
   const initAudio = async (file) => {
@@ -664,6 +679,17 @@ export default function ThreeDVisualizer() {
 
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.4}));
     scene.add(sphere);
+    
+    // Add lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, ambientLightIntensity);
+    scene.add(ambientLight);
+    lightsRef.current.ambient = ambientLight;
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, directionalLightIntensity);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+    lightsRef.current.directional = directionalLight;
+    
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
@@ -691,6 +717,25 @@ export default function ThreeDVisualizer() {
     };
   }, []);
 
+  // Update scene background, fog, and lights when settings change
+  useEffect(() => {
+    if (sceneRef.current && rendererRef.current) {
+      const bgColor = new THREE.Color(backgroundColor);
+      sceneRef.current.background = bgColor;
+      sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+      rendererRef.current.setClearColor(backgroundColor);
+    }
+  }, [backgroundColor]);
+
+  useEffect(() => {
+    if (lightsRef.current.ambient) {
+      lightsRef.current.ambient.intensity = ambientLightIntensity;
+    }
+    if (lightsRef.current.directional) {
+      lightsRef.current.directional.intensity = directionalLightIntensity;
+    }
+  }, [ambientLightIntensity, directionalLightIntensity]);
+
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -711,20 +756,33 @@ export default function ThreeDVisualizer() {
       const sec = sections.find(s => t >= s.start && t < s.end);
       const type = sec ? sec.animation : 'orbit';
       
-      // Interpolate camera settings from keyframes or use global settings
-      let activeCameraDistance, activeCameraHeight, activeCameraRotation, activeCameraAutoRotate;
+      // Interpolate camera settings from global keyframes or use global settings
+      let activeCameraDistance, activeCameraHeight, activeCameraRotation;
       
-      if (sec && sec.cameraKeyframes) {
-        const interpolated = interpolateCameraKeyframes(sec.cameraKeyframes, t);
+      if (cameraKeyframes && cameraKeyframes.length > 0) {
+        const interpolated = interpolateCameraKeyframes(cameraKeyframes, t);
         activeCameraDistance = interpolated.distance;
         activeCameraHeight = interpolated.height;
         activeCameraRotation = interpolated.rotation;
-        activeCameraAutoRotate = interpolated.autoRotate;
       } else {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
         activeCameraRotation = cameraRotation;
-        activeCameraAutoRotate = cameraAutoRotate;
+      }
+
+      // Calculate camera shake offset
+      let shakeX = 0, shakeY = 0, shakeZ = 0;
+      for (const shake of cameraShakes) {
+        const timeSinceShake = t - shake.time;
+        if (timeSinceShake >= 0 && timeSinceShake < shake.duration) {
+          const progress = timeSinceShake / shake.duration;
+          const decay = 1 - progress; // Linear decay
+          const frequency = 50; // Shake frequency
+          const amplitude = shake.intensity * decay;
+          shakeX += Math.sin(timeSinceShake * frequency) * amplitude * 0.1;
+          shakeY += Math.cos(timeSinceShake * frequency * 1.3) * amplitude * 0.1;
+          shakeZ += Math.sin(timeSinceShake * frequency * 0.7) * amplitude * 0.05;
+        }
       }
 
       if (type !== prevAnimRef.current) {
@@ -737,9 +795,9 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = activeCameraAutoRotate ? el*0.2 : 0;
+        const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
         const r = activeCameraDistance - f.bass * 5;
-        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation)*r);
+        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const sunScale = 3 + f.bass * 2;
@@ -822,7 +880,7 @@ export default function ThreeDVisualizer() {
           asteroid.material.wireframe = true;
         });
       } else if (type === 'explosion') {
-        cam.position.set(0, activeCameraHeight, activeCameraDistance - f.bass*10);
+        cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance - f.bass*10 + shakeZ);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const ss = 1.5+f.bass+f.mids*0.5;
@@ -874,7 +932,7 @@ export default function ThreeDVisualizer() {
           tr.material.wireframe = true;
         });
       } else if (type === 'chill') {
-        cam.position.set(0, 5 + activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const a = (i/obj.cubes.length)*Math.PI*2;
@@ -898,7 +956,7 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'wave') {
         const pathProgress = el * 2;
-        cam.position.set(Math.sin(pathProgress * 0.3) * 3, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight, activeCameraDistance - 5);
+        cam.position.set(Math.sin(pathProgress * 0.3) * 3 + shakeX, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight + shakeY, activeCameraDistance - 5 + shakeZ);
         cam.lookAt(Math.sin((pathProgress + 2) * 0.3) * 3, Math.cos((pathProgress + 2) * 0.4) * 2, -10);
         obj.octas.slice(0, 30).forEach((segment, i) => {
           const segmentTime = el * 3 - i * 0.3;
@@ -971,9 +1029,9 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = activeCameraAutoRotate ? el*0.3 : 0;
+        const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
         const a = rotationSpeed + activeCameraRotation;
-        cam.position.set(Math.cos(a)*activeCameraDistance, Math.sin(el*0.2)*5 + activeCameraHeight, Math.sin(a)*activeCameraDistance);
+        cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const sa = el+i*0.5;
@@ -1000,7 +1058,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'pulse') {
-        cam.position.set(0, activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const gridX = (i % 4 - 1.5) * 5;
@@ -1027,7 +1085,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'vortex') {
-        cam.position.set(0, 15 + activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const angle = el * 2 + i * 0.8;
@@ -1054,8 +1112,8 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = activeCameraAutoRotate ? el * 0.3 : 0;
-        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight, activeCameraDistance);
+        const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
+        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const segmentTime = el * 1.5 - i * 0.6;
@@ -1173,13 +1231,21 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 border-purple-600 rounded-lg shadow-2xl" style={{width:'960px',height:'540px'}} />
-          {audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
-          <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
-            <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
-          </div>
-          {duration > 0 && (
+          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          {showLetterbox && letterboxSize > 0 && (
+            <>
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
+            </>
+          )}
+          {showFilename && audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
+          {showTimeDisplay && (
+            <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
+              <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
+              {showPresetDisplay && getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
+            </div>
+          )}
+          {showTimeline && duration > 0 && (
             <div className="absolute bottom-4 left-4 right-4">
               <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
             </div>
@@ -1201,6 +1267,18 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'camera' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             📷 Camera Settings
+          </button>
+          <button 
+            onClick={() => setActiveTab('keyframes')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'keyframes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎬 Keyframes
+          </button>
+          <button 
+            onClick={() => setActiveTab('effects')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'effects' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            ✨ Effects
           </button>
           <button 
             onClick={() => setActiveTab('presets')} 
@@ -1287,7 +1365,7 @@ export default function ThreeDVisualizer() {
           <div>
             <div className="bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">📷 Global Camera Controls</h3>
-              <p className="text-xs text-gray-400 mb-3">These settings apply when no preset is active, or as defaults for new presets.</p>
+              <p className="text-xs text-gray-400 mb-3">These settings apply when no keyframes are active.</p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="autoRotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} className="w-4 h-4 cursor-pointer" />
@@ -1308,6 +1386,244 @@ export default function ThreeDVisualizer() {
                 <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
               </div>
             </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 HUD Display Options</h3>
+              <p className="text-xs text-gray-400 mb-3">Control what information is shown on the visualization canvas.</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showTimeline" checked={showTimeline} onChange={(e) => setShowTimeline(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showTimeline" className="text-sm text-white cursor-pointer">Show Timeline Slider</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showTimeDisplay" checked={showTimeDisplay} onChange={(e) => setShowTimeDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showTimeDisplay" className="text-sm text-white cursor-pointer">Show Time Display</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showPresetDisplay" className="text-sm text-white cursor-pointer">Show Current Preset</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Effects Tab */}
+        {activeTab === 'effects' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">📹 Camera Shake Events</h3>
+              <p className="text-xs text-gray-400 mb-3">Add manual shake events at specific timestamps for impact moments.</p>
+              <button 
+                onClick={addCameraShake} 
+                className="mb-3 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              >
+                <Plus size={16} /> Add Shake at {formatTime(currentTime)}
+              </button>
+              
+              {cameraShakes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cameraShakes.map((shake, index) => (
+                    <div key={index} className="bg-gray-600 rounded p-3 space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Shake {index + 1}</span>
+                        <button 
+                          onClick={() => deleteCameraShake(index)} 
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(shake.time)}</label>
+                        <input 
+                          type="text" 
+                          value={formatTime(shake.time)} 
+                          onChange={(e) => updateCameraShake(index, 'time', parseTime(e.target.value))} 
+                          className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Intensity: {shake.intensity.toFixed(1)}</label>
+                        <input 
+                          type="range" 
+                          min="1" 
+                          max="20" 
+                          step="0.5" 
+                          value={shake.intensity} 
+                          onChange={(e) => updateCameraShake(index, 'intensity', Number(e.target.value))} 
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Duration: {shake.duration.toFixed(2)}s</label>
+                        <input 
+                          type="range" 
+                          min="0.05" 
+                          max="1" 
+                          step="0.05" 
+                          value={shake.duration} 
+                          onChange={(e) => updateCameraShake(index, 'duration', Number(e.target.value))} 
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic text-center py-4">No shake events yet. Click "Add Shake" to create one.</p>
+              )}
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Visual Effects</h3>
+              <p className="text-xs text-gray-400 mb-3">Customize the look and feel of the visualization.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+                  <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+                  <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">Cinematic Letterbox Bars</label>
+                </div>
+                {showLetterbox && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
+                    <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">💡 Lighting Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust scene lighting intensity.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Ambient Light: {(ambientLightIntensity * 100).toFixed(0)}%</label>
+                  <input type="range" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Directional Light: {(directionalLightIntensity * 100).toFixed(0)}%</label>
+                  <input type="range" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Keyframes Tab */}
+        {activeTab === 'keyframes' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Global Camera Keyframes</h3>
+                <p className="text-xs text-gray-400 mt-1">Independent camera timeline - not tied to animation presets. Auto-rotate is controlled in Camera Settings.</p>
+              </div>
+              <button 
+                onClick={addKeyframe} 
+                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              >
+                <Plus size={16} /> Add Keyframe
+              </button>
+            </div>
+            
+            {cameraKeyframes && cameraKeyframes.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {cameraKeyframes.map((kf, kfIndex) => (
+                  <div key={kfIndex} className="bg-gray-700 rounded p-3 space-y-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white font-semibold text-sm">Keyframe {kfIndex + 1}</span>
+                      {cameraKeyframes.length > 1 && (
+                        <button 
+                          onClick={() => deleteKeyframe(kfIndex)} 
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
+                      <input 
+                        type="text" 
+                        value={formatTime(kf.time)} 
+                        onChange={(e) => updateKeyframe(kfIndex, 'time', parseTime(e.target.value))} 
+                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Easing</label>
+                      <select 
+                        value={kf.easing || 'linear'} 
+                        onChange={(e) => updateKeyframe(kfIndex, 'easing', e.target.value)}
+                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded"
+                      >
+                        <option value="linear">Linear (No Easing)</option>
+                        <option value="easeIn">Ease In (Slow Start)</option>
+                        <option value="easeOut">Ease Out (Slow End)</option>
+                        <option value="easeInOut">Ease In-Out (Smooth)</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
+                      <input 
+                        type="range" 
+                        min="5" 
+                        max="50" 
+                        step="0.5" 
+                        value={kf.distance} 
+                        onChange={(e) => updateKeyframe(kfIndex, 'distance', Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
+                      <input 
+                        type="range" 
+                        min="-10" 
+                        max="10" 
+                        step="0.5" 
+                        value={kf.height} 
+                        onChange={(e) => updateKeyframe(kfIndex, 'height', Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max={Math.PI * 2} 
+                        step="0.05" 
+                        value={kf.rotation} 
+                        onChange={(e) => updateKeyframe(kfIndex, 'rotation', Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center py-4">No keyframes yet. Click "Add Keyframe" to create one.</p>
+            )}
           </div>
         )}
 
@@ -1332,101 +1648,6 @@ export default function ThreeDVisualizer() {
                   <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
                     {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
                   </select>
-                  
-                  {/* Camera Keyframes for this preset */}
-                  <div className="mt-3 pt-3 border-t border-gray-600">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-cyan-400 font-semibold">🎬 Camera Keyframes</p>
-                      <button 
-                        onClick={() => addKeyframe(s.id)} 
-                        className="text-xs bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded flex items-center gap-1"
-                      >
-                        <Plus size={12} /> Add
-                      </button>
-                    </div>
-                    
-                    {s.cameraKeyframes && s.cameraKeyframes.length > 0 ? (
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {s.cameraKeyframes.map((kf, kfIndex) => (
-                          <div key={kfIndex} className="bg-gray-600 rounded p-2 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white font-semibold">KF {kfIndex + 1}</span>
-                              {s.cameraKeyframes.length > 1 && (
-                                <button 
-                                  onClick={() => deleteKeyframe(s.id, kfIndex)} 
-                                  className="text-red-400 hover:text-red-300"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
-                              <input 
-                                type="text" 
-                                value={formatTime(kf.time)} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'time', parseTime(e.target.value))} 
-                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                              />
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                id={`kf-autoRotate-${s.id}-${kfIndex}`} 
-                                checked={kf.autoRotate} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'autoRotate', e.target.checked)} 
-                                className="w-3 h-3 cursor-pointer" 
-                              />
-                              <label htmlFor={`kf-autoRotate-${s.id}-${kfIndex}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
-                              <input 
-                                type="range" 
-                                min="5" 
-                                max="50" 
-                                step="0.5" 
-                                value={kf.distance} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'distance', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
-                              <input 
-                                type="range" 
-                                min="-10" 
-                                max="10" 
-                                step="0.5" 
-                                value={kf.height} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'height', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
-                              <input 
-                                type="range" 
-                                min="0" 
-                                max={Math.PI * 2} 
-                                step="0.05" 
-                                value={kf.rotation} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'rotation', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 italic">No keyframes. Click "Add" to create one.</p>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
