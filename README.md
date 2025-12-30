@@ -43,7 +43,7 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 
 **Visual Effects:**
 - Letterbox bars (cinematic black bars top/bottom)
-- Adjustable letterbox size (0-200px)
+- Adjustable letterbox size (0-135px)
 - HUD toggle (show/hide time, title, seekbar)
 
 ### 🎤 **3D Song Name Overlay**
@@ -74,7 +74,7 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 
 ### **3D Rendering:**
 - Built with Three.js (WebGL)
-- 1920x1080 canvas (Full HD 16:9 YouTube standard)
+- 1280x720 canvas (HD 720p 16:9 YouTube standard)
 - Fog effect for depth
 - Wireframe + solid rendering modes
 - Geometric primitives: Cubes, Octahedrons, Tetrahedrons, Spheres

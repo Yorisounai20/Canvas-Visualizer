@@ -61,7 +61,7 @@ export default function ThreeDVisualizer() {
   const [showFilename, setShowFilename] = useState(true);
   
   // NEW: Visual effects controls
-  const [letterboxSize, setLetterboxSize] = useState(0); // 0-200 pixels
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-135 pixels
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
@@ -623,12 +623,12 @@ export default function ThreeDVisualizer() {
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
-      camera = new THREE.PerspectiveCamera(75, 1920/1080, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, 1280/720, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-      renderer.setSize(1920, 1080);
+      renderer.setSize(1280, 720);
       renderer.setClearColor(0x0a0a14);
 
       if (containerRef.current.children.length > 0) {
@@ -1231,7 +1231,7 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'1920px',height:'1080px',borderColor:borderColor}} />
+          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'1280px',height:'720px',borderColor:borderColor}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
@@ -1501,7 +1501,7 @@ export default function ThreeDVisualizer() {
                 {showLetterbox && (
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
-                    <input type="range" min="0" max="200" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <input type="range" min="0" max="135" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                 )}
               </div>
