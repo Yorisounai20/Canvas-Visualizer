@@ -59,6 +59,7 @@ export default function ThreeDVisualizer() {
   const [showTimeDisplay, setShowTimeDisplay] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
+  const [showBorder, setShowBorder] = useState(true);
   
   // NEW: Visual effects controls
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
@@ -1267,7 +1268,7 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl overflow-hidden" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:showBorder ? borderColor : 'transparent'}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
@@ -1456,6 +1457,10 @@ export default function ThreeDVisualizer() {
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showBorder" checked={showBorder} onChange={(e) => setShowBorder(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showBorder" className="text-sm text-white cursor-pointer">Show Canvas Border</label>
                 </div>
               </div>
             </div>
