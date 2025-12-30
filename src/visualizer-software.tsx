@@ -1501,7 +1501,7 @@ export default function ThreeDVisualizer() {
                 {showLetterbox && (
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
-                    <input type="range" min="0" max="200" step="10" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <input type="range" min="0" max="200" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                 )}
               </div>
