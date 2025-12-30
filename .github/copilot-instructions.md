@@ -8,12 +8,13 @@ This is a **3D music video editor** that creates real-time audio-reactive visual
 
 - **React 18** - UI framework with hooks
 - **TypeScript** - Strongly typed JavaScript
-- **Three.js (r0.182.0)** - 3D graphics rendering via WebGL
+- **Three.js (0.182.0)** - 3D graphics rendering via WebGL
 - **Vite** - Build tool and dev server
 - **Tailwind CSS** - Utility-first CSS framework
 - **Lucide React** - Icon library
 - **Web Audio API** - Audio loading and frequency analysis
 - **MediaRecorder API** - Video recording functionality
+- **Note:** Three.js types are provided by the library itself (no separate @types/three package needed)
 
 ## Architecture
 
