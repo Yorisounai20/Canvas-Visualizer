@@ -1268,7 +1268,7 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:showBorder ? borderColor : 'transparent'}} />
+          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
