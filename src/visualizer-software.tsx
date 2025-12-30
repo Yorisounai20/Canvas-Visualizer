@@ -983,7 +983,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = activeCameraAutoRotate ? el*0.3 : 0;
+        const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
         const a = rotationSpeed + activeCameraRotation;
         cam.position.set(Math.cos(a)*activeCameraDistance, Math.sin(el*0.2)*5 + activeCameraHeight, Math.sin(a)*activeCameraDistance);
         cam.lookAt(0,0,0);
@@ -1066,7 +1066,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = activeCameraAutoRotate ? el * 0.3 : 0;
+        const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
         cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight, activeCameraDistance);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
