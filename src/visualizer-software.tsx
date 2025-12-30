@@ -623,12 +623,12 @@ export default function ThreeDVisualizer() {
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
-      camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, 1920/1080, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-      renderer.setSize(960, 540);
+      renderer.setSize(1920, 1080);
       renderer.setClearColor(0x0a0a14);
 
       if (containerRef.current.children.length > 0) {
@@ -1231,7 +1231,7 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'1920px',height:'1080px',borderColor:borderColor}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
