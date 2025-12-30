@@ -43,8 +43,10 @@ export default function ThreeDVisualizer() {
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
   const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
-  // NEW: Recording state
-  const [isRecording, setIsRecording] = useState(false);
+  // NEW: Video export state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
   
@@ -407,14 +409,35 @@ export default function ThreeDVisualizer() {
     if (play) playAudio();
   };
 
-  // NEW: Recording functions
-  const startRecording = () => {
-    if (!rendererRef.current || !audioContextRef.current) {
-      addLog('Cannot record: scene or audio not ready', 'error');
+  // NEW: Automated video export functions
+  const exportVideo = async () => {
+    if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
+      addLog('Cannot export: scene or audio not ready', 'error');
+      return;
+    }
+
+    if (!audioReady) {
+      addLog('Please load an audio file first', 'error');
       return;
     }
 
     try {
+      setIsExporting(true);
+      setExportProgress(0);
+      addLog('Starting automated video export...', 'info');
+
+      // Get audio duration
+      const duration = audioBufferRef.current.duration;
+      
+      // Reset playback state
+      if (bufferSourceRef.current) {
+        bufferSourceRef.current.stop();
+        bufferSourceRef.current = null;
+      }
+      pauseTimeRef.current = 0;
+      setCurrentTime(0);
+
+      // Set up streams
       const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioDestination = audioContextRef.current.createMediaStreamDestination();
       analyserRef.current.connect(audioDestination);
@@ -425,8 +448,22 @@ export default function ThreeDVisualizer() {
         ...audioStream.getAudioTracks()
       ]);
       
+      // Determine MIME type based on format
+      let mimeType = 'video/webm;codecs=vp9,opus';
+      let extension = 'webm';
+      
+      if (exportFormat === 'mp4') {
+        // Note: MP4 export depends on browser support
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+          mimeType = 'video/mp4';
+          extension = 'mp4';
+        } else {
+          addLog('MP4 not supported, using WebM', 'info');
+        }
+      }
+      
       const recorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm;codecs=vp9,opus',
+        mimeType,
         videoBitsPerSecond: 5000000
       });
       
@@ -439,31 +476,69 @@ export default function ThreeDVisualizer() {
       };
       
       recorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `visualizer_${Date.now()}.webm`;
+        a.download = `visualizer_${Date.now()}.${extension}`;
         a.click();
         URL.revokeObjectURL(url);
-        addLog('Recording saved!', 'success');
+        addLog(`Video exported successfully as ${extension.toUpperCase()}!`, 'success');
+        setIsExporting(false);
+        setExportProgress(100);
+        
+        // Reset playback state
+        pauseTimeRef.current = 0;
+        setCurrentTime(0);
+        setIsPlaying(false);
       };
       
+      // Start recording
       recorder.start();
       mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-      addLog('Recording started', 'success');
-    } catch (e) {
-      addLog(`Recording error: ${e.message}`, 'error');
-      console.error('Recording error:', e);
-    }
-  };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      addLog('Recording stopped', 'info');
+      // Auto-play the audio using Web Audio API
+      const src = audioContextRef.current.createBufferSource();
+      src.buffer = audioBufferRef.current;
+      src.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      src.start(0, 0);
+      bufferSourceRef.current = src;
+      startTimeRef.current = Date.now();
+      setIsPlaying(true);
+
+      // Track progress
+      const AUDIO_END_THRESHOLD = 0.1;
+      const FINAL_FRAME_DELAY = 500;
+      
+      const progressInterval = setInterval(() => {
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        const progress = (elapsed / duration) * 100;
+        setExportProgress(Math.min(progress, 99));
+        setCurrentTime(elapsed);
+        
+        // Stop when audio ends
+        if (elapsed >= duration - AUDIO_END_THRESHOLD) {
+          clearInterval(progressInterval);
+          setTimeout(() => {
+            if (mediaRecorderRef.current) {
+              mediaRecorderRef.current.stop();
+              if (bufferSourceRef.current) {
+                bufferSourceRef.current.stop();
+                bufferSourceRef.current = null;
+              }
+            }
+          }, FINAL_FRAME_DELAY);
+        }
+      }, 100);
+
+      addLog(`Exporting ${duration.toFixed(1)}s video as ${extension.toUpperCase()}...`, 'info');
+
+    } catch (e) {
+      addLog(`Export error: ${e.message}`, 'error');
+      console.error('Export error:', e);
+      setIsExporting(false);
+      setExportProgress(0);
     }
   };
 
@@ -1126,13 +1201,47 @@ export default function ThreeDVisualizer() {
             </div>
 
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎥 Recording</h3>
-              <div className="flex gap-2">
-                <button onClick={startRecording} disabled={!audioReady || isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!audioReady || isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'} text-white`}>⏺️ Start Recording</button>
-                <button onClick={stopRecording} disabled={!isRecording} className={`flex-1 px-4 py-2 rounded font-semibold ${!isRecording ? 'bg-gray-500 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'} text-white`}>⏹️ Stop & Download</button>
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 Video Export</h3>
+              
+              {/* Format Selector */}
+              <div className="mb-3">
+                <label className="text-xs text-gray-400 block mb-1">Output Format</label>
+                <select 
+                  value={exportFormat} 
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
+                  <option value="webm">WebM (VP9 + Opus)</option>
+                  <option value="mp4">MP4 (if supported)</option>
+                </select>
               </div>
-              {isRecording && <p className="text-red-400 text-xs mt-2 animate-pulse">🔴 Recording in progress...</p>}
-              <p className="text-xs text-gray-400 mt-2">Records canvas + audio as WebM</p>
+
+              {/* Export Button */}
+              <button 
+                onClick={exportVideo} 
+                disabled={!audioReady || isExporting} 
+                className={`w-full px-4 py-2 rounded font-semibold ${!audioReady || isExporting ? 'bg-gray-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
+                {isExporting ? '🎬 Exporting...' : '🎬 Export Full Video'}
+              </button>
+
+              {/* Progress Bar */}
+              {isExporting && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>Progress</span>
+                    <span>{exportProgress.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-600 rounded-full h-2">
+                    <div 
+                      className="bg-purple-500 h-2 rounded-full transition-all duration-300" 
+                      style={{width: `${exportProgress}%`}}>
+                    </div>
+                  </div>
+                  <p className="text-purple-400 text-xs mt-2 animate-pulse">🎬 Rendering video...</p>
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-400 mt-2">Automatically renders full timeline with all presets & camera movements</p>
             </div>
           </div>
         )}
