@@ -68,6 +68,9 @@ export default function ThreeDVisualizer() {
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
+  // NEW: Camera shake events
+  const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
+  
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -387,6 +390,22 @@ export default function ThreeDVisualizer() {
   const updateKeyframe = (keyframeIndex, field, value) => {
     setCameraKeyframes(cameraKeyframes.map((kf, i) => 
       i === keyframeIndex ? { ...kf, [field]: value } : kf
+    ));
+  };
+
+  // Camera shake event management
+  const addCameraShake = () => {
+    const newTime = currentTime > 0 ? currentTime : 0;
+    setCameraShakes([...cameraShakes, { time: newTime, intensity: 5, duration: 0.2 }].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteCameraShake = (index) => {
+    setCameraShakes(cameraShakes.filter((_, i) => i !== index));
+  };
+
+  const updateCameraShake = (index, field, value) => {
+    setCameraShakes(cameraShakes.map((shake, i) => 
+      i === index ? { ...shake, [field]: value } : shake
     ));
   };
 
@@ -751,6 +770,21 @@ export default function ThreeDVisualizer() {
         activeCameraRotation = cameraRotation;
       }
 
+      // Calculate camera shake offset
+      let shakeX = 0, shakeY = 0, shakeZ = 0;
+      for (const shake of cameraShakes) {
+        const timeSinceShake = t - shake.time;
+        if (timeSinceShake >= 0 && timeSinceShake < shake.duration) {
+          const progress = timeSinceShake / shake.duration;
+          const decay = 1 - progress; // Linear decay
+          const frequency = 50; // Shake frequency
+          const amplitude = shake.intensity * decay;
+          shakeX += Math.sin(timeSinceShake * frequency) * amplitude * 0.1;
+          shakeY += Math.cos(timeSinceShake * frequency * 1.3) * amplitude * 0.1;
+          shakeZ += Math.sin(timeSinceShake * frequency * 0.7) * amplitude * 0.05;
+        }
+      }
+
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
         prevAnimRef.current = type;
@@ -763,7 +797,7 @@ export default function ThreeDVisualizer() {
       if (type === 'orbit') {
         const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
         const r = activeCameraDistance - f.bass * 5;
-        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation)*r);
+        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const sunScale = 3 + f.bass * 2;
@@ -846,7 +880,7 @@ export default function ThreeDVisualizer() {
           asteroid.material.wireframe = true;
         });
       } else if (type === 'explosion') {
-        cam.position.set(0, activeCameraHeight, activeCameraDistance - f.bass*10);
+        cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance - f.bass*10 + shakeZ);
         cam.lookAt(0,0,0);
         obj.sphere.position.set(0, 0, 0);
         const ss = 1.5+f.bass+f.mids*0.5;
@@ -898,7 +932,7 @@ export default function ThreeDVisualizer() {
           tr.material.wireframe = true;
         });
       } else if (type === 'chill') {
-        cam.position.set(0, 5 + activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const a = (i/obj.cubes.length)*Math.PI*2;
@@ -922,7 +956,7 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'wave') {
         const pathProgress = el * 2;
-        cam.position.set(Math.sin(pathProgress * 0.3) * 3, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight, activeCameraDistance - 5);
+        cam.position.set(Math.sin(pathProgress * 0.3) * 3 + shakeX, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight + shakeY, activeCameraDistance - 5 + shakeZ);
         cam.lookAt(Math.sin((pathProgress + 2) * 0.3) * 3, Math.cos((pathProgress + 2) * 0.4) * 2, -10);
         obj.octas.slice(0, 30).forEach((segment, i) => {
           const segmentTime = el * 3 - i * 0.3;
@@ -997,7 +1031,7 @@ export default function ThreeDVisualizer() {
       } else if (type === 'spiral') {
         const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
         const a = rotationSpeed + activeCameraRotation;
-        cam.position.set(Math.cos(a)*activeCameraDistance, Math.sin(el*0.2)*5 + activeCameraHeight, Math.sin(a)*activeCameraDistance);
+        cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const sa = el+i*0.5;
@@ -1024,7 +1058,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'pulse') {
-        cam.position.set(0, activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const gridX = (i % 4 - 1.5) * 5;
@@ -1051,7 +1085,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'vortex') {
-        cam.position.set(0, 15 + activeCameraHeight, activeCameraDistance);
+        cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
           const angle = el * 2 + i * 0.8;
@@ -1079,7 +1113,7 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'seiryu') {
         const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
-        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight, activeCameraDistance);
+        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const segmentTime = el * 1.5 - i * 0.6;
@@ -1241,6 +1275,12 @@ export default function ThreeDVisualizer() {
             🎬 Keyframes
           </button>
           <button 
+            onClick={() => setActiveTab('effects')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'effects' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            ✨ Effects
+          </button>
+          <button 
             onClick={() => setActiveTab('presets')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -1368,6 +1408,78 @@ export default function ThreeDVisualizer() {
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Effects Tab */}
+        {activeTab === 'effects' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">📹 Camera Shake Events</h3>
+              <p className="text-xs text-gray-400 mb-3">Add manual shake events at specific timestamps for impact moments.</p>
+              <button 
+                onClick={addCameraShake} 
+                className="mb-3 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
+              >
+                <Plus size={16} /> Add Shake at {formatTime(currentTime)}
+              </button>
+              
+              {cameraShakes.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cameraShakes.map((shake, index) => (
+                    <div key={index} className="bg-gray-600 rounded p-3 space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Shake {index + 1}</span>
+                        <button 
+                          onClick={() => deleteCameraShake(index)} 
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(shake.time)}</label>
+                        <input 
+                          type="text" 
+                          value={formatTime(shake.time)} 
+                          onChange={(e) => updateCameraShake(index, 'time', parseTime(e.target.value))} 
+                          className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Intensity: {shake.intensity.toFixed(1)}</label>
+                        <input 
+                          type="range" 
+                          min="1" 
+                          max="20" 
+                          step="0.5" 
+                          value={shake.intensity} 
+                          onChange={(e) => updateCameraShake(index, 'intensity', Number(e.target.value))} 
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-300 block mb-1">Duration: {shake.duration.toFixed(2)}s</label>
+                        <input 
+                          type="range" 
+                          min="0.05" 
+                          max="1" 
+                          step="0.05" 
+                          value={shake.duration} 
+                          onChange={(e) => updateCameraShake(index, 'duration', Number(e.target.value))} 
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic text-center py-4">No shake events yet. Click "Add Shake" to create one.</p>
+              )}
             </div>
             
             <div className="bg-gray-700 rounded-lg p-3 mt-4">
