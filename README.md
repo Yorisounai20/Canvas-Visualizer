@@ -54,7 +54,6 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 - Letters color-coded by frequency (bass/mids/highs)
 
 ### 🎥 **Recording System**
-- Records canvas + audio simultaneously
 - Exports as WebM or MP4 (if browser supports)
 - 30 FPS capture
 - Includes synchronized audio
@@ -166,9 +165,8 @@ Each preset controls:
 
 ## **Known Limitations**
 
-- No localStorage/sessionStorage support in Claude.ai artifacts
+- No localStorage/sessionStorage support
 - All state is in-memory only (resets on refresh)
-- Recording only works when audio is playing
 - Cannot access local filesystem directly (must use file input)
 - Font loading requires external CDN or user upload
 
@@ -188,7 +186,7 @@ Each preset controls:
 
 ---
 
-**Version:** 15 (Timeline-based with Recording)  
-**Last Updated:** constantly  
+**Version:** 98 (Timeline-based with Export)  
+**Last Updated:** 12/30/2025 
 **License:** IDK 
 **Author:** YoriSounai01
