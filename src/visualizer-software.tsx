@@ -629,6 +629,17 @@ export default function ThreeDVisualizer() {
       console.error('Export error:', e);
       setIsExporting(false);
       setExportProgress(0);
+      
+      // Restore original canvas size on error
+      const originalWidth = 960;
+      const originalHeight = 540;
+      if (rendererRef.current) {
+        rendererRef.current.setSize(originalWidth, originalHeight);
+      }
+      if (cameraRef.current) {
+        cameraRef.current.aspect = originalWidth / originalHeight;
+        cameraRef.current.updateProjectionMatrix();
+      }
     }
   };
 
