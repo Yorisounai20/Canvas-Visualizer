@@ -275,7 +275,8 @@ export default function ThreeDVisualizer() {
       distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * progress,
       height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * progress,
       rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * progress,
-      autoRotate: progress < 0.5 ? prevKeyframe.autoRotate : nextKeyframe.autoRotate
+      // Use the starting keyframe's autoRotate setting throughout the interpolation
+      autoRotate: prevKeyframe.autoRotate
     };
   };
 
@@ -318,8 +319,24 @@ export default function ThreeDVisualizer() {
           autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
         };
         
-        // Add new keyframe in the middle of the section
-        const newTime = s.start + (s.end - s.start) / 2;
+        // Find the largest gap between keyframes and place new keyframe there
+        let newTime = s.start + (s.end - s.start) / 2;
+        
+        if (newKeyframes.length >= 2) {
+          const sortedKf = [...newKeyframes].sort((a, b) => a.time - b.time);
+          let maxGap = 0;
+          let gapStartTime = s.start;
+          
+          for (let i = 0; i < sortedKf.length - 1; i++) {
+            const gap = sortedKf[i + 1].time - sortedKf[i].time;
+            if (gap > maxGap) {
+              maxGap = gap;
+              gapStartTime = sortedKf[i].time + gap / 2;
+            }
+          }
+          newTime = gapStartTime;
+        }
+        
         newKeyframes.push({
           time: newTime,
           distance: lastKeyframe.distance,
@@ -338,7 +355,8 @@ export default function ThreeDVisualizer() {
     setSections(sections.map(s => {
       if (s.id === sectionId && s.cameraKeyframes) {
         const newKeyframes = s.cameraKeyframes.filter((_, i) => i !== keyframeIndex);
-        return { ...s, cameraKeyframes: newKeyframes.length > 0 ? newKeyframes : undefined };
+        // Keep at least an empty array instead of undefined
+        return { ...s, cameraKeyframes: newKeyframes.length > 0 ? newKeyframes : [] };
       }
       return s;
     }));
