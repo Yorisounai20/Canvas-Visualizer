@@ -61,7 +61,7 @@ export default function ThreeDVisualizer() {
   const [showFilename, setShowFilename] = useState(true);
   
   // NEW: Visual effects controls
-  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-200 pixels
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
@@ -623,12 +623,12 @@ export default function ThreeDVisualizer() {
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
-      camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(75, 1920/1080, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-      renderer.setSize(960, 540);
+      renderer.setSize(1920, 1080);
       renderer.setClearColor(0x0a0a14);
 
       if (containerRef.current.children.length > 0) {
@@ -1231,22 +1231,22 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'1920px',height:'1080px',borderColor:borderColor}} />
           {showLetterbox && letterboxSize > 0 && (
             <>
               <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
               <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
             </>
           )}
-          {showFilename && audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
           {showTimeDisplay && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
+            <div className="absolute bg-black bg-opacity-70 px-3 py-2 rounded" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, right: '16px'}}>
               <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
               {showPresetDisplay && getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
             </div>
           )}
           {showTimeline && duration > 0 && (
-            <div className="absolute bottom-4 left-4 right-4">
+            <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
               <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
             </div>
           )}
@@ -1501,7 +1501,7 @@ export default function ThreeDVisualizer() {
                 {showLetterbox && (
                   <div>
                     <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
-                    <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <input type="range" min="0" max="200" step="10" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                 )}
               </div>
