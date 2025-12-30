@@ -69,22 +69,22 @@ export default function ThreeDVisualizer() {
     { 
       id: 1, start: 0, end: 20, animation: 'orbit',
       cameraKeyframes: [
-        { time: 0, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true }
+        { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+        { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' }
       ]
     },
     { 
       id: 2, start: 20, end: 40, animation: 'explosion',
       cameraKeyframes: [
-        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true }
+        { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+        { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
       ]
     },
     { 
       id: 3, start: 40, end: 60, animation: 'chill',
       cameraKeyframes: [
-        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true },
-        { time: 60, distance: 15, height: 0, rotation: 0, autoRotate: true }
+        { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+        { time: 60, distance: 15, height: 0, rotation: 0, easing: 'linear' }
       ]
     }
   ]);
@@ -242,14 +242,28 @@ export default function ThreeDVisualizer() {
   const parseTime = (t: string) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
+  // Easing functions for smooth transitions
+  const applyEasing = (t: number, easing: string) => {
+    switch(easing) {
+      case 'easeIn':
+        return t * t * t; // Cubic ease in
+      case 'easeOut':
+        return 1 - Math.pow(1 - t, 3); // Cubic ease out
+      case 'easeInOut':
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
+      case 'linear':
+      default:
+        return t; // Linear (no easing)
+    }
+  };
+
   // Interpolate camera values between keyframes
   const interpolateCameraKeyframes = (keyframes, currentTime) => {
     if (!keyframes || keyframes.length === 0) {
       return {
         distance: DEFAULT_CAMERA_DISTANCE,
         height: DEFAULT_CAMERA_HEIGHT,
-        rotation: DEFAULT_CAMERA_ROTATION,
-        autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+        rotation: DEFAULT_CAMERA_ROTATION
       };
     }
 
@@ -273,8 +287,7 @@ export default function ThreeDVisualizer() {
       return {
         distance: sortedKeyframes[0].distance,
         height: sortedKeyframes[0].height,
-        rotation: sortedKeyframes[0].rotation,
-        autoRotate: sortedKeyframes[0].autoRotate
+        rotation: sortedKeyframes[0].rotation
       };
     }
     if (currentTime >= sortedKeyframes[sortedKeyframes.length - 1].time) {
@@ -282,21 +295,22 @@ export default function ThreeDVisualizer() {
       return {
         distance: last.distance,
         height: last.height,
-        rotation: last.rotation,
-        autoRotate: last.autoRotate
+        rotation: last.rotation
       };
     }
 
-    // Linear interpolation between keyframes
+    // Interpolation between keyframes with easing
     const timeDiff = nextKeyframe.time - prevKeyframe.time;
-    const progress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    const linearProgress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    
+    // Apply easing function to the progress
+    const easing = prevKeyframe.easing || 'linear';
+    const easedProgress = applyEasing(linearProgress, easing);
 
     return {
-      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * progress,
-      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * progress,
-      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * progress,
-      // Use the starting keyframe's autoRotate setting throughout the interpolation
-      autoRotate: prevKeyframe.autoRotate
+      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * easedProgress,
+      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * easedProgress,
+      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * easedProgress
     };
   };
 
@@ -310,8 +324,8 @@ export default function ThreeDVisualizer() {
       end: endTime, 
       animation: 'orbit',
       cameraKeyframes: [
-        { time: startTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
-        { time: endTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE }
+        { time: startTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
+        { time: endTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' }
       ]
     }]);
   };
@@ -336,7 +350,7 @@ export default function ThreeDVisualizer() {
           distance: DEFAULT_CAMERA_DISTANCE,
           height: DEFAULT_CAMERA_HEIGHT,
           rotation: DEFAULT_CAMERA_ROTATION,
-          autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+          easing: 'linear'
         };
         
         // Find the largest gap between keyframes and place new keyframe there
@@ -362,7 +376,7 @@ export default function ThreeDVisualizer() {
           distance: lastKeyframe.distance,
           height: lastKeyframe.height,
           rotation: lastKeyframe.rotation,
-          autoRotate: lastKeyframe.autoRotate
+          easing: 'linear'
         });
         
         return { ...s, cameraKeyframes: newKeyframes };
@@ -712,19 +726,17 @@ export default function ThreeDVisualizer() {
       const type = sec ? sec.animation : 'orbit';
       
       // Interpolate camera settings from keyframes or use global settings
-      let activeCameraDistance, activeCameraHeight, activeCameraRotation, activeCameraAutoRotate;
+      let activeCameraDistance, activeCameraHeight, activeCameraRotation;
       
       if (sec && sec.cameraKeyframes) {
         const interpolated = interpolateCameraKeyframes(sec.cameraKeyframes, t);
         activeCameraDistance = interpolated.distance;
         activeCameraHeight = interpolated.height;
         activeCameraRotation = interpolated.rotation;
-        activeCameraAutoRotate = interpolated.autoRotate;
       } else {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
         activeCameraRotation = cameraRotation;
-        activeCameraAutoRotate = cameraAutoRotate;
       }
 
       if (type !== prevAnimRef.current) {
@@ -737,7 +749,7 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = activeCameraAutoRotate ? el*0.2 : 0;
+        const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
         const r = activeCameraDistance - f.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation)*r);
         cam.lookAt(0,0,0);
@@ -1203,6 +1215,12 @@ export default function ThreeDVisualizer() {
             📷 Camera Settings
           </button>
           <button 
+            onClick={() => setActiveTab('keyframes')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'keyframes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎬 Keyframes
+          </button>
+          <button 
             onClick={() => setActiveTab('presets')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -1332,101 +1350,116 @@ export default function ThreeDVisualizer() {
                   <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
                     {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
                   </select>
-                  
-                  {/* Camera Keyframes for this preset */}
-                  <div className="mt-3 pt-3 border-t border-gray-600">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-cyan-400 font-semibold">🎬 Camera Keyframes</p>
-                      <button 
-                        onClick={() => addKeyframe(s.id)} 
-                        className="text-xs bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded flex items-center gap-1"
-                      >
-                        <Plus size={12} /> Add
-                      </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Keyframes Tab */}
+        {activeTab === 'keyframes' && (
+          <div>
+            <p className="text-xs text-gray-400 mb-4">Configure camera movements for each timeline section. Auto-rotate is controlled globally in Camera Settings.</p>
+            <div className="space-y-4">
+              {sections.map((s) => (
+                <div key={s.id} className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</h3>
+                      <p className="text-xs text-gray-400">{formatTime(s.start)} - {formatTime(s.end)}</p>
                     </div>
-                    
-                    {s.cameraKeyframes && s.cameraKeyframes.length > 0 ? (
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {s.cameraKeyframes.map((kf, kfIndex) => (
-                          <div key={kfIndex} className="bg-gray-600 rounded p-2 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-white font-semibold">KF {kfIndex + 1}</span>
-                              {s.cameraKeyframes.length > 1 && (
-                                <button 
-                                  onClick={() => deleteKeyframe(s.id, kfIndex)} 
-                                  className="text-red-400 hover:text-red-300"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
-                              <input 
-                                type="text" 
-                                value={formatTime(kf.time)} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'time', parseTime(e.target.value))} 
-                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                              />
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <input 
-                                type="checkbox" 
-                                id={`kf-autoRotate-${s.id}-${kfIndex}`} 
-                                checked={kf.autoRotate} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'autoRotate', e.target.checked)} 
-                                className="w-3 h-3 cursor-pointer" 
-                              />
-                              <label htmlFor={`kf-autoRotate-${s.id}-${kfIndex}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
-                              <input 
-                                type="range" 
-                                min="5" 
-                                max="50" 
-                                step="0.5" 
-                                value={kf.distance} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'distance', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
-                              <input 
-                                type="range" 
-                                min="-10" 
-                                max="10" 
-                                step="0.5" 
-                                value={kf.height} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'height', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                            
-                            <div>
-                              <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
-                              <input 
-                                type="range" 
-                                min="0" 
-                                max={Math.PI * 2} 
-                                step="0.05" 
-                                value={kf.rotation} 
-                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'rotation', Number(e.target.value))} 
-                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-gray-400 italic">No keyframes. Click "Add" to create one.</p>
-                    )}
+                    <button 
+                      onClick={() => addKeyframe(s.id)} 
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded flex items-center gap-1 text-sm"
+                    >
+                      <Plus size={14} /> Add Keyframe
+                    </button>
                   </div>
+                  
+                  {s.cameraKeyframes && s.cameraKeyframes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {s.cameraKeyframes.map((kf, kfIndex) => (
+                        <div key={kfIndex} className="bg-gray-600 rounded p-3 space-y-2">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-semibold text-sm">Keyframe {kfIndex + 1}</span>
+                            {s.cameraKeyframes.length > 1 && (
+                              <button 
+                                onClick={() => deleteKeyframe(s.id, kfIndex)} 
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
+                            <input 
+                              type="text" 
+                              value={formatTime(kf.time)} 
+                              onChange={(e) => updateKeyframe(s.id, kfIndex, 'time', parseTime(e.target.value))} 
+                              className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-300 block mb-1">Easing</label>
+                            <select 
+                              value={kf.easing || 'linear'} 
+                              onChange={(e) => updateKeyframe(s.id, kfIndex, 'easing', e.target.value)}
+                              className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded"
+                            >
+                              <option value="linear">Linear (No Easing)</option>
+                              <option value="easeIn">Ease In (Slow Start)</option>
+                              <option value="easeOut">Ease Out (Slow End)</option>
+                              <option value="easeInOut">Ease In-Out (Smooth)</option>
+                            </select>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
+                            <input 
+                              type="range" 
+                              min="5" 
+                              max="50" 
+                              step="0.5" 
+                              value={kf.distance} 
+                              onChange={(e) => updateKeyframe(s.id, kfIndex, 'distance', Number(e.target.value))} 
+                              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
+                            <input 
+                              type="range" 
+                              min="-10" 
+                              max="10" 
+                              step="0.5" 
+                              value={kf.height} 
+                              onChange={(e) => updateKeyframe(s.id, kfIndex, 'height', Number(e.target.value))} 
+                              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max={Math.PI * 2} 
+                              step="0.05" 
+                              value={kf.rotation} 
+                              onChange={(e) => updateKeyframe(s.id, kfIndex, 'rotation', Number(e.target.value))} 
+                              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic text-center py-4">No keyframes yet. Click "Add Keyframe" to create one.</p>
+                  )}
                 </div>
               ))}
             </div>
