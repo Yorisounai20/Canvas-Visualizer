@@ -52,9 +52,27 @@ export default function ThreeDVisualizer() {
   const [activeTab, setActiveTab] = useState('controls');
   
   const [sections, setSections] = useState([
-    { id: 1, start: 0, end: 20, animation: 'orbit', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
-    { id: 2, start: 20, end: 40, animation: 'explosion', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
-    { id: 3, start: 40, end: 60, animation: 'chill', cameraDistance: DEFAULT_CAMERA_DISTANCE, cameraHeight: DEFAULT_CAMERA_HEIGHT, cameraRotation: DEFAULT_CAMERA_ROTATION, cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE }
+    { 
+      id: 1, start: 0, end: 20, animation: 'orbit',
+      cameraKeyframes: [
+        { time: 0, distance: 15, height: 0, rotation: 0, autoRotate: true },
+        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true }
+      ]
+    },
+    { 
+      id: 2, start: 20, end: 40, animation: 'explosion',
+      cameraKeyframes: [
+        { time: 20, distance: 15, height: 0, rotation: 0, autoRotate: true },
+        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true }
+      ]
+    },
+    { 
+      id: 3, start: 40, end: 60, animation: 'chill',
+      cameraKeyframes: [
+        { time: 40, distance: 15, height: 0, rotation: 0, autoRotate: true },
+        { time: 60, distance: 15, height: 0, rotation: 0, autoRotate: true }
+      ]
+    }
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
@@ -204,17 +222,76 @@ export default function ThreeDVisualizer() {
   const parseTime = (t) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
+  // Interpolate camera values between keyframes
+  const interpolateCameraKeyframes = (keyframes, currentTime) => {
+    if (!keyframes || keyframes.length === 0) {
+      return {
+        distance: DEFAULT_CAMERA_DISTANCE,
+        height: DEFAULT_CAMERA_HEIGHT,
+        rotation: DEFAULT_CAMERA_ROTATION,
+        autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+      };
+    }
+
+    // Sort keyframes by time
+    const sortedKeyframes = [...keyframes].sort((a, b) => a.time - b.time);
+
+    // Find the two keyframes to interpolate between
+    let prevKeyframe = sortedKeyframes[0];
+    let nextKeyframe = sortedKeyframes[sortedKeyframes.length - 1];
+
+    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
+      if (currentTime >= sortedKeyframes[i].time && currentTime <= sortedKeyframes[i + 1].time) {
+        prevKeyframe = sortedKeyframes[i];
+        nextKeyframe = sortedKeyframes[i + 1];
+        break;
+      }
+    }
+
+    // If we're before the first keyframe or after the last, use the boundary values
+    if (currentTime <= sortedKeyframes[0].time) {
+      return {
+        distance: sortedKeyframes[0].distance,
+        height: sortedKeyframes[0].height,
+        rotation: sortedKeyframes[0].rotation,
+        autoRotate: sortedKeyframes[0].autoRotate
+      };
+    }
+    if (currentTime >= sortedKeyframes[sortedKeyframes.length - 1].time) {
+      const last = sortedKeyframes[sortedKeyframes.length - 1];
+      return {
+        distance: last.distance,
+        height: last.height,
+        rotation: last.rotation,
+        autoRotate: last.autoRotate
+      };
+    }
+
+    // Linear interpolation between keyframes
+    const timeDiff = nextKeyframe.time - prevKeyframe.time;
+    const progress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+
+    return {
+      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * progress,
+      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * progress,
+      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * progress,
+      autoRotate: progress < 0.5 ? prevKeyframe.autoRotate : nextKeyframe.autoRotate
+    };
+  };
+
   const addSection = () => {
     const last = sections[sections.length-1];
+    const startTime = last ? last.end : 0;
+    const endTime = startTime + 20;
     setSections([...sections, {
       id: Date.now(), 
-      start: last ? last.end : 0, 
-      end: (last ? last.end : 0) + 20, 
+      start: startTime, 
+      end: endTime, 
       animation: 'orbit',
-      cameraDistance: DEFAULT_CAMERA_DISTANCE,
-      cameraHeight: DEFAULT_CAMERA_HEIGHT,
-      cameraRotation: DEFAULT_CAMERA_ROTATION,
-      cameraAutoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+      cameraKeyframes: [
+        { time: startTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE },
+        { time: endTime, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, autoRotate: DEFAULT_CAMERA_AUTO_ROTATE }
+      ]
     }]);
   };
 
@@ -226,6 +303,57 @@ export default function ThreeDVisualizer() {
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
     setCameraRotation(DEFAULT_CAMERA_ROTATION);
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+  };
+
+  // Keyframe management functions
+  const addKeyframe = (sectionId) => {
+    setSections(sections.map(s => {
+      if (s.id === sectionId) {
+        const newKeyframes = [...(s.cameraKeyframes || [])];
+        const lastKeyframe = newKeyframes[newKeyframes.length - 1] || {
+          time: s.start,
+          distance: DEFAULT_CAMERA_DISTANCE,
+          height: DEFAULT_CAMERA_HEIGHT,
+          rotation: DEFAULT_CAMERA_ROTATION,
+          autoRotate: DEFAULT_CAMERA_AUTO_ROTATE
+        };
+        
+        // Add new keyframe in the middle of the section
+        const newTime = s.start + (s.end - s.start) / 2;
+        newKeyframes.push({
+          time: newTime,
+          distance: lastKeyframe.distance,
+          height: lastKeyframe.height,
+          rotation: lastKeyframe.rotation,
+          autoRotate: lastKeyframe.autoRotate
+        });
+        
+        return { ...s, cameraKeyframes: newKeyframes };
+      }
+      return s;
+    }));
+  };
+
+  const deleteKeyframe = (sectionId, keyframeIndex) => {
+    setSections(sections.map(s => {
+      if (s.id === sectionId && s.cameraKeyframes) {
+        const newKeyframes = s.cameraKeyframes.filter((_, i) => i !== keyframeIndex);
+        return { ...s, cameraKeyframes: newKeyframes.length > 0 ? newKeyframes : undefined };
+      }
+      return s;
+    }));
+  };
+
+  const updateKeyframe = (sectionId, keyframeIndex, field, value) => {
+    setSections(sections.map(s => {
+      if (s.id === sectionId && s.cameraKeyframes) {
+        const newKeyframes = s.cameraKeyframes.map((kf, i) => 
+          i === keyframeIndex ? { ...kf, [field]: value } : kf
+        );
+        return { ...s, cameraKeyframes: newKeyframes };
+      }
+      return s;
+    }));
   };
 
   const initAudio = async (file) => {
@@ -454,11 +582,21 @@ export default function ThreeDVisualizer() {
       const sec = sections.find(s => t >= s.start && t < s.end);
       const type = sec ? sec.animation : 'orbit';
       
-      // Use camera settings from section if available, otherwise use global settings
-      const activeCameraDistance = sec?.cameraDistance ?? cameraDistance;
-      const activeCameraHeight = sec?.cameraHeight ?? cameraHeight;
-      const activeCameraRotation = sec?.cameraRotation ?? cameraRotation;
-      const activeCameraAutoRotate = sec?.cameraAutoRotate ?? cameraAutoRotate;
+      // Interpolate camera settings from keyframes or use global settings
+      let activeCameraDistance, activeCameraHeight, activeCameraRotation, activeCameraAutoRotate;
+      
+      if (sec && sec.cameraKeyframes) {
+        const interpolated = interpolateCameraKeyframes(sec.cameraKeyframes, t);
+        activeCameraDistance = interpolated.distance;
+        activeCameraHeight = interpolated.height;
+        activeCameraRotation = interpolated.rotation;
+        activeCameraAutoRotate = interpolated.autoRotate;
+      } else {
+        activeCameraDistance = cameraDistance;
+        activeCameraHeight = cameraHeight;
+        activeCameraRotation = cameraRotation;
+        activeCameraAutoRotate = cameraAutoRotate;
+      }
 
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
@@ -1050,57 +1188,99 @@ export default function ThreeDVisualizer() {
                     {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
                   </select>
                   
-                  {/* Camera Settings for this preset */}
+                  {/* Camera Keyframes for this preset */}
                   <div className="mt-3 pt-3 border-t border-gray-600">
-                    <p className="text-xs text-cyan-400 font-semibold mb-2">📷 Camera Movement</p>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="checkbox" 
-                          id={`autoRotate-${s.id}`} 
-                          checked={s.cameraAutoRotate ?? DEFAULT_CAMERA_AUTO_ROTATE} 
-                          onChange={(e) => updateSection(s.id, 'cameraAutoRotate', e.target.checked)} 
-                          className="w-3 h-3 cursor-pointer" 
-                        />
-                        <label htmlFor={`autoRotate-${s.id}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Distance: {s.cameraDistance ?? DEFAULT_CAMERA_DISTANCE}</label>
-                        <input 
-                          type="range" 
-                          min="5" 
-                          max="50" 
-                          step="1" 
-                          value={s.cameraDistance ?? DEFAULT_CAMERA_DISTANCE} 
-                          onChange={(e) => updateSection(s.id, 'cameraDistance', Number(e.target.value))} 
-                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Height: {s.cameraHeight ?? DEFAULT_CAMERA_HEIGHT}</label>
-                        <input 
-                          type="range" 
-                          min="-10" 
-                          max="10" 
-                          step="1" 
-                          value={s.cameraHeight ?? DEFAULT_CAMERA_HEIGHT} 
-                          onChange={(e) => updateSection(s.id, 'cameraHeight', Number(e.target.value))} 
-                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Rotation: {((s.cameraRotation ?? DEFAULT_CAMERA_ROTATION) * 180 / Math.PI).toFixed(0)}°</label>
-                        <input 
-                          type="range" 
-                          min="0" 
-                          max={Math.PI * 2} 
-                          step="0.1" 
-                          value={s.cameraRotation ?? DEFAULT_CAMERA_ROTATION} 
-                          onChange={(e) => updateSection(s.id, 'cameraRotation', Number(e.target.value))} 
-                          className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                        />
-                      </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-cyan-400 font-semibold">🎬 Camera Keyframes</p>
+                      <button 
+                        onClick={() => addKeyframe(s.id)} 
+                        className="text-xs bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Add
+                      </button>
                     </div>
+                    
+                    {s.cameraKeyframes && s.cameraKeyframes.length > 0 ? (
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {s.cameraKeyframes.map((kf, kfIndex) => (
+                          <div key={kfIndex} className="bg-gray-600 rounded p-2 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-white font-semibold">KF {kfIndex + 1}</span>
+                              {s.cameraKeyframes.length > 1 && (
+                                <button 
+                                  onClick={() => deleteKeyframe(s.id, kfIndex)} 
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
+                              <input 
+                                type="text" 
+                                value={formatTime(kf.time)} 
+                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'time', parseTime(e.target.value))} 
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                              />
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="checkbox" 
+                                id={`kf-autoRotate-${s.id}-${kfIndex}`} 
+                                checked={kf.autoRotate} 
+                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'autoRotate', e.target.checked)} 
+                                className="w-3 h-3 cursor-pointer" 
+                              />
+                              <label htmlFor={`kf-autoRotate-${s.id}-${kfIndex}`} className="text-xs text-white cursor-pointer">Auto-Rotate</label>
+                            </div>
+                            
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
+                              <input 
+                                type="range" 
+                                min="5" 
+                                max="50" 
+                                step="0.5" 
+                                value={kf.distance} 
+                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'distance', Number(e.target.value))} 
+                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
+                              <input 
+                                type="range" 
+                                min="-10" 
+                                max="10" 
+                                step="0.5" 
+                                value={kf.height} 
+                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'height', Number(e.target.value))} 
+                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
+                              <input 
+                                type="range" 
+                                min="0" 
+                                max={Math.PI * 2} 
+                                step="0.05" 
+                                value={kf.rotation} 
+                                onChange={(e) => updateKeyframe(s.id, kfIndex, 'rotation', Number(e.target.value))} 
+                                className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-700" 
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No keyframes. Click "Add" to create one.</p>
+                    )}
                   </div>
                 </div>
               ))}
