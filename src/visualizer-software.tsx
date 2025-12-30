@@ -23,6 +23,7 @@ export default function ThreeDVisualizer() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
@@ -58,6 +59,14 @@ export default function ThreeDVisualizer() {
   const [showTimeDisplay, setShowTimeDisplay] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
+  
+  // NEW: Visual effects controls
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
+  const [showLetterbox, setShowLetterbox] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
+  const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
+  const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
   // NEW: Recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -651,6 +660,17 @@ export default function ThreeDVisualizer() {
 
     const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.4}));
     scene.add(sphere);
+    
+    // Add lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, ambientLightIntensity);
+    scene.add(ambientLight);
+    lightsRef.current.ambient = ambientLight;
+    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, directionalLightIntensity);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+    lightsRef.current.directional = directionalLight;
+    
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
@@ -677,6 +697,25 @@ export default function ThreeDVisualizer() {
       }
     };
   }, []);
+
+  // Update scene background, fog, and lights when settings change
+  useEffect(() => {
+    if (sceneRef.current && rendererRef.current) {
+      const bgColor = new THREE.Color(backgroundColor);
+      sceneRef.current.background = bgColor;
+      sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+      rendererRef.current.setClearColor(backgroundColor);
+    }
+  }, [backgroundColor]);
+
+  useEffect(() => {
+    if (lightsRef.current.ambient) {
+      lightsRef.current.ambient.intensity = ambientLightIntensity;
+    }
+    if (lightsRef.current.directional) {
+      lightsRef.current.directional.intensity = directionalLightIntensity;
+    }
+  }, [ambientLightIntensity, directionalLightIntensity]);
 
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
@@ -1158,7 +1197,13 @@ export default function ThreeDVisualizer() {
         </div>
 
         <div className="relative">
-          <div ref={containerRef} className="border-2 border-purple-600 rounded-lg shadow-2xl" style={{width:'960px',height:'540px'}} />
+          <div ref={containerRef} className="border-2 rounded-lg shadow-2xl" style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          {showLetterbox && letterboxSize > 0 && (
+            <>
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
+            </>
+          )}
           {showFilename && audioFileName && <div className="absolute top-4 left-4 text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold">{audioFileName}</div>}
           {showTimeDisplay && (
             <div className="absolute top-4 right-4 bg-black bg-opacity-70 px-3 py-2 rounded">
@@ -1321,6 +1366,46 @@ export default function ThreeDVisualizer() {
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Visual Effects</h3>
+              <p className="text-xs text-gray-400 mb-3">Customize the look and feel of the visualization.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+                  <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+                  <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">Cinematic Letterbox Bars</label>
+                </div>
+                {showLetterbox && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
+                    <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">💡 Lighting Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust scene lighting intensity.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Ambient Light: {(ambientLightIntensity * 100).toFixed(0)}%</label>
+                  <input type="range" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Directional Light: {(directionalLightIntensity * 100).toFixed(0)}%</label>
+                  <input type="range" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
               </div>
             </div>
