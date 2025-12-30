@@ -100,28 +100,10 @@ export default function ThreeDVisualizer() {
   };
 
   useEffect(() => {
-    addLog('Starting font load...', 'info');
-    const loader = new FontLoader();
-    loader.load(
-      'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
-      (font) => {
-        console.log('Font loaded successfully!');
-        addLog('Font loaded successfully!', 'success');
-        fontRef.current = font;
-        setFontLoaded(true);
-      },
-      (progress) => {
-        if (progress.total > 0) {
-          const percent = Math.round((progress.loaded / progress.total) * 100);
-          console.log('Font loading progress:', percent + '%');
-          addLog(`Font loading: ${percent}%`, 'info');
-        }
-      },
-      (error) => {
-        console.error('Font loading error:', error);
-        addLog(`Font load failed - upload custom font instead`, 'error');
-      }
-    );
+    // Skip automatic font loading to avoid CORS errors
+    // Users can upload their own .typeface.json font file
+    addLog('Font system ready - upload custom font to use text', 'info');
+    setCustomFontName('None (Upload Required)');
   }, []);
 
   const toggleSongName = () => {
