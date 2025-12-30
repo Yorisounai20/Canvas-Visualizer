@@ -61,8 +61,6 @@ export default function ThreeDVisualizer() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
-  const mediaRecorderRef = useRef(null);
-  const recordedChunksRef = useRef([]);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('controls');
@@ -321,7 +319,6 @@ export default function ThreeDVisualizer() {
   const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
   const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
 
-  const initAudio = async (file: File) => {
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
@@ -453,6 +450,12 @@ export default function ThreeDVisualizer() {
   const startRecording = () => {
     if (!rendererRef.current || !audioContextRef.current || !analyserRef.current) {
       addLog('Cannot record: scene or audio not ready', 'error');
+      return;
+    }
+    // Recording logic would go here if needed
+    addLog('Recording feature not fully implemented', 'info');
+  };
+
   // NEW: Automated video export functions
   const exportVideo = async () => {
     if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
@@ -542,12 +545,6 @@ export default function ThreeDVisualizer() {
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       addLog('Recording started', 'success');
-    } catch (e) {
-      const error = e as Error;
-      addLog(`Recording error: ${error.message}`, 'error');
-      console.error('Recording error:', e);
-    }
-  };
 
       // Auto-play the audio using Web Audio API
       const src = audioContextRef.current.createBufferSource();
@@ -587,7 +584,8 @@ export default function ThreeDVisualizer() {
       addLog(`Exporting ${duration.toFixed(1)}s video as ${extension.toUpperCase()}...`, 'info');
 
     } catch (e) {
-      addLog(`Export error: ${e.message}`, 'error');
+      const error = e as Error;
+      addLog(`Export error: ${error.message}`, 'error');
       console.error('Export error:', e);
       setIsExporting(false);
       setExportProgress(0);
@@ -603,7 +601,6 @@ export default function ThreeDVisualizer() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    let scene: THREE.Scene;
     let scene, camera, renderer;
     
     try {
@@ -1285,16 +1282,6 @@ export default function ThreeDVisualizer() {
           </div>
         )}
 
-        <div className="mb-4 bg-gray-700 rounded-lg p-3">
-          <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
-          <div className="mb-3 pb-3 border-b border-gray-600">
-            <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-            <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files?.[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
-            <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
-          </div>
-          <div className="flex gap-2 mb-2">
-            <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
-            <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
         {/* Camera Settings Tab */}
         {activeTab === 'camera' && (
           <div>
