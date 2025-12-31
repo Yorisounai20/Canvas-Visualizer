@@ -1579,13 +1579,16 @@ export default function ThreeDVisualizer() {
 
         <div className="relative">
           <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-          {showLetterbox && (
-            <>
-              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${invertLetterbox ? (100 - letterboxSize) : letterboxSize}px`}} />
-              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${invertLetterbox ? (100 - letterboxSize) : letterboxSize}px`}} />
-            </>
-          )}
-          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+          {showLetterbox && (() => {
+            const actualBarHeight = invertLetterbox ? (100 - letterboxSize) : letterboxSize;
+            return (
+              <>
+                <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+                <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+              </>
+            );
+          })()}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (invertLetterbox ? (100 - letterboxSize) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         </div>
       </div>
 
