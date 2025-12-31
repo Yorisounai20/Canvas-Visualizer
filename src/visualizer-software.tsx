@@ -928,43 +928,53 @@ export default function ThreeDVisualizer() {
 
       // Animate letterbox based on keyframes (only if animation is enabled)
       if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
-        // Find the active keyframe(s) for current time
-        let activeKeyframe = null;
-        let activeKeyframeIndex = -1;
-        
+        // Find the current keyframe (most recent one that has passed)
+        let currentKeyframeIndex = -1;
         for (let i = 0; i < sortedLetterboxKeyframes.length; i++) {
           if (t >= sortedLetterboxKeyframes[i].time) {
-            activeKeyframe = sortedLetterboxKeyframes[i];
-            activeKeyframeIndex = i;
+            currentKeyframeIndex = i;
           }
         }
         
-        if (activeKeyframe) {
-          const timeSinceKeyframe = t - activeKeyframe.time;
+        // Check if we should be animating toward the next keyframe
+        if (currentKeyframeIndex < sortedLetterboxKeyframes.length - 1) {
+          const nextKeyframe = sortedLetterboxKeyframes[currentKeyframeIndex + 1];
+          const timeUntilNextKeyframe = nextKeyframe.time - t;
           
-          if (activeKeyframe.mode === 'instant') {
-            // Instant change
-            setLetterboxSize(activeKeyframe.targetSize);
-          } else {
-            // Smooth animation
-            if (timeSinceKeyframe < activeKeyframe.duration) {
-              // Currently animating
-              const progress = timeSinceKeyframe / activeKeyframe.duration;
+          // If we're within the duration window before the next keyframe, animate toward it
+          if (timeUntilNextKeyframe <= nextKeyframe.duration && timeUntilNextKeyframe >= 0) {
+            if (nextKeyframe.mode === 'smooth') {
+              // Calculate progress (0 at start of animation, 1 at keyframe time)
+              const progress = 1 - (timeUntilNextKeyframe / nextKeyframe.duration);
               const easeProgress = progress < 0.5 
                 ? 2 * progress * progress 
                 : 1 - Math.pow(-2 * progress + 2, 2) / 2; // easeInOutQuad
               
-              // Get start size from previous keyframe
-              const startSize = activeKeyframeIndex > 0
-                ? sortedLetterboxKeyframes[activeKeyframeIndex - 1].targetSize
+              // Get start size from current keyframe (or 0 if at the beginning)
+              const startSize = currentKeyframeIndex >= 0
+                ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
                 : 0;
               
-              const newSize = startSize + (activeKeyframe.targetSize - startSize) * easeProgress;
+              const newSize = startSize + (nextKeyframe.targetSize - startSize) * easeProgress;
               setLetterboxSize(Math.round(newSize));
             } else {
-              // Animation complete, hold at target
-              setLetterboxSize(activeKeyframe.targetSize);
+              // Instant mode - hold current size until we hit the keyframe
+              const currentSize = currentKeyframeIndex >= 0
+                ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
+                : 0;
+              setLetterboxSize(currentSize);
             }
+          } else {
+            // Not in animation window, hold at current keyframe's target
+            const currentSize = currentKeyframeIndex >= 0
+              ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
+              : 0;
+            setLetterboxSize(currentSize);
+          }
+        } else {
+          // We're past the last keyframe, hold at its target
+          if (currentKeyframeIndex >= 0) {
+            setLetterboxSize(sortedLetterboxKeyframes[currentKeyframeIndex].targetSize);
           }
         }
       }
