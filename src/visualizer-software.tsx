@@ -15,6 +15,7 @@ const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
 const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
+const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1325,9 +1326,11 @@ export default function ThreeDVisualizer() {
       const now = performance.now();
       const timeSinceLastRender = now - lastWaveformRenderRef.current;
       
-      // Throttle to max 30fps for waveform rendering (every ~33ms)
-      if (timeSinceLastRender < 33) {
-        waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+      // Throttle to max 30fps for waveform rendering
+      if (timeSinceLastRender < WAVEFORM_THROTTLE_MS) {
+        if (isPlaying) {
+          waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+        }
         return;
       }
       
