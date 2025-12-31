@@ -104,6 +104,11 @@ export default function ThreeDVisualizer() {
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
   
+  // FPS tracking
+  const [fps, setFps] = useState<number>(0);
+  const fpsFrameCount = useRef(0);
+  const fpsLastTime = useRef(performance.now());
+  
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -837,6 +842,18 @@ export default function ThreeDVisualizer() {
     const anim = () => {
       if (!isPlaying) return;
       animationRef.current = requestAnimationFrame(anim);
+      
+      // FPS calculation
+      fpsFrameCount.current++;
+      const now = performance.now();
+      const elapsed = now - fpsLastTime.current;
+      if (elapsed >= 1000) { // Update FPS every second
+        const currentFps = Math.round((fpsFrameCount.current * 1000) / elapsed);
+        setFps(currentFps);
+        fpsFrameCount.current = 0;
+        fpsLastTime.current = now;
+      }
+      
       analyser.getByteFrequencyData(data);
       const f = getFreq(data);
       const el = (Date.now() - startTimeRef.current) * 0.001;
@@ -1902,7 +1919,10 @@ export default function ThreeDVisualizer() {
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
+              {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
+            </div>
             <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
           </div>
           <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
