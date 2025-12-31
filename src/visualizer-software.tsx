@@ -1307,6 +1307,7 @@ export default function ThreeDVisualizer() {
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
   // Draw waveform on canvas
+  // Draw waveform on canvas
   useEffect(() => {
     if (!waveformCanvasRef.current || waveformData.length === 0) return;
     
@@ -1318,9 +1319,15 @@ export default function ThreeDVisualizer() {
     const height = canvas.height;
     
     // Static waveform parameters (entire waveform visible, like timeline slider)
-    const barWidth = Math.max(1, width / waveformData.length - 0.5); // Dynamic bar width to fit all data
+    const BAR_GAP = 0.5; // Gap compensation between bars
+    const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
     const maxHeight = height * 0.8;
     const baseY = height / 2;
+    
+    // Colors matching app theme
+    const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)'; // Cyan for played portion
+    const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)'; // Gray for unplayed portion
+    const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)'; // White playhead line
     
     // Calculate current progress (0 to 1)
     const currentProgress = duration > 0 ? currentTime / duration : 0;
@@ -1338,17 +1345,12 @@ export default function ThreeDVisualizer() {
       
       const isPast = (i / waveformData.length) < currentProgress;
       
-      if (isPast) {
-        ctx.fillStyle = 'rgba(6, 182, 212, 0.9)'; // Cyan for played portion
-      } else {
-        ctx.fillStyle = 'rgba(100, 100, 120, 0.4)'; // Gray for unplayed portion
-      }
-      
+      ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
       ctx.fillRect(x, y, barWidth, barHeight);
     }
     
     // Draw playhead line (moves across the waveform)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillStyle = PLAYHEAD_COLOR;
     ctx.fillRect(playheadX - 1, 0, 2, height);
   }, [waveformData, currentTime, duration]);
 
