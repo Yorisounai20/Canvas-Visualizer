@@ -303,10 +303,39 @@ export default function VisualizerEditor() {
       const type = sec?.animation || 'orbit';
       const isVisible = sec?.visible !== false;
 
-      // Handle preset transitions
+      // Handle preset transitions with cleanup
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
         prevAnimRef.current = type;
+        
+        // CRITICAL FIX: Reset all object properties to default state when switching presets
+        // This prevents visual artifacts from previous presets
+        obj.cubes.forEach(c => {
+          c.position.set(0, 0, 0);
+          c.rotation.set(0, 0, 0);
+          c.scale.set(1, 1, 1);
+          (c.material as THREE.MeshBasicMaterial).opacity = 1;
+          (c.material as THREE.MeshBasicMaterial).wireframe = true;
+        });
+        obj.octas.forEach(o => {
+          o.position.set(0, 0, 0);
+          o.rotation.set(0, 0, 0);
+          o.scale.set(1, 1, 1);
+          (o.material as THREE.MeshBasicMaterial).opacity = 1;
+          (o.material as THREE.MeshBasicMaterial).wireframe = true;
+        });
+        obj.tetras.forEach(t => {
+          t.position.set(0, 0, 0);
+          t.rotation.set(0, 0, 0);
+          t.scale.set(1, 1, 1);
+          (t.material as THREE.MeshBasicMaterial).opacity = 1;
+          (t.material as THREE.MeshBasicMaterial).wireframe = true;
+        });
+        obj.sphere.position.set(0, 0, 0);
+        obj.sphere.rotation.set(0, 0, 0);
+        obj.sphere.scale.set(1, 1, 1);
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = 1;
+        (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = true;
       }
       if (transitionRef.current < 1) {
         transitionRef.current = Math.min(1, transitionRef.current + 0.02);
@@ -715,7 +744,7 @@ export default function VisualizerEditor() {
         });
 
       } else if (type === 'seiryu') {
-        // Azure Dragon - Dragon-like serpentine movement
+        // Azure Dragon - Dragon-like serpentine movement (FIXED: added proper body rotation)
         const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
         cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight, activeCameraDistance);
         cam.lookAt(0, 0, 0);
@@ -731,6 +760,13 @@ export default function VisualizerEditor() {
           const baseScale = isHead ? 5 : 1.3;
           const scaleSize = baseScale + f.bass * 0.8;
           c.scale.set(scaleSize, scaleSize * 0.8, scaleSize * 1.2);
+          // CRITICAL FIX: Calculate rotation to point along the dragon's body path
+          const nextT = el * 1.5 - (i + 1) * 0.6;
+          const lookX = Math.sin(nextT) * 6;
+          const lookY = Math.cos(nextT * 0.5) * 4;
+          const lookZ = (progress + 0.1) * -15;
+          c.rotation.x = Math.atan2(lookY - y, lookZ - z);
+          c.rotation.y = Math.atan2(lookX - x, lookZ - z);
           (c.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
           (c.material as THREE.MeshBasicMaterial).opacity = (0.8 + f.bass * 0.2) * blend;
           (c.material as THREE.MeshBasicMaterial).wireframe = isHead ? false : true;
@@ -757,11 +793,12 @@ export default function VisualizerEditor() {
         // Octas as environment and dragon scales
         obj.octas.forEach((o, i) => {
           if (i < 10) {
-            // Mountains
+            // Mountains (background scenery)
             const mountainX = (i - 5) * 8;
             const mountainHeight = 3 + (i % 3) * 2;
             const mountainZ = -25 - (i % 2) * 5;
             o.position.set(mountainX, -5 + mountainHeight, mountainZ);
+            o.rotation.x = 0; // CRITICAL FIX: Reset rotation.x for mountains
             o.rotation.y = el * 0.1 + i;
             const s = 8 + (i % 3) * 3;
             o.scale.set(s, mountainHeight * 2, s);
@@ -1105,6 +1142,7 @@ export default function VisualizerEditor() {
     }
   }, [backgroundColor]);
 
+  // CRITICAL FIX: Update lighting intensities safely without breaking animation
   useEffect(() => {
     if (lightsRef.current.ambient) {
       lightsRef.current.ambient.intensity = ambientLightIntensity;
@@ -1112,7 +1150,11 @@ export default function VisualizerEditor() {
     if (lightsRef.current.directional) {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
-  }, [ambientLightIntensity, directionalLightIntensity]);
+    // Trigger a re-render if animation is not playing
+    if (!isPlaying && rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+  }, [ambientLightIntensity, directionalLightIntensity, isPlaying]);
 
   // Get selected section
   const selectedSection = selectedSectionId 

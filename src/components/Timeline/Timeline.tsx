@@ -45,9 +45,13 @@ export default function Timeline({
   const [scrollOffset, setScrollOffset] = useState(0);
   const PIXELS_PER_SECOND = 40; // Scaling factor
   const TIMELINE_HEIGHT = 60; // Height of each layer bar
+  const timelineWidth = Math.max(duration * PIXELS_PER_SECOND, 1000); // CRITICAL FIX: Moved before useEffect
 
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+
+  // CRITICAL FIX: Add playhead dragging state
+  const [isPlayheadDragging, setIsPlayheadDragging] = useState(false);
 
   const getAnimationInfo = (animValue: string) => {
     return animationTypes.find(a => a.value === animValue) || {
@@ -63,14 +67,40 @@ export default function Timeline({
   // Convert pixel position to time
   const pixelsToTime = (pixels: number) => Math.max(0, pixels / PIXELS_PER_SECOND);
 
-  // Handle playhead click/drag
+  // Handle playhead click/drag - CRITICAL FIX: Improved interaction like original slider
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const x = e.clientX - rect.left + scrollOffset;
     const time = pixelsToTime(x);
-    onSeek(Math.min(time, duration));
+    onSeek(Math.min(Math.max(0, time), duration));
+    setIsPlayheadDragging(true);
   };
+
+  // CRITICAL FIX: Add playhead drag handling
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isPlayheadDragging && timelineRef.current) {
+        const rect = timelineRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left + scrollOffset;
+        const time = pixelsToTime(x);
+        onSeek(Math.min(Math.max(0, time), duration));
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsPlayheadDragging(false);
+    };
+
+    if (isPlayheadDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isPlayheadDragging, scrollOffset, duration, onSeek]);
 
   // Start dragging a section
   const handleSectionMouseDown = (
@@ -136,7 +166,7 @@ export default function Timeline({
     }
   }, [dragState, sections, onUpdateSection]);
 
-  // Handle scroll wheel for horizontal scrolling
+  // Handle scroll wheel for horizontal scrolling - CRITICAL FIX: Updated dependencies
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -153,9 +183,7 @@ export default function Timeline({
       timelineElement.addEventListener('wheel', handleWheel, { passive: false });
       return () => timelineElement.removeEventListener('wheel', handleWheel);
     }
-  }, [duration]);
-
-  const timelineWidth = Math.max(duration * PIXELS_PER_SECOND, 1000);
+  }, [timelineWidth]); // CRITICAL FIX: Changed from [duration] to [timelineWidth]
 
   return (
     <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
