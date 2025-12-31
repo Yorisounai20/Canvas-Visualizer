@@ -936,13 +936,18 @@ export default function ThreeDVisualizer() {
           }
         }
         
+        // Helper to get current target size
+        const getCurrentSize = () => currentKeyframeIndex >= 0 
+          ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize 
+          : 0;
+        
         // Check if we should be animating toward the next keyframe
         if (currentKeyframeIndex < sortedLetterboxKeyframes.length - 1) {
           const nextKeyframe = sortedLetterboxKeyframes[currentKeyframeIndex + 1];
           const timeUntilNextKeyframe = nextKeyframe.time - t;
           
           // If we're within the duration window before the next keyframe, animate toward it
-          if (timeUntilNextKeyframe <= nextKeyframe.duration && timeUntilNextKeyframe >= 0) {
+          if (timeUntilNextKeyframe <= nextKeyframe.duration) {
             if (nextKeyframe.mode === 'smooth') {
               // Calculate progress (0 at start of animation, 1 at keyframe time)
               const progress = 1 - (timeUntilNextKeyframe / nextKeyframe.duration);
@@ -950,32 +955,20 @@ export default function ThreeDVisualizer() {
                 ? 2 * progress * progress 
                 : 1 - Math.pow(-2 * progress + 2, 2) / 2; // easeInOutQuad
               
-              // Get start size from current keyframe (or 0 if at the beginning)
-              const startSize = currentKeyframeIndex >= 0
-                ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
-                : 0;
-              
+              const startSize = getCurrentSize();
               const newSize = startSize + (nextKeyframe.targetSize - startSize) * easeProgress;
               setLetterboxSize(Math.round(newSize));
             } else {
-              // Instant mode - hold current size until we hit the keyframe
-              const currentSize = currentKeyframeIndex >= 0
-                ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
-                : 0;
-              setLetterboxSize(currentSize);
+              // Instant mode - jump immediately to target size
+              setLetterboxSize(nextKeyframe.targetSize);
             }
           } else {
             // Not in animation window, hold at current keyframe's target
-            const currentSize = currentKeyframeIndex >= 0
-              ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize
-              : 0;
-            setLetterboxSize(currentSize);
+            setLetterboxSize(getCurrentSize());
           }
         } else {
           // We're past the last keyframe, hold at its target
-          if (currentKeyframeIndex >= 0) {
-            setLetterboxSize(sortedLetterboxKeyframes[currentKeyframeIndex].targetSize);
-          }
+          setLetterboxSize(getCurrentSize());
         }
       }
 
