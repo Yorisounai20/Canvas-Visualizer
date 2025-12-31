@@ -99,6 +99,10 @@ export default function ThreeDVisualizer() {
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
+  
+  // Waveform state
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -411,6 +415,23 @@ export default function ThreeDVisualizer() {
     ));
   };
 
+  const generateWaveformData = (buffer: AudioBuffer, samples = 1000) => {
+    const rawData = buffer.getChannelData(0); // Get mono or first channel
+    const blockSize = Math.floor(rawData.length / samples);
+    const waveform: number[] = [];
+    
+    for (let i = 0; i < samples; i++) {
+      let blockStart = blockSize * i;
+      let sum = 0;
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[blockStart + j]);
+      }
+      waveform.push(sum / blockSize);
+    }
+    
+    return waveform;
+  };
+
   const initAudio = async (file) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
@@ -424,6 +445,11 @@ export default function ThreeDVisualizer() {
       analyserRef.current = analyser;
       setDuration(buf.duration);
       setAudioReady(true);
+      
+      // Generate waveform data
+      const waveform = generateWaveformData(buf);
+      setWaveformData(waveform);
+      
       addLog('Audio loaded successfully!', 'success');
     } catch (e) { 
       console.error(e);
@@ -1259,6 +1285,46 @@ export default function ThreeDVisualizer() {
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
+  // Draw waveform on canvas
+  useEffect(() => {
+    if (!waveformCanvasRef.current || waveformData.length === 0) return;
+    
+    const canvas = waveformCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const width = canvas.width;
+    const height = canvas.height;
+    const barWidth = width / waveformData.length;
+    
+    // Clear canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Draw waveform (top half only - like SoundCloud)
+    ctx.fillStyle = '#8b5cf6'; // Purple color
+    waveformData.forEach((value, index) => {
+      const barHeight = value * height;
+      const x = index * barWidth;
+      const y = height - barHeight; // Draw from bottom up
+      ctx.fillRect(x, y, barWidth - 0.5, barHeight);
+    });
+    
+    // Draw playback progress overlay
+    if (duration > 0) {
+      const progressWidth = (currentTime / duration) * width;
+      ctx.fillStyle = '#06b6d4'; // Cyan color for progress
+      waveformData.forEach((value, index) => {
+        const x = index * barWidth;
+        if (x < progressWidth) {
+          const barHeight = value * height;
+          const y = height - barHeight;
+          ctx.fillRect(x, y, barWidth - 0.5, barHeight);
+        }
+      });
+    }
+  }, [waveformData, currentTime, duration]);
+
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
       <div className="flex flex-col items-center">
@@ -1276,12 +1342,6 @@ export default function ThreeDVisualizer() {
             </>
           )}
           {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-          {showTimeDisplay && (
-            <div className="absolute bg-black bg-opacity-70 px-3 py-2 rounded" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, right: '16px'}}>
-              <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
-              {showPresetDisplay && getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
-            </div>
-          )}
           {showTimeline && duration > 0 && (
             <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
               <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
@@ -1289,6 +1349,38 @@ export default function ThreeDVisualizer() {
           )}
         </div>
       </div>
+
+      {/* Waveform Display - Between Canvas and Tabs */}
+      {audioReady && waveformData.length > 0 && (
+        <div className="bg-gray-800 rounded-lg p-4">
+          <div className="flex items-center gap-4">
+            {/* Time Display */}
+            <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
+              <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
+              {showPresetDisplay && getCurrentSection() && (
+                <p className="text-cyan-400 text-xs mt-1">
+                  {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
+                </p>
+              )}
+            </div>
+            
+            {/* Waveform */}
+            <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const seekPosition = (x / rect.width) * duration;
+              seekTo(seekPosition);
+            }}>
+              <canvas 
+                ref={waveformCanvasRef} 
+                width={800} 
+                height={80}
+                className="w-full h-full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="bg-gray-800 rounded-lg p-4">
