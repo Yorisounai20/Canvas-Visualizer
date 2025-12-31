@@ -1317,48 +1317,38 @@ export default function ThreeDVisualizer() {
     const width = canvas.width;
     const height = canvas.height;
     
-    // Scrolling waveform parameters
-    const barWidth = 3;
-    const gap = 1;
-    const totalBarWidth = barWidth + gap;
-    const maxHeight = height * 0.4;
-    const baseY = height;
-    const playheadX = width / 2;
+    // Static waveform parameters (entire waveform visible, like timeline slider)
+    const barWidth = Math.max(1, width / waveformData.length - 0.5); // Dynamic bar width to fit all data
+    const maxHeight = height * 0.8;
+    const baseY = height / 2;
     
     // Calculate current progress (0 to 1)
     const currentProgress = duration > 0 ? currentTime / duration : 0;
-    const playedBarIndex = Math.floor(currentProgress * waveformData.length);
+    const playheadX = currentProgress * width;
     
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
     
-    // Calculate scroll offset
-    const totalWidth = waveformData.length * totalBarWidth;
-    const scrollOffset = currentProgress * totalWidth;
-    
-    // Draw waveform bars (scrolling with centered playhead)
+    // Draw waveform bars (static, entire waveform visible)
     for (let i = 0; i < waveformData.length; i++) {
       const barHeight = waveformData[i] * maxHeight;
-      const x = playheadX + (i * totalBarWidth) - scrollOffset;
+      const x = (i / waveformData.length) * width;
+      const y = baseY - barHeight / 2;
       
-      // Only render bars that are visible in the viewport
-      if (x > -totalBarWidth && x < width) {
-        const y = baseY - barHeight;
-        const isPlayed = i < playedBarIndex;
-        
-        if (isPlayed) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        } else {
-          ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
-        }
-        
-        ctx.fillRect(x, y, barWidth, barHeight);
+      const isPast = (i / waveformData.length) < currentProgress;
+      
+      if (isPast) {
+        ctx.fillStyle = 'rgba(6, 182, 212, 0.9)'; // Cyan for played portion
+      } else {
+        ctx.fillStyle = 'rgba(100, 100, 120, 0.4)'; // Gray for unplayed portion
       }
+      
+      ctx.fillRect(x, y, barWidth, barHeight);
     }
     
-    // Draw playhead line at center
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    // Draw playhead line (moves across the waveform)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.fillRect(playheadX - 1, 0, 2, height);
   }, [waveformData, currentTime, duration]);
 
