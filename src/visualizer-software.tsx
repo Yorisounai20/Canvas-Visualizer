@@ -14,7 +14,7 @@ const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
-const WAVEFORM_SAMPLES = 1000;
+const WAVEFORM_SAMPLES = 800;
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1309,34 +1309,49 @@ export default function ThreeDVisualizer() {
     
     const width = canvas.width;
     const height = canvas.height;
-    const barWidth = width / waveformData.length;
+    
+    // Scrolling waveform parameters
+    const barWidth = 3;
+    const gap = 1;
+    const totalBarWidth = barWidth + gap;
+    const maxHeight = height * 0.4;
+    const baseY = height;
+    const playheadX = width / 2;
+    
+    // Calculate current progress (0 to 1)
+    const currentProgress = duration > 0 ? currentTime / duration : 0;
     
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
     
-    // Draw waveform (top half only - like SoundCloud)
-    ctx.fillStyle = '#8b5cf6'; // Purple color
-    waveformData.forEach((value, index) => {
-      const barHeight = value * height;
-      const x = index * barWidth;
-      const y = height - barHeight; // Draw from bottom up
-      ctx.fillRect(x, y, barWidth - 0.5, barHeight);
-    });
+    // Calculate scroll offset
+    const totalWidth = waveformData.length * totalBarWidth;
+    const scrollOffset = currentProgress * totalWidth;
     
-    // Draw playback progress overlay
-    if (duration > 0) {
-      const progressWidth = (currentTime / duration) * width;
-      const endIndex = Math.ceil(progressWidth / barWidth);
-      ctx.fillStyle = '#06b6d4'; // Cyan color for progress
-      for (let index = 0; index < endIndex && index < waveformData.length; index++) {
-        const value = waveformData[index];
-        const barHeight = value * height;
-        const x = index * barWidth;
-        const y = height - barHeight;
-        ctx.fillRect(x, y, barWidth - 0.5, barHeight);
+    // Draw waveform bars (scrolling with centered playhead)
+    for (let i = 0; i < waveformData.length; i++) {
+      const barHeight = waveformData[i] * maxHeight;
+      const x = playheadX + (i * totalBarWidth) - scrollOffset;
+      
+      // Only render bars that are visible in the viewport
+      if (x > -totalBarWidth && x < width) {
+        const y = baseY - barHeight;
+        const isPlayed = i < Math.floor(currentProgress * waveformData.length);
+        
+        if (isPlayed) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        } else {
+          ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
+        }
+        
+        ctx.fillRect(x, y, barWidth, barHeight);
       }
     }
+    
+    // Draw playhead line at center
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillRect(playheadX - 1, 0, 2, height);
   }, [waveformData, currentTime, duration]);
 
   // Handle ESC key to close export modal
