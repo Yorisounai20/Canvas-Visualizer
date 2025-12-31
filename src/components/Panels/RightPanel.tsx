@@ -73,7 +73,7 @@ export default function RightPanel({
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
   return (
-    <div className="w-80 bg-[#2B2B2B] border-l border-gray-700 flex flex-col shadow-lg overflow-hidden">
+    <div className="h-full bg-[#2B2B2B] border-l border-gray-700 flex flex-col shadow-lg overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-700 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">

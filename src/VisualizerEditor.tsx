@@ -130,6 +130,14 @@ export default function VisualizerEditor() {
   const [fps, setFps] = useState(0);
   const [fontLoaded, setFontLoaded] = useState(false);
 
+  // Panel resize state
+  const [leftPanelWidth, setLeftPanelWidth] = useState(256); // 64 * 4 = 256px (w-64)
+  const [rightPanelWidth, setRightPanelWidth] = useState(320); // 80 * 4 = 320px (w-80)
+  const [timelineHeight, setTimelineHeight] = useState(256); // h-64
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+  const [isResizingTimeline, setIsResizingTimeline] = useState(false);
+
   // Helper functions
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -250,6 +258,205 @@ export default function VisualizerEditor() {
     addLog('Export feature requires full implementation', 'info');
     // Full export logic from original file would go here
   };
+
+  // Update current time during playback
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const updateTime = () => {
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      const newTime = Math.min(elapsed, duration);
+      setCurrentTime(newTime);
+
+      if (newTime >= duration) {
+        stopAudio();
+      } else {
+        animationRef.current = requestAnimationFrame(updateTime);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(updateTime);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying, duration]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      // Prevent default for shortcuts we handle
+      const shouldPreventDefault = () => {
+        switch (e.key.toLowerCase()) {
+          case ' ':
+          case 'home':
+          case 'end':
+          case 'arrowleft':
+          case 'arrowright':
+          case 'arrowup':
+          case 'arrowdown':
+            return true;
+          default:
+            return false;
+        }
+      };
+
+      if (shouldPreventDefault()) {
+        e.preventDefault();
+      }
+
+      // Transport controls
+      if (e.key === ' ') {
+        // Space - Play/Pause
+        if (isPlaying) {
+          stopAudio();
+        } else if (audioReady) {
+          playAudio();
+        }
+      } else if (e.key === 'Home') {
+        // Home - Go to start
+        seekTo(0);
+      } else if (e.key === 'End') {
+        // End - Go to end
+        seekTo(duration);
+      } else if (e.key === 'ArrowLeft') {
+        // Left arrow - Step backward
+        const step = e.shiftKey ? 5 : 1; // Shift for larger jumps
+        seekTo(Math.max(0, currentTime - step));
+      } else if (e.key === 'ArrowRight') {
+        // Right arrow - Step forward
+        const step = e.shiftKey ? 5 : 1;
+        seekTo(Math.min(duration, currentTime + step));
+      }
+
+      // Section navigation
+      if (e.key === '[') {
+        // Previous section
+        const currentSection = getCurrentSection();
+        if (currentSection) {
+          const currentIndex = sections.findIndex((s: Section) => s.id === currentSection.id);
+          if (currentIndex > 0) {
+            const prevSection = sections[currentIndex - 1];
+            seekTo(prevSection.start);
+            setSelectedSectionId(prevSection.id);
+          }
+        } else if (sections.length > 0) {
+          seekTo(sections[0].start);
+          setSelectedSectionId(sections[0].id);
+        }
+      } else if (e.key === ']') {
+        // Next section
+        const currentSection = getCurrentSection();
+        if (currentSection) {
+          const currentIndex = sections.findIndex((s: Section) => s.id === currentSection.id);
+          if (currentIndex < sections.length - 1) {
+            const nextSection = sections[currentIndex + 1];
+            seekTo(nextSection.start);
+            setSelectedSectionId(nextSection.id);
+          }
+        } else if (sections.length > 0) {
+          seekTo(sections[0].start);
+          setSelectedSectionId(sections[0].id);
+        }
+      }
+
+      // Preset switching (1-9 keys)
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 9 && selectedSectionId && !e.ctrlKey && !e.metaKey) {
+        const presetIndex = num - 1;
+        if (presetIndex < ANIMATION_TYPES.length) {
+          updateSection(selectedSectionId, 'animation', ANIMATION_TYPES[presetIndex].value);
+        }
+      }
+
+      // Layer navigation with arrow up/down
+      if (e.key === 'ArrowUp' && selectedSectionId) {
+        const currentIndex = sections.findIndex((s: Section) => s.id === selectedSectionId);
+        if (currentIndex > 0) {
+          setSelectedSectionId(sections[currentIndex - 1].id);
+        }
+      } else if (e.key === 'ArrowDown' && selectedSectionId) {
+        const currentIndex = sections.findIndex((s: Section) => s.id === selectedSectionId);
+        if (currentIndex < sections.length - 1) {
+          setSelectedSectionId(sections[currentIndex + 1].id);
+        }
+      }
+
+      // Effect toggles
+      if (e.key.toLowerCase() === 'g') {
+        // G - Toggle letterbox
+        setShowLetterbox(!showLetterbox);
+      } else if (e.key.toLowerCase() === 'b') {
+        // B - Toggle border
+        setShowBorder(!showBorder);
+      }
+
+      // Camera controls
+      if (e.key.toLowerCase() === 'r' && selectedSectionId === null) {
+        // R - Reset camera (only when no section selected to avoid conflicts)
+        setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+        setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+        setCameraRotation(DEFAULT_CAMERA_ROTATION);
+        setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isPlaying,
+    audioReady,
+    currentTime,
+    duration,
+    sections,
+    selectedSectionId,
+    showLetterbox,
+    showBorder
+  ]);
+
+  // Handle panel resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingLeft) {
+        const newWidth = Math.max(200, Math.min(600, e.clientX));
+        setLeftPanelWidth(newWidth);
+      } else if (isResizingRight) {
+        const newWidth = Math.max(200, Math.min(600, window.innerWidth - e.clientX));
+        setRightPanelWidth(newWidth);
+      } else if (isResizingTimeline) {
+        const newHeight = Math.max(150, Math.min(500, window.innerHeight - e.clientY));
+        setTimelineHeight(newHeight);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false);
+      setIsResizingRight(false);
+      setIsResizingTimeline(false);
+    };
+
+    if (isResizingLeft || isResizingRight || isResizingTimeline) {
+      document.body.style.cursor = isResizingTimeline ? 'ns-resize' : 'ew-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizingLeft, isResizingRight, isResizingTimeline]);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -419,76 +626,102 @@ export default function VisualizerEditor() {
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - Layers */}
-        <LeftPanel
-          sections={sections}
-          selectedSectionId={selectedSectionId}
-          animationTypes={ANIMATION_TYPES}
-          onSelectSection={setSelectedSectionId}
-          onToggleVisibility={toggleSectionVisibility}
-          onToggleLock={toggleSectionLock}
-          onDeleteSection={deleteSection}
-          onReorderSections={reorderSections}
-        />
+        <div style={{ width: `${leftPanelWidth}px` }} className="flex-shrink-0 relative">
+          <LeftPanel
+            sections={sections}
+            selectedSectionId={selectedSectionId}
+            animationTypes={ANIMATION_TYPES}
+            onSelectSection={setSelectedSectionId}
+            onToggleVisibility={toggleSectionVisibility}
+            onToggleLock={toggleSectionLock}
+            onDeleteSection={deleteSection}
+            onReorderSections={reorderSections}
+          />
+          {/* Resize handle for left panel */}
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-ew-resize hover:bg-purple-500 transition-colors"
+            onMouseDown={() => setIsResizingLeft(true)}
+            title="Drag to resize"
+          />
+        </div>
 
         {/* Center - Canvas */}
-        <CanvasWrapper
-          containerRef={containerRef}
-          showBorder={showBorder}
-          borderColor={borderColor}
-          showLetterbox={showLetterbox}
-          letterboxSize={letterboxSize}
-          activeLetterboxInvert={activeLetterboxInvert}
-          maxLetterboxHeight={maxLetterboxHeight}
-          showFilename={showFilename}
-          audioFileName={audioFileName}
-        />
+        <div className="flex-1 min-w-0">
+          <CanvasWrapper
+            containerRef={containerRef}
+            showBorder={showBorder}
+            borderColor={borderColor}
+            showLetterbox={showLetterbox}
+            letterboxSize={letterboxSize}
+            activeLetterboxInvert={activeLetterboxInvert}
+            maxLetterboxHeight={maxLetterboxHeight}
+            showFilename={showFilename}
+            audioFileName={audioFileName}
+          />
+        </div>
 
         {/* Right Panel - Properties */}
-        <RightPanel
-          selectedSection={selectedSection}
-          animationTypes={ANIMATION_TYPES}
-          bassColor={bassColor}
-          midsColor={midsColor}
-          highsColor={highsColor}
-          backgroundColor={backgroundColor}
-          borderColor={borderColor}
-          ambientLightIntensity={ambientLightIntensity}
-          directionalLightIntensity={directionalLightIntensity}
-          cameraDistance={cameraDistance}
-          cameraHeight={cameraHeight}
-          cameraRotation={cameraRotation}
-          cameraAutoRotate={cameraAutoRotate}
-          showLetterbox={showLetterbox}
-          letterboxSize={letterboxSize}
-          onUpdateSection={updateSection}
-          onSetBassColor={setBassColor}
-          onSetMidsColor={setMidsColor}
-          onSetHighsColor={setHighsColor}
-          onSetBackgroundColor={setBackgroundColor}
-          onSetBorderColor={setBorderColor}
-          onSetAmbientLight={setAmbientLightIntensity}
-          onSetDirectionalLight={setDirectionalLightIntensity}
-          onSetCameraDistance={setCameraDistance}
-          onSetCameraHeight={setCameraHeight}
-          onSetCameraRotation={setCameraRotation}
-          onSetCameraAutoRotate={setCameraAutoRotate}
-          onSetShowLetterbox={setShowLetterbox}
-          onSetLetterboxSize={setLetterboxSize}
-        />
+        <div style={{ width: `${rightPanelWidth}px` }} className="flex-shrink-0 relative">
+          {/* Resize handle for right panel */}
+          <div
+            className="absolute top-0 left-0 w-1 h-full cursor-ew-resize hover:bg-purple-500 transition-colors z-10"
+            onMouseDown={() => setIsResizingRight(true)}
+            title="Drag to resize"
+          />
+          <RightPanel
+            selectedSection={selectedSection}
+            animationTypes={ANIMATION_TYPES}
+            bassColor={bassColor}
+            midsColor={midsColor}
+            highsColor={highsColor}
+            backgroundColor={backgroundColor}
+            borderColor={borderColor}
+            ambientLightIntensity={ambientLightIntensity}
+            directionalLightIntensity={directionalLightIntensity}
+            cameraDistance={cameraDistance}
+            cameraHeight={cameraHeight}
+            cameraRotation={cameraRotation}
+            cameraAutoRotate={cameraAutoRotate}
+            showLetterbox={showLetterbox}
+            letterboxSize={letterboxSize}
+            onUpdateSection={updateSection}
+            onSetBassColor={setBassColor}
+            onSetMidsColor={setMidsColor}
+            onSetHighsColor={setHighsColor}
+            onSetBackgroundColor={setBackgroundColor}
+            onSetBorderColor={setBorderColor}
+            onSetAmbientLight={setAmbientLightIntensity}
+            onSetDirectionalLight={setDirectionalLightIntensity}
+            onSetCameraDistance={setCameraDistance}
+            onSetCameraHeight={setCameraHeight}
+            onSetCameraRotation={setCameraRotation}
+            onSetCameraAutoRotate={setCameraAutoRotate}
+            onSetShowLetterbox={setShowLetterbox}
+            onSetLetterboxSize={setLetterboxSize}
+          />
+        </div>
       </div>
 
       {/* Bottom - Timeline */}
-      <Timeline
-        sections={sections}
-        currentTime={currentTime}
-        duration={duration}
-        animationTypes={ANIMATION_TYPES}
-        selectedSectionId={selectedSectionId}
-        onSelectSection={setSelectedSectionId}
-        onUpdateSection={updateSection}
-        onAddSection={addSection}
-        onSeek={seekTo}
-      />
+      <div style={{ height: `${timelineHeight}px` }} className="flex-shrink-0 relative">
+        {/* Resize handle for timeline */}
+        <div
+          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-purple-500 transition-colors z-10"
+          onMouseDown={() => setIsResizingTimeline(true)}
+          title="Drag to resize"
+        />
+        <Timeline
+          sections={sections}
+          currentTime={currentTime}
+          duration={duration}
+          animationTypes={ANIMATION_TYPES}
+          selectedSectionId={selectedSectionId}
+          onSelectSection={setSelectedSectionId}
+          onUpdateSection={updateSection}
+          onAddSection={addSection}
+          onSeek={seekTo}
+        />
+      </div>
 
       {/* Export Modal */}
       <ExportModal

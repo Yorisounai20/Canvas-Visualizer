@@ -64,7 +64,7 @@ export default function LeftPanel({
   };
 
   return (
-    <div className="w-64 bg-[#2B2B2B] border-r border-gray-700 flex flex-col shadow-lg">
+    <div className="h-full bg-[#2B2B2B] border-r border-gray-700 flex flex-col shadow-lg">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-700">
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">

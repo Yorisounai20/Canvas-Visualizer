@@ -39,6 +39,7 @@ export default function Timeline({
   }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
 
   const timelineRef = useRef<HTMLDivElement>(null);
+  const [scrollOffset, setScrollOffset] = useState(0);
   const PIXELS_PER_SECOND = 40; // Scaling factor
   const TIMELINE_HEIGHT = 60; // Height of each layer bar
 
@@ -132,10 +133,29 @@ export default function Timeline({
     }
   }, [dragState, sections, onUpdateSection]);
 
+  // Handle scroll wheel for horizontal scrolling
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      // Horizontal scroll with wheel
+      setScrollOffset(prev => {
+        const newOffset = prev + e.deltaY;
+        // Clamp to reasonable bounds
+        return Math.max(0, Math.min(newOffset, Math.max(0, timelineWidth - 1000)));
+      });
+    };
+
+    const timelineElement = timelineRef.current?.parentElement;
+    if (timelineElement) {
+      timelineElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => timelineElement.removeEventListener('wheel', handleWheel);
+    }
+  }, [duration]);
+
   const timelineWidth = Math.max(duration * PIXELS_PER_SECOND, 1000);
 
   return (
-    <div className="h-64 bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
+    <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
       {/* Timeline Header */}
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
         <div>
@@ -157,7 +177,7 @@ export default function Timeline({
       </div>
 
       {/* Timeline Content */}
-      <div className="flex-1 overflow-auto relative">
+      <div className="flex-1 overflow-auto relative" style={{ scrollLeft: scrollOffset }}>
         {/* Time ruler */}
         <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 h-8 flex items-center">
           <div className="relative" style={{ width: `${timelineWidth}px` }}>
