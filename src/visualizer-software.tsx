@@ -16,6 +16,7 @@ const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
 const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
 const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
+const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -107,7 +108,7 @@ export default function ThreeDVisualizer() {
   // FPS tracking
   const [fps, setFps] = useState<number>(0);
   const fpsFrameCount = useRef(0);
-  const fpsLastTime = useRef(performance.now());
+  const fpsLastTime = useRef(0);
   
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -846,9 +847,15 @@ export default function ThreeDVisualizer() {
       // FPS calculation
       fpsFrameCount.current++;
       const now = performance.now();
+      
+      // Initialize fpsLastTime on first frame
+      if (fpsLastTime.current === 0) {
+        fpsLastTime.current = now;
+      }
+      
       const elapsed = now - fpsLastTime.current;
-      if (elapsed >= 1000) { // Update FPS every second
-        const currentFps = Math.round((fpsFrameCount.current * 1000) / elapsed);
+      if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
+        const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
         setFps(currentFps);
         fpsFrameCount.current = 0;
         fpsLastTime.current = now;
