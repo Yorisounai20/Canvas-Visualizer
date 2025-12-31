@@ -1402,32 +1402,45 @@ export default function ThreeDVisualizer() {
         </div>
       </div>
 
-      {/* Waveform Display - Between Canvas and Tabs */}
-      {audioReady && waveformData.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center gap-4">
-            {/* Time Display */}
-            <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
-              <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-              {showPresetDisplay && getCurrentSection() && (
-                <p className="text-cyan-400 text-xs mt-1">
-                  {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
-                </p>
-              )}
+      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-4 mb-4">
+          {/* Time Display and Audio Upload */}
+          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
+            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
+            {showPresetDisplay && getCurrentSection() && (
+              <p className="text-cyan-400 text-xs mt-1">
+                {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
+              </p>
+            )}
+            
+            {/* Audio File Upload - Always visible */}
+            <div className="mt-3 pt-3 border-t border-gray-600">
+              <label className="text-cyan-400 text-xs font-semibold block mb-2">Audio File</label>
+              <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files?.[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
             </div>
             
-            {/* Waveform */}
-            <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={handleWaveformClick}>
+            {/* Play/Stop Button */}
+            {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+          </div>
+          
+          {/* Waveform - Made bigger, only shows when audio loaded */}
+          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={audioReady ? handleWaveformClick : undefined}>
+            {audioReady && waveformData.length > 0 ? (
               <canvas 
                 ref={waveformCanvasRef} 
                 width={800} 
-                height={80}
+                height={120}
                 className="w-full h-full"
               />
-            </div>
+            ) : (
+              <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                Upload an audio file to see the waveform
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Tab Navigation */}
       <div className="bg-gray-800 rounded-lg p-4">
@@ -1791,16 +1804,8 @@ export default function ThreeDVisualizer() {
         )}
       </div>
 
-      {/* Audio Upload and Debugger - Always visible at bottom */}
+      {/* Debugger - Always visible at bottom */}
       <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex gap-4 items-start mb-4 flex-wrap">
-          <div className="flex-1 min-w-[300px]">
-            <label className="text-cyan-400 text-sm font-semibold block mb-2">Audio File</label>
-            <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files?.[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
-          </div>
-          {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-6 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">{isPlaying ? <><Square size={16} /> Stop</> : <><Play size={16} /> Play</>}</button>}
-        </div>
-
         <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
