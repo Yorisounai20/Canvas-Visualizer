@@ -14,7 +14,7 @@ const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
-const WAVEFORM_SAMPLES = 800;
+const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -106,6 +106,8 @@ export default function ThreeDVisualizer() {
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastWaveformRenderRef = useRef<number>(0);
+  const waveformAnimationFrameRef = useRef<number | null>(null);
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -1308,7 +1310,7 @@ export default function ThreeDVisualizer() {
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
-  // Draw waveform on canvas
+  // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
     if (!waveformCanvasRef.current || waveformData.length === 0) return;
     
@@ -1319,81 +1321,114 @@ export default function ThreeDVisualizer() {
     const width = canvas.width;
     const height = canvas.height;
     
-    // Calculate current progress (0 to 1)
-    const currentProgress = duration > 0 ? currentTime / duration : 0;
-    
-    // Clear canvas
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
-    
-    if (waveformMode === 'scrolling') {
-      // Scrolling waveform parameters
-      const BAR_WIDTH = 3;
-      const BAR_GAP = 1;
-      const totalBarWidth = BAR_WIDTH + BAR_GAP;
-      const maxHeight = height * 0.4;
-      const baseY = height;
-      const playheadX = width / 2;
-      const playedBarIndex = Math.floor(currentProgress * waveformData.length);
+    const renderWaveform = () => {
+      const now = performance.now();
+      const timeSinceLastRender = now - lastWaveformRenderRef.current;
       
-      // Colors for scrolling mode
-      const SCROLLING_PLAYED_COLOR = 'rgba(255, 255, 255, 0.85)';
-      const SCROLLING_UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.35)';
-      const SCROLLING_PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.6)';
+      // Throttle to max 30fps for waveform rendering (every ~33ms)
+      if (timeSinceLastRender < 33) {
+        waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+        return;
+      }
       
-      // Calculate scroll offset
-      const totalWidth = waveformData.length * totalBarWidth;
-      const scrollOffset = currentProgress * totalWidth;
+      lastWaveformRenderRef.current = now;
       
-      // Draw waveform bars (scrolling with centered playhead)
-      for (let i = 0; i < waveformData.length; i++) {
-        const barHeight = waveformData[i] * maxHeight;
-        const x = playheadX + (i * totalBarWidth) - scrollOffset;
+      // Calculate current progress (0 to 1)
+      const currentProgress = duration > 0 ? currentTime / duration : 0;
+      
+      // Clear canvas
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+      
+      if (waveformMode === 'scrolling') {
+        // Scrolling waveform parameters
+        const BAR_WIDTH = 3;
+        const BAR_GAP = 1;
+        const totalBarWidth = BAR_WIDTH + BAR_GAP;
+        const maxHeight = height * 0.4;
+        const baseY = height;
+        const playheadX = width / 2;
+        const playedBarIndex = Math.floor(currentProgress * waveformData.length);
         
-        // Only render bars that are visible in the viewport
-        if (x > -totalBarWidth && x < width) {
-          const y = baseY - barHeight;
-          const isPlayed = i < playedBarIndex;
+        // Colors for scrolling mode
+        const SCROLLING_PLAYED_COLOR = 'rgba(255, 255, 255, 0.85)';
+        const SCROLLING_UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.35)';
+        const SCROLLING_PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.6)';
+        
+        // Calculate scroll offset
+        const totalWidth = waveformData.length * totalBarWidth;
+        const scrollOffset = currentProgress * totalWidth;
+        
+        // Draw waveform bars (scrolling with centered playhead)
+        for (let i = 0; i < waveformData.length; i++) {
+          const barHeight = waveformData[i] * maxHeight;
+          const x = playheadX + (i * totalBarWidth) - scrollOffset;
           
-          ctx.fillStyle = isPlayed ? SCROLLING_PLAYED_COLOR : SCROLLING_UNPLAYED_COLOR;
-          ctx.fillRect(x, y, BAR_WIDTH, barHeight);
+          // Only render bars that are visible in the viewport
+          if (x > -totalBarWidth && x < width) {
+            const y = baseY - barHeight;
+            const isPlayed = i < playedBarIndex;
+            
+            ctx.fillStyle = isPlayed ? SCROLLING_PLAYED_COLOR : SCROLLING_UNPLAYED_COLOR;
+            ctx.fillRect(x, y, BAR_WIDTH, barHeight);
+          }
         }
+        
+        // Draw playhead line at center
+        ctx.fillStyle = SCROLLING_PLAYHEAD_COLOR;
+        ctx.fillRect(playheadX - 1, 0, 2, height);
+      } else {
+        // Static waveform parameters (entire waveform visible)
+        const BAR_GAP = 0.5;
+        const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
+        const maxHeight = height * 0.8;
+        const baseY = height / 2;
+        
+        // Colors matching app theme
+        const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)';
+        const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)';
+        const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)';
+        
+        const playheadX = currentProgress * width;
+        
+        // Draw waveform bars (static, entire waveform visible)
+        for (let i = 0; i < waveformData.length; i++) {
+          const barHeight = waveformData[i] * maxHeight;
+          const x = (i / waveformData.length) * width;
+          const y = baseY - barHeight / 2;
+          
+          const isPast = (i / waveformData.length) < currentProgress;
+          
+          ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
+          ctx.fillRect(x, y, barWidth, barHeight);
+        }
+        
+        // Draw playhead line (moves across the waveform)
+        ctx.fillStyle = PLAYHEAD_COLOR;
+        ctx.fillRect(playheadX - 1, 0, 2, height);
       }
       
-      // Draw playhead line at center
-      ctx.fillStyle = SCROLLING_PLAYHEAD_COLOR;
-      ctx.fillRect(playheadX - 1, 0, 2, height);
+      // Continue animation loop if playing
+      if (isPlaying) {
+        waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+      }
+    };
+    
+    // Start rendering
+    if (isPlaying) {
+      waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
     } else {
-      // Static waveform parameters (entire waveform visible)
-      const BAR_GAP = 0.5;
-      const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
-      const maxHeight = height * 0.8;
-      const baseY = height / 2;
-      
-      // Colors matching app theme
-      const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)';
-      const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)';
-      const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)';
-      
-      const playheadX = currentProgress * width;
-      
-      // Draw waveform bars (static, entire waveform visible)
-      for (let i = 0; i < waveformData.length; i++) {
-        const barHeight = waveformData[i] * maxHeight;
-        const x = (i / waveformData.length) * width;
-        const y = baseY - barHeight / 2;
-        
-        const isPast = (i / waveformData.length) < currentProgress;
-        
-        ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
-        ctx.fillRect(x, y, barWidth, barHeight);
-      }
-      
-      // Draw playhead line (moves across the waveform)
-      ctx.fillStyle = PLAYHEAD_COLOR;
-      ctx.fillRect(playheadX - 1, 0, 2, height);
+      // Render once when not playing
+      renderWaveform();
     }
-  }, [waveformData, currentTime, duration, waveformMode]);
+    
+    return () => {
+      if (waveformAnimationFrameRef.current) {
+        cancelAnimationFrame(waveformAnimationFrameRef.current);
+        waveformAnimationFrameRef.current = null;
+      }
+    };
+  }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
   // Handle ESC key to close export modal
   useEffect(() => {
