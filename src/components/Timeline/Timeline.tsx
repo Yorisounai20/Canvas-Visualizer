@@ -14,10 +14,12 @@ interface TimelineProps {
   onSeek: (time: number) => void;
 }
 
+type TimelineTab = 'sections' | 'presets' | 'camera' | 'text';
+
 /**
- * Timeline Component - After Effects-style timeline
+ * Timeline Component - After Effects-style timeline with tabs
  * Shows sections as bars that can be moved, trimmed, and resized
- * Includes playhead scrubbing and keyframe markers
+ * Includes tabs for Sections, Presets, Camera, and Text organization
  */
 export default function Timeline({
   sections,
@@ -30,6 +32,7 @@ export default function Timeline({
   onAddSection,
   onSeek
 }: TimelineProps) {
+  const [activeTab, setActiveTab] = useState<TimelineTab>('sections');
   const [dragState, setDragState] = useState<{
     type: 'move' | 'resize-start' | 'resize-end' | null;
     sectionId: number | null;
@@ -176,8 +179,38 @@ export default function Timeline({
         </button>
       </div>
 
+      {/* Timeline Tabs */}
+      <div className="border-b border-gray-700 bg-[#2B2B2B] px-2">
+        <div className="flex gap-1">
+          {[
+            { id: 'sections' as TimelineTab, label: 'Sections', icon: '📋' },
+            { id: 'presets' as TimelineTab, label: 'Presets', icon: '🎨' },
+            { id: 'camera' as TimelineTab, label: 'Camera', icon: '📷' },
+            { id: 'text' as TimelineTab, label: 'Text', icon: '📝' }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-2 text-sm font-medium transition-all relative ${
+                activeTab === tab.id
+                  ? 'text-cyan-400 bg-gray-700'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700 hover:bg-opacity-50'
+              }`}
+            >
+              <span className="mr-1.5">{tab.icon}</span>
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Timeline Content */}
       <div className="flex-1 overflow-auto relative" style={{ scrollLeft: scrollOffset }}>
+        {activeTab === 'sections' && (
+          <>
         {/* Time ruler */}
         <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 h-8 flex items-center">
           <div className="relative" style={{ width: `${timelineWidth}px` }}>
@@ -283,6 +316,35 @@ export default function Timeline({
             );
           })}
         </div>
+        </>
+        )}
+
+        {/* Presets Tab */}
+        {activeTab === 'presets' && (
+          <div className="p-8 text-center text-gray-400">
+            <p className="text-lg mb-2">🎨 Preset Keyframes</p>
+            <p className="text-sm">Timeline-based preset automation coming soon</p>
+            <p className="text-xs mt-2 text-gray-500">Switch presets at specific timestamps for automated transitions</p>
+          </div>
+        )}
+
+        {/* Camera Tab */}
+        {activeTab === 'camera' && (
+          <div className="p-8 text-center text-gray-400">
+            <p className="text-lg mb-2">📷 Camera Keyframes</p>
+            <p className="text-sm">Timeline-based camera animation coming soon</p>
+            <p className="text-xs mt-2 text-gray-500">Animate camera position, rotation, and distance over time</p>
+          </div>
+        )}
+
+        {/* Text Tab */}
+        {activeTab === 'text' && (
+          <div className="p-8 text-center text-gray-400">
+            <p className="text-lg mb-2">📝 Text Keyframes</p>
+            <p className="text-sm">3D text overlay animations coming soon</p>
+            <p className="text-xs mt-2 text-gray-500">Animate song name position, scale, rotation, and opacity</p>
+          </div>
+        )}
       </div>
     </div>
   );

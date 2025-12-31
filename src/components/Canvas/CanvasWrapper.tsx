@@ -33,8 +33,8 @@ export default function CanvasWrapper({
     : letterboxSize;
 
   return (
-    <div className="flex-1 flex items-center justify-center bg-[#1E1E1E] p-4">
-      <div className="relative">
+    <div className="flex-1 flex items-center justify-center bg-[#1E1E1E] p-4 overflow-hidden">
+      <div className="relative flex items-center justify-center">
         {/* Canvas container - this is where Three.js will render */}
         <div 
           ref={containerRef} 
@@ -42,7 +42,8 @@ export default function CanvasWrapper({
           style={{
             width: '960px',
             height: '540px',
-            borderColor: showBorder ? borderColor : 'transparent'
+            borderColor: showBorder ? borderColor : 'transparent',
+            margin: '0 auto'
           }}
         />
 
