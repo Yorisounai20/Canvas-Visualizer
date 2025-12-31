@@ -1320,6 +1320,7 @@ export default function ThreeDVisualizer() {
     
     // Calculate current progress (0 to 1)
     const currentProgress = duration > 0 ? currentTime / duration : 0;
+    const playedBarIndex = Math.floor(currentProgress * waveformData.length);
     
     // Clear canvas
     ctx.fillStyle = '#000000';
@@ -1337,7 +1338,7 @@ export default function ThreeDVisualizer() {
       // Only render bars that are visible in the viewport
       if (x > -totalBarWidth && x < width) {
         const y = baseY - barHeight;
-        const isPlayed = i < Math.floor(currentProgress * waveformData.length);
+        const isPlayed = i < playedBarIndex;
         
         if (isPlayed) {
           ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
