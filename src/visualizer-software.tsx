@@ -69,7 +69,7 @@ export default function ThreeDVisualizer() {
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
-  const [invertLetterbox, setInvertLetterbox] = useState(false); // Toggle: false = bars visible when size is large, true = bars visible when size is small
+  const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
@@ -81,6 +81,7 @@ export default function ThreeDVisualizer() {
     targetSize: number;  // Target letterbox size (0-100px)
     duration: number;    // Duration of the animation in seconds
     mode: 'instant' | 'smooth'; // Animation mode
+    invert: boolean;     // Per-keyframe invert: true = curtain mode (100=closed, 0=open)
   }>>([]);
   // NEW: Camera shake events
   const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
@@ -453,7 +454,8 @@ export default function ThreeDVisualizer() {
         : 0,
       targetSize: 50,
       duration: 1,
-      mode: 'smooth' as 'smooth' | 'instant'
+      mode: 'smooth' as 'smooth' | 'instant',
+      invert: false  // Default to non-inverted
     };
     setLetterboxKeyframes([...letterboxKeyframes, newKeyframe]);
     setShowLetterbox(true); // Enable letterbox when adding keyframes
@@ -947,6 +949,9 @@ export default function ThreeDVisualizer() {
           const nextKeyframe = sortedLetterboxKeyframes[currentKeyframeIndex + 1];
           const timeUntilNextKeyframe = nextKeyframe.time - t;
           
+          // Use the next keyframe's invert setting during animation
+          setActiveLetterboxInvert(nextKeyframe.invert);
+          
           // If we're within the duration window before the next keyframe, animate toward it
           if (timeUntilNextKeyframe <= nextKeyframe.duration) {
             if (nextKeyframe.mode === 'smooth') {
@@ -966,10 +971,17 @@ export default function ThreeDVisualizer() {
           } else {
             // Not in animation window, hold at current keyframe's target
             setLetterboxSize(getCurrentSize());
+            // Use current keyframe's invert when not animating
+            if (currentKeyframeIndex >= 0) {
+              setActiveLetterboxInvert(sortedLetterboxKeyframes[currentKeyframeIndex].invert);
+            }
           }
         } else {
           // We're past the last keyframe, hold at its target
           setLetterboxSize(getCurrentSize());
+          if (currentKeyframeIndex >= 0) {
+            setActiveLetterboxInvert(sortedLetterboxKeyframes[currentKeyframeIndex].invert);
+          }
         }
       }
 
@@ -1580,7 +1592,12 @@ export default function ThreeDVisualizer() {
         <div className="relative">
           <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
           {showLetterbox && (() => {
-            const actualBarHeight = invertLetterbox ? (100 - letterboxSize) : letterboxSize;
+            // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
+            // We need to map this to actual bar heights: 100 -> 270px (full coverage), 0 -> 0px
+            // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
+            const actualBarHeight = activeLetterboxInvert 
+              ? Math.round((letterboxSize / 100) * 270)  // 270px = half of 540px canvas height (full coverage)
+              : letterboxSize;
             return (
               <>
                 <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
@@ -1588,7 +1605,7 @@ export default function ThreeDVisualizer() {
               </>
             );
           })()}
-          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (invertLetterbox ? (100 - letterboxSize) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * 270) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         </div>
       </div>
 
@@ -1879,21 +1896,6 @@ export default function ThreeDVisualizer() {
                   <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
                 </div>
                 
-                {showLetterbox && (
-                  <div className="flex items-center gap-3 ml-7">
-                    <input 
-                      type="checkbox" 
-                      id="invertLetterbox" 
-                      checked={invertLetterbox} 
-                      onChange={(e) => setInvertLetterbox(e.target.checked)} 
-                      className="w-4 h-4 cursor-pointer" 
-                    />
-                    <label htmlFor="invertLetterbox" className="text-sm text-gray-300 cursor-pointer">
-                      Invert (start closed, open up)
-                    </label>
-                  </div>
-                )}
-                
                 {showLetterbox && letterboxKeyframes.length > 0 && (
                   <div className="flex items-center gap-3 ml-7">
                     <input 
@@ -1981,10 +1983,27 @@ export default function ThreeDVisualizer() {
                         </div>
                       </div>
                       
+                      <div className="flex items-center gap-2 mt-2">
+                        <input 
+                          type="checkbox" 
+                          id={`invert-${index}`}
+                          checked={keyframe.invert} 
+                          onChange={(e) => updateLetterboxKeyframe(index, 'invert', e.target.checked)} 
+                          className="w-4 h-4 cursor-pointer" 
+                        />
+                        <label htmlFor={`invert-${index}`} className="text-xs text-gray-300 cursor-pointer">
+                          Curtain mode (100=closed, 0=open)
+                        </label>
+                      </div>
+                      
                       <p className="text-xs text-gray-400 italic">
-                        {keyframe.mode === 'smooth' 
-                          ? `Opens/closes to ${keyframe.targetSize}px over ${keyframe.duration}s`
-                          : `Instantly sets to ${keyframe.targetSize}px`}
+                        {keyframe.invert
+                          ? (keyframe.mode === 'smooth' 
+                              ? `Animates to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`} over ${keyframe.duration}s`
+                              : `Instantly sets to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`}`)
+                          : (keyframe.mode === 'smooth' 
+                              ? `Animates to ${keyframe.targetSize}px bars over ${keyframe.duration}s`
+                              : `Instantly sets to ${keyframe.targetSize}px bars`)}
                       </p>
                     </div>
                   ))}
