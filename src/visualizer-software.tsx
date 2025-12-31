@@ -66,13 +66,21 @@ export default function ThreeDVisualizer() {
   const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
   
   // NEW: Visual effects controls
-  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
+  const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
+  // NEW: Letterbox animation keyframes
+  const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
+    time: number;        // Time in seconds when this keyframe activates
+    targetSize: number;  // Target letterbox size (0-100px)
+    duration: number;    // Duration of the animation in seconds
+    mode: 'instant' | 'smooth'; // Animation mode
+  }>>([]);
   // NEW: Camera shake events
   const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
   
@@ -428,6 +436,36 @@ export default function ThreeDVisualizer() {
   const updateKeyframe = (keyframeIndex, field, value) => {
     setCameraKeyframes(cameraKeyframes.map((kf, i) => 
       i === keyframeIndex ? { ...kf, [field]: value } : kf
+    ));
+  };
+
+  // Letterbox keyframe management
+  const addLetterboxKeyframe = () => {
+    const newKeyframe = {
+      time: letterboxKeyframes.length > 0 
+        ? Math.max(...letterboxKeyframes.map(k => k.time)) + 5 
+        : 0,
+      targetSize: 50,
+      duration: 1,
+      mode: 'smooth' as 'smooth' | 'instant'
+    };
+    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe]);
+    setShowLetterbox(true); // Enable letterbox when adding keyframes
+    setUseLetterboxAnimation(true); // Enable animation mode
+  };
+
+  const deleteLetterboxKeyframe = (index: number) => {
+    const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
+    setLetterboxKeyframes(newKeyframes);
+    // If no keyframes left, disable animation mode
+    if (newKeyframes.length === 0) {
+      setUseLetterboxAnimation(false);
+    }
+  };
+
+  const updateLetterboxKeyframe = (index: number, field: string, value: any) => {
+    setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
+      i === index ? { ...kf, [field]: value } : kf
     ));
   };
 
@@ -881,6 +919,50 @@ export default function ThreeDVisualizer() {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
         activeCameraRotation = cameraRotation;
+      }
+
+      // Animate letterbox based on keyframes (only if animation is enabled)
+      if (showLetterbox && useLetterboxAnimation && letterboxKeyframes.length > 0) {
+        const sortedKeyframes = [...letterboxKeyframes].sort((a, b) => a.time - b.time);
+        
+        // Find the active keyframe(s) for current time
+        let activeKeyframe = null;
+        let nextKeyframe = null;
+        
+        for (let i = 0; i < sortedKeyframes.length; i++) {
+          if (t >= sortedKeyframes[i].time) {
+            activeKeyframe = sortedKeyframes[i];
+            nextKeyframe = sortedKeyframes[i + 1] || null;
+          }
+        }
+        
+        if (activeKeyframe) {
+          const timeSinceKeyframe = t - activeKeyframe.time;
+          
+          if (activeKeyframe.mode === 'instant') {
+            // Instant change
+            setLetterboxSize(activeKeyframe.targetSize);
+          } else {
+            // Smooth animation
+            if (timeSinceKeyframe < activeKeyframe.duration) {
+              // Currently animating
+              const progress = timeSinceKeyframe / activeKeyframe.duration;
+              const easeProgress = progress < 0.5 
+                ? 2 * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 2) / 2; // easeInOutQuad
+              
+              const startSize = activeKeyframe === sortedKeyframes[0] 
+                ? 0 
+                : sortedKeyframes[sortedKeyframes.indexOf(activeKeyframe) - 1]?.targetSize || 0;
+              
+              const newSize = startSize + (activeKeyframe.targetSize - startSize) * easeProgress;
+              setLetterboxSize(Math.round(newSize));
+            } else {
+              // Animation complete, hold at target
+              setLetterboxSize(activeKeyframe.targetSize);
+            }
+          }
+        }
       }
 
       // Calculate camera shake offset
@@ -1761,17 +1843,138 @@ export default function ThreeDVisualizer() {
                   <label className="text-xs text-gray-400 block mb-1">Border Color</label>
                   <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
+              </div>
+            </div>
+            
+            {/* Letterbox Animation Section */}
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Animated Letterbox</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create cinematic curtain-like letterbox animations</p>
+                </div>
+                <button 
+                  onClick={addLetterboxKeyframe} 
+                  disabled={!showLetterbox}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+              
+              <div className="space-y-2 mb-3">
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">Cinematic Letterbox Bars</label>
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
                 </div>
-                {showLetterbox && (
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
-                    <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                
+                {showLetterbox && letterboxKeyframes.length > 0 && (
+                  <div className="flex items-center gap-3 ml-7">
+                    <input 
+                      type="checkbox" 
+                      id="useLetterboxAnimation" 
+                      checked={useLetterboxAnimation} 
+                      onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
+                      Use Animations ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
+                    </label>
                   </div>
                 )}
+                
+                {showLetterbox && letterboxKeyframes.length === 0 && (
+                  <p className="text-xs text-gray-400 ml-7">Manual mode - use slider below</p>
+                )}
               </div>
+              
+              {letterboxKeyframes.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {letterboxKeyframes.map((keyframe, index) => (
+                    <div key={index} className="bg-gray-800 rounded p-3 space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Keyframe {index + 1}</span>
+                        <button 
+                          onClick={() => deleteLetterboxKeyframe(index)} 
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max={duration}
+                            step="0.1" 
+                            value={keyframe.time} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'time', parseFloat(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            step="5" 
+                            value={keyframe.targetSize} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'targetSize', parseInt(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="10" 
+                            step="0.1" 
+                            value={keyframe.duration} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'duration', parseFloat(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Mode</label>
+                          <select 
+                            value={keyframe.mode} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'mode', e.target.value)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="smooth">Smooth</option>
+                            <option value="instant">Instant</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-400 italic">
+                        {keyframe.mode === 'smooth' 
+                          ? `Opens/closes to ${keyframe.targetSize}px over ${keyframe.duration}s`
+                          : `Instantly sets to ${keyframe.targetSize}px`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic text-center py-4">
+                  No letterbox animations yet. Click "Add" to create cinematic curtain effects.
+                </p>
+              )}
+              
+              {showLetterbox && letterboxKeyframes.length === 0 && (
+                <div className="mt-3">
+                  <label className="text-xs text-gray-400 block mb-1">Manual Size: {letterboxSize}px</label>
+                  <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+              )}
             </div>
             
             <div className="bg-gray-700 rounded-lg p-3 mt-4">
