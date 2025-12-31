@@ -1307,7 +1307,6 @@ export default function ThreeDVisualizer() {
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
   // Draw waveform on canvas
-  // Draw waveform on canvas
   useEffect(() => {
     if (!waveformCanvasRef.current || waveformData.length === 0) return;
     
