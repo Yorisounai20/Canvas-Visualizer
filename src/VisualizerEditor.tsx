@@ -616,9 +616,11 @@ export default function VisualizerEditor() {
         currentTime={currentTime}
         duration={duration}
         currentPreset={currentPreset}
+        audioFileName={audioFileName}
         onPlay={playAudio}
         onStop={stopAudio}
         onExport={() => setShowExportModal(true)}
+        onAudioFileChange={handleAudioFileChange}
         canUndo={false}
         canRedo={false}
       />
@@ -736,21 +738,6 @@ export default function VisualizerEditor() {
         onSetFormat={setExportFormat}
         onSetResolution={setExportResolution}
       />
-
-      {/* Audio Upload - Floating button */}
-      <div className="fixed bottom-72 right-4 z-30">
-        <div className="bg-[#2B2B2B] rounded-lg p-4 shadow-2xl border border-gray-700">
-          <label className="text-cyan-400 text-sm font-semibold block mb-2">
-            Upload Audio
-          </label>
-          <input
-            type="file"
-            accept="audio/*"
-            onChange={handleAudioFileChange}
-            className="block w-full text-xs text-gray-300 file:mr-2 file:py-2 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer"
-          />
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Video, Undo2, Redo2 } from 'lucide-react';
+import { Play, Square, Video, Undo2, Redo2, Upload } from 'lucide-react';
 
 interface TopBarProps {
   isPlaying: boolean;
@@ -7,9 +7,11 @@ interface TopBarProps {
   currentTime: number;
   duration: number;
   currentPreset: string | null;
+  audioFileName: string;
   onPlay: () => void;
   onStop: () => void;
   onExport: () => void;
+  onAudioFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUndo?: () => void;
   onRedo?: () => void;
   canUndo?: boolean;
@@ -26,9 +28,11 @@ export default function TopBar({
   currentTime,
   duration,
   currentPreset,
+  audioFileName,
   onPlay,
   onStop,
   onExport,
+  onAudioFileChange,
   onUndo,
   onRedo,
   canUndo = false,
@@ -57,6 +61,21 @@ export default function TopBar({
         <div className="text-white font-mono text-sm bg-gray-700 px-3 py-1.5 rounded">
           {formatTime(currentTime)} / {formatTime(duration)}
         </div>
+
+        {/* Audio Upload Button */}
+        <label
+          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-semibold cursor-pointer transition-colors"
+          title="Upload Audio File"
+        >
+          <Upload size={16} />
+          <span>{audioFileName || 'Upload Audio'}</span>
+          <input
+            type="file"
+            accept="audio/*"
+            onChange={onAudioFileChange}
+            className="hidden"
+          />
+        </label>
 
         {/* Playback Buttons */}
         <div className="flex items-center gap-2">
