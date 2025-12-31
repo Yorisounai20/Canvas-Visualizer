@@ -109,6 +109,13 @@ export default function ThreeDVisualizer() {
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
+  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const seekPosition = (x / rect.width) * duration;
+    seekTo(seekPosition);
+  };
+
   const loadCustomFont = async (file: File) => {
     try {
       addLog(`Loading custom font: ${file.name}`, 'info');
@@ -1313,15 +1320,15 @@ export default function ThreeDVisualizer() {
     // Draw playback progress overlay
     if (duration > 0) {
       const progressWidth = (currentTime / duration) * width;
+      const endIndex = Math.ceil(progressWidth / barWidth);
       ctx.fillStyle = '#06b6d4'; // Cyan color for progress
-      waveformData.forEach((value, index) => {
+      for (let index = 0; index < endIndex && index < waveformData.length; index++) {
+        const value = waveformData[index];
+        const barHeight = value * height;
         const x = index * barWidth;
-        if (x < progressWidth) {
-          const barHeight = value * height;
-          const y = height - barHeight;
-          ctx.fillRect(x, y, barWidth - 0.5, barHeight);
-        }
-      });
+        const y = height - barHeight;
+        ctx.fillRect(x, y, barWidth - 0.5, barHeight);
+      }
     }
   }, [waveformData, currentTime, duration]);
 
@@ -1365,12 +1372,7 @@ export default function ThreeDVisualizer() {
             </div>
             
             {/* Waveform */}
-            <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const x = e.clientX - rect.left;
-              const seekPosition = (x / rect.width) * duration;
-              seekTo(seekPosition);
-            }}>
+            <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={handleWaveformClick}>
               <canvas 
                 ref={waveformCanvasRef} 
                 width={800} 
