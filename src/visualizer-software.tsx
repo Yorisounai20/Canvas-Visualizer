@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { Trash2, Plus, Play, Square } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X } from 'lucide-react';
 
 interface LogEntry {
   message: string;
@@ -14,6 +14,7 @@ const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
+const WAVEFORM_SAMPLES = 800;
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -81,6 +82,7 @@ export default function ThreeDVisualizer() {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
+  const [showExportModal, setShowExportModal] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('controls');
@@ -99,10 +101,34 @@ export default function ThreeDVisualizer() {
   ]);
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
+  
+  // Waveform state
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const seekPosition = (x / rect.width) * duration;
+    seekTo(seekPosition);
+  };
+
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      const f = e.target.files[0];
+      setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
+      initAudio(f);
+    }
+  };
+
+  const handleExportAndCloseModal = () => {
+    exportVideo();
+    setShowExportModal(false);
   };
 
   const loadCustomFont = async (file: File) => {
@@ -411,6 +437,23 @@ export default function ThreeDVisualizer() {
     ));
   };
 
+  const generateWaveformData = (buffer: AudioBuffer, samples = WAVEFORM_SAMPLES) => {
+    const rawData = buffer.getChannelData(0); // Get mono or first channel
+    const blockSize = Math.floor(rawData.length / samples);
+    const waveform: number[] = [];
+    
+    for (let i = 0; i < samples; i++) {
+      let blockStart = blockSize * i;
+      let sum = 0;
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[blockStart + j]);
+      }
+      waveform.push(sum / blockSize);
+    }
+    
+    return waveform;
+  };
+
   const initAudio = async (file) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
@@ -424,6 +467,11 @@ export default function ThreeDVisualizer() {
       analyserRef.current = analyser;
       setDuration(buf.duration);
       setAudioReady(true);
+      
+      // Generate waveform data
+      const waveform = generateWaveformData(buf);
+      setWaveformData(waveform);
+      
       addLog('Audio loaded successfully!', 'success');
     } catch (e) { 
       console.error(e);
@@ -1259,12 +1307,90 @@ export default function ThreeDVisualizer() {
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
+  // Draw waveform on canvas
+  useEffect(() => {
+    if (!waveformCanvasRef.current || waveformData.length === 0) return;
+    
+    const canvas = waveformCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    const width = canvas.width;
+    const height = canvas.height;
+    
+    // Scrolling waveform parameters
+    const barWidth = 3;
+    const gap = 1;
+    const totalBarWidth = barWidth + gap;
+    const maxHeight = height * 0.4;
+    const baseY = height;
+    const playheadX = width / 2;
+    
+    // Calculate current progress (0 to 1)
+    const currentProgress = duration > 0 ? currentTime / duration : 0;
+    const playedBarIndex = Math.floor(currentProgress * waveformData.length);
+    
+    // Clear canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+    
+    // Calculate scroll offset
+    const totalWidth = waveformData.length * totalBarWidth;
+    const scrollOffset = currentProgress * totalWidth;
+    
+    // Draw waveform bars (scrolling with centered playhead)
+    for (let i = 0; i < waveformData.length; i++) {
+      const barHeight = waveformData[i] * maxHeight;
+      const x = playheadX + (i * totalBarWidth) - scrollOffset;
+      
+      // Only render bars that are visible in the viewport
+      if (x > -totalBarWidth && x < width) {
+        const y = baseY - barHeight;
+        const isPlayed = i < playedBarIndex;
+        
+        if (isPlayed) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        } else {
+          ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
+        }
+        
+        ctx.fillRect(x, y, barWidth, barHeight);
+      }
+    }
+    
+    // Draw playhead line at center
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.fillRect(playheadX - 1, 0, 2, height);
+  }, [waveformData, currentTime, duration]);
+
+  // Handle ESC key to close export modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showExportModal) {
+        setShowExportModal(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showExportModal]);
+
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
       <div className="flex flex-col items-center">
-        <div className="mb-4 text-center">
+        <div className="mb-4 text-center relative" style={{width: '960px'}}>
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
+          
+          {/* Export Button - Top Right */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="absolute top-0 right-0 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            title="Video Export"
+          >
+            <Video size={18} />
+            <span className="text-sm font-semibold">Export</span>
+          </button>
         </div>
 
         <div className="relative">
@@ -1276,17 +1402,51 @@ export default function ThreeDVisualizer() {
             </>
           )}
           {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-          {showTimeDisplay && (
-            <div className="absolute bg-black bg-opacity-70 px-3 py-2 rounded" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, right: '16px'}}>
-              <p className="text-white text-sm font-mono">{formatTime(currentTime)} / {formatTime(duration)}</p>
-              {showPresetDisplay && getCurrentSection() && <p className="text-cyan-400 text-xs mt-1">{animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}</p>}
-            </div>
-          )}
           {showTimeline && duration > 0 && (
             <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
               <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-4">
+          {/* Time Display and Audio Upload */}
+          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
+            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
+            {showPresetDisplay && getCurrentSection() && (
+              <p className="text-cyan-400 text-xs mt-1">
+                {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
+              </p>
+            )}
+            
+            {/* Audio File Upload - Always visible */}
+            <div className="mt-3 pt-3 border-t border-gray-600">
+              <label className="text-cyan-400 text-xs font-semibold block mb-2">Audio File</label>
+              <input type="file" accept="audio/*" onChange={handleAudioFileChange} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
+            </div>
+            
+            {/* Play/Stop Button */}
+            {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+          </div>
+          
+          {/* Waveform - Made bigger, only shows when audio loaded */}
+          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={audioReady ? handleWaveformClick : undefined}>
+            {audioReady && waveformData.length > 0 ? (
+              <canvas 
+                ref={waveformCanvasRef} 
+                width={800} 
+                height={120}
+                className="w-full h-full"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                Upload an audio file to see the waveform
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1349,64 +1509,6 @@ export default function ThreeDVisualizer() {
                 <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
                 <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
               </div>
-            </div>
-
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 Video Export</h3>
-              
-              {/* Resolution Selector */}
-              <div className="mb-3">
-                <label className="text-xs text-gray-400 block mb-1">Export Resolution</label>
-                <select 
-                  value={exportResolution} 
-                  onChange={(e) => setExportResolution(e.target.value)}
-                  disabled={isExporting}
-                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
-                  <option value="960x540">960x540 (SD)</option>
-                  <option value="1280x720">1280x720 (HD 720p)</option>
-                  <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
-                </select>
-              </div>
-              
-              {/* Format Selector */}
-              <div className="mb-3">
-                <label className="text-xs text-gray-400 block mb-1">Output Format</label>
-                <select 
-                  value={exportFormat} 
-                  onChange={(e) => setExportFormat(e.target.value)}
-                  disabled={isExporting}
-                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
-                  <option value="webm">WebM (VP9 + Opus)</option>
-                  <option value="mp4">MP4 (if supported)</option>
-                </select>
-              </div>
-
-              {/* Export Button */}
-              <button 
-                onClick={exportVideo} 
-                disabled={!audioReady || isExporting} 
-                className={`w-full px-4 py-2 rounded font-semibold ${!audioReady || isExporting ? 'bg-gray-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
-                {isExporting ? '🎬 Exporting...' : '🎬 Export Full Video'}
-              </button>
-
-              {/* Progress Bar */}
-              {isExporting && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-400 mb-1">
-                    <span>Progress</span>
-                    <span>{exportProgress.toFixed(0)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-600 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full transition-all duration-300" 
-                      style={{width: `${exportProgress}%`}}>
-                    </div>
-                  </div>
-                  <p className="text-purple-400 text-xs mt-2 animate-pulse">🎬 Rendering video...</p>
-                </div>
-              )}
-              
-              <p className="text-xs text-gray-400 mt-2">Automatically renders full timeline with all presets & camera movements</p>
             </div>
           </div>
         )}
@@ -1710,16 +1812,8 @@ export default function ThreeDVisualizer() {
         )}
       </div>
 
-      {/* Audio Upload and Debugger - Always visible at bottom */}
+      {/* Debugger - Always visible at bottom */}
       <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex gap-4 items-start mb-4 flex-wrap">
-          <div className="flex-1 min-w-[300px]">
-            <label className="text-cyan-400 text-sm font-semibold block mb-2">Audio File</label>
-            <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files?.[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
-          </div>
-          {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-6 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded-lg flex items-center gap-2">{isPlaying ? <><Square size={16} /> Stop</> : <><Play size={16} /> Play</>}</button>}
-        </div>
-
         <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
@@ -1734,6 +1828,83 @@ export default function ThreeDVisualizer() {
           </div>
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowExportModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-purple-400 flex items-center gap-2">
+                <Video size={24} />
+                Video Export
+              </h2>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Resolution Selector */}
+              <div>
+                <label className="text-sm text-gray-300 block mb-2 font-semibold">Export Resolution</label>
+                <select 
+                  value={exportResolution} 
+                  onChange={(e) => setExportResolution(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+                  <option value="960x540">960x540 (SD)</option>
+                  <option value="1280x720">1280x720 (HD 720p)</option>
+                  <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
+                </select>
+              </div>
+              
+              {/* Format Selector */}
+              <div>
+                <label className="text-sm text-gray-300 block mb-2 font-semibold">Output Format</label>
+                <select 
+                  value={exportFormat} 
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+                  <option value="webm">WebM (VP9 + Opus)</option>
+                  <option value="mp4">MP4 (if supported)</option>
+                </select>
+              </div>
+
+              {/* Export Button */}
+              <button 
+                onClick={handleExportAndCloseModal} 
+                disabled={!audioReady || isExporting} 
+                className={`w-full px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${!audioReady || isExporting ? 'bg-gray-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white transition-colors`}>
+                <Video size={20} />
+                {isExporting ? 'Exporting...' : 'Export Full Video'}
+              </button>
+
+              {/* Progress Bar */}
+              {isExporting && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-400 mb-2">
+                    <span>Progress</span>
+                    <span>{exportProgress.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-3">
+                    <div 
+                      className="bg-purple-500 h-3 rounded-full transition-all duration-300" 
+                      style={{width: `${exportProgress}%`}}>
+                    </div>
+                  </div>
+                  <p className="text-purple-400 text-sm mt-2 animate-pulse text-center">🎬 Rendering video...</p>
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-400 text-center">Automatically renders full timeline with all presets & camera movements</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
