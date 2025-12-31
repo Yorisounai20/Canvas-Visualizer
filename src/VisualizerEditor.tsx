@@ -361,7 +361,7 @@ export default function VisualizerEditor() {
           planet.position.x = Math.cos(angle) * orbitRadius;
           planet.position.z = Math.sin(angle) * orbitRadius;
           planet.position.y = Math.sin(angle * 2) * tilt;
-          const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i];
+          const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i] || 1.0;
           const planetSize = sizeVariation + f.bass * 0.3;
           planet.scale.set(planetSize, planetSize, planetSize);
           planet.rotation.y += 0.02 + i * 0.005;
@@ -770,7 +770,7 @@ export default function VisualizerEditor() {
             (o.material as THREE.MeshBasicMaterial).wireframe = true;
           } else {
             // Dragon scales
-            const bodyIndex = (i % obj.cubes.length);
+            const bodyIndex = i % obj.cubes.length;
             const orbitAngle = (i / 4) * Math.PI * 2 + el * 3;
             const bodyCube = obj.cubes[bodyIndex];
             const orbitRadius = 1.2 + f.mids * 1.5;
