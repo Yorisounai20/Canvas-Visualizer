@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
@@ -123,6 +123,11 @@ export default function ThreeDVisualizer() {
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastWaveformRenderRef = useRef<number>(0);
   const waveformAnimationFrameRef = useRef<number | null>(null);
+
+  // Memoized sorted letterbox keyframes for performance
+  const sortedLetterboxKeyframes = useMemo(() => {
+    return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
+  }, [letterboxKeyframes]);
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -463,7 +468,7 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const updateLetterboxKeyframe = (index: number, field: string, value: any) => {
+  const updateLetterboxKeyframe = (index: number, field: string, value: number | string) => {
     setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
       i === index ? { ...kf, [field]: value } : kf
     ));
@@ -922,17 +927,15 @@ export default function ThreeDVisualizer() {
       }
 
       // Animate letterbox based on keyframes (only if animation is enabled)
-      if (showLetterbox && useLetterboxAnimation && letterboxKeyframes.length > 0) {
-        const sortedKeyframes = [...letterboxKeyframes].sort((a, b) => a.time - b.time);
-        
+      if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
         // Find the active keyframe(s) for current time
         let activeKeyframe = null;
-        let nextKeyframe = null;
+        let activeKeyframeIndex = -1;
         
-        for (let i = 0; i < sortedKeyframes.length; i++) {
-          if (t >= sortedKeyframes[i].time) {
-            activeKeyframe = sortedKeyframes[i];
-            nextKeyframe = sortedKeyframes[i + 1] || null;
+        for (let i = 0; i < sortedLetterboxKeyframes.length; i++) {
+          if (t >= sortedLetterboxKeyframes[i].time) {
+            activeKeyframe = sortedLetterboxKeyframes[i];
+            activeKeyframeIndex = i;
           }
         }
         
@@ -951,9 +954,10 @@ export default function ThreeDVisualizer() {
                 ? 2 * progress * progress 
                 : 1 - Math.pow(-2 * progress + 2, 2) / 2; // easeInOutQuad
               
-              const startSize = activeKeyframe === sortedKeyframes[0] 
-                ? 0 
-                : sortedKeyframes[sortedKeyframes.indexOf(activeKeyframe) - 1]?.targetSize || 0;
+              // Get start size from previous keyframe
+              const startSize = activeKeyframeIndex > 0
+                ? sortedLetterboxKeyframes[activeKeyframeIndex - 1].targetSize
+                : 0;
               
               const newSize = startSize + (activeKeyframe.targetSize - startSize) * easeProgress;
               setLetterboxSize(Math.round(newSize));
