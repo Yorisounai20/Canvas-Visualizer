@@ -69,6 +69,7 @@ export default function ThreeDVisualizer() {
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
+  const [invertLetterbox, setInvertLetterbox] = useState(false); // Toggle: false = bars visible when size is large, true = bars visible when size is small
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
@@ -1578,10 +1579,10 @@ export default function ThreeDVisualizer() {
 
         <div className="relative">
           <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-          {showLetterbox && letterboxSize > 0 && (
+          {showLetterbox && (
             <>
-              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
-              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${letterboxSize}px`}} />
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${invertLetterbox ? (100 - letterboxSize) : letterboxSize}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${invertLetterbox ? (100 - letterboxSize) : letterboxSize}px`}} />
             </>
           )}
           {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
@@ -1874,6 +1875,21 @@ export default function ThreeDVisualizer() {
                   <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
                 </div>
+                
+                {showLetterbox && (
+                  <div className="flex items-center gap-3 ml-7">
+                    <input 
+                      type="checkbox" 
+                      id="invertLetterbox" 
+                      checked={invertLetterbox} 
+                      onChange={(e) => setInvertLetterbox(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="invertLetterbox" className="text-sm text-gray-300 cursor-pointer">
+                      Invert (start closed, open up)
+                    </label>
+                  </div>
+                )}
                 
                 {showLetterbox && letterboxKeyframes.length > 0 && (
                   <div className="flex items-center gap-3 ml-7">
