@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
@@ -14,7 +14,9 @@ const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
-const WAVEFORM_SAMPLES = 800;
+const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
+const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
+const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -56,20 +58,29 @@ export default function ThreeDVisualizer() {
   const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
   // NEW: HUD visibility controls
-  const [showTimeline, setShowTimeline] = useState(true);
-  const [showTimeDisplay, setShowTimeDisplay] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
   const [showBorder, setShowBorder] = useState(true);
   
+  // NEW: Waveform mode control
+  const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
+  
   // NEW: Visual effects controls
-  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
+  const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
+  // NEW: Letterbox animation keyframes
+  const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
+    time: number;        // Time in seconds when this keyframe activates
+    targetSize: number;  // Target letterbox size (0-100px)
+    duration: number;    // Duration of the animation in seconds
+    mode: 'instant' | 'smooth'; // Animation mode
+  }>>([]);
   // NEW: Camera shake events
   const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
   
@@ -102,9 +113,21 @@ export default function ThreeDVisualizer() {
   const prevAnimRef = useRef('orbit');
   const transitionRef = useRef(1);
   
+  // FPS tracking
+  const [fps, setFps] = useState<number>(0);
+  const fpsFrameCount = useRef(0);
+  const fpsLastTime = useRef(0);
+  
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastWaveformRenderRef = useRef<number>(0);
+  const waveformAnimationFrameRef = useRef<number | null>(null);
+
+  // Memoized sorted letterbox keyframes for performance
+  const sortedLetterboxKeyframes = useMemo(() => {
+    return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
+  }, [letterboxKeyframes]);
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -418,6 +441,36 @@ export default function ThreeDVisualizer() {
   const updateKeyframe = (keyframeIndex, field, value) => {
     setCameraKeyframes(cameraKeyframes.map((kf, i) => 
       i === keyframeIndex ? { ...kf, [field]: value } : kf
+    ));
+  };
+
+  // Letterbox keyframe management
+  const addLetterboxKeyframe = () => {
+    const newKeyframe = {
+      time: letterboxKeyframes.length > 0 
+        ? Math.max(...letterboxKeyframes.map(k => k.time)) + 5 
+        : 0,
+      targetSize: 50,
+      duration: 1,
+      mode: 'smooth' as 'smooth' | 'instant'
+    };
+    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe]);
+    setShowLetterbox(true); // Enable letterbox when adding keyframes
+    setUseLetterboxAnimation(true); // Enable animation mode
+  };
+
+  const deleteLetterboxKeyframe = (index: number) => {
+    const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
+    setLetterboxKeyframes(newKeyframes);
+    // If no keyframes left, disable animation mode
+    if (newKeyframes.length === 0) {
+      setUseLetterboxAnimation(false);
+    }
+  };
+
+  const updateLetterboxKeyframe = (index: number, field: string, value: number | string) => {
+    setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
+      i === index ? { ...kf, [field]: value } : kf
     ));
   };
 
@@ -833,6 +886,24 @@ export default function ThreeDVisualizer() {
     const anim = () => {
       if (!isPlaying) return;
       animationRef.current = requestAnimationFrame(anim);
+      
+      // FPS calculation
+      fpsFrameCount.current++;
+      const now = performance.now();
+      
+      // Initialize fpsLastTime on first frame
+      if (fpsLastTime.current === 0) {
+        fpsLastTime.current = now;
+      }
+      
+      const elapsed = now - fpsLastTime.current;
+      if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
+        const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
+        setFps(currentFps);
+        fpsFrameCount.current = 0;
+        fpsLastTime.current = now;
+      }
+      
       analyser.getByteFrequencyData(data);
       const f = getFreq(data);
       const el = (Date.now() - startTimeRef.current) * 0.001;
@@ -853,6 +924,49 @@ export default function ThreeDVisualizer() {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
         activeCameraRotation = cameraRotation;
+      }
+
+      // Animate letterbox based on keyframes (only if animation is enabled)
+      if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
+        // Find the active keyframe(s) for current time
+        let activeKeyframe = null;
+        let activeKeyframeIndex = -1;
+        
+        for (let i = 0; i < sortedLetterboxKeyframes.length; i++) {
+          if (t >= sortedLetterboxKeyframes[i].time) {
+            activeKeyframe = sortedLetterboxKeyframes[i];
+            activeKeyframeIndex = i;
+          }
+        }
+        
+        if (activeKeyframe) {
+          const timeSinceKeyframe = t - activeKeyframe.time;
+          
+          if (activeKeyframe.mode === 'instant') {
+            // Instant change
+            setLetterboxSize(activeKeyframe.targetSize);
+          } else {
+            // Smooth animation
+            if (timeSinceKeyframe < activeKeyframe.duration) {
+              // Currently animating
+              const progress = timeSinceKeyframe / activeKeyframe.duration;
+              const easeProgress = progress < 0.5 
+                ? 2 * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 2) / 2; // easeInOutQuad
+              
+              // Get start size from previous keyframe
+              const startSize = activeKeyframeIndex > 0
+                ? sortedLetterboxKeyframes[activeKeyframeIndex - 1].targetSize
+                : 0;
+              
+              const newSize = startSize + (activeKeyframe.targetSize - startSize) * easeProgress;
+              setLetterboxSize(Math.round(newSize));
+            } else {
+              // Animation complete, hold at target
+              setLetterboxSize(activeKeyframe.targetSize);
+            }
+          }
+        }
       }
 
       // Calculate camera shake offset
@@ -1307,7 +1421,7 @@ export default function ThreeDVisualizer() {
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
-  // Draw waveform on canvas
+  // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
     if (!waveformCanvasRef.current || waveformData.length === 0) return;
     
@@ -1318,50 +1432,116 @@ export default function ThreeDVisualizer() {
     const width = canvas.width;
     const height = canvas.height;
     
-    // Scrolling waveform parameters
-    const barWidth = 3;
-    const gap = 1;
-    const totalBarWidth = barWidth + gap;
-    const maxHeight = height * 0.4;
-    const baseY = height;
-    const playheadX = width / 2;
-    
-    // Calculate current progress (0 to 1)
-    const currentProgress = duration > 0 ? currentTime / duration : 0;
-    const playedBarIndex = Math.floor(currentProgress * waveformData.length);
-    
-    // Clear canvas
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, width, height);
-    
-    // Calculate scroll offset
-    const totalWidth = waveformData.length * totalBarWidth;
-    const scrollOffset = currentProgress * totalWidth;
-    
-    // Draw waveform bars (scrolling with centered playhead)
-    for (let i = 0; i < waveformData.length; i++) {
-      const barHeight = waveformData[i] * maxHeight;
-      const x = playheadX + (i * totalBarWidth) - scrollOffset;
+    const renderWaveform = () => {
+      const now = performance.now();
+      const timeSinceLastRender = now - lastWaveformRenderRef.current;
       
-      // Only render bars that are visible in the viewport
-      if (x > -totalBarWidth && x < width) {
-        const y = baseY - barHeight;
-        const isPlayed = i < playedBarIndex;
+      // Throttle to max 30fps for waveform rendering
+      if (timeSinceLastRender < WAVEFORM_THROTTLE_MS) {
+        if (isPlaying) {
+          waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+        }
+        return;
+      }
+      
+      lastWaveformRenderRef.current = now;
+      
+      // Calculate current progress (0 to 1)
+      const currentProgress = duration > 0 ? currentTime / duration : 0;
+      
+      // Clear canvas
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+      
+      if (waveformMode === 'scrolling') {
+        // Scrolling waveform parameters
+        const BAR_WIDTH = 3;
+        const BAR_GAP = 1;
+        const totalBarWidth = BAR_WIDTH + BAR_GAP;
+        const maxHeight = height * 0.4;
+        const baseY = height;
+        const playheadX = width / 2;
+        const playedBarIndex = Math.floor(currentProgress * waveformData.length);
         
-        if (isPlayed) {
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        } else {
-          ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
+        // Colors for scrolling mode
+        const SCROLLING_PLAYED_COLOR = 'rgba(255, 255, 255, 0.85)';
+        const SCROLLING_UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.35)';
+        const SCROLLING_PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.6)';
+        
+        // Calculate scroll offset
+        const totalWidth = waveformData.length * totalBarWidth;
+        const scrollOffset = currentProgress * totalWidth;
+        
+        // Draw waveform bars (scrolling with centered playhead)
+        for (let i = 0; i < waveformData.length; i++) {
+          const barHeight = waveformData[i] * maxHeight;
+          const x = playheadX + (i * totalBarWidth) - scrollOffset;
+          
+          // Only render bars that are visible in the viewport
+          if (x > -totalBarWidth && x < width) {
+            const y = baseY - barHeight;
+            const isPlayed = i < playedBarIndex;
+            
+            ctx.fillStyle = isPlayed ? SCROLLING_PLAYED_COLOR : SCROLLING_UNPLAYED_COLOR;
+            ctx.fillRect(x, y, BAR_WIDTH, barHeight);
+          }
         }
         
-        ctx.fillRect(x, y, barWidth, barHeight);
+        // Draw playhead line at center
+        ctx.fillStyle = SCROLLING_PLAYHEAD_COLOR;
+        ctx.fillRect(playheadX - 1, 0, 2, height);
+      } else {
+        // Static waveform parameters (entire waveform visible)
+        const BAR_GAP = 0.5;
+        const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
+        const maxHeight = height * 0.8;
+        const baseY = height / 2;
+        
+        // Colors matching app theme
+        const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)';
+        const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)';
+        const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)';
+        
+        const playheadX = currentProgress * width;
+        
+        // Draw waveform bars (static, entire waveform visible)
+        for (let i = 0; i < waveformData.length; i++) {
+          const barHeight = waveformData[i] * maxHeight;
+          const x = (i / waveformData.length) * width;
+          const y = baseY - barHeight / 2;
+          
+          const isPast = (i / waveformData.length) < currentProgress;
+          
+          ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
+          ctx.fillRect(x, y, barWidth, barHeight);
+        }
+        
+        // Draw playhead line (moves across the waveform)
+        ctx.fillStyle = PLAYHEAD_COLOR;
+        ctx.fillRect(playheadX - 1, 0, 2, height);
       }
+      
+      // Continue animation loop if playing
+      if (isPlaying) {
+        waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+      }
+    };
+    
+    // Start rendering
+    if (isPlaying) {
+      waveformAnimationFrameRef.current = requestAnimationFrame(renderWaveform);
+    } else {
+      // Render once when not playing
+      renderWaveform();
     }
     
-    // Draw playhead line at center
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillRect(playheadX - 1, 0, 2, height);
-  }, [waveformData, currentTime, duration]);
+    return () => {
+      if (waveformAnimationFrameRef.current) {
+        cancelAnimationFrame(waveformAnimationFrameRef.current);
+        waveformAnimationFrameRef.current = null;
+      }
+    };
+  }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
   // Handle ESC key to close export modal
   useEffect(() => {
@@ -1402,11 +1582,6 @@ export default function ThreeDVisualizer() {
             </>
           )}
           {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-          {showTimeline && duration > 0 && (
-            <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
-              <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
-            </div>
-          )}
         </div>
       </div>
 
@@ -1433,17 +1608,46 @@ export default function ThreeDVisualizer() {
           </div>
           
           {/* Waveform - Made bigger, only shows when audio loaded */}
-          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={audioReady ? handleWaveformClick : undefined}>
-            {audioReady && waveformData.length > 0 ? (
-              <canvas 
-                ref={waveformCanvasRef} 
-                width={800} 
-                height={120}
-                className="w-full h-full"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                Upload an audio file to see the waveform
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
+              {audioReady && waveformData.length > 0 ? (
+                <canvas 
+                  ref={waveformCanvasRef} 
+                  width={800} 
+                  height={120}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                  Upload an audio file to see the waveform
+                </div>
+              )}
+            </div>
+            
+            {/* Timeline Slider - Always visible when audio is ready */}
+            {audioReady && duration > 0 && (
+              <div className="flex items-center gap-3">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max={duration} 
+                  step="0.1" 
+                  value={currentTime} 
+                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
+                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
+                />
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <input 
+                    type="checkbox" 
+                    id="waveformMode" 
+                    checked={waveformMode === 'static'} 
+                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
+                    className="w-3 h-3 cursor-pointer"
+                    aria-label="Toggle between scrolling and static waveform modes"
+                  />
+                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
+                </div>
               </div>
             )}
           </div>
@@ -1545,14 +1749,6 @@ export default function ThreeDVisualizer() {
               <p className="text-xs text-gray-400 mb-3">Control what information is shown on the visualization canvas.</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showTimeline" checked={showTimeline} onChange={(e) => setShowTimeline(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showTimeline" className="text-sm text-white cursor-pointer">Show Timeline Slider</label>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showTimeDisplay" checked={showTimeDisplay} onChange={(e) => setShowTimeDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showTimeDisplay" className="text-sm text-white cursor-pointer">Show Time Display</label>
-                </div>
-                <div className="flex items-center gap-3">
                   <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showPresetDisplay" className="text-sm text-white cursor-pointer">Show Current Preset</label>
                 </div>
@@ -1651,17 +1847,138 @@ export default function ThreeDVisualizer() {
                   <label className="text-xs text-gray-400 block mb-1">Border Color</label>
                   <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
+              </div>
+            </div>
+            
+            {/* Letterbox Animation Section */}
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Animated Letterbox</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create cinematic curtain-like letterbox animations</p>
+                </div>
+                <button 
+                  onClick={addLetterboxKeyframe} 
+                  disabled={!showLetterbox}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+              
+              <div className="space-y-2 mb-3">
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">Cinematic Letterbox Bars</label>
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
                 </div>
-                {showLetterbox && (
-                  <div>
-                    <label className="text-xs text-gray-400 block mb-1">Letterbox Size: {letterboxSize}px</label>
-                    <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                
+                {showLetterbox && letterboxKeyframes.length > 0 && (
+                  <div className="flex items-center gap-3 ml-7">
+                    <input 
+                      type="checkbox" 
+                      id="useLetterboxAnimation" 
+                      checked={useLetterboxAnimation} 
+                      onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
+                      Use Animations ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
+                    </label>
                   </div>
                 )}
+                
+                {showLetterbox && letterboxKeyframes.length === 0 && (
+                  <p className="text-xs text-gray-400 ml-7">Manual mode - use slider below</p>
+                )}
               </div>
+              
+              {letterboxKeyframes.length > 0 ? (
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {letterboxKeyframes.map((keyframe, index) => (
+                    <div key={index} className="bg-gray-800 rounded p-3 space-y-2">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold text-sm">Keyframe {index + 1}</span>
+                        <button 
+                          onClick={() => deleteLetterboxKeyframe(index)} 
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max={duration}
+                            step="0.1" 
+                            value={keyframe.time} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'time', parseFloat(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            step="5" 
+                            value={keyframe.targetSize} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'targetSize', parseInt(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="10" 
+                            step="0.1" 
+                            value={keyframe.duration} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'duration', parseFloat(e.target.value) || 0)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-300 block mb-1">Mode</label>
+                          <select 
+                            value={keyframe.mode} 
+                            onChange={(e) => updateLetterboxKeyframe(index, 'mode', e.target.value)} 
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="smooth">Smooth</option>
+                            <option value="instant">Instant</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-gray-400 italic">
+                        {keyframe.mode === 'smooth' 
+                          ? `Opens/closes to ${keyframe.targetSize}px over ${keyframe.duration}s`
+                          : `Instantly sets to ${keyframe.targetSize}px`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic text-center py-4">
+                  No letterbox animations yet. Click "Add" to create cinematic curtain effects.
+                </p>
+              )}
+              
+              {showLetterbox && letterboxKeyframes.length === 0 && (
+                <div className="mt-3">
+                  <label className="text-xs text-gray-400 block mb-1">Manual Size: {letterboxSize}px</label>
+                  <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                </div>
+              )}
             </div>
             
             <div className="bg-gray-700 rounded-lg p-3 mt-4">
@@ -1816,7 +2133,10 @@ export default function ThreeDVisualizer() {
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="bg-gray-700 rounded-lg p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
+              {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
+            </div>
             <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
           </div>
           <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
