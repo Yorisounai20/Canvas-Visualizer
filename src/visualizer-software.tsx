@@ -70,6 +70,7 @@ export default function ThreeDVisualizer() {
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
+  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
@@ -471,7 +472,7 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const updateLetterboxKeyframe = (index: number, field: string, value: number | string) => {
+  const updateLetterboxKeyframe = (index: number, field: string, value: number | string | boolean) => {
     setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
       i === index ? { ...kf, [field]: value } : kf
     ));
@@ -1593,10 +1594,10 @@ export default function ThreeDVisualizer() {
           <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
           {showLetterbox && (() => {
             // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
-            // We need to map this to actual bar heights: 100 -> 270px (full coverage), 0 -> 0px
+            // We need to map this to actual bar heights using the configurable maxLetterboxHeight
             // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
             const actualBarHeight = activeLetterboxInvert 
-              ? Math.round((letterboxSize / 100) * 270)  // 270px = half of 540px canvas height (full coverage)
+              ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
               : letterboxSize;
             return (
               <>
@@ -1605,7 +1606,7 @@ export default function ThreeDVisualizer() {
               </>
             );
           })()}
-          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * 270) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         </div>
       </div>
 
@@ -1895,6 +1896,24 @@ export default function ThreeDVisualizer() {
                   <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
                 </div>
+                
+                {showLetterbox && (
+                  <div className="ml-7 space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Max Curtain Height (px) - affects both top & bottom bars</label>
+                      <input 
+                        type="number" 
+                        min="50" 
+                        max="500" 
+                        step="10" 
+                        value={maxLetterboxHeight} 
+                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || 270)} 
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Default: 270px (full coverage). Tip: 270px covers entire 540px canvas when both bars at 100%</p>
+                    </div>
+                  </div>
+                )}
                 
                 {showLetterbox && letterboxKeyframes.length > 0 && (
                   <div className="flex items-center gap-3 ml-7">
