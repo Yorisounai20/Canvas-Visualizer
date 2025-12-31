@@ -56,10 +56,12 @@ export default function ThreeDVisualizer() {
   const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
   // NEW: HUD visibility controls
-  const [showTimeline, setShowTimeline] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
   const [showBorder, setShowBorder] = useState(true);
+  
+  // NEW: Waveform mode control
+  const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
   
   // NEW: Visual effects controls
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels
@@ -1317,41 +1319,81 @@ export default function ThreeDVisualizer() {
     const width = canvas.width;
     const height = canvas.height;
     
-    // Static waveform parameters (entire waveform visible, like timeline slider)
-    const BAR_GAP = 0.5; // Gap compensation between bars
-    const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
-    const maxHeight = height * 0.8;
-    const baseY = height / 2;
-    
-    // Colors matching app theme
-    const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)'; // Cyan for played portion
-    const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)'; // Gray for unplayed portion
-    const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)'; // White playhead line
-    
     // Calculate current progress (0 to 1)
     const currentProgress = duration > 0 ? currentTime / duration : 0;
-    const playheadX = currentProgress * width;
     
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, width, height);
     
-    // Draw waveform bars (static, entire waveform visible)
-    for (let i = 0; i < waveformData.length; i++) {
-      const barHeight = waveformData[i] * maxHeight;
-      const x = (i / waveformData.length) * width;
-      const y = baseY - barHeight / 2;
+    if (waveformMode === 'scrolling') {
+      // Scrolling waveform parameters
+      const barWidth = 3;
+      const gap = 1;
+      const totalBarWidth = barWidth + gap;
+      const maxHeight = height * 0.4;
+      const baseY = height;
+      const playheadX = width / 2;
+      const playedBarIndex = Math.floor(currentProgress * waveformData.length);
       
-      const isPast = (i / waveformData.length) < currentProgress;
+      // Calculate scroll offset
+      const totalWidth = waveformData.length * totalBarWidth;
+      const scrollOffset = currentProgress * totalWidth;
       
-      ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
-      ctx.fillRect(x, y, barWidth, barHeight);
+      // Draw waveform bars (scrolling with centered playhead)
+      for (let i = 0; i < waveformData.length; i++) {
+        const barHeight = waveformData[i] * maxHeight;
+        const x = playheadX + (i * totalBarWidth) - scrollOffset;
+        
+        // Only render bars that are visible in the viewport
+        if (x > -totalBarWidth && x < width) {
+          const y = baseY - barHeight;
+          const isPlayed = i < playedBarIndex;
+          
+          if (isPlayed) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          } else {
+            ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
+          }
+          
+          ctx.fillRect(x, y, barWidth, barHeight);
+        }
+      }
+      
+      // Draw playhead line at center
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillRect(playheadX - 1, 0, 2, height);
+    } else {
+      // Static waveform parameters (entire waveform visible)
+      const BAR_GAP = 0.5;
+      const barWidth = Math.max(1, width / waveformData.length - BAR_GAP);
+      const maxHeight = height * 0.8;
+      const baseY = height / 2;
+      
+      // Colors matching app theme
+      const PLAYED_COLOR = 'rgba(6, 182, 212, 0.9)';
+      const UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.4)';
+      const PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.9)';
+      
+      const playheadX = currentProgress * width;
+      
+      // Draw waveform bars (static, entire waveform visible)
+      for (let i = 0; i < waveformData.length; i++) {
+        const barHeight = waveformData[i] * maxHeight;
+        const x = (i / waveformData.length) * width;
+        const y = baseY - barHeight / 2;
+        
+        const isPast = (i / waveformData.length) < currentProgress;
+        
+        ctx.fillStyle = isPast ? PLAYED_COLOR : UNPLAYED_COLOR;
+        ctx.fillRect(x, y, barWidth, barHeight);
+      }
+      
+      // Draw playhead line (moves across the waveform)
+      ctx.fillStyle = PLAYHEAD_COLOR;
+      ctx.fillRect(playheadX - 1, 0, 2, height);
     }
-    
-    // Draw playhead line (moves across the waveform)
-    ctx.fillStyle = PLAYHEAD_COLOR;
-    ctx.fillRect(playheadX - 1, 0, 2, height);
-  }, [waveformData, currentTime, duration]);
+  }, [waveformData, currentTime, duration, waveformMode]);
 
   // Handle ESC key to close export modal
   useEffect(() => {
@@ -1392,11 +1434,6 @@ export default function ThreeDVisualizer() {
             </>
           )}
           {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? letterboxSize + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-          {showTimeline && duration > 0 && (
-            <div className="absolute left-4 right-4" style={{bottom: `${showLetterbox ? letterboxSize + 16 : 16}px`}}>
-              <input type="range" min="0" max={duration} step="0.1" value={currentTime} onChange={(e) => seekTo(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer" style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} />
-            </div>
-          )}
         </div>
       </div>
 
@@ -1423,17 +1460,45 @@ export default function ThreeDVisualizer() {
           </div>
           
           {/* Waveform - Made bigger, only shows when audio loaded */}
-          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-            {audioReady && waveformData.length > 0 ? (
-              <canvas 
-                ref={waveformCanvasRef} 
-                width={800} 
-                height={120}
-                className="w-full h-full"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                Upload an audio file to see the waveform
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
+              {audioReady && waveformData.length > 0 ? (
+                <canvas 
+                  ref={waveformCanvasRef} 
+                  width={800} 
+                  height={120}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                  Upload an audio file to see the waveform
+                </div>
+              )}
+            </div>
+            
+            {/* Timeline Slider - Always visible when audio is ready */}
+            {audioReady && duration > 0 && (
+              <div className="flex items-center gap-3">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max={duration} 
+                  step="0.1" 
+                  value={currentTime} 
+                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
+                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
+                />
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <input 
+                    type="checkbox" 
+                    id="waveformMode" 
+                    checked={waveformMode === 'static'} 
+                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
+                    className="w-3 h-3 cursor-pointer" 
+                  />
+                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
+                </div>
               </div>
             )}
           </div>
@@ -1534,10 +1599,6 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 HUD Display Options</h3>
               <p className="text-xs text-gray-400 mb-3">Control what information is shown on the visualization canvas.</p>
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showTimeline" checked={showTimeline} onChange={(e) => setShowTimeline(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showTimeline" className="text-sm text-white cursor-pointer">Show Timeline Slider</label>
-                </div>
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showPresetDisplay" className="text-sm text-white cursor-pointer">Show Current Preset</label>
