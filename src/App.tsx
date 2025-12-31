@@ -1,7 +1,7 @@
-import ThreeDVisualizer from './visualizer-software';
+import VisualizerEditor from './VisualizerEditor';
 
 function App() {
-  return <ThreeDVisualizer />;
+  return <VisualizerEditor />;
 }
 
 export default App;
