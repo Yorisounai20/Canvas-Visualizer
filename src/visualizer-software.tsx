@@ -1328,13 +1328,18 @@ export default function ThreeDVisualizer() {
     
     if (waveformMode === 'scrolling') {
       // Scrolling waveform parameters
-      const barWidth = 3;
-      const gap = 1;
-      const totalBarWidth = barWidth + gap;
+      const BAR_WIDTH = 3;
+      const BAR_GAP = 1;
+      const totalBarWidth = BAR_WIDTH + BAR_GAP;
       const maxHeight = height * 0.4;
       const baseY = height;
       const playheadX = width / 2;
       const playedBarIndex = Math.floor(currentProgress * waveformData.length);
+      
+      // Colors for scrolling mode
+      const SCROLLING_PLAYED_COLOR = 'rgba(255, 255, 255, 0.85)';
+      const SCROLLING_UNPLAYED_COLOR = 'rgba(100, 100, 120, 0.35)';
+      const SCROLLING_PLAYHEAD_COLOR = 'rgba(255, 255, 255, 0.6)';
       
       // Calculate scroll offset
       const totalWidth = waveformData.length * totalBarWidth;
@@ -1350,18 +1355,13 @@ export default function ThreeDVisualizer() {
           const y = baseY - barHeight;
           const isPlayed = i < playedBarIndex;
           
-          if (isPlayed) {
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-          } else {
-            ctx.fillStyle = 'rgba(100, 100, 120, 0.35)';
-          }
-          
-          ctx.fillRect(x, y, barWidth, barHeight);
+          ctx.fillStyle = isPlayed ? SCROLLING_PLAYED_COLOR : SCROLLING_UNPLAYED_COLOR;
+          ctx.fillRect(x, y, BAR_WIDTH, barHeight);
         }
       }
       
       // Draw playhead line at center
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillStyle = SCROLLING_PLAYHEAD_COLOR;
       ctx.fillRect(playheadX - 1, 0, 2, height);
     } else {
       // Static waveform parameters (entire waveform visible)
@@ -1495,7 +1495,8 @@ export default function ThreeDVisualizer() {
                     id="waveformMode" 
                     checked={waveformMode === 'static'} 
                     onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
-                    className="w-3 h-3 cursor-pointer" 
+                    className="w-3 h-3 cursor-pointer"
+                    aria-label="Toggle between scrolling and static waveform modes"
                   />
                   <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
                 </div>
