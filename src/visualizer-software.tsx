@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { Trash2, Plus, Play, Square } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X } from 'lucide-react';
 
 interface LogEntry {
   message: string;
@@ -81,6 +81,7 @@ export default function ThreeDVisualizer() {
   const [exportProgress, setExportProgress] = useState(0);
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
+  const [showExportModal, setShowExportModal] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('controls');
@@ -1335,9 +1336,19 @@ export default function ThreeDVisualizer() {
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
       <div className="flex flex-col items-center">
-        <div className="mb-4 text-center">
+        <div className="mb-4 text-center relative" style={{width: '960px'}}>
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
+          
+          {/* Export Button - Top Right */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="absolute top-0 right-0 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+            title="Video Export"
+          >
+            <Video size={18} />
+            <span className="text-sm font-semibold">Export</span>
+          </button>
         </div>
 
         <div className="relative">
@@ -1443,64 +1454,6 @@ export default function ThreeDVisualizer() {
                 <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
                 <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
               </div>
-            </div>
-
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 Video Export</h3>
-              
-              {/* Resolution Selector */}
-              <div className="mb-3">
-                <label className="text-xs text-gray-400 block mb-1">Export Resolution</label>
-                <select 
-                  value={exportResolution} 
-                  onChange={(e) => setExportResolution(e.target.value)}
-                  disabled={isExporting}
-                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
-                  <option value="960x540">960x540 (SD)</option>
-                  <option value="1280x720">1280x720 (HD 720p)</option>
-                  <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
-                </select>
-              </div>
-              
-              {/* Format Selector */}
-              <div className="mb-3">
-                <label className="text-xs text-gray-400 block mb-1">Output Format</label>
-                <select 
-                  value={exportFormat} 
-                  onChange={(e) => setExportFormat(e.target.value)}
-                  disabled={isExporting}
-                  className="w-full px-3 py-2 bg-gray-600 rounded text-white text-sm">
-                  <option value="webm">WebM (VP9 + Opus)</option>
-                  <option value="mp4">MP4 (if supported)</option>
-                </select>
-              </div>
-
-              {/* Export Button */}
-              <button 
-                onClick={exportVideo} 
-                disabled={!audioReady || isExporting} 
-                className={`w-full px-4 py-2 rounded font-semibold ${!audioReady || isExporting ? 'bg-gray-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white`}>
-                {isExporting ? '🎬 Exporting...' : '🎬 Export Full Video'}
-              </button>
-
-              {/* Progress Bar */}
-              {isExporting && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-xs text-gray-400 mb-1">
-                    <span>Progress</span>
-                    <span>{exportProgress.toFixed(0)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-600 rounded-full h-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded-full transition-all duration-300" 
-                      style={{width: `${exportProgress}%`}}>
-                    </div>
-                  </div>
-                  <p className="text-purple-400 text-xs mt-2 animate-pulse">🎬 Rendering video...</p>
-                </div>
-              )}
-              
-              <p className="text-xs text-gray-400 mt-2">Automatically renders full timeline with all presets & camera movements</p>
             </div>
           </div>
         )}
@@ -1828,6 +1781,83 @@ export default function ThreeDVisualizer() {
           </div>
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowExportModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-purple-400 flex items-center gap-2">
+                <Video size={24} />
+                Video Export
+              </h2>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Resolution Selector */}
+              <div>
+                <label className="text-sm text-gray-300 block mb-2 font-semibold">Export Resolution</label>
+                <select 
+                  value={exportResolution} 
+                  onChange={(e) => setExportResolution(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+                  <option value="960x540">960x540 (SD)</option>
+                  <option value="1280x720">1280x720 (HD 720p)</option>
+                  <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
+                </select>
+              </div>
+              
+              {/* Format Selector */}
+              <div>
+                <label className="text-sm text-gray-300 block mb-2 font-semibold">Output Format</label>
+                <select 
+                  value={exportFormat} 
+                  onChange={(e) => setExportFormat(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+                  <option value="webm">WebM (VP9 + Opus)</option>
+                  <option value="mp4">MP4 (if supported)</option>
+                </select>
+              </div>
+
+              {/* Export Button */}
+              <button 
+                onClick={() => { exportVideo(); setShowExportModal(false); }} 
+                disabled={!audioReady || isExporting} 
+                className={`w-full px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${!audioReady || isExporting ? 'bg-gray-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white transition-colors`}>
+                <Video size={20} />
+                {isExporting ? 'Exporting...' : 'Export Full Video'}
+              </button>
+
+              {/* Progress Bar */}
+              {isExporting && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-xs text-gray-400 mb-2">
+                    <span>Progress</span>
+                    <span>{exportProgress.toFixed(0)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-3">
+                    <div 
+                      className="bg-purple-500 h-3 rounded-full transition-all duration-300" 
+                      style={{width: `${exportProgress}%`}}>
+                    </div>
+                  </div>
+                  <p className="text-purple-400 text-sm mt-2 animate-pulse text-center">🎬 Rendering video...</p>
+                </div>
+              )}
+              
+              <p className="text-xs text-gray-400 text-center">Automatically renders full timeline with all presets & camera movements</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
