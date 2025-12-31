@@ -1,14 +1,38 @@
-# 🎵 3D Timeline Visualizer - README
+# 🎵 3D Music Visualizer Editor - README
 
 ## **What Is This?**
 
-A **music video editor** that creates 3D animated visualizations synced to audio. Think of it as a video editor specifically designed for making music visualizers - you upload a song, set different animations for different parts, customize colors, and record the final video.
+A **professional music video editor** with an **After Effects-style interface** that creates 3D animated visualizations synced to audio. Features a modular panel-based UI with layers, timeline, properties inspector, and real-time 3D preview. Upload a song, compose sections with different animations, customize every detail, and export high-quality videos.
 
 ---
 
 ## **Core Features**
 
-### 🎨 **Timeline-Based Animation System**
+### 🎨 **After Effects-Style Interface**
+- **Top Bar** - Playback controls, current section info, export button, undo/redo (coming soon)
+- **Left Panel (Layers)** - Section/layer management with:
+  - Visibility toggles (eye icon)
+  - Lock/unlock layers
+  - Drag-and-drop reordering
+  - Delete layers
+  - Color tags (coming soon)
+- **Center Canvas** - 3D visualization preview (960x540, 16:9 aspect ratio)
+- **Right Panel (Properties)** - Context-sensitive controls for selected layer:
+  - Animation preset picker
+  - Start/end time editing
+  - Color controls (bass, mids, highs)
+  - Camera settings
+  - Visual effects
+  - Lighting controls
+- **Bottom Timeline** - Visual timeline with:
+  - Section bars showing duration
+  - Drag to move sections
+  - Resize handles for trimming
+  - Click to scrub/seek
+  - Playhead indicator
+  - Add section button
+
+### 🎬 **Timeline-Based Animation System**
 - Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
 - Assign different animation presets to each section
 - Smooth transitions between animation styles
@@ -114,16 +138,58 @@ Timeline-based keyframe system for cinematic curtain effects:
 
 ## **Technical Stack**
 
-- **React** - UI and state management
-- **Three.js** (r128) - 3D graphics rendering
-- **Web Audio API** - Audio loading and frequency analysis
-- **MediaRecorder API** - Video recording
-- **Tailwind CSS** - Styling
-- **Lucide React** - Icons
+- **React 18** - UI and component-based architecture
+- **TypeScript** - Type safety and better development experience
+- **Three.js** (0.182.0) - 3D graphics rendering via WebGL
+- **Web Audio API** - Audio loading and real-time frequency analysis
+- **MediaRecorder API** - Video recording and export
+- **Tailwind CSS** - Utility-first styling framework
+- **Lucide React** - Icon library
+- **Vite** - Build tool and development server
+
+---
+
+## **Architecture**
+
+### **Component Structure:**
+```
+src/
+├── components/
+│   ├── Canvas/
+│   │   └── CanvasWrapper.tsx       # 3D preview wrapper
+│   ├── Controls/
+│   │   ├── TopBar.tsx              # Top control bar
+│   │   └── ExportModal.tsx         # Video export dialog
+│   ├── Panels/
+│   │   ├── LeftPanel.tsx           # Layers/Sections panel
+│   │   └── RightPanel.tsx          # Properties/Effects panel
+│   └── Timeline/
+│       └── Timeline.tsx            # Bottom timeline
+├── types/
+│   └── index.ts                    # TypeScript type definitions
+├── VisualizerEditor.tsx            # Main editor component
+└── App.tsx                         # Application entry point
+```
+
+### **Design System:**
+- **Dark Theme:**
+  - Main background: `#1E1E1E`
+  - Panels: `#2B2B2B`
+  - Borders: `#374151` (gray-700)
+  - Active layer highlight: `#4A90E2` (blue)
+  - Accent purple: `#9333EA` for buttons
+  - Cyan accents: `#06B6D4` for interactive elements
 
 ---
 
 ## **Key Components**
+
+### **UI Panels:**
+- **TopBar** - Global controls, playback, export
+- **LeftPanel** - Layer management and organization  
+- **RightPanel** - Properties inspector for selected layer
+- **Timeline** - Visual timeline with draggable section bars
+- **CanvasWrapper** - 3D scene container with overlays
 
 ### **Scene Objects:**
 - **8 Cubes** - Main animated shapes (planets in Orbit, segments in Seiryu)
@@ -147,11 +213,78 @@ Timeline-based keyframe system for cinematic curtain effects:
 
 ## **Use Cases**
 
-1. **Music Video Creation** - Make custom visualizers for your songs
+1. **Music Video Creation** - Professional visualizers for your songs with AE-style editing
 2. **Live Performance Visuals** - Real-time reactive visuals for DJs/musicians
-3. **Audio Analysis** - Visualize frequency content of tracks
-4. **Creative Experimentation** - Test different visual styles quickly
+3. **Audio Analysis** - Visualize frequency content of tracks with precision
+4. **Creative Experimentation** - Test different visual styles with instant preview
 5. **Social Media Content** - Export videos for YouTube, Instagram, TikTok
+6. **Video Production** - Create intros/outros with animated letterbox effects
+7. **Learning Tool** - Understand audio frequencies through visual representation
+
+---
+
+## **Getting Started**
+
+### **UI Overview:**
+
+The interface is divided into 5 main areas, inspired by professional video editing software:
+
+1. **Top Bar (Purple/Dark):**
+   - Title and current section indicator
+   - Time display
+   - Play/Stop button
+   - Undo/Redo buttons (coming soon)
+   - Export button (purple, top-right)
+
+2. **Left Panel - Layers/Sections (Dark Gray):**
+   - List of all animation sections
+   - Each layer shows: icon, name, time range, duration
+   - Controls: visibility (eye), lock, delete (trash)
+   - Drag layers to reorder
+   - Selected layer highlighted in blue
+
+3. **Center Canvas (Black Background):**
+   - 960x540 3D visualization preview
+   - Real-time rendering of your composition
+   - Optional border (can be toggled)
+   - Letterbox overlays when enabled
+   - Filename overlay (top-left when audio loaded)
+
+4. **Right Panel - Properties/Effects (Dark Gray):**
+   - Shows when a layer is selected
+   - **Layer Properties:** preset, start/end time
+   - **Colors:** bass, mids, highs color pickers
+   - **Camera:** auto-rotate, distance, height, rotation
+   - **Effects:** letterbox, background, border
+   - **Lighting:** ambient and directional intensity
+
+5. **Bottom Timeline (Dark Gray):**
+   - Visual representation of all sections
+   - Horizontal bars for each section
+   - Drag bars to move sections
+   - Resize handles on edges to adjust duration
+   - Red playhead shows current time
+   - Click anywhere to seek
+   - Time ruler at top
+   - "Add Section" button (purple, top-right)
+
+### **Development:**
+```bash
+npm install          # Install dependencies
+npm run dev          # Start dev server (http://localhost:5173)
+npm run build        # Build for production
+npm run preview      # Preview production build
+npm run typecheck    # Run TypeScript type checking
+npm run lint         # Run ESLint
+```
+
+### **Basic Workflow:**
+1. **Upload Audio** - Click "Choose File" in bottom-right to load an audio file
+2. **Select Layer** - Click on a layer in the left panel to edit its properties
+3. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
+4. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
+5. **Preview** - Click Play button in top bar to preview your composition
+6. **Export** - Click Export button to render and download the final video
 
 ---
 
@@ -193,19 +326,27 @@ Timeline-based keyframe system for cinematic curtain effects:
 
 ## **Future Enhancement Ideas**
 
-- More animation presets
-- Particle systems
-- Post-processing effects (bloom, chromatic aberration)
-- MIDI controller support
-- Real-time microphone input
-- Multiple export formats (MP4, GIF)
-- Preset saving/loading
-- Beat detection for automated sections
-- Lyrics overlay system
+- **Keyboard Shortcuts** - Play/pause (Space), undo/redo (Ctrl+Z/Y), layer navigation
+- **Undo/Redo System** - Full history management for all edits
+- **Collapsible Panels** - Maximize canvas by hiding panels
+- **Resizable Panels** - Drag panel edges to resize
+- **More Animation Presets** - Expand the visual library
+- **Keyframe System** - Per-property keyframe animation
+- **Color Tags** - Organize layers with color labels
+- **Particle Systems** - Additional visual effects
+- **Post-Processing** - Bloom, chromatic aberration, vignette
+- **MIDI Controller Support** - Hardware control integration
+- **Real-time Microphone Input** - Live audio visualization
+- **Multiple Export Formats** - MP4, GIF, image sequences
+- **Preset Saving/Loading** - Save compositions as templates
+- **Beat Detection** - Automated section creation
+- **Lyrics Overlay System** - Synchronized text display
+- **Layer Grouping** - Organize complex compositions
+- **Effect Stack** - Multiple effects per layer
 
 ---
 
-**Version:** 99 (Letterbox Animation System)  
-**Last Updated:** 12/31/2025 
-**License:** IDK 
+**Version:** 2.0 (After Effects-Style UI)  
+**Last Updated:** 12/31/2024  
+**License:** MIT (To be determined)  
 **Author:** YoriSounai01
