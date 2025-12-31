@@ -57,7 +57,6 @@ export default function ThreeDVisualizer() {
   
   // NEW: HUD visibility controls
   const [showTimeline, setShowTimeline] = useState(true);
-  const [showTimeDisplay, setShowTimeDisplay] = useState(true);
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
   const [showBorder, setShowBorder] = useState(true);
@@ -1433,7 +1432,7 @@ export default function ThreeDVisualizer() {
           </div>
           
           {/* Waveform - Made bigger, only shows when audio loaded */}
-          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer" onClick={audioReady ? handleWaveformClick : undefined}>
+          <div className="flex-1 bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
             {audioReady && waveformData.length > 0 ? (
               <canvas 
                 ref={waveformCanvasRef} 
@@ -1547,10 +1546,6 @@ export default function ThreeDVisualizer() {
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showTimeline" checked={showTimeline} onChange={(e) => setShowTimeline(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showTimeline" className="text-sm text-white cursor-pointer">Show Timeline Slider</label>
-                </div>
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showTimeDisplay" checked={showTimeDisplay} onChange={(e) => setShowTimeDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showTimeDisplay" className="text-sm text-white cursor-pointer">Show Time Display</label>
                 </div>
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
