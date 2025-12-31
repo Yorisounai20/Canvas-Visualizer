@@ -14,6 +14,7 @@ const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
+const WAVEFORM_SAMPLES = 1000;
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -115,6 +116,11 @@ export default function ThreeDVisualizer() {
     const x = e.clientX - rect.left;
     const seekPosition = (x / rect.width) * duration;
     seekTo(seekPosition);
+  };
+
+  const handleExportAndCloseModal = () => {
+    exportVideo();
+    setShowExportModal(false);
   };
 
   const loadCustomFont = async (file: File) => {
@@ -423,7 +429,7 @@ export default function ThreeDVisualizer() {
     ));
   };
 
-  const generateWaveformData = (buffer: AudioBuffer, samples = 1000) => {
+  const generateWaveformData = (buffer: AudioBuffer, samples = WAVEFORM_SAMPLES) => {
     const rawData = buffer.getChannelData(0); // Get mono or first channel
     const blockSize = Math.floor(rawData.length / samples);
     const waveform: number[] = [];
@@ -1333,6 +1339,18 @@ export default function ThreeDVisualizer() {
     }
   }, [waveformData, currentTime, duration]);
 
+  // Handle ESC key to close export modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showExportModal) {
+        setShowExportModal(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showExportModal]);
+
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
       <div className="flex flex-col items-center">
@@ -1829,7 +1847,7 @@ export default function ThreeDVisualizer() {
 
               {/* Export Button */}
               <button 
-                onClick={() => { exportVideo(); setShowExportModal(false); }} 
+                onClick={handleExportAndCloseModal} 
                 disabled={!audioReady || isExporting} 
                 className={`w-full px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 ${!audioReady || isExporting ? 'bg-gray-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'} text-white transition-colors`}>
                 <Video size={20} />
