@@ -118,6 +118,14 @@ export default function ThreeDVisualizer() {
     seekTo(seekPosition);
   };
 
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      const f = e.target.files[0];
+      setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
+      initAudio(f);
+    }
+  };
+
   const handleExportAndCloseModal = () => {
     exportVideo();
     setShowExportModal(false);
@@ -1404,7 +1412,7 @@ export default function ThreeDVisualizer() {
 
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
       <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-4 mb-4">
+        <div className="flex items-center gap-4">
           {/* Time Display and Audio Upload */}
           <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
             <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
@@ -1417,7 +1425,7 @@ export default function ThreeDVisualizer() {
             {/* Audio File Upload - Always visible */}
             <div className="mt-3 pt-3 border-t border-gray-600">
               <label className="text-cyan-400 text-xs font-semibold block mb-2">Audio File</label>
-              <input type="file" accept="audio/*" onChange={(e) => { if (e.target.files?.[0]) { const f = e.target.files[0]; setAudioFileName(f.name.replace(/\.[^/.]+$/,'')); initAudio(f); } }} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
+              <input type="file" accept="audio/*" onChange={handleAudioFileChange} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
             </div>
             
             {/* Play/Stop Button */}
