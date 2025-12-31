@@ -42,8 +42,12 @@ A **music video editor** that creates 3D animated visualizations synced to audio
 - Reset to defaults button
 
 **Visual Effects:**
-- Letterbox bars (cinematic black bars top/bottom)
-- Adjustable letterbox size (0-100px)
+- **Animated Letterbox System** - Create cinematic curtain-like effects
+  - Timeline-based keyframe animation
+  - Smooth or instant animation modes
+  - Adjustable size (0-100px)
+  - **Invert mode** - Toggle between "curtain opening" (start closed→open) and "curtain closing" (start open→closed)
+  - Perfect for video intros/outros with dramatic black bar animations
 - HUD toggle (show/hide time, title, seekbar)
 
 ### 🎤 **3D Song Name Overlay**
@@ -90,6 +94,21 @@ Each preset controls:
 - Object opacity based on audio
 - Material colors from user-selected palette
 - Smooth blending when switching between presets
+
+### **Letterbox Animation System:**
+Timeline-based keyframe system for cinematic curtain effects:
+- **Keyframes** - Define target sizes at specific timestamps
+- **Animation Modes:**
+  - **Smooth** - Eased animations with easeInOutQuad interpolation
+  - **Instant** - Immediate jumps to target size
+- **Timing** - Animations finish AT keyframe times (not after)
+- **Invert Toggle:**
+  - **OFF (default)**: Size value = bar height in pixels (0=no bars, 100=100px bars)
+  - **ON**: Size value inverted for curtain metaphor (100=fully closed/black, 0=fully open)
+- **Use Cases:**
+  - Opening curtain effect for video intros
+  - Closing curtain effect for video outros
+  - Mid-song dramatic transitions
 
 ---
 
@@ -186,7 +205,7 @@ Each preset controls:
 
 ---
 
-**Version:** 98 (Timeline-based with Export)  
-**Last Updated:** 12/30/2025 
+**Version:** 99 (Letterbox Animation System)  
+**Last Updated:** 12/31/2025 
 **License:** IDK 
 **Author:** YoriSounai01
