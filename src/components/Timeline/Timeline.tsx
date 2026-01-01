@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, WorkspaceObject } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 
@@ -15,6 +15,7 @@ interface TimelineProps {
   presetKeyframes: PresetKeyframe[];
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
+  workspaceObjects?: WorkspaceObject[]; // For camera selection in camera keyframes
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onAddSection: () => void;
@@ -48,6 +49,7 @@ export default function Timeline({
   presetKeyframes,
   cameraKeyframes,
   textKeyframes,
+  workspaceObjects = [],
   onSelectSection,
   onUpdateSection,
   onAddSection,
@@ -611,6 +613,11 @@ export default function Timeline({
                   <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
                     {formatTime(kf.time)} - Dist: {kf.distance.toFixed(1)}, H: {kf.height.toFixed(1)}, Rot: {(kf.rotation * 180 / Math.PI).toFixed(0)}°
                     <br />
+                    {kf.cameraId ? (
+                      <>Camera: {workspaceObjects.find(obj => obj.id === kf.cameraId)?.name || 'Unknown'}<br /></>
+                    ) : (
+                      <>Camera: Main (Default)<br /></>
+                    )}
                     Easing: {kf.easing}
                     {onDeleteCameraKeyframe && (
                       <button
@@ -826,6 +833,28 @@ export default function Timeline({
                 })}
                 className="w-full"
               />
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">Camera Object</label>
+              <select
+                value={editingKeyframe.data.cameraId || ''}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, cameraId: e.target.value || undefined }
+                })}
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+              >
+                <option value="">Default Main Camera</option>
+                {workspaceObjects
+                  .filter(obj => obj.type === 'camera')
+                  .map(cam => (
+                    <option key={cam.id} value={cam.id}>
+                      {cam.name}
+                    </option>
+                  ))
+                }
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Select which camera to use at this keyframe</p>
             </div>
             <div>
               <label className="text-sm text-gray-400 block mb-2">Easing</label>

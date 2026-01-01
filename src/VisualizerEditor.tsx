@@ -963,6 +963,23 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
       const blend = transitionRef.current;
 
+      // Camera switching based on keyframes
+      // Find the most recent camera keyframe before or at current time
+      const activeCameraKeyframe = [...cameraKeyframes]
+        .reverse()
+        .find(kf => kf.time <= t);
+      
+      // If a keyframe specifies a camera object, switch to it
+      let activeCamera = cam; // Default to main camera
+      if (activeCameraKeyframe?.cameraId) {
+        const cameraObject = workspaceObjects.find(obj => 
+          obj.id === activeCameraKeyframe.cameraId && obj.type === 'camera'
+        );
+        if (cameraObject && cameraObject.mesh) {
+          activeCamera = cameraObject.mesh as THREE.Camera;
+        }
+      }
+
       // Camera settings
       const activeCameraDistance = cameraDistance;
       const activeCameraHeight = cameraHeight;
@@ -975,7 +992,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         obj.octas.forEach(o => { o.visible = false; });
         obj.tetras.forEach(t => { t.visible = false; });
         obj.sphere.visible = false;
-        rend.render(scene, cam);
+        rend.render(scene, activeCamera || cam);
         return;
       } else {
         // Make all visible for rendering
@@ -1469,7 +1486,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
 
       // PHASE 1: Always render (whether playing or idle)
-      rend.render(scene, cam);
+      // Use activeCamera if it was switched via keyframes, otherwise use main camera
+      rend.render(scene, activeCamera || cam);
     };
 
     // PHASE 1: Start the unified render loop immediately
@@ -2213,6 +2231,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           presetKeyframes={presetKeyframes}
           cameraKeyframes={cameraKeyframes}
           textKeyframes={textKeyframes}
+          workspaceObjects={workspaceObjects}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
           onAddSection={addSection}
