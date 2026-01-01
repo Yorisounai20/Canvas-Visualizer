@@ -136,10 +136,10 @@ export default function ThreeDVisualizer() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   
-  // PHASE 4: Active parameter effect values (interpolated from events)
-  const [activeBackgroundFlash, setActiveBackgroundFlash] = useState(0);
-  const [activeVignettePulse, setActiveVignettePulse] = useState(0);
-  const [activeSaturationBurst, setActiveSaturationBurst] = useState(0);
+  // PHASE 4: Active parameter effect values (stored in refs for performance)
+  const activeBackgroundFlashRef = useRef(0);
+  const activeVignettePulseRef = useRef(0);
+  const activeSaturationBurstRef = useRef(0);
   
   // NEW: Global camera keyframes (independent from presets)
   const [cameraKeyframes, setCameraKeyframes] = useState([
@@ -676,16 +676,18 @@ export default function ThreeDVisualizer() {
       track.source.disconnect();
     }
     
-    const updatedTracks = audioTracks.filter(t => t.id !== trackId);
-    setAudioTracks(updatedTracks);
-    audioTracksRef.current = updatedTracks;
+    let updatedTracks = audioTracks.filter(t => t.id !== trackId);
     
     // If we removed the active track, make the first remaining track active
     if (track?.active && updatedTracks.length > 0) {
-      updatedTracks[0].active = true;
-      setAudioTracks([...updatedTracks]);
-      audioTracksRef.current = [...updatedTracks];
+      updatedTracks = updatedTracks.map((t, i) => ({
+        ...t,
+        active: i === 0
+      }));
     }
+    
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
     
     // Update refs for backward compatibility
     if (updatedTracks.length > 0) {
@@ -779,9 +781,8 @@ export default function ThreeDVisualizer() {
       track.source = source;
     });
     
-    // Update tracks state
-    setAudioTracks([...audioTracks]);
-    audioTracksRef.current = [...audioTracks];
+    // Update ref for internal tracking
+    audioTracksRef.current = audioTracks;
     
     startTimeRef.current = Date.now() - (startOffset * 1000);
     setIsPlaying(true);
@@ -800,8 +801,8 @@ export default function ThreeDVisualizer() {
       }
     });
     
-    setAudioTracks([...audioTracks]);
-    audioTracksRef.current = [...audioTracks];
+    // Update ref for internal tracking
+    audioTracksRef.current = audioTracks;
     
     pauseTimeRef.current = currentTime;
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -1327,10 +1328,10 @@ export default function ThreeDVisualizer() {
       shakeY += eventShakeY;
       shakeZ += eventShakeZ;
       
-      // Update active parameter values for UI/effects
-      setActiveBackgroundFlash(bgFlash);
-      setActiveVignettePulse(vignetteFlash);
-      setActiveSaturationBurst(saturationFlash);
+      // Store active parameter values in refs (not state to avoid re-renders)
+      activeBackgroundFlashRef.current = bgFlash;
+      activeVignettePulseRef.current = vignetteFlash;
+      activeSaturationBurstRef.current = saturationFlash;
 
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
