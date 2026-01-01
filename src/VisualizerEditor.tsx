@@ -1157,6 +1157,85 @@ export default function VisualizerEditor() {
     };
   }, [ambientLightIntensity, directionalLightIntensity]);
 
+  // Load default font for 3D text
+  useEffect(() => {
+    const loader = new FontLoader();
+    
+    // Load Helvetiker font from CDN
+    addLog('Loading font for 3D text...', 'info');
+    loader.load(
+      'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
+      (font) => {
+        fontRef.current = font;
+        setFontLoaded(true);
+        addLog('Font loaded successfully', 'success');
+      },
+      undefined,
+      (error) => {
+        console.error('Font loading error:', error);
+        addLog('Failed to load font', 'error');
+      }
+    );
+  }, []);
+
+  // Create/update 3D song name text
+  useEffect(() => {
+    if (!sceneRef.current || !fontRef.current || !fontLoaded) return;
+
+    // Remove existing text meshes
+    songNameMeshesRef.current.forEach(mesh => {
+      sceneRef.current?.remove(mesh);
+      mesh.geometry.dispose();
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(m => m.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    });
+    songNameMeshesRef.current = [];
+
+    // Create new text if showSongName is true
+    if (showSongName) {
+      const textToDisplay = customSongName || audioFileName || '3D Music Visualizer';
+      
+      try {
+        const textGeometry = new TextGeometry(textToDisplay, {
+          font: fontRef.current,
+          size: 0.8,
+          depth: 0.2,
+          curveSegments: 12,
+          bevelEnabled: true,
+          bevelThickness: 0.03,
+          bevelSize: 0.02,
+          bevelSegments: 5
+        });
+
+        textGeometry.center();
+
+        const textMaterial = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(bassColor),
+          transparent: true,
+          opacity: 0.9
+        });
+
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+        textMesh.position.set(0, 5, 0);
+        sceneRef.current.add(textMesh);
+        songNameMeshesRef.current.push(textMesh);
+        
+        addLog(`3D text created: "${textToDisplay}"`, 'success');
+      } catch (error) {
+        console.error('Text geometry error:', error);
+        addLog('Failed to create 3D text', 'error');
+      }
+    }
+
+    // Trigger a re-render if not playing
+    if (!isPlaying && rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+  }, [showSongName, customSongName, audioFileName, fontLoaded, bassColor, isPlaying]);
+
   // Update scene background and lighting when settings change
   useEffect(() => {
     if (sceneRef.current && rendererRef.current) {
@@ -1272,6 +1351,9 @@ export default function VisualizerEditor() {
             showLetterbox={showLetterbox}
             letterboxSize={letterboxSize}
             showBorder={showBorder}
+            showSongName={showSongName}
+            customSongName={customSongName}
+            fontLoaded={fontLoaded}
             onUpdateSection={updateSection}
             onSetBassColor={setBassColor}
             onSetMidsColor={setMidsColor}
@@ -1287,6 +1369,8 @@ export default function VisualizerEditor() {
             onSetShowLetterbox={setShowLetterbox}
             onSetLetterboxSize={setLetterboxSize}
             onSetShowBorder={setShowBorder}
+            onSetShowSongName={setShowSongName}
+            onSetCustomSongName={setCustomSongName}
           />
         </div>
       </div>

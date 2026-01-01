@@ -18,6 +18,9 @@ interface RightPanelProps {
   showLetterbox: boolean;
   letterboxSize: number;
   showBorder: boolean;
+  showSongName: boolean;
+  customSongName: string;
+  fontLoaded: boolean;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onSetBassColor: (color: string) => void;
   onSetMidsColor: (color: string) => void;
@@ -33,6 +36,8 @@ interface RightPanelProps {
   onSetShowLetterbox: (show: boolean) => void;
   onSetLetterboxSize: (size: number) => void;
   onSetShowBorder: (show: boolean) => void;
+  onSetShowSongName: (show: boolean) => void;
+  onSetCustomSongName: (name: string) => void;
 }
 
 type RightPanelTab = 'layer' | 'canvas';
@@ -59,6 +64,9 @@ export default function RightPanel({
   showLetterbox,
   letterboxSize,
   showBorder,
+  showSongName,
+  customSongName,
+  fontLoaded,
   onUpdateSection,
   onSetBassColor,
   onSetMidsColor,
@@ -73,7 +81,9 @@ export default function RightPanel({
   onSetCameraAutoRotate,
   onSetShowLetterbox,
   onSetLetterboxSize,
-  onSetShowBorder
+  onSetShowBorder,
+  onSetShowSongName,
+  onSetCustomSongName
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layer');
   const formatTime = (s: number) => 
@@ -422,6 +432,52 @@ export default function RightPanel({
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Use keyframes in timeline for animated letterbox
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3D Text Overlay Controls */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              3D Text Overlay
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSongName"
+                  checked={showSongName}
+                  onChange={(e) => onSetShowSongName(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                  disabled={!fontLoaded}
+                />
+                <label htmlFor="showSongName" className={`text-sm cursor-pointer ${fontLoaded ? 'text-white' : 'text-gray-500'}`}>
+                  Show 3D Text
+                </label>
+              </div>
+
+              {!fontLoaded && (
+                <p className="text-xs text-yellow-400">
+                  Loading font...
+                </p>
+              )}
+
+              {fontLoaded && showSongName && (
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    Custom Text
+                  </label>
+                  <input
+                    type="text"
+                    value={customSongName}
+                    onChange={(e) => onSetCustomSongName(e.target.value)}
+                    placeholder="Enter custom text (or leave empty for song name)"
+                    className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Text color follows bass color
                   </p>
                 </div>
               )}
