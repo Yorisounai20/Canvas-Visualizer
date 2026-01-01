@@ -1,5 +1,44 @@
 // Type definitions for the visualizer application
 
+// PHASE 2: Project state schema for save/load functionality
+export interface ProjectSettings {
+  name: string;
+  resolution: {
+    width: number;
+    height: number;
+  };
+  fps: number;
+  backgroundColor: string;
+  createdAt: string;
+  lastModified: string;
+  audioFileName?: string;
+}
+
+// PHASE 2: Complete project state (everything that can be saved/loaded)
+export interface ProjectState {
+  settings: ProjectSettings;
+  sections: Section[];
+  presetKeyframes: PresetKeyframe[];
+  textKeyframes: TextKeyframe[];
+  // Camera, lighting, and other properties
+  cameraDistance: number;
+  cameraHeight: number;
+  cameraRotation: number;
+  cameraAutoRotate: boolean;
+  ambientLightIntensity: number;
+  directionalLightIntensity: number;
+  showBorder: boolean;
+  borderColor: string;
+  showLetterbox: boolean;
+  letterboxSize: number;
+  bassColor: string;
+  midsColor: string;
+  highsColor: string;
+  showSongName: boolean;
+  customSongName: string;
+  manualMode: boolean;
+}
+
 export interface Section {
   id: number;
   start: number;

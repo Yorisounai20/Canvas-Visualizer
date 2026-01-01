@@ -8,6 +8,7 @@ interface TopBarProps {
   duration: number;
   currentPreset: string | null;
   audioFileName: string;
+  projectName?: string; // PHASE 2: Optional project name
   onPlay: () => void;
   onStop: () => void;
   onExport: () => void;
@@ -21,6 +22,7 @@ interface TopBarProps {
 /**
  * TopBar Component - After Effects-style top control bar
  * Contains playback controls, current section info, export button, and undo/redo
+ * PHASE 2: Now displays project name from project settings
  */
 export default function TopBar({
   isPlaying,
@@ -29,6 +31,7 @@ export default function TopBar({
   duration,
   currentPreset,
   audioFileName,
+  projectName = '3D Music Visualizer Editor', // PHASE 2: Default name if not provided
   onPlay,
   onStop,
   onExport,
@@ -45,7 +48,7 @@ export default function TopBar({
     <div className="bg-[#2B2B2B] border-b border-gray-700 px-4 py-3 flex items-center justify-between shadow-lg">
       {/* Left: Title and Current Info */}
       <div className="flex items-center gap-4">
-        <h1 className="text-lg font-bold text-purple-400">3D Music Visualizer Editor</h1>
+        <h1 className="text-lg font-bold text-purple-400">{projectName}</h1>
         <div className="text-sm text-gray-400">
           {currentPreset && (
             <span className="px-2 py-1 bg-gray-700 rounded text-cyan-400">

@@ -9,7 +9,7 @@ import Timeline from './components/Timeline/Timeline';
 import CanvasWrapper from './components/Canvas/CanvasWrapper';
 import ExportModal from './components/Controls/ExportModal';
 import DebugConsole from './components/Debug/DebugConsole';
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -30,6 +30,11 @@ const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
 
+interface VisualizerEditorProps {
+  projectSettings: ProjectSettings;
+  initialAudioFile?: File;
+}
+
 /**
  * VisualizerEditor - Main After Effects-style editor component
  * 
@@ -40,9 +45,14 @@ const DEFAULT_CAMERA_AUTO_ROTATE = true;
  * - Timeline sections are the single source of truth for animations
  * - All errors/successes logged to debug console
  * 
+ * PHASE 2 ARCHITECTURE (PROJECT SYSTEM):
+ * - Accepts ProjectSettings from NewProjectModal
+ * - Initializes editor with project configuration
+ * - Project state can be saved/loaded (persistence not yet implemented)
+ * 
  * Coordinates all panels and manages the 3D visualization state
  */
-export default function VisualizerEditor() {
+export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
   // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -109,11 +119,11 @@ export default function VisualizerEditor() {
   const [presetKeyframes, setPresetKeyframes] = useState<PresetKeyframe[]>([]);
   const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
 
-  // Colors
+  // PHASE 2: Colors (initialized from project settings)
   const [bassColor, setBassColor] = useState('#8a2be2');
   const [midsColor, setMidsColor] = useState('#40e0d0');
   const [highsColor, setHighsColor] = useState('#c8b4ff');
-  const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
+  const [backgroundColor, setBackgroundColor] = useState(projectSettings.backgroundColor);
   const [borderColor, setBorderColor] = useState('#9333ea');
 
   // Effects
@@ -158,6 +168,13 @@ export default function VisualizerEditor() {
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isResizingTimeline, setIsResizingTimeline] = useState(false);
+
+  // PHASE 2: Log project initialization
+  useEffect(() => {
+    addLog(`Project "${projectSettings.name}" initialized`, 'success');
+    addLog(`Resolution: ${projectSettings.resolution.width}x${projectSettings.resolution.height} @ ${projectSettings.fps}fps`, 'info');
+    addLog(`Background: ${projectSettings.backgroundColor}`, 'info');
+  }, [projectSettings]);
 
   // Helper functions
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -1322,6 +1339,15 @@ export default function VisualizerEditor() {
     );
   }, []);
 
+  // PHASE 2: Load initial audio file from project settings
+  useEffect(() => {
+    if (initialAudioFile) {
+      addLog(`Loading initial audio: ${initialAudioFile.name}`, 'info');
+      setAudioFileName(initialAudioFile.name.replace(/\.[^/.]+$/, ''));
+      initAudio(initialAudioFile);
+    }
+  }, [initialAudioFile]);
+
   // Create/update 3D song name text
   useEffect(() => {
     if (!sceneRef.current || !fontRef.current || !fontLoaded) return;
@@ -1424,6 +1450,7 @@ export default function VisualizerEditor() {
         duration={duration}
         currentPreset={currentPreset}
         audioFileName={audioFileName}
+        projectName={projectSettings.name} // PHASE 2: Pass project name from settings
         onPlay={playAudio}
         onStop={stopAudio}
         onExport={() => setShowExportModal(true)}
