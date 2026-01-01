@@ -47,6 +47,106 @@ function getDefaultParameters(presetType: string): PresetParameters {
   return DEFAULT_PRESET_PARAMETERS[presetType] || DEFAULT_PRESET_PARAMETERS.orbit;
 }
 
+// NEW REQUIREMENT: Helper function to create workspace objects from a preset
+// This makes presets actually CREATE their geometry as editable workspace objects
+function createPresetObjects(presetType: string, params: PresetParameters): WorkspaceObject[] {
+  const { density, spread } = params;
+  const objects: WorkspaceObject[] = [];
+  let idCounter = Date.now();
+  
+  const createObject = (
+    type: 'sphere' | 'box' | 'plane' | 'torus',
+    pos: { x: number; y: number; z: number },
+    scale: { x: number; y: number; z: number },
+    color: string,
+    name?: string
+  ): WorkspaceObject => ({
+    id: `preset-${presetType}-${idCounter++}`,
+    type,
+    name: name || `${type}-${idCounter}`,
+    position: pos,
+    rotation: { x: 0, y: 0, z: 0 },
+    scale,
+    color,
+    wireframe: type !== 'sphere',
+    visible: true,
+    mesh: null // Will be created when added to scene
+  });
+  
+  if (presetType === 'orbit') {
+    // Orbital Dance - Solar system
+    objects.push(createObject('sphere', { x: 0, y: 0, z: 0 }, { x: 3, y: 3, z: 3 }, '#ff6b35', 'Sun'));
+    
+    const planetCount = Math.min(Math.floor(density / 4), 8);
+    for (let i = 0; i < planetCount; i++) {
+      const orbitRadius = spread * 0.3 + i * (spread / planetCount);
+      const angle = (i / planetCount) * Math.PI * 2;
+      objects.push(createObject('box', 
+        { x: Math.cos(angle) * orbitRadius, y: 0, z: Math.sin(angle) * orbitRadius },
+        { x: 1, y: 1, z: 1 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Planet-${i + 1}`
+      ));
+    }
+  } else if (presetType === 'explosion') {
+    // Explosion - Expanding particles
+    const particleCount = Math.floor(density);
+    for (let i = 0; i < particleCount; i++) {
+      const phi = Math.acos(-1 + (2 * i) / particleCount);
+      const theta = Math.sqrt(particleCount * Math.PI) * phi;
+      const r = spread * 0.5;
+      objects.push(createObject('box',
+        { x: r * Math.cos(theta) * Math.sin(phi), y: r * Math.sin(theta) * Math.sin(phi), z: r * Math.cos(phi) },
+        { x: 0.5, y: 0.5, z: 0.5 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Particle-${i + 1}`
+      ));
+    }
+  } else if (presetType === 'pulse') {
+    // Pulse Grid - Grid of cubes
+    const gridSize = Math.ceil(Math.sqrt(density / 3));
+    const spacing = spread / gridSize;
+    for (let x = 0; x < gridSize; x++) {
+      for (let z = 0; z < gridSize; z++) {
+        objects.push(createObject('box',
+          { x: (x - gridSize / 2) * spacing, y: 0, z: (z - gridSize / 2) * spacing },
+          { x: 1, y: 1, z: 1 },
+          '#9333ea',
+          `Grid-${x}-${z}`
+        ));
+      }
+    }
+  } else if (presetType === 'wave') {
+    // Wave Motion - Wavy line of objects
+    const count = Math.floor(density);
+    for (let i = 0; i < count; i++) {
+      const x = (i - count / 2) * (spread / count);
+      const z = Math.sin((i / count) * Math.PI * 4) * spread * 0.3;
+      objects.push(createObject('box',
+        { x, y: 0, z },
+        { x: 0.8, y: 0.8, z: 0.8 },
+        '#40e0d0',
+        `Wave-${i + 1}`
+      ));
+    }
+  } else {
+    // Generic preset - circle of objects
+    const count = Math.floor(density / 2);
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const r = spread * 0.6;
+      objects.push(createObject('box',
+        { x: Math.cos(angle) * r, y: 0, z: Math.sin(angle) * r },
+        { x: 1, y: 1, z: 1 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Object-${i + 1}`
+      ));
+    }
+  }
+  
+  return objects;
+}
+
 // Default constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
@@ -548,6 +648,73 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       setSelectedObjectId(null);
     }
     addLog(`Deleted workspace object`, 'info');
+  };
+
+  // NEW REQUIREMENT: Apply a preset - creates workspace objects from preset template
+  const applyPreset = (presetType: string) => {
+    if (!sceneRef.current) {
+      addLog('Scene not initialized', 'error');
+      return;
+    }
+
+    // Get current section or use defaults
+    const currentSection = getCurrentSection();
+    const params = currentSection?.parameters || getDefaultParameters(presetType);
+    
+    // Clear existing workspace objects
+    workspaceObjects.forEach(obj => deleteWorkspaceObject(obj.id));
+    
+    // Create preset objects
+    const presetObjects = createPresetObjects(presetType, params);
+    
+    // Add each object to the scene
+    presetObjects.forEach(objTemplate => {
+      let geometry: THREE.BufferGeometry;
+      let material: THREE.Material;
+      let mesh: THREE.Mesh;
+      
+      // Create geometry based on type
+      switch (objTemplate.type) {
+        case 'sphere':
+          geometry = new THREE.SphereGeometry(1, 32, 32);
+          break;
+        case 'box':
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+          break;
+        case 'plane':
+          geometry = new THREE.PlaneGeometry(1, 1);
+          break;
+        case 'torus':
+          geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+          break;
+        default:
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+      }
+      
+      // Create material
+      material = new THREE.MeshBasicMaterial({ 
+        color: objTemplate.color,
+        wireframe: objTemplate.wireframe,
+        transparent: true,
+        opacity: 1
+      });
+      
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(objTemplate.position.x, objTemplate.position.y, objTemplate.position.z);
+      mesh.scale.set(objTemplate.scale.x, objTemplate.scale.y, objTemplate.scale.z);
+      sceneRef.current!.add(mesh);
+      
+      // Add to workspace objects with mesh reference
+      setWorkspaceObjects(prev => [...prev, { ...objTemplate, mesh }]);
+    });
+    
+    addLog(`Applied preset: ${presetType} (${presetObjects.length} objects created)`, 'success');
+    
+    // Switch to workspace mode to see the objects
+    if (!workspaceMode) {
+      setWorkspaceMode(true);
+      addLog('Switched to workspace mode', 'info');
+    }
   };
 
 
@@ -1977,6 +2144,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               manualMode={manualMode}
               onUpdateSection={updateSection}
               onUpdateSectionParameters={updateSectionParameters} 
+              onApplyPreset={applyPreset}
               onSetBassColor={setBassColor}
               onSetMidsColor={setMidsColor}
               onSetHighsColor={setHighsColor}

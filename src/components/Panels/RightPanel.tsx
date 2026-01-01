@@ -24,6 +24,7 @@ interface RightPanelProps {
   manualMode: boolean;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onUpdateSectionParameters: (id: number, params: Partial<PresetParameters>) => void; // PHASE 4
+  onApplyPreset?: (presetType: string) => void; // NEW REQUIREMENT: Create workspace objects from preset
   onSetBassColor: (color: string) => void;
   onSetMidsColor: (color: string) => void;
   onSetHighsColor: (color: string) => void;
@@ -73,6 +74,7 @@ export default function RightPanel({
   manualMode,
   onUpdateSection,
   onUpdateSectionParameters, // PHASE 4
+  onApplyPreset, // NEW REQUIREMENT
   onSetBassColor,
   onSetMidsColor,
   onSetHighsColor,
@@ -149,17 +151,29 @@ export default function RightPanel({
                 <label className="text-xs text-gray-400 block mb-1">
                   Animation Preset
                 </label>
-                <select
-                  value={selectedSection.animation}
-                  onChange={(e) => onUpdateSection(selectedSection.id, 'animation', e.target.value)}
-                  className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
-                >
-                  {animationTypes.map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.icon} {type.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={selectedSection.animation}
+                    onChange={(e) => onUpdateSection(selectedSection.id, 'animation', e.target.value)}
+                    className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                  >
+                    {animationTypes.map(type => (
+                      <option key={type.value} value={type.value}>
+                        {type.icon} {type.label}
+                      </option>
+                    ))}
+                  </select>
+                  {onApplyPreset && (
+                    <button
+                      onClick={() => onApplyPreset(selectedSection.animation)}
+                      className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded font-medium transition-colors whitespace-nowrap"
+                      title="Create preset objects in workspace"
+                    >
+                      Create
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Click "Create" to generate workspace objects from this preset</p>
               </div>
 
               {/* Time Range */}
