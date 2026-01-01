@@ -1,6 +1,7 @@
-import React from 'react';
-import { Eye, EyeOff, Lock, Unlock, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Eye, EyeOff, Lock, Unlock, Trash2, Copy } from 'lucide-react';
 import { Section, AnimationType } from '../../types';
+import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 
 interface LeftPanelProps {
   sections: Section[];
@@ -11,12 +12,13 @@ interface LeftPanelProps {
   onToggleLock: (id: number) => void;
   onDeleteSection: (id: number) => void;
   onReorderSections: (sections: Section[]) => void;
+  onDuplicateSection?: (id: number) => void;
 }
 
 /**
  * LeftPanel Component - Layers/Sections panel (After Effects-style)
  * Shows sections as layers with visibility, lock, and color tags
- * Supports drag-and-drop reordering
+ * Supports drag-and-drop reordering and right-click context menu
  */
 export default function LeftPanel({
   sections,
@@ -26,8 +28,16 @@ export default function LeftPanel({
   onToggleVisibility,
   onToggleLock,
   onDeleteSection,
-  onReorderSections
+  onReorderSections,
+  onDuplicateSection
 }: LeftPanelProps) {
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    sectionId: number | null;
+  }>({ isOpen: false, x: 0, y: 0, sectionId: null });
+
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
@@ -61,6 +71,50 @@ export default function LeftPanel({
     newSections.splice(targetIndex, 0, movedSection);
     
     onReorderSections(newSections);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, sectionId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      sectionId
+    });
+  };
+
+  const getContextMenuItems = (): ContextMenuItem[] => {
+    if (!contextMenu.sectionId) return [];
+    
+    const section = sections.find(s => s.id === contextMenu.sectionId);
+    if (!section) return [];
+
+    return [
+      {
+        label: section.visible !== false ? 'Hide Layer' : 'Show Layer',
+        icon: section.visible !== false ? <EyeOff size={16} /> : <Eye size={16} />,
+        onClick: () => onToggleVisibility(section.id)
+      },
+      {
+        label: section.locked ? 'Unlock Layer' : 'Lock Layer',
+        icon: section.locked ? <Unlock size={16} /> : <Lock size={16} />,
+        onClick: () => onToggleLock(section.id)
+      },
+      { separator: true } as ContextMenuItem,
+      {
+        label: 'Duplicate Layer',
+        icon: <Copy size={16} />,
+        onClick: () => onDuplicateSection && onDuplicateSection(section.id),
+        disabled: !onDuplicateSection
+      },
+      { separator: true } as ContextMenuItem,
+      {
+        label: 'Delete Layer',
+        icon: <Trash2 size={16} />,
+        onClick: () => onDeleteSection(section.id)
+      }
+    ];
   };
 
   return (
@@ -98,6 +152,7 @@ export default function LeftPanel({
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
                   onClick={() => !isLocked && onSelectSection(section.id)}
+                  onContextMenu={(e) => handleContextMenu(e, section.id)}
                   className={`px-3 py-3 cursor-pointer transition-all ${
                     isSelected
                       ? 'bg-[#4A90E2] bg-opacity-20 border-l-4 border-[#4A90E2]'
@@ -196,6 +251,15 @@ export default function LeftPanel({
           </div>
         )}
       </div>
+
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={getContextMenuItems()}
+        onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, sectionId: null })}
+      />
     </div>
   );
 }

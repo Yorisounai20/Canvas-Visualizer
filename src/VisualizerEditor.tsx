@@ -174,6 +174,21 @@ export default function VisualizerEditor() {
     }
   };
 
+  const duplicateSection = (id: number) => {
+    const sectionToDuplicate = sections.find((s: Section) => s.id === id);
+    if (!sectionToDuplicate) return;
+
+    const newSection: Section = {
+      ...sectionToDuplicate,
+      id: Date.now(),
+      start: sectionToDuplicate.end,
+      end: sectionToDuplicate.end + (sectionToDuplicate.end - sectionToDuplicate.start)
+    };
+    setSections([...sections, newSection]);
+    setSelectedSectionId(newSection.id);
+    addLog(`Duplicated section "${ANIMATION_TYPES.find(a => a.value === newSection.animation)?.label}"`, 'success');
+  };
+
   const updateSection = (id: number, field: string, value: any) => {
     setSections(sections.map((s: Section) => s.id === id ? { ...s, [field]: value } : s));
   };
@@ -1199,6 +1214,7 @@ export default function VisualizerEditor() {
             onToggleLock={toggleSectionLock}
             onDeleteSection={deleteSection}
             onReorderSections={reorderSections}
+            onDuplicateSection={duplicateSection}
           />
           {/* Resize handle for left panel */}
           <div
@@ -1281,6 +1297,8 @@ export default function VisualizerEditor() {
           duration={duration}
           animationTypes={ANIMATION_TYPES}
           selectedSectionId={selectedSectionId}
+          audioBuffer={audioBufferRef.current}
+          showWaveform={true}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
           onAddSection={addSection}

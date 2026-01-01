@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { Section, AnimationType } from '../../types';
+import WaveformVisualizer from './WaveformVisualizer';
 
 interface TimelineProps {
   sections: Section[];
@@ -8,6 +9,8 @@ interface TimelineProps {
   duration: number;
   animationTypes: AnimationType[];
   selectedSectionId: number | null;
+  audioBuffer: AudioBuffer | null;
+  showWaveform?: boolean;
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onAddSection: () => void;
@@ -27,6 +30,8 @@ export default function Timeline({
   duration,
   animationTypes,
   selectedSectionId,
+  audioBuffer,
+  showWaveform = true,
   onSelectSection,
   onUpdateSection,
   onAddSection,
@@ -270,6 +275,17 @@ export default function Timeline({
           style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
           onClick={handleTimelineClick}
         >
+          {/* Waveform background */}
+          {showWaveform && audioBuffer && (
+            <WaveformVisualizer
+              audioBuffer={audioBuffer}
+              duration={duration}
+              width={timelineWidth}
+              height={Math.max(sections.length * (TIMELINE_HEIGHT + 4), 100)}
+              color="rgba(100, 180, 255, 0.15)"
+            />
+          )}
+
           {/* Playhead */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
