@@ -11,12 +11,25 @@ interface ObjectPropertiesPanelProps {
   selectedObject: WorkspaceObject | null;
   onUpdateObject: (id: string, updates: Partial<WorkspaceObject>) => void;
   onDeleteObject: (id: string) => void;
+  // Camera settings from main editor (for camera objects)
+  cameraDistance?: number;
+  cameraHeight?: number;
+  cameraRotation?: number;
+  onSetCameraDistance?: (value: number) => void;
+  onSetCameraHeight?: (value: number) => void;
+  onSetCameraRotation?: (value: number) => void;
 }
 
 export default function ObjectPropertiesPanel({
   selectedObject,
   onUpdateObject,
-  onDeleteObject
+  onDeleteObject,
+  cameraDistance,
+  cameraHeight,
+  cameraRotation,
+  onSetCameraDistance,
+  onSetCameraHeight,
+  onSetCameraRotation
 }: ObjectPropertiesPanelProps) {
   if (!selectedObject) {
     return (
@@ -180,6 +193,64 @@ export default function ObjectPropertiesPanel({
           className="w-4 h-4"
         />
       </div>
+
+      {/* Camera-specific settings (only for camera objects) */}
+      {selectedObject.type === 'camera' && (
+        <div className="mt-4 pt-4 border-t border-gray-700">
+          <div className="text-sm font-semibold text-gray-300 mb-3">Camera Settings</div>
+          
+          {cameraDistance !== undefined && onSetCameraDistance && (
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 block mb-1">
+                Distance: {cameraDistance.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="5"
+                max="50"
+                step="0.5"
+                value={cameraDistance}
+                onChange={(e) => onSetCameraDistance(Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+              />
+            </div>
+          )}
+
+          {cameraHeight !== undefined && onSetCameraHeight && (
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 block mb-1">
+                Height: {cameraHeight.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="-10"
+                max="10"
+                step="0.5"
+                value={cameraHeight}
+                onChange={(e) => onSetCameraHeight(Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+              />
+            </div>
+          )}
+
+          {cameraRotation !== undefined && onSetCameraRotation && (
+            <div className="mb-3">
+              <label className="text-xs text-gray-400 block mb-1">
+                Rotation: {(cameraRotation * 180 / Math.PI).toFixed(0)}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max={Math.PI * 2}
+                step="0.05"
+                value={cameraRotation}
+                onChange={(e) => onSetCameraRotation(Number(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

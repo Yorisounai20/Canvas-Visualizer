@@ -444,49 +444,11 @@ export default function RightPanel({
                 </label>
               </div>
 
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Distance: {cameraDistance.toFixed(1)}
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="0.5"
-                  value={cameraDistance}
-                  onChange={(e) => onSetCameraDistance(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Height: {cameraHeight.toFixed(1)}
-                </label>
-                <input
-                  type="range"
-                  min="-10"
-                  max="10"
-                  step="0.5"
-                  value={cameraHeight}
-                  onChange={(e) => onSetCameraHeight(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Rotation: {(cameraRotation * 180 / Math.PI).toFixed(0)}°
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max={Math.PI * 2}
-                  step="0.05"
-                  value={cameraRotation}
-                  onChange={(e) => onSetCameraRotation(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                />
+              {/* NOTE: Camera position settings moved to Workspace mode 
+                  Select a camera object in workspace mode to edit Distance, Height, Rotation */}
+              <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded">
+                <p className="mb-1">💡 <strong>Camera settings moved:</strong></p>
+                <p>Switch to Workspace mode (W key) and select a camera object to adjust Distance, Height, and Rotation.</p>
               </div>
             </div>
           </div>

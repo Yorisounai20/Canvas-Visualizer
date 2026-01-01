@@ -2049,8 +2049,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)} // PHASE 5: Keyboard shortcuts modal
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content Area - Calculate height based on available space minus timeline */}
+      <div className="flex-1 flex overflow-hidden" style={{ height: `calc(100vh - ${64 + timelineHeight}px)` }}>
         {/* Left Panel - Layers */}
         <div style={{ width: `${leftPanelWidth}px` }} className="flex-shrink-0 relative">
           <LeftPanel
@@ -2118,6 +2118,12 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
                 selectedObject={workspaceObjects.find(o => o.id === selectedObjectId) || null}
                 onUpdateObject={updateWorkspaceObject}
                 onDeleteObject={deleteWorkspaceObject}
+                cameraDistance={cameraDistance}
+                cameraHeight={cameraHeight}
+                cameraRotation={cameraRotation}
+                onSetCameraDistance={setCameraDistance}
+                onSetCameraHeight={setCameraHeight}
+                onSetCameraRotation={setCameraRotation}
               />
             </div>
           ) : (
