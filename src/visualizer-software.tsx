@@ -132,6 +132,13 @@ export default function ThreeDVisualizer() {
     return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
   }, [letterboxKeyframes]);
 
+  // PHASE 1: Time remapping state
+  const [timeScale, setTimeScale] = useState(1.0); // Global playback speed (0.1 to 2.0)
+  
+  // PHASE 1: Camera control state
+  const [cameraLocked, setCameraLocked] = useState(false); // Toggle camera lock (C key)
+  const cameraManualOffsetRef = useRef({ x: 0, y: 0, z: 0, rotX: 0, rotY: 0 }); // Manual camera adjustments
+
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
@@ -395,6 +402,10 @@ export default function ThreeDVisualizer() {
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
     setCameraRotation(DEFAULT_CAMERA_ROTATION);
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+    // PHASE 1: Also reset manual camera offsets and lock
+    cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
+    setCameraLocked(false);
+    addLog('Camera reset', 'success');
   };
 
   // Global keyframe management functions
@@ -542,11 +553,13 @@ export default function ThreeDVisualizer() {
     if (bufferSourceRef.current) bufferSourceRef.current.stop();
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
+    // PHASE 1: Apply time scale to audio playback rate
+    src.playbackRate.value = timeScale;
     src.connect(analyserRef.current);
     analyserRef.current.connect(audioContextRef.current.destination);
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000 / timeScale);
     setIsPlaying(true);
   };
 
@@ -566,6 +579,94 @@ export default function ThreeDVisualizer() {
     pauseTimeRef.current = t;
     setCurrentTime(t);
     if (play) playAudio();
+  };
+
+  // PHASE 1: Keyboard controls - Transport controls
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Don't trigger shortcuts when typing in text inputs
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
+    const key = e.key;
+    const shift = e.shiftKey;
+    const alt = e.altKey;
+
+    // Transport controls
+    if (key === ' ') {
+      e.preventDefault();
+      if (audioReady) {
+        if (isPlaying) stopAudio();
+        else playAudio();
+      }
+    } else if (key === 'j' || key === 'J') {
+      e.preventDefault();
+      const step = shift ? 5 : 1; // Large jump vs small step
+      seekTo(Math.max(0, currentTime - step));
+    } else if (key === 'l' || key === 'L') {
+      e.preventDefault();
+      const step = shift ? 5 : 1;
+      seekTo(Math.min(duration, currentTime + step));
+    } else if (key === 'Home') {
+      e.preventDefault();
+      seekTo(0);
+    } else if (key === 'End') {
+      e.preventDefault();
+      seekTo(duration);
+    }
+    // Camera controls
+    else if (key === 'c' || key === 'C') {
+      e.preventDefault();
+      setCameraLocked(!cameraLocked);
+      addLog(cameraLocked ? 'Camera unlocked' : 'Camera locked', 'info');
+    } else if (key === 'r' || key === 'R') {
+      e.preventDefault();
+      // Reset camera to defaults
+      setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+      setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+      setCameraRotation(DEFAULT_CAMERA_ROTATION);
+      cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
+      addLog('Camera reset to defaults', 'info');
+    } else if (!cameraLocked) {
+      // Camera movement controls (only when not locked)
+      const moveSpeed = shift ? 2.0 : (alt ? 0.1 : 0.5);
+      const rotSpeed = shift ? 10 : (alt ? 1 : 5);
+
+      if (key === 'q' || key === 'Q') {
+        e.preventDefault();
+        setCameraDistance(prev => Math.max(5, Math.min(50, prev - moveSpeed)));
+      } else if (key === 'e' || key === 'E') {
+        e.preventDefault();
+        setCameraDistance(prev => Math.max(5, Math.min(50, prev + moveSpeed)));
+      } else if (key === 'ArrowUp') {
+        e.preventDefault();
+        cameraManualOffsetRef.current.rotX += rotSpeed;
+      } else if (key === 'ArrowDown') {
+        e.preventDefault();
+        cameraManualOffsetRef.current.rotX -= rotSpeed;
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        setCameraRotation(prev => (prev - rotSpeed + 360) % 360);
+      } else if (key === 'ArrowRight') {
+        e.preventDefault();
+        setCameraRotation(prev => (prev + rotSpeed) % 360);
+      }
+    }
+  };
+
+  // PHASE 1: Wheel zoom control
+  const handleWheel = (e: WheelEvent) => {
+    if (cameraLocked) return;
+    
+    const target = e.target as HTMLElement;
+    // Only zoom when scrolling over the canvas container
+    if (containerRef.current && containerRef.current.contains(target)) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 : -1;
+      const zoomSpeed = e.shiftKey ? 2 : (e.altKey ? 0.1 : 0.5);
+      setCameraDistance(prev => Math.max(5, Math.min(50, prev + delta * zoomSpeed)));
+    }
   };
 
   // NEW: Recording functions
@@ -878,6 +979,22 @@ export default function ThreeDVisualizer() {
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
 
+  // PHASE 1: Attach keyboard and wheel event listeners
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (container) {
+        container.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, [isPlaying, audioReady, currentTime, duration, cameraLocked]);
+
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -910,7 +1027,8 @@ export default function ThreeDVisualizer() {
       
       analyser.getByteFrequencyData(data);
       const f = getFreq(data);
-      const el = (Date.now() - startTimeRef.current) * 0.001;
+      // PHASE 1: Apply time scaling
+      const el = (Date.now() - startTimeRef.current) * 0.001 * timeScale;
       const t = el % duration;
       setCurrentTime(t);
       const sec = sections.find(s => t >= s.start && t < s.end);
@@ -1766,6 +1884,62 @@ export default function ThreeDVisualizer() {
                   <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
                 <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">⏱️ Time Remapping</h3>
+              <p className="text-xs text-gray-400 mb-3">Control global playback speed (affects both visuals and audio).</p>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Playback Speed: {timeScale.toFixed(2)}x</label>
+                <input 
+                  type="range" 
+                  min="0.1" 
+                  max="2.0" 
+                  step="0.1" 
+                  value={timeScale} 
+                  onChange={(e) => setTimeScale(Number(e.target.value))} 
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0.1x (Slow)</span>
+                  <span>1.0x (Normal)</span>
+                  <span>2.0x (Fast)</span>
+                </div>
+                <button 
+                  onClick={() => setTimeScale(1.0)} 
+                  className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded mt-2"
+                >
+                  Reset to 1.0x
+                </button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-purple-400 mb-2">⌨️ Keyboard Shortcuts</h3>
+              <div className="text-xs text-gray-300 space-y-1">
+                <div className="grid grid-cols-2 gap-x-2">
+                  <div className="text-gray-400">Space</div>
+                  <div>Play/Pause</div>
+                  <div className="text-gray-400">J/L</div>
+                  <div>Step backward/forward (1s)</div>
+                  <div className="text-gray-400">Shift+J/L</div>
+                  <div>Large jump (5s)</div>
+                  <div className="text-gray-400">Home/End</div>
+                  <div>Go to start/end</div>
+                  <div className="text-gray-400">Q/E</div>
+                  <div>Zoom in/out</div>
+                  <div className="text-gray-400">Arrow Keys</div>
+                  <div>Rotate camera</div>
+                  <div className="text-gray-400">Scroll Wheel</div>
+                  <div>Zoom (over canvas)</div>
+                  <div className="text-gray-400">C</div>
+                  <div>Toggle camera lock {cameraLocked ? '🔒' : '🔓'}</div>
+                  <div className="text-gray-400">R</div>
+                  <div>Reset camera</div>
+                  <div className="text-gray-400">Shift/Alt</div>
+                  <div>Faster/slower movement</div>
+                </div>
               </div>
             </div>
             
