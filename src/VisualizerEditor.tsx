@@ -696,9 +696,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     const render = () => {
       animationRef.current = requestAnimationFrame(render);
 
+      // PHASE 1: Calculate elapsed time (always available, not just when playing)
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+
       // PHASE 1: Update time if playing
       if (isPlaying && audioContextRef.current) {
-        const elapsed = (Date.now() - startTimeRef.current) / 1000;
         const t = Math.min(elapsed, duration);
         setCurrentTime(t);
 
