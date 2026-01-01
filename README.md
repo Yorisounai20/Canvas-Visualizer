@@ -2,12 +2,14 @@
 
 ## **✅ Development Status**
 
-**Version 2.0 - After Effects-Style UI (Phase 10 Complete + Phases 1-5)**
+**Version 2.1 - Complete Architecture Refactor (Phase 10 + Phases 1-5 + Final Refactor)**
 
-Professional music video editor with a complete After Effects-style interface featuring timeline-based animation, keyframe systems, 3D text overlays, parameter-driven presets, Blender-like workspace, keyboard shortcuts, and comprehensive visual controls.
+Professional music video editor with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, keyframe systems, parameter-driven presets, and comprehensive visual controls.
 
 **Core Features:**
-- ✅ Professional panel-based layout (Top Bar, Layers, Canvas, Properties, Timeline)
+- ✅ Professional panel-based layout (Top Bar, Scene Explorer, Canvas, Properties, Timeline)
+- ✅ **NEW: Scene Explorer** - Blender-style object hierarchy panel
+- ✅ **NEW: Extended object types** - Support for cameras and lights as workspace objects
 - ✅ Layer management (select, reorder, lock, delete, duplicate, visibility toggle)
 - ✅ Timeline editing with multiple tabs (Sections, Presets, Camera, Text)
 - ✅ Complete keyframe systems (Presets, Camera, Text)
@@ -19,17 +21,19 @@ Professional music video editor with a complete After Effects-style interface fe
 - ✅ Manual control mode for non-audio-reactive animations
 - ✅ Color pickers and camera controls
 - ✅ Export modal with resolution selection
-- ✅ **NEW (Phase 1):** Unified render loop and stabilized architecture
-- ✅ **NEW (Phase 2):** Project system with New Project modal
-- ✅ **NEW (Phase 3):** Blender-like 3D workspace (toggle with `W` key)
-- ✅ **NEW (Phase 4):** Parameter-driven presets (density, speed, intensity, spread)
-- ✅ **NEW (Phase 5):** Keyboard shortcuts modal, undo/redo functionality
+- ✅ **Phase 1:** Unified render loop and stabilized architecture
+- ✅ **Phase 2:** Project system with New Project modal
+- ✅ **Phase 3:** Blender-like 3D workspace (toggle with `W` key)
+- ✅ **Phase 4:** Parameter-driven presets (density, speed, intensity, spread)
+- ✅ **Phase 5:** Keyboard shortcuts modal, undo/redo functionality
+- ✅ **Final Refactor:** Scene Explorer, extended object types for multiple cameras
 
-**Latest Additions (Phase 5 - UI Structure):**
-- ✨ Keyboard shortcuts modal (? button in top bar)
-- ✨ Undo/Redo functionality (Ctrl+Z / Ctrl+Shift+Z)
-- ✨ Complete keyboard shortcut reference
-- ✨ README documentation updated
+**Latest Additions (Final Architecture Refactor):**
+- ✨ Scene Explorer component - Blender-style object hierarchy
+- ✨ Camera and light support as workspace objects
+- ✨ Foundation for multiple cameras and camera animation
+- ✨ Extended WorkspaceObject type system
+- ✨ Improved architecture for complex scene management
 
 ---
 
@@ -207,12 +211,19 @@ src/
 │   │   └── ExportModal.tsx         # Video export dialog
 │   ├── Debug/
 │   │   └── DebugConsole.tsx        # Debug console panel
+│   ├── Modals/
+│   │   ├── NewProjectModal.tsx     # Project creation modal (Phase 2)
+│   │   └── KeyboardShortcutsModal.tsx  # Keyboard shortcuts reference (Phase 5)
 │   ├── Panels/
 │   │   ├── LeftPanel.tsx           # Layers/Sections panel
 │   │   └── RightPanel.tsx          # Properties/Effects panel (tabbed)
-│   └── Timeline/
-│       ├── Timeline.tsx            # Multi-tab timeline
-│       └── WaveformVisualizer.tsx  # Audio waveform renderer
+│   ├── Timeline/
+│   │   ├── Timeline.tsx            # Multi-tab timeline
+│   │   └── WaveformVisualizer.tsx  # Audio waveform renderer
+│   └── Workspace/
+│       ├── WorkspaceControls.tsx   # Object creation toolbar (Phase 3)
+│       ├── ObjectPropertiesPanel.tsx # Object properties editor (Phase 3)
+│       └── SceneExplorer.tsx       # Blender-style object hierarchy (Final Refactor)
 ├── types/
 │   └── index.ts                    # TypeScript type definitions
 ├── VisualizerEditor.tsx            # Main editor component
@@ -403,9 +414,53 @@ npm run lint         # Run ESLint
 - All state is in-memory only (resets on refresh)
 - Cannot access local filesystem directly (must use file input)
 
-### **Known Issues:**
-- Undo/redo buttons present but not wired up yet
-- Letterbox keyframe animations not yet implemented (basic letterbox works)
+### **In Development (Final Architecture Refactor):**
+- Scene Explorer integration into main layout (created, not yet integrated)
+- Canvas resize based on timeline height (planned)
+- Camera settings migration to object properties (planned)
+- Preset menu relocation to workspace controls (planned)
+- Multiple camera implementation (type system ready)
+- Form field ID additions for accessibility (planned)
+
+---
+
+## **Recent Changes & Improvements**
+
+### **Final Architecture Refactor (Latest):**
+- ✨ **Scene Explorer Component** - Blender-style object hierarchy panel created
+- ✨ **Extended WorkspaceObject Types** - Support for camera and light objects
+- ✨ **Camera Object Properties** - Type system prepared for camera-specific settings
+- ✨ **Multiple Cameras Foundation** - Architecture supports multiple cameras for animation
+- 🔨 **Next:** Integration of Scene Explorer, canvas resize fixes, settings migration
+
+### **Phase 5 - UI Structure:**
+- ✨ Keyboard shortcuts modal with comprehensive reference
+- ✨ Undo/Redo functionality with full history tracking
+- ✨ After Effects-style layout refinements
+- ✨ Professional keyboard shortcut system
+
+### **Phase 4 - Preset Rework:**
+- ✨ Parameter-driven presets (density, speed, intensity, spread)
+- ✨ Real-time parameter editing with live preview
+- ✨ No hardcoded geometry or camera
+- ✨ Presets as starting configurations
+
+### **Phase 3 - Workspace:**
+- ✨ Blender-like 3D workspace mode (toggle with W key)
+- ✨ OrbitControls for camera navigation
+- ✨ TransformControls with visual gizmos
+- ✨ Manual object creation and editing
+
+### **Phase 2 - Project System:**
+- ✨ New Project modal before editor loads
+- ✨ Project settings schema for save/load
+- ✨ Resolution presets and FPS configuration
+
+### **Phase 1 - Core Stability:**
+- ✨ Single unified render loop
+- ✨ Stabilized Three.js lifecycle
+- ✨ Enhanced audio system with validation
+- ✨ Timeline as single source of truth
 
 ---
 
@@ -439,7 +494,35 @@ npm run lint         # Run ESLint
 
 ---
 
-**Version:** 2.0 (Phase 10 Complete)  
+**Version:** 2.1 (Phase 10 + Phases 1-5 + Final Architecture Refactor)  
 **Last Updated:** 01/01/2026  
 **License:** MIT  
 **Author:** Yorisounai20
+
+---
+
+## **Development Roadmap**
+
+### **✅ Completed:**
+- Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
+- Phase 1: Core Stability (unified render loop, stabilized lifecycle)
+- Phase 2: Project System (new project modal, settings schema)
+- Phase 3: Workspace (Blender-like viewport, object creation, transform controls)
+- Phase 4: Preset Rework (parameter-driven templates)
+- Phase 5: UI Structure (keyboard shortcuts, undo/redo)
+- Final Refactor: Scene Explorer component, extended object types
+
+### **🔨 In Progress:**
+- Scene Explorer integration into main layout
+- Canvas resize based on timeline height
+- Camera settings migration to object properties
+- Preset menu relocation to workspace controls
+- Multiple camera implementation
+- Form field accessibility improvements
+
+### **📋 Planned:**
+- Database persistence with Neon
+- Save/Load project functionality
+- Advanced camera animation system
+- Enhanced lighting controls
+- More animation presets
