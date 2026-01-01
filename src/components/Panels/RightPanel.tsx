@@ -21,6 +21,7 @@ interface RightPanelProps {
   showSongName: boolean;
   customSongName: string;
   fontLoaded: boolean;
+  manualMode: boolean;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onSetBassColor: (color: string) => void;
   onSetMidsColor: (color: string) => void;
@@ -38,6 +39,7 @@ interface RightPanelProps {
   onSetShowBorder: (show: boolean) => void;
   onSetShowSongName: (show: boolean) => void;
   onSetCustomSongName: (name: string) => void;
+  onSetManualMode: (mode: boolean) => void;
 }
 
 type RightPanelTab = 'layer' | 'canvas';
@@ -67,6 +69,7 @@ export default function RightPanel({
   showSongName,
   customSongName,
   fontLoaded,
+  manualMode,
   onUpdateSection,
   onSetBassColor,
   onSetMidsColor,
@@ -83,7 +86,8 @@ export default function RightPanel({
   onSetLetterboxSize,
   onSetShowBorder,
   onSetShowSongName,
-  onSetCustomSongName
+  onSetCustomSongName,
+  onSetManualMode
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layer');
   const formatTime = (s: number) => 
@@ -478,6 +482,39 @@ export default function RightPanel({
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Text color follows bass color
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Manual Control Mode */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              Manual Control
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="manualMode"
+                  checked={manualMode}
+                  onChange={(e) => onSetManualMode(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="manualMode" className="text-sm text-white cursor-pointer">
+                  Manual Mode
+                </label>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                When enabled, animations are controlled by keyframes instead of audio frequency
+              </p>
+
+              {manualMode && (
+                <div className="bg-yellow-900 bg-opacity-20 border border-yellow-600 rounded p-2">
+                  <p className="text-xs text-yellow-400">
+                    ⚠️ Manual mode active: Use timeline keyframes to control camera, presets, and text
                   </p>
                 </div>
               )}

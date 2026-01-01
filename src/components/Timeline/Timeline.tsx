@@ -464,11 +464,80 @@ export default function Timeline({
 
         {/* Camera Tab */}
         {activeTab === 'camera' && (
-          <div className="p-8 text-center text-gray-400">
-            <p className="text-lg mb-2">📷 Camera Keyframes</p>
-            <p className="text-sm">Timeline-based camera animation coming soon</p>
-            <p className="text-xs mt-2 text-gray-500">Animate camera position, rotation, and distance over time</p>
-          </div>
+          <>
+            {/* Add Camera Keyframe Button */}
+            <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs text-gray-400">Click timeline to add camera keyframe</p>
+              {onAddCameraKeyframe && (
+                <button
+                  onClick={() => onAddCameraKeyframe(currentTime)}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                >
+                  <Plus size={12} className="inline mr-1" />
+                  Add at Current Time
+                </button>
+              )}
+            </div>
+
+            {/* Keyframe Timeline */}
+            <div 
+              className="relative cursor-pointer"
+              style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left + scrollOffset;
+                const clickedTime = pixelsToTime(x);
+                if (onAddCameraKeyframe) {
+                  onAddCameraKeyframe(clickedTime);
+                }
+              }}
+            >
+              {/* Playhead */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ left: `${timeToPixels(currentTime)}px` }}
+              >
+                <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
+              </div>
+
+              {/* Camera Keyframe Markers */}
+              {cameraKeyframes.map((kf, index) => (
+                <div
+                  key={index}
+                  className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-pointer group"
+                  style={{ left: `${timeToPixels(kf.time)}px` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(kf.time);
+                  }}
+                >
+                  <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
+                  <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
+                    {formatTime(kf.time)} - Dist: {kf.distance.toFixed(1)}, H: {kf.height.toFixed(1)}, Rot: {(kf.rotation * 180 / Math.PI).toFixed(0)}°
+                    <br />
+                    Easing: {kf.easing}
+                    {onDeleteCameraKeyframe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteCameraKeyframe(kf.time);
+                        }}
+                        className="ml-2 text-red-400 hover:text-red-300"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {cameraKeyframes.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                  Click timeline to add camera keyframes
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Text Tab */}

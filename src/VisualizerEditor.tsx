@@ -110,6 +110,9 @@ export default function VisualizerEditor() {
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270);
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false);
 
+  // Manual control mode
+  const [manualMode, setManualMode] = useState(false);
+
   // UI state
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
@@ -1410,6 +1413,7 @@ export default function VisualizerEditor() {
             showSongName={showSongName}
             customSongName={customSongName}
             fontLoaded={fontLoaded}
+            manualMode={manualMode}
             onUpdateSection={updateSection}
             onSetBassColor={setBassColor}
             onSetMidsColor={setMidsColor}
@@ -1427,6 +1431,7 @@ export default function VisualizerEditor() {
             onSetShowBorder={setShowBorder}
             onSetShowSongName={setShowSongName}
             onSetCustomSongName={setCustomSongName}
+            onSetManualMode={setManualMode}
           />
         </div>
       </div>
