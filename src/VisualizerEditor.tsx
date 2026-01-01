@@ -2163,6 +2163,10 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
                 onSetCameraDistance={setCameraDistance}
                 onSetCameraHeight={setCameraHeight}
                 onSetCameraRotation={setCameraRotation}
+                showLetterbox={showLetterbox}
+                letterboxSize={letterboxSize}
+                onSetShowLetterbox={setShowLetterbox}
+                onSetLetterboxSize={setLetterboxSize}
               />
             </div>
           ) : (
