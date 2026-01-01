@@ -13,7 +13,7 @@ import ExportModal from './components/Controls/ExportModal';
 import DebugConsole from './components/Debug/DebugConsole';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -27,6 +27,24 @@ const ANIMATION_TYPES: AnimationType[] = [
   { value: 'vortex', label: 'Vortex Storm', icon: '🌪️' },
   { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
 ];
+
+// PHASE 4: Default preset parameters for each animation type
+const DEFAULT_PRESET_PARAMETERS: Record<string, PresetParameters> = {
+  orbit: { density: 30, speed: 1.0, intensity: 1.0, spread: 15 },
+  explosion: { density: 30, speed: 1.0, intensity: 1.0, spread: 20 },
+  tunnel: { density: 30, speed: 2.0, intensity: 1.0, spread: 10 },
+  wave: { density: 30, speed: 1.5, intensity: 1.5, spread: 5 },
+  spiral: { density: 40, speed: 1.0, intensity: 1.0, spread: 20 },
+  chill: { density: 20, speed: 0.5, intensity: 0.7, spread: 15 },
+  pulse: { density: 10, speed: 1.5, intensity: 1.5, spread: 8 },
+  vortex: { density: 50, speed: 2.5, intensity: 1.5, spread: 25 },
+  seiryu: { density: 35, speed: 1.2, intensity: 1.0, spread: 18 }
+};
+
+// PHASE 4: Helper to get default parameters for a preset
+function getDefaultParameters(presetType: string): PresetParameters {
+  return DEFAULT_PRESET_PARAMETERS[presetType] || DEFAULT_PRESET_PARAMETERS.orbit;
+}
 
 // Default constants
 const DEFAULT_CAMERA_DISTANCE = 15;
@@ -114,11 +132,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Sections/Layers state
+  // Sections/Layers state (PHASE 4: Initialize with default preset parameters)
   const [sections, setSections] = useState<Section[]>([
-    { id: 1, start: 0, end: 20, animation: 'orbit', visible: true, locked: false },
-    { id: 2, start: 20, end: 40, animation: 'explosion', visible: true, locked: false },
-    { id: 3, start: 40, end: 60, animation: 'chill', visible: true, locked: false }
+    { id: 1, start: 0, end: 20, animation: 'orbit', visible: true, locked: false, parameters: getDefaultParameters('orbit') },
+    { id: 2, start: 20, end: 40, animation: 'explosion', visible: true, locked: false, parameters: getDefaultParameters('explosion') },
+    { id: 3, start: 40, end: 60, animation: 'chill', visible: true, locked: false, parameters: getDefaultParameters('chill') }
   ]);
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
 
@@ -221,7 +239,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       end: endTime,
       animation: 'orbit',
       visible: true,
-      locked: false
+      locked: false,
+      parameters: getDefaultParameters('orbit') // PHASE 4: Add default preset parameters
     };
     setSections([...sections, newSection]);
     setSelectedSectionId(newSection.id);
@@ -250,7 +269,23 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   };
 
   const updateSection = (id: number, field: string, value: any) => {
-    setSections(sections.map((s: Section) => s.id === id ? { ...s, [field]: value } : s));
+    setSections(sections.map((s: Section) => {
+      if (s.id !== id) return s;
+      
+      // PHASE 4: When animation type changes, reset parameters to preset defaults
+      if (field === 'animation') {
+        return { ...s, [field]: value, parameters: getDefaultParameters(value) };
+      }
+      
+      return { ...s, [field]: value };
+    }));
+  };
+  
+  // PHASE 4: Update preset parameters for a section
+  const updateSectionParameters = (id: number, params: Partial<PresetParameters>) => {
+    setSections(sections.map((s: Section) => 
+      s.id === id ? { ...s, parameters: { ...s.parameters, ...params } as PresetParameters } : s
+    ));
   };
 
   const toggleSectionVisibility = (id: number) => {
@@ -628,9 +663,20 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       const sec = sections.find((s: Section) => t >= s.start && t < s.end);
       const type = sec?.animation || 'orbit';
       const isVisible = sec?.visible !== false;
+      
+      // PHASE 4: Get preset parameters (use defaults if not set)
+      const params = sec?.parameters || getDefaultParameters(type);
+      const { density, speed, intensity, spread } = params;
 
       // PHASE 1: Get frequency data (defaults to 0 when not playing)
       const f = isPlaying && analyserRef.current ? getFreq(data) : { bass: 0, mids: 0, highs: 0 };
+      
+      // PHASE 4: Apply intensity multiplier to frequency data
+      const reactiveF = {
+        bass: f.bass * intensity,
+        mids: f.mids * intensity,
+        highs: f.highs * intensity
+      };
 
       // Handle preset transitions with cleanup
       if (type !== prevAnimRef.current) {
@@ -695,57 +741,74 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
 
       // PRESET ANIMATIONS
+      // PHASE 4: All presets now use parameters (density, speed, intensity, spread)
+      // - density: controls number of visible objects (limiting loops)
+      // - speed: multiplies animation speeds and elapsed time
+      // - intensity: already applied to reactiveF
+      // - spread: controls spatial distribution/radii
+      
       if (type === 'orbit') {
         // Orbital Dance - Solar system with orbiting planets
-        const rotationSpeed = cameraAutoRotate ? el * 0.2 : 0;
-        const r = activeCameraDistance - f.bass * 5;
+        // PHASE 4: Uses speed for rotation, spread for orbit radii, density for object count
+        const rotationSpeed = cameraAutoRotate ? el * 0.2 * speed : 0;
+        const r = activeCameraDistance - reactiveF.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation) * r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation) * r);
         cam.lookAt(0, 0, 0);
         
         // Central sphere as sun
         obj.sphere.position.set(0, 0, 0);
-        const sunScale = 3 + f.bass * 2;
+        const sunScale = 3 + reactiveF.bass * 2;
         obj.sphere.scale.set(sunScale, sunScale, sunScale);
-        obj.sphere.rotation.y += 0.01;
+        obj.sphere.rotation.y += 0.01 * speed;
         (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.9 + f.bass * 0.1) * blend;
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.9 + reactiveF.bass * 0.1) * blend;
         (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
         
-        // Cubes as planets
+        // Cubes as planets (PHASE 4: limit by density parameter)
+        const planetCount = Math.min(Math.floor(density / 4), obj.cubes.length);
         obj.cubes.forEach((planet, i) => {
-          const orbitRadius = 5 + i * 1.8;
-          const orbitSpeed = 0.8 / (1 + i * 0.3);
+          if (i >= planetCount) {
+            planet.scale.set(0, 0, 0); // Hide extra planets
+            return;
+          }
+          const orbitRadius = spread * 0.3 + i * (spread / planetCount);
+          const orbitSpeed = (0.8 / (1 + i * 0.3)) * speed;
           const angle = el * orbitSpeed + i * 0.5;
           const tilt = Math.sin(i) * 0.3;
           planet.position.x = Math.cos(angle) * orbitRadius;
           planet.position.z = Math.sin(angle) * orbitRadius;
           planet.position.y = Math.sin(angle * 2) * tilt;
           const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i] || 1.0;
-          const planetSize = sizeVariation + f.bass * 0.3;
+          const planetSize = sizeVariation + reactiveF.bass * 0.3;
           planet.scale.set(planetSize, planetSize, planetSize);
-          planet.rotation.y += 0.02 + i * 0.005;
+          planet.rotation.y += (0.02 + i * 0.005) * speed;
           const colorIndex = i % 3;
           (planet.material as THREE.MeshBasicMaterial).color.setStyle(colorIndex === 0 ? bassColor : colorIndex === 1 ? midsColor : highsColor);
-          (planet.material as THREE.MeshBasicMaterial).opacity = (0.8 + f.bass * 0.2) * blend;
+          (planet.material as THREE.MeshBasicMaterial).opacity = (0.8 + reactiveF.bass * 0.2) * blend;
           (planet.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // Octas as moons and distant objects
+        // Octas as moons and distant objects (PHASE 4: limit by density)
+        const moonCount = Math.min(Math.floor(density * 0.8), 24);
         obj.octas.slice(0, 24).forEach((moon, i) => {
-          const planetIndex = Math.floor(i / 3) % obj.cubes.length;
+          if (i >= moonCount) {
+            moon.scale.set(0, 0, 0);
+            return;
+          }
+          const planetIndex = Math.floor(i / 3) % planetCount;
           const planet = obj.cubes[planetIndex];
           const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
-          const moonOrbitSpeed = 3 + (i % 3);
+          const moonOrbitSpeed = (3 + (i % 3)) * speed;
           const moonAngle = el * moonOrbitSpeed + i;
           moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
           moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
           moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
-          const moonSize = 0.3 + f.mids * 0.2;
+          const moonSize = 0.3 + reactiveF.mids * 0.2;
           moon.scale.set(moonSize, moonSize, moonSize);
-          moon.rotation.x += 0.05;
-          moon.rotation.y += 0.03;
+          moon.rotation.x += 0.05 * speed;
+          moon.rotation.y += 0.03 * speed;
           (moon.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
-          (moon.material as THREE.MeshBasicMaterial).opacity = (0.6 + f.mids * 0.4) * blend;
+          (moon.material as THREE.MeshBasicMaterial).opacity = (0.6 + reactiveF.mids * 0.4) * blend;
           (moon.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
@@ -1834,6 +1897,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               fontLoaded={fontLoaded}
               manualMode={manualMode}
               onUpdateSection={updateSection}
+              onUpdateSectionParameters={updateSectionParameters} 
               onSetBassColor={setBassColor}
               onSetMidsColor={setMidsColor}
               onSetHighsColor={setHighsColor}

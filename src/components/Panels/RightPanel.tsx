@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Section, AnimationType } from '../../types';
+import { Section, AnimationType, PresetParameters } from '../../types';
 
 interface RightPanelProps {
   selectedSection: Section | null;
@@ -23,6 +23,7 @@ interface RightPanelProps {
   fontLoaded: boolean;
   manualMode: boolean;
   onUpdateSection: (id: number, field: string, value: any) => void;
+  onUpdateSectionParameters: (id: number, params: Partial<PresetParameters>) => void; // PHASE 4
   onSetBassColor: (color: string) => void;
   onSetMidsColor: (color: string) => void;
   onSetHighsColor: (color: string) => void;
@@ -71,6 +72,7 @@ export default function RightPanel({
   fontLoaded,
   manualMode,
   onUpdateSection,
+  onUpdateSectionParameters, // PHASE 4
   onSetBassColor,
   onSetMidsColor,
   onSetHighsColor,
@@ -238,6 +240,80 @@ export default function RightPanel({
                     onChange={(e) => onSetHighsColor(e.target.value)}
                     className="w-full h-10 rounded cursor-pointer"
                   />
+                </div>
+              </div>
+            </div>
+            
+            {/* PHASE 4: Preset Parameters */}
+            <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+              <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                Preset Parameters
+              </h3>
+              <div className="space-y-3">
+                {/* Density */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    Density: {selectedSection.parameters?.density || 30}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={selectedSection.parameters?.density || 30}
+                    onChange={(e) => onUpdateSectionParameters(selectedSection.id, { density: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Object/particle count</p>
+                </div>
+                
+                {/* Speed */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    Speed: {selectedSection.parameters?.speed?.toFixed(1) || '1.0'}x
+                  </label>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="10"
+                    step="0.1"
+                    value={selectedSection.parameters?.speed || 1.0}
+                    onChange={(e) => onUpdateSectionParameters(selectedSection.id, { speed: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Animation speed multiplier</p>
+                </div>
+                
+                {/* Intensity */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    Intensity: {selectedSection.parameters?.intensity?.toFixed(1) || '1.0'}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3"
+                    step="0.1"
+                    value={selectedSection.parameters?.intensity || 1.0}
+                    onChange={(e) => onUpdateSectionParameters(selectedSection.id, { intensity: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Audio reactivity strength</p>
+                </div>
+                
+                {/* Spread */}
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">
+                    Spread: {selectedSection.parameters?.spread || 15}
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={selectedSection.parameters?.spread || 15}
+                    onChange={(e) => onUpdateSectionParameters(selectedSection.id, { spread: Number(e.target.value) })}
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Spatial distribution/radius</p>
                 </div>
               </div>
             </div>

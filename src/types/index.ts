@@ -39,6 +39,14 @@ export interface ProjectState {
   manualMode: boolean;
 }
 
+// PHASE 4: Preset parameters for parameter-driven animations
+export interface PresetParameters {
+  density: number;    // Object/particle count (1-100)
+  speed: number;      // Animation speed multiplier (0.1-10.0)
+  intensity: number;  // Audio reactivity strength (0-3.0)
+  spread: number;     // Spatial distribution/radius (1-50)
+}
+
 export interface Section {
   id: number;
   start: number;
@@ -47,6 +55,7 @@ export interface Section {
   visible?: boolean;
   locked?: boolean;
   colorTag?: string;
+  parameters?: PresetParameters; // PHASE 4: Editable preset parameters
 }
 
 export interface CameraKeyframe {
