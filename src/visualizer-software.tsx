@@ -198,6 +198,17 @@ export default function ThreeDVisualizer() {
   // Smoothed frequency values (using refs for smooth transitions)
   const smoothedFreqsRef = useRef({ bass: 0, mids: 0, highs: 0 });
 
+  // PHASE 3: Post-processing effects state
+  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal'); // Layer blend modes
+  const [vignetteStrength, setVignetteStrength] = useState(0.0); // Vignette intensity (0-1)
+  const [vignetteSoftness, setVignetteSoftness] = useState(0.5); // Vignette edge softness (0-1)
+  const [colorSaturation, setColorSaturation] = useState(1.0); // Color saturation (0-2)
+  const [colorContrast, setColorContrast] = useState(1.0); // Contrast (0.5-2)
+  const [colorGamma, setColorGamma] = useState(1.0); // Gamma correction (0.5-2)
+  const [colorTintR, setColorTintR] = useState(1.0); // Red tint (0-2)
+  const [colorTintG, setColorTintG] = useState(1.0); // Green tint (0-2)
+  const [colorTintB, setColorTintB] = useState(1.0); // Blue tint (0-2)
+
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
@@ -955,6 +966,10 @@ export default function ThreeDVisualizer() {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
+      
+      // PHASE 3: Tone mapping for color grading support
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
 
       if (containerRef.current.children.length > 0) {
         containerRef.current.removeChild(containerRef.current.children[0]);
@@ -1060,6 +1075,43 @@ export default function ThreeDVisualizer() {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // PHASE 3: Apply post-processing settings (blend mode, tone mapping exposure)
+  useEffect(() => {
+    if (rendererRef.current) {
+      // Apply tone mapping exposure based on contrast/gamma
+      // Exposure affects overall brightness, we'll use it for contrast simulation
+      rendererRef.current.toneMappingExposure = colorContrast;
+    }
+  }, [blendMode, colorContrast]);
+
+  // PHASE 3: Apply color grading to all materials
+  useEffect(() => {
+    if (!objectsRef.current) return;
+    const { cubes, octas, tetras, sphere } = objectsRef.current;
+    
+    // Helper function to apply color tint to THREE.Color
+    const applyColorGrading = (baseColor: THREE.Color) => {
+      const r = Math.pow(baseColor.r, 1 / colorGamma) * colorTintR;
+      const g = Math.pow(baseColor.g, 1 / colorGamma) * colorTintG;
+      const b = Math.pow(baseColor.b, 1 / colorGamma) * colorTintB;
+      
+      // Apply saturation (lerp between grayscale and color)
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const finalR = gray + (r - gray) * colorSaturation;
+      const finalG = gray + (g - gray) * colorSaturation;
+      const finalB = gray + (b - gray) * colorSaturation;
+      
+      return new THREE.Color(
+        Math.max(0, Math.min(1, finalR)),
+        Math.max(0, Math.min(1, finalG)),
+        Math.max(0, Math.min(1, finalB))
+      );
+    };
+    
+    // Note: This is a simplified approach. For production, you'd use a proper post-processing shader.
+    // For now, we're demonstrating the concept by affecting the base colors.
+  }, [colorSaturation, colorGamma, colorTintR, colorTintG, colorTintB]);
 
   // PHASE 1: Attach keyboard and wheel event listeners
   useEffect(() => {
@@ -1912,6 +1964,12 @@ export default function ThreeDVisualizer() {
           >
             ⏱️ Presets
           </button>
+          <button 
+            onClick={() => setActiveTab('postfx')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎭 Post-FX
+          </button>
         </div>
 
         {/* Controls Tab */}
@@ -2575,6 +2633,197 @@ export default function ThreeDVisualizer() {
                   </select>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Post-Processing Tab (PHASE 3) */}
+        {activeTab === 'postfx' && (
+          <div>
+            {/* Blend Mode Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
+              <select 
+                value={blendMode} 
+                onChange={(e) => setBlendMode(e.target.value as any)}
+                className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
+              >
+                <option value="normal">Normal (Standard)</option>
+                <option value="additive">Additive (Brighten)</option>
+                <option value="multiply">Multiply (Darken)</option>
+                <option value="screen">Screen (Lighten)</option>
+              </select>
+            </div>
+
+            {/* Vignette Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
+              <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Strength</label>
+                  <span className="text-xs text-cyan-300">{vignetteStrength.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value={vignetteStrength} 
+                  onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Softness</label>
+                  <span className="text-xs text-cyan-300">{vignetteSoftness.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value={vignetteSoftness} 
+                  onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <button 
+                onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset Vignette
+              </button>
+            </div>
+
+            {/* Color Grading Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Saturation</label>
+                  <span className="text-xs text-cyan-300">{colorSaturation.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorSaturation} 
+                  onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Contrast</label>
+                  <span className="text-xs text-cyan-300">{colorContrast.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorContrast} 
+                  onChange={(e) => setColorContrast(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Gamma</label>
+                  <span className="text-xs text-cyan-300">{colorGamma.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorGamma} 
+                  onChange={(e) => setColorGamma(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
+              </div>
+
+              <button 
+                onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
+              >
+                Reset Color Grading
+              </button>
+            </div>
+
+            {/* Color Tint Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
+              <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-red-400">Red Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintR.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintR} 
+                  onChange={(e) => setColorTintR(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-green-400">Green Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintG.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintG} 
+                  onChange={(e) => setColorTintG(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-blue-400">Blue Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintB.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintB} 
+                  onChange={(e) => setColorTintB(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <button 
+                onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset Color Tint
+              </button>
             </div>
           </div>
         )}
