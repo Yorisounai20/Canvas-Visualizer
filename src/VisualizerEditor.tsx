@@ -8,6 +8,7 @@ import RightPanel from './components/Panels/RightPanel';
 import Timeline from './components/Timeline/Timeline';
 import CanvasWrapper from './components/Canvas/CanvasWrapper';
 import ExportModal from './components/Controls/ExportModal';
+import DebugConsole from './components/Debug/DebugConsole';
 import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType } from './types';
 
 // Animation types/presets
@@ -129,6 +130,7 @@ export default function VisualizerEditor() {
   const [errorLog, setErrorLog] = useState<LogEntry[]>([]);
   const [fps, setFps] = useState(0);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [showDebugConsole, setShowDebugConsole] = useState(false);
 
   // Panel resize state
   const [leftPanelWidth, setLeftPanelWidth] = useState(256); // 64 * 4 = 256px (w-64)
@@ -1245,6 +1247,7 @@ export default function VisualizerEditor() {
             cameraAutoRotate={cameraAutoRotate}
             showLetterbox={showLetterbox}
             letterboxSize={letterboxSize}
+            showBorder={showBorder}
             onUpdateSection={updateSection}
             onSetBassColor={setBassColor}
             onSetMidsColor={setMidsColor}
@@ -1259,6 +1262,7 @@ export default function VisualizerEditor() {
             onSetCameraAutoRotate={setCameraAutoRotate}
             onSetShowLetterbox={setShowLetterbox}
             onSetLetterboxSize={setLetterboxSize}
+            onSetShowBorder={setShowBorder}
           />
         </div>
       </div>
@@ -1296,6 +1300,13 @@ export default function VisualizerEditor() {
         onExport={exportVideo}
         onSetFormat={setExportFormat}
         onSetResolution={setExportResolution}
+      />
+
+      {/* Debug Console */}
+      <DebugConsole
+        logs={errorLog}
+        isOpen={showDebugConsole}
+        onToggle={() => setShowDebugConsole(!showDebugConsole)}
       />
     </div>
   );

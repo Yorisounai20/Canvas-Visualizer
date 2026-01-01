@@ -153,13 +153,18 @@ export default function Timeline({
 
     const handleMouseUp = () => {
       setDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      // Re-enable text selection
+      document.body.style.userSelect = '';
     };
 
     if (dragState.type) {
+      // Prevent text selection during drag
+      document.body.style.userSelect = 'none';
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       
       return () => {
+        document.body.style.userSelect = '';
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
       };

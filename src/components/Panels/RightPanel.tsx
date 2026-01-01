@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Section, AnimationType } from '../../types';
 
 interface RightPanelProps {
@@ -17,6 +17,7 @@ interface RightPanelProps {
   cameraAutoRotate: boolean;
   showLetterbox: boolean;
   letterboxSize: number;
+  showBorder: boolean;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onSetBassColor: (color: string) => void;
   onSetMidsColor: (color: string) => void;
@@ -31,7 +32,10 @@ interface RightPanelProps {
   onSetCameraAutoRotate: (autoRotate: boolean) => void;
   onSetShowLetterbox: (show: boolean) => void;
   onSetLetterboxSize: (size: number) => void;
+  onSetShowBorder: (show: boolean) => void;
 }
+
+type RightPanelTab = 'layer' | 'canvas';
 
 /**
  * RightPanel Component - Properties/Effects panel (After Effects-style)
@@ -54,6 +58,7 @@ export default function RightPanel({
   cameraAutoRotate,
   showLetterbox,
   letterboxSize,
+  showBorder,
   onUpdateSection,
   onSetBassColor,
   onSetMidsColor,
@@ -67,8 +72,10 @@ export default function RightPanel({
   onSetCameraRotation,
   onSetCameraAutoRotate,
   onSetShowLetterbox,
-  onSetLetterboxSize
+  onSetLetterboxSize,
+  onSetShowBorder
 }: RightPanelProps) {
+  const [activeTab, setActiveTab] = useState<RightPanelTab>('layer');
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
@@ -79,16 +86,41 @@ export default function RightPanel({
         <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           Properties / Effects
         </h2>
-        {selectedSection && (
+        {selectedSection && activeTab === 'layer' && (
           <p className="text-xs text-cyan-400 mt-1">
             {animationTypes.find(a => a.value === selectedSection.animation)?.label || 'Unknown'}
           </p>
         )}
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-gray-700 flex-shrink-0">
+        <button
+          onClick={() => setActiveTab('layer')}
+          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'layer'
+              ? 'bg-gray-700 text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Layer
+        </button>
+        <button
+          onClick={() => setActiveTab('canvas')}
+          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'canvas'
+              ? 'bg-gray-700 text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Canvas
+        </button>
+      </div>
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {selectedSection ? (
+        {activeTab === 'layer' ? (
+          selectedSection ? (
           <div className="p-4 space-y-4">
             {/* Layer Properties */}
             <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
@@ -195,9 +227,15 @@ export default function RightPanel({
                 </div>
               </div>
             </div>
-
-            {/* Camera Controls */}
-            <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+          </div>
+        ) : (
+          <div className="p-4 text-center text-gray-500 text-sm">
+            Select a layer to view properties
+          </div>
+        )
+      ) : (
+        /* Canvas Tab */
+        <div className="p-4 space-y-4">
               <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
                 Camera
               </h3>
@@ -298,18 +336,40 @@ export default function RightPanel({
                   </div>
                 )}
 
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">
-                    Background
-                  </label>
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(e) => onSetBackgroundColor(e.target.value)}
-                    className="w-full h-10 rounded cursor-pointer"
-                  />
-                </div>
+        /* Canvas Tab */
+        <div className="p-4 space-y-4">
+          {/* Background & Border */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              Background & Border
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Background Color
+                </label>
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(e) => onSetBackgroundColor(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
 
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showBorder"
+                  checked={showBorder}
+                  onChange={(e) => onSetShowBorder(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showBorder" className="text-sm text-white cursor-pointer">
+                  Show Border
+                </label>
+              </div>
+
+              {showBorder && (
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">
                     Border Color
@@ -321,52 +381,156 @@ export default function RightPanel({
                     className="w-full h-10 rounded cursor-pointer"
                   />
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Lighting */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              Lighting
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Ambient: {(ambientLightIntensity * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={ambientLightIntensity}
+                  onChange={(e) => onSetAmbientLight(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Directional: {(directionalLightIntensity * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={directionalLightIntensity}
+                  onChange={(e) => onSetDirectionalLight(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
               </div>
             </div>
+          </div>
 
-            {/* Lighting */}
-            <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
-                Lighting
-              </h3>
-              <div className="space-y-3">
+          {/* Camera Controls */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              Camera
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="autoRotate"
+                  checked={cameraAutoRotate}
+                  onChange={(e) => onSetCameraAutoRotate(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">
+                  Auto-Rotate
+                </label>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Distance: {cameraDistance.toFixed(1)}
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="0.5"
+                  value={cameraDistance}
+                  onChange={(e) => onSetCameraDistance(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Height: {cameraHeight.toFixed(1)}
+                </label>
+                <input
+                  type="range"
+                  min="-10"
+                  max="10"
+                  step="0.5"
+                  value={cameraHeight}
+                  onChange={(e) => onSetCameraHeight(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Rotation: {(cameraRotation * 180 / Math.PI).toFixed(0)}°
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max={Math.PI * 2}
+                  step="0.05"
+                  value={cameraRotation}
+                  onChange={(e) => onSetCameraRotation(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Letterbox Controls */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+              Letterbox
+            </h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showLetterbox"
+                  checked={showLetterbox}
+                  onChange={(e) => onSetShowLetterbox(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">
+                  Show Letterbox
+                </label>
+              </div>
+
+              {showLetterbox && (
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">
-                    Ambient: {(ambientLightIntensity * 100).toFixed(0)}%
+                    Size: {letterboxSize}px
                   </label>
                   <input
                     type="range"
                     min="0"
-                    max="2"
-                    step="0.1"
-                    value={ambientLightIntensity}
-                    onChange={(e) => onSetAmbientLight(Number(e.target.value))}
+                    max="100"
+                    step="5"
+                    value={letterboxSize}
+                    onChange={(e) => onSetLetterboxSize(Number(e.target.value))}
                     className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use keyframes in timeline for animated letterbox
+                  </p>
                 </div>
-
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">
-                    Directional: {(directionalLightIntensity * 100).toFixed(0)}%
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={directionalLightIntensity}
-                    onChange={(e) => onSetDirectionalLight(Number(e.target.value))}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                  />
-                </div>
-              </div>
+              )}
             </div>
           </div>
-        ) : (
-          <div className="p-4 text-center text-gray-500 text-sm">
-            Select a layer to view properties
-          </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );
