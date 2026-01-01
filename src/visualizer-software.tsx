@@ -209,6 +209,49 @@ export default function ThreeDVisualizer() {
   const [colorTintG, setColorTintG] = useState(1.0); // Green tint (0-2)
   const [colorTintB, setColorTintB] = useState(1.0); // Blue tint (0-2)
 
+  // PHASE 4: Multi-audio system types and state
+  interface AudioTrack {
+    id: string;
+    name: string;
+    buffer: AudioBuffer | null;
+    source: AudioBufferSourceNode | null;
+    analyser: AnalyserNode;
+    gainNode: GainNode;
+    volume: number;
+    muted: boolean;
+    active: boolean; // Which track's frequencies to visualize
+  }
+
+  interface ParameterEvent {
+    id: string;
+    time: number; // When to trigger (in seconds)
+    duration: number; // How long the effect lasts (in seconds)
+    parameters: {
+      backgroundFlash?: number; // 0-1 intensity
+      bloomBurst?: number; // 0-1 intensity (currently unused, for future bloom effect)
+      fogPulse?: number; // 0-1 intensity (currently unused, for future fog effect)
+      cameraShake?: number; // 0-1 intensity
+      vignettePulse?: number; // 0-1 intensity
+      saturationBurst?: number; // 0-1 intensity
+    };
+  }
+
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null); // Which track to visualize
+  
+  // Event UI state
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ParameterEvent | null>(null);
+  
+  // Temporary event parameter values (for active events)
+  const activeEventValuesRef = useRef({
+    backgroundFlash: 0,
+    cameraShake: 0,
+    vignettePulse: 0,
+    saturationBurst: 0
+  });
+
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
