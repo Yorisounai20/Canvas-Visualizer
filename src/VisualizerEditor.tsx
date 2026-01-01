@@ -9,7 +9,7 @@ import Timeline from './components/Timeline/Timeline';
 import CanvasWrapper from './components/Canvas/CanvasWrapper';
 import ExportModal from './components/Controls/ExportModal';
 import DebugConsole from './components/Debug/DebugConsole';
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -92,6 +92,8 @@ export default function VisualizerEditor() {
     { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
   ]);
   const [cameraShakes, setCameraShakes] = useState<CameraShake[]>([]);
+  const [presetKeyframes, setPresetKeyframes] = useState<PresetKeyframe[]>([]);
+  const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
 
   // Colors
   const [bassColor, setBassColor] = useState('#8a2be2');
@@ -208,6 +210,60 @@ export default function VisualizerEditor() {
   const reorderSections = (newSections: Section[]) => {
     setSections(newSections);
   };
+
+  // Keyframe management
+  const addPresetKeyframe = (time: number) => {
+    const currentSection = getCurrentSection();
+    const preset = currentSection?.animation || 'orbit';
+    const newKeyframe: PresetKeyframe = {
+      id: Date.now(),
+      time: parseFloat(time.toFixed(2)),
+      preset
+    };
+    setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added preset keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deletePresetKeyframe = (id: number) => {
+    setPresetKeyframes(presetKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted preset keyframe', 'info');
+  };
+
+  const addCameraKeyframe = (time: number) => {
+    const newKeyframe: CameraKeyframe = {
+      time: parseFloat(time.toFixed(2)),
+      distance: cameraDistance,
+      height: cameraHeight,
+      rotation: cameraRotation,
+      easing: 'linear'
+    };
+    setCameraKeyframes([...cameraKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added camera keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteCameraKeyframe = (time: number) => {
+    setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
+    addLog('Deleted camera keyframe', 'info');
+  };
+
+  const addTextKeyframe = (time: number) => {
+    const newKeyframe: TextKeyframe = {
+      id: Date.now(),
+      time: parseFloat(time.toFixed(2)),
+      show: showSongName
+    };
+    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added text keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteTextKeyframe = (id: number) => {
+    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted text keyframe', 'info');
+  };
+
+  const formatTime = (s: number) => 
+    `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+
 
   // Audio management
   const initAudio = async (file: File) => {
@@ -1391,10 +1447,19 @@ export default function VisualizerEditor() {
           selectedSectionId={selectedSectionId}
           audioBuffer={audioBufferRef.current}
           showWaveform={true}
+          presetKeyframes={presetKeyframes}
+          cameraKeyframes={cameraKeyframes}
+          textKeyframes={textKeyframes}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
           onAddSection={addSection}
           onSeek={seekTo}
+          onAddPresetKeyframe={addPresetKeyframe}
+          onAddCameraKeyframe={addCameraKeyframe}
+          onAddTextKeyframe={addTextKeyframe}
+          onDeletePresetKeyframe={deletePresetKeyframe}
+          onDeleteCameraKeyframe={deleteCameraKeyframe}
+          onDeleteTextKeyframe={deleteTextKeyframe}
         />
       </div>
 

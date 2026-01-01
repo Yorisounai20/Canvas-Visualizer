@@ -18,6 +18,19 @@ export interface CameraKeyframe {
   easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 }
 
+export interface PresetKeyframe {
+  id: number;
+  time: number;
+  preset: string;
+}
+
+export interface TextKeyframe {
+  id: number;
+  time: number;
+  show: boolean;
+  text?: string;
+}
+
 export interface LetterboxKeyframe {
   time: number;
   targetSize: number;
