@@ -2,9 +2,9 @@
 
 ## **✅ Development Status**
 
-**Version 2.0 - After Effects-Style UI (Phase 10 Complete)**
+**Version 2.0 - After Effects-Style UI (Phase 10 Complete + Phases 1-5)**
 
-Professional music video editor with a complete After Effects-style interface featuring timeline-based animation, keyframe systems, 3D text overlays, and comprehensive visual controls.
+Professional music video editor with a complete After Effects-style interface featuring timeline-based animation, keyframe systems, 3D text overlays, parameter-driven presets, Blender-like workspace, keyboard shortcuts, and comprehensive visual controls.
 
 **Core Features:**
 - ✅ Professional panel-based layout (Top Bar, Layers, Canvas, Properties, Timeline)
@@ -19,14 +19,17 @@ Professional music video editor with a complete After Effects-style interface fe
 - ✅ Manual control mode for non-audio-reactive animations
 - ✅ Color pickers and camera controls
 - ✅ Export modal with resolution selection
+- ✅ **NEW (Phase 1):** Unified render loop and stabilized architecture
+- ✅ **NEW (Phase 2):** Project system with New Project modal
+- ✅ **NEW (Phase 3):** Blender-like 3D workspace (toggle with `W` key)
+- ✅ **NEW (Phase 4):** Parameter-driven presets (density, speed, intensity, spread)
+- ✅ **NEW (Phase 5):** Keyboard shortcuts modal, undo/redo functionality
 
-**Latest Additions (Phase 10):**
-- ✨ Keyframe-based preset automation
-- ✨ Camera animation system with easing
-- ✨ Text visibility keyframes
-- ✨ Debug console with backtick key toggle
-- ✨ Manual mode for epilepsy-safe animations
-- ✨ Waveform background in timeline
+**Latest Additions (Phase 5 - UI Structure):**
+- ✨ Keyboard shortcuts modal (? button in top bar)
+- ✨ Undo/Redo functionality (Ctrl+Z / Ctrl+Shift+Z)
+- ✨ Complete keyboard shortcut reference
+- ✨ README documentation updated
 
 ---
 
@@ -39,7 +42,7 @@ A **professional music video editor** with an **After Effects-style interface** 
 ## **Core Features**
 
 ### 🎨 **After Effects-Style Interface**
-- **Top Bar** - Playback controls, current section info, export button, undo/redo (coming soon)
+- **Top Bar** - Playback controls, current section info, undo/redo, keyboard shortcuts (?), export button
 - **Left Panel (Layers)** - Section/layer management with:
   - Visibility toggles (eye icon)
   - Lock/unlock layers
@@ -122,6 +125,17 @@ A **professional music video editor** with an **After Effects-style interface** 
 - Epilepsy-safe control for precise timing
 - Keyframe-based animations instead of frequency-reactive
 - Visual warning when active
+
+**Keyboard Shortcuts:**
+- Click **?** button in top bar to view all shortcuts
+- Comprehensive reference modal with categorized shortcuts
+- Includes playback, timeline, tools, editing, and workspace controls
+
+**Undo/Redo System:**
+- Full history tracking for section operations
+- **Ctrl+Z** (Cmd+Z on Mac) to undo
+- **Ctrl+Shift+Z** or **Ctrl+Y** (Cmd+Shift+Z or Cmd+Y on Mac) to redo
+- Visual indication of undo/redo availability in top bar
 
 ### 🎥 **Video Export System**
 - Export modal with format and resolution selection
@@ -270,7 +284,8 @@ The interface is divided into 5 main areas, inspired by professional video editi
    - Title and current section indicator
    - Time display
    - Play/Stop button
-   - Undo/Redo buttons (coming soon)
+   - Undo/Redo buttons (**PHASE 5:** Ctrl+Z / Ctrl+Shift+Z)
+   - Keyboard shortcuts button (? icon) (**PHASE 5**)
    - Export button (purple, top-right)
 
 2. **Left Panel - Layers/Sections (Dark Gray):**
@@ -322,6 +337,29 @@ npm run lint         # Run ESLint
 4. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
 5. **Preview** - Click Play button in top bar to preview your composition
 6. **Export** - Click Export button to render and download the final video
+
+### **Keyboard Shortcuts:**
+
+**Click the ? button in the top bar** to view the complete keyboard shortcuts reference.
+
+| Category | Shortcut | Action |
+|----------|----------|--------|
+| **Playback** | Space | Play/Pause audio |
+| **Timeline** | ← / → | Navigate timeline (1 second) |
+| | Shift + ← / → | Navigate timeline (5 seconds) |
+| **Tools & Modes** | W | Toggle Workspace Mode |
+| | ` (backtick) | Toggle Debug Console |
+| | Esc | Close modals/panels |
+| **Editing** | Ctrl/Cmd + Z | Undo |
+| | Ctrl/Cmd + Shift + Z | Redo |
+| | Ctrl/Cmd + Y | Redo (alternative) |
+| **Workspace (W Mode)** | Left Click | Select object |
+| | Left Drag | Rotate camera |
+| | Right Drag | Pan camera |
+| | Scroll | Zoom camera |
+| | T | Translate mode |
+| | R | Rotate mode |
+| | S | Scale mode |
 
 ---
 

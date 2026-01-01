@@ -13,6 +13,7 @@ import ExportModal from './components/Controls/ExportModal';
 import DebugConsole from './components/Debug/DebugConsole';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
+import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
 import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
 
 // Animation types/presets
@@ -196,6 +197,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showDebugConsole, setShowDebugConsole] = useState(false);
 
+  // PHASE 5: UI state
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
+  // PHASE 5: Undo/Redo state
+  const [history, setHistory] = useState<Section[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
   // Panel resize state
   const [leftPanelWidth, setLeftPanelWidth] = useState(256); // 64 * 4 = 256px (w-64)
   const [rightPanelWidth, setRightPanelWidth] = useState(320); // 80 * 4 = 320px (w-80)
@@ -218,6 +226,14 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     addLog(`Background: ${projectSettings.backgroundColor}`, 'info');
   }, [projectSettings]);
 
+  // PHASE 5: Initialize history with initial sections
+  useEffect(() => {
+    if (history.length === 0) {
+      setHistory([JSON.parse(JSON.stringify(sections))]);
+      setHistoryIndex(0);
+    }
+  }, []); // Only run once on mount
+
   // Helper functions
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -226,6 +242,30 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
 
   const getCurrentSection = (): Section | null => {
     return sections.find((s: Section) => currentTime >= s.start && currentTime < s.end) || null;
+  };
+
+  // PHASE 5: Undo/Redo functionality
+  const saveHistory = (newSections: Section[]) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(newSections)));
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setSections(JSON.parse(JSON.stringify(history[historyIndex - 1])));
+      addLog('Undo performed', 'info');
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setSections(JSON.parse(JSON.stringify(history[historyIndex + 1])));
+      addLog('Redo performed', 'info');
+    }
   };
 
   // Section management
@@ -242,12 +282,16 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       locked: false,
       parameters: getDefaultParameters('orbit') // PHASE 4: Add default preset parameters
     };
-    setSections([...sections, newSection]);
+    const newSections = [...sections, newSection];
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
     setSelectedSectionId(newSection.id);
   };
 
   const deleteSection = (id: number) => {
-    setSections(sections.filter((s: Section) => s.id !== id));
+    const newSections = sections.filter((s: Section) => s.id !== id);
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
     if (selectedSectionId === id) {
       setSelectedSectionId(null);
     }
@@ -263,13 +307,15 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       start: sectionToDuplicate.end,
       end: sectionToDuplicate.end + (sectionToDuplicate.end - sectionToDuplicate.start)
     };
-    setSections([...sections, newSection]);
+    const newSections = [...sections, newSection];
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
     setSelectedSectionId(newSection.id);
     addLog(`Duplicated section "${ANIMATION_TYPES.find(a => a.value === newSection.animation)?.label}"`, 'success');
   };
 
   const updateSection = (id: number, field: string, value: any) => {
-    setSections(sections.map((s: Section) => {
+    const newSections = sections.map((s: Section) => {
       if (s.id !== id) return s;
       
       // PHASE 4: When animation type changes, reset parameters to preset defaults
@@ -278,30 +324,39 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
       
       return { ...s, [field]: value };
-    }));
+    });
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
   
   // PHASE 4: Update preset parameters for a section
   const updateSectionParameters = (id: number, params: Partial<PresetParameters>) => {
-    setSections(sections.map((s: Section) => 
+    const newSections = sections.map((s: Section) => 
       s.id === id ? { ...s, parameters: { ...s.parameters, ...params } as PresetParameters } : s
-    ));
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const toggleSectionVisibility = (id: number) => {
-    setSections(sections.map((s: Section) => 
+    const newSections = sections.map((s: Section) => 
       s.id === id ? { ...s, visible: !(s.visible !== false) } : s
-    ));
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const toggleSectionLock = (id: number) => {
-    setSections(sections.map((s: Section) => 
+    const newSections = sections.map((s: Section) => 
       s.id === id ? { ...s, locked: !(s.locked === true) } : s
-    ));
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const reorderSections = (newSections: Section[]) => {
     setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   // Keyframe management
@@ -1367,6 +1422,21 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         setShowDebugConsole(!showDebugConsole);
       }
 
+      // PHASE 5: Undo/Redo keyboard shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+
+      // PHASE 5: Keyboard shortcuts modal (Escape to close)
+      if (e.key === 'Escape' && showKeyboardShortcuts) {
+        e.preventDefault();
+        setShowKeyboardShortcuts(false);
+      }
+
       // Camera controls
       if (e.key.toLowerCase() === 'r' && selectedSectionId === null) {
         // R - Reset camera (only when no section selected to avoid conflicts)
@@ -1388,7 +1458,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     selectedSectionId,
     showLetterbox,
     showBorder,
-    showDebugConsole
+    showDebugConsole,
+    workspaceMode,
+    showKeyboardShortcuts,
+    historyIndex,
+    history
   ]);
 
   // Handle panel resizing
@@ -1799,8 +1873,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         onStop={stopAudio}
         onExport={() => setShowExportModal(true)}
         onAudioFileChange={handleAudioFileChange}
-        canUndo={false}
-        canRedo={false}
+        onUndo={handleUndo} // PHASE 5: Undo handler
+        onRedo={handleRedo} // PHASE 5: Redo handler
+        canUndo={historyIndex > 0} // PHASE 5: Can undo if history exists
+        canRedo={historyIndex < history.length - 1} // PHASE 5: Can redo if not at end
+        onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)} // PHASE 5: Keyboard shortcuts modal
       />
 
       {/* Main Content Area */}
@@ -1971,6 +2048,12 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         logs={errorLog}
         isOpen={showDebugConsole}
         onToggle={() => setShowDebugConsole(!showDebugConsole)}
+      />
+
+      {/* PHASE 5: Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
       />
     </div>
   );

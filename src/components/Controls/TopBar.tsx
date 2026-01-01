@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Video, Undo2, Redo2, Upload } from 'lucide-react';
+import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle } from 'lucide-react';
 
 interface TopBarProps {
   isPlaying: boolean;
@@ -17,12 +17,14 @@ interface TopBarProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  onShowKeyboardShortcuts?: () => void; // PHASE 5: Keyboard shortcuts modal
 }
 
 /**
  * TopBar Component - After Effects-style top control bar
  * Contains playback controls, current section info, export button, and undo/redo
  * PHASE 2: Now displays project name from project settings
+ * PHASE 5: Added keyboard shortcuts button
  */
 export default function TopBar({
   isPlaying,
@@ -39,7 +41,8 @@ export default function TopBar({
   onUndo,
   onRedo,
   canUndo = false,
-  canRedo = false
+  canRedo = false,
+  onShowKeyboardShortcuts
 }: TopBarProps) {
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
@@ -109,7 +112,7 @@ export default function TopBar({
         </div>
       </div>
 
-      {/* Right: Undo/Redo and Export */}
+      {/* Right: Undo/Redo, Keyboard Shortcuts, and Export */}
       <div className="flex items-center gap-2">
         {/* Undo/Redo Buttons */}
         <button
@@ -139,6 +142,17 @@ export default function TopBar({
 
         {/* Divider */}
         <div className="w-px h-6 bg-gray-700 mx-2" />
+
+        {/* PHASE 5: Keyboard Shortcuts Button */}
+        {onShowKeyboardShortcuts && (
+          <button
+            onClick={onShowKeyboardShortcuts}
+            className="p-2 rounded hover:bg-gray-700 text-gray-300 transition-colors"
+            title="Keyboard Shortcuts"
+          >
+            <HelpCircle size={18} />
+          </button>
+        )}
 
         {/* Export Button */}
         <button
