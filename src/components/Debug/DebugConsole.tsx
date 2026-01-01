@@ -12,18 +12,11 @@ interface DebugConsoleProps {
  * DebugConsole Component - Collapsible debug log panel
  * Displays timestamped log entries with color-coded types
  * Shows last 10 messages
+ * Toggle with ` (backtick) key
  */
 export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsoleProps) {
   if (!isOpen) {
-    return (
-      <button
-        onClick={onToggle}
-        className="fixed bottom-4 right-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-full shadow-lg transition-colors"
-        title="Show Debug Console"
-      >
-        <Terminal size={20} />
-      </button>
-    );
+    return null;
   }
 
   return (
@@ -37,7 +30,7 @@ export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsolePro
         <button
           onClick={onToggle}
           className="text-gray-400 hover:text-white transition-colors"
-          title="Hide Debug Console"
+          title="Hide Debug Console (` key)"
         >
           <X size={16} />
         </button>
@@ -68,9 +61,14 @@ export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsolePro
 
       {/* Footer */}
       <div className="px-4 py-2 border-t border-gray-700 bg-gray-800">
-        <p className="text-xs text-gray-500">
-          Showing last {Math.min(logs.length, 10)} messages
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            Showing last {Math.min(logs.length, 10)} messages
+          </p>
+          <p className="text-xs text-gray-500">
+            Press <kbd className="px-1 py-0.5 bg-gray-700 rounded text-cyan-400">`</kbd> to toggle
+          </p>
+        </div>
       </div>
     </div>
   );

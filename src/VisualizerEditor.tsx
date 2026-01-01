@@ -970,6 +970,13 @@ export default function VisualizerEditor() {
         setShowBorder(!showBorder);
       }
 
+      // Debug console toggle
+      if (e.key === '`') {
+        // ` (backtick) - Toggle debug console
+        e.preventDefault();
+        setShowDebugConsole(!showDebugConsole);
+      }
+
       // Camera controls
       if (e.key.toLowerCase() === 'r' && selectedSectionId === null) {
         // R - Reset camera (only when no section selected to avoid conflicts)
@@ -990,7 +997,8 @@ export default function VisualizerEditor() {
     sections,
     selectedSectionId,
     showLetterbox,
-    showBorder
+    showBorder,
+    showDebugConsole
   ]);
 
   // Handle panel resizing
