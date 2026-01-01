@@ -28,7 +28,7 @@ This is a major UI redesign currently in active development. The new modular pan
 
 ## **What Is This?**
 
-A **professional music video editor** with an **After Effects-style interface** that creates 3D animated visualizations synced to audio. Features a modular panel-based UI with layers, timeline, properties inspector, and real-time 3D preview. Upload a song, compose sections with different animations, customize every detail, and export high-quality videos.
+A **personsal project music video editor** with an **After Effects-style interface** that creates 3D animated visualizations synced to audio. Features a modular panel-based UI with layers, timeline, properties inspector, and real-time 3D preview. Upload a song, compose sections with different animations, customize every detail, and export high-quality videos.
 
 ---
 
