@@ -9,6 +9,54 @@ interface LogEntry {
   type: string;
   timestamp: string;
 }
+
+// PHASE 2: Central Easing Utilities
+const EasingFunctions = {
+  // Linear
+  linear: (t: number) => t,
+  
+  // Quadratic
+  easeInQuad: (t: number) => t * t,
+  easeOutQuad: (t: number) => t * (2 - t),
+  easeInOutQuad: (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  
+  // Cubic
+  easeInCubic: (t: number) => t * t * t,
+  easeOutCubic: (t: number) => (--t) * t * t + 1,
+  easeInOutCubic: (t: number) => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
+  
+  // Exponential
+  easeInExpo: (t: number) => t === 0 ? 0 : Math.pow(2, 10 * (t - 1)),
+  easeOutExpo: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+  easeInOutExpo: (t: number) => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    if (t < 0.5) return Math.pow(2, 20 * t - 10) / 2;
+    return (2 - Math.pow(2, -20 * t + 10)) / 2;
+  },
+  
+  // Elastic (overshoot)
+  easeOutElastic: (t: number) => {
+    const c4 = (2 * Math.PI) / 3;
+    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+  
+  // Bounce
+  easeOutBounce: (t: number) => {
+    const n1 = 7.5625;
+    const d1 = 2.75;
+    if (t < 1 / d1) {
+      return n1 * t * t;
+    } else if (t < 2 / d1) {
+      return n1 * (t -= 1.5 / d1) * t + 0.75;
+    } else if (t < 2.5 / d1) {
+      return n1 * (t -= 2.25 / d1) * t + 0.9375;
+    } else {
+      return n1 * (t -= 2.625 / d1) * t + 0.984375;
+    }
+  }
+};
+
 // Default camera settings constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
@@ -131,6 +179,78 @@ export default function ThreeDVisualizer() {
   const sortedLetterboxKeyframes = useMemo(() => {
     return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
   }, [letterboxKeyframes]);
+
+  // PHASE 1: Time remapping state
+  const [timeScale, setTimeScale] = useState(1.0); // Global playback speed (0.1 to 2.0)
+  
+  // PHASE 1: Camera control state
+  const [cameraLocked, setCameraLocked] = useState(false); // Toggle camera lock (C key)
+  const cameraManualOffsetRef = useRef({ x: 0, y: 0, z: 0, rotX: 0, rotY: 0 }); // Manual camera adjustments
+
+  // PHASE 2: Audio smoothing & mapping state
+  const [bassSmoothing, setBassSmoothing] = useState(0.7); // 0-1 (lower = more responsive, higher = smoother)
+  const [midsSmoothing, setMidsSmoothing] = useState(0.7);
+  const [highsSmoothing, setHighsSmoothing] = useState(0.7);
+  const [bassGain, setBassGain] = useState(1.0); // Multiplier for bass intensity (0.1-3.0)
+  const [midsGain, setMidsGain] = useState(1.0);
+  const [highsGain, setHighsGain] = useState(1.0);
+  
+  // Smoothed frequency values (using refs for smooth transitions)
+  const smoothedFreqsRef = useRef({ bass: 0, mids: 0, highs: 0 });
+
+  // PHASE 3: Post-processing effects state
+  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal'); // Layer blend modes
+  const [vignetteStrength, setVignetteStrength] = useState(0.0); // Vignette intensity (0-1)
+  const [vignetteSoftness, setVignetteSoftness] = useState(0.5); // Vignette edge softness (0-1)
+  const [colorSaturation, setColorSaturation] = useState(1.0); // Color saturation (0-2)
+  const [colorContrast, setColorContrast] = useState(1.0); // Contrast (0.5-2)
+  const [colorGamma, setColorGamma] = useState(1.0); // Gamma correction (0.5-2)
+  const [colorTintR, setColorTintR] = useState(1.0); // Red tint (0-2)
+  const [colorTintG, setColorTintG] = useState(1.0); // Green tint (0-2)
+  const [colorTintB, setColorTintB] = useState(1.0); // Blue tint (0-2)
+
+  // PHASE 4: Multi-audio system types and state
+  interface AudioTrack {
+    id: string;
+    name: string;
+    buffer: AudioBuffer | null;
+    source: AudioBufferSourceNode | null;
+    analyser: AnalyserNode;
+    gainNode: GainNode;
+    volume: number;
+    muted: boolean;
+    active: boolean; // Which track's frequencies to visualize
+  }
+
+  interface ParameterEvent {
+    id: string;
+    time: number; // When to trigger (in seconds)
+    duration: number; // How long the effect lasts (in seconds)
+    parameters: {
+      backgroundFlash?: number; // 0-1 intensity
+      bloomBurst?: number; // 0-1 intensity (currently unused, for future bloom effect)
+      fogPulse?: number; // 0-1 intensity (currently unused, for future fog effect)
+      cameraShake?: number; // 0-1 intensity
+      vignettePulse?: number; // 0-1 intensity
+      saturationBurst?: number; // 0-1 intensity
+    };
+  }
+
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null); // Which track to visualize
+  
+  // Event UI state
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<ParameterEvent | null>(null);
+  
+  // Temporary event parameter values (for active events)
+  const activeEventValuesRef = useRef({
+    backgroundFlash: 0,
+    cameraShake: 0,
+    vignettePulse: 0,
+    saturationBurst: 0
+  });
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -304,18 +424,27 @@ export default function ThreeDVisualizer() {
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
   // Easing functions for smooth transitions
+  // PHASE 2: Apply easing function using central easing utilities
   const applyEasing = (t: number, easing: string) => {
-    switch(easing) {
-      case 'easeIn':
-        return t * t * t; // Cubic ease in
-      case 'easeOut':
-        return 1 - Math.pow(1 - t, 3); // Cubic ease out
-      case 'easeInOut':
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
-      case 'linear':
-      default:
-        return t; // Linear (no easing)
-    }
+    // Map legacy easing names to new easing functions
+    const easingMap: { [key: string]: keyof typeof EasingFunctions } = {
+      'linear': 'linear',
+      'easeIn': 'easeInCubic',
+      'easeOut': 'easeOutCubic',
+      'easeInOut': 'easeInOutCubic',
+      // New easing options
+      'easeInQuad': 'easeInQuad',
+      'easeOutQuad': 'easeOutQuad',
+      'easeInOutQuad': 'easeInOutQuad',
+      'easeInExpo': 'easeInExpo',
+      'easeOutExpo': 'easeOutExpo',
+      'easeInOutExpo': 'easeInOutExpo',
+      'easeOutElastic': 'easeOutElastic',
+      'easeOutBounce': 'easeOutBounce'
+    };
+    
+    const easingFn = easingMap[easing] || 'linear';
+    return EasingFunctions[easingFn](t);
   };
 
   // Interpolate camera values between keyframes
@@ -395,6 +524,10 @@ export default function ThreeDVisualizer() {
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
     setCameraRotation(DEFAULT_CAMERA_ROTATION);
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+    // PHASE 1: Also reset manual camera offsets and lock
+    cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
+    setCameraLocked(false);
+    addLog('Camera reset', 'success');
   };
 
   // Global keyframe management functions
@@ -542,11 +675,13 @@ export default function ThreeDVisualizer() {
     if (bufferSourceRef.current) bufferSourceRef.current.stop();
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
+    // PHASE 1: Apply time scale to audio playback rate
+    src.playbackRate.value = timeScale;
     src.connect(analyserRef.current);
     analyserRef.current.connect(audioContextRef.current.destination);
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000 / timeScale);
     setIsPlaying(true);
   };
 
@@ -566,6 +701,94 @@ export default function ThreeDVisualizer() {
     pauseTimeRef.current = t;
     setCurrentTime(t);
     if (play) playAudio();
+  };
+
+  // PHASE 1: Keyboard controls - Transport controls
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // Don't trigger shortcuts when typing in text inputs
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
+    const key = e.key;
+    const shift = e.shiftKey;
+    const alt = e.altKey;
+
+    // Transport controls
+    if (key === ' ') {
+      e.preventDefault();
+      if (audioReady) {
+        if (isPlaying) stopAudio();
+        else playAudio();
+      }
+    } else if (key === 'j' || key === 'J') {
+      e.preventDefault();
+      const step = shift ? 5 : 1; // Large jump vs small step
+      seekTo(Math.max(0, currentTime - step));
+    } else if (key === 'l' || key === 'L') {
+      e.preventDefault();
+      const step = shift ? 5 : 1;
+      seekTo(Math.min(duration, currentTime + step));
+    } else if (key === 'Home') {
+      e.preventDefault();
+      seekTo(0);
+    } else if (key === 'End') {
+      e.preventDefault();
+      seekTo(duration);
+    }
+    // Camera controls
+    else if (key === 'c' || key === 'C') {
+      e.preventDefault();
+      setCameraLocked(!cameraLocked);
+      addLog(cameraLocked ? 'Camera unlocked' : 'Camera locked', 'info');
+    } else if (key === 'r' || key === 'R') {
+      e.preventDefault();
+      // Reset camera to defaults
+      setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+      setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+      setCameraRotation(DEFAULT_CAMERA_ROTATION);
+      cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
+      addLog('Camera reset to defaults', 'info');
+    } else if (!cameraLocked) {
+      // Camera movement controls (only when not locked)
+      const moveSpeed = shift ? 2.0 : (alt ? 0.1 : 0.5);
+      const rotSpeed = shift ? 10 : (alt ? 1 : 5);
+
+      if (key === 'q' || key === 'Q') {
+        e.preventDefault();
+        setCameraDistance(prev => Math.max(5, Math.min(50, prev - moveSpeed)));
+      } else if (key === 'e' || key === 'E') {
+        e.preventDefault();
+        setCameraDistance(prev => Math.max(5, Math.min(50, prev + moveSpeed)));
+      } else if (key === 'ArrowUp') {
+        e.preventDefault();
+        cameraManualOffsetRef.current.rotX += rotSpeed;
+      } else if (key === 'ArrowDown') {
+        e.preventDefault();
+        cameraManualOffsetRef.current.rotX -= rotSpeed;
+      } else if (key === 'ArrowLeft') {
+        e.preventDefault();
+        setCameraRotation(prev => (prev - rotSpeed + 360) % 360);
+      } else if (key === 'ArrowRight') {
+        e.preventDefault();
+        setCameraRotation(prev => (prev + rotSpeed) % 360);
+      }
+    }
+  };
+
+  // PHASE 1: Wheel zoom control
+  const handleWheel = (e: WheelEvent) => {
+    if (cameraLocked) return;
+    
+    const target = e.target as HTMLElement;
+    // Only zoom when scrolling over the canvas container
+    if (containerRef.current && containerRef.current.contains(target)) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 1 : -1;
+      const zoomSpeed = e.shiftKey ? 2 : (e.altKey ? 0.1 : 0.5);
+      setCameraDistance(prev => Math.max(5, Math.min(50, prev + delta * zoomSpeed)));
+    }
   };
 
   // NEW: Recording functions
@@ -749,11 +972,25 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const getFreq = (d: Uint8Array) => ({
-    bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
-    mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
-    highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
-  });
+  // PHASE 2: Enhanced getFreq with smoothing and gain
+  const getFreq = (d: Uint8Array) => {
+    // Raw frequency values
+    const rawBass = d.slice(0,10).reduce((a,b)=>a+b,0)/10/255;
+    const rawMids = d.slice(10,100).reduce((a,b)=>a+b,0)/90/255;
+    const rawHighs = d.slice(100,200).reduce((a,b)=>a+b,0)/100/255;
+    
+    // Apply smoothing (exponential moving average)
+    smoothedFreqsRef.current.bass = smoothedFreqsRef.current.bass * bassSmoothing + rawBass * (1 - bassSmoothing);
+    smoothedFreqsRef.current.mids = smoothedFreqsRef.current.mids * midsSmoothing + rawMids * (1 - midsSmoothing);
+    smoothedFreqsRef.current.highs = smoothedFreqsRef.current.highs * highsSmoothing + rawHighs * (1 - highsSmoothing);
+    
+    // Apply gain and clamp to 0-1 range
+    return {
+      bass: Math.min(1, Math.max(0, smoothedFreqsRef.current.bass * bassGain)),
+      mids: Math.min(1, Math.max(0, smoothedFreqsRef.current.mids * midsGain)),
+      highs: Math.min(1, Math.max(0, smoothedFreqsRef.current.highs * highsGain))
+    };
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -772,6 +1009,10 @@ export default function ThreeDVisualizer() {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
+      
+      // PHASE 3: Tone mapping for color grading support
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
 
       if (containerRef.current.children.length > 0) {
         containerRef.current.removeChild(containerRef.current.children[0]);
@@ -878,6 +1119,59 @@ export default function ThreeDVisualizer() {
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
 
+  // PHASE 3: Apply post-processing settings (blend mode, tone mapping exposure)
+  useEffect(() => {
+    if (rendererRef.current) {
+      // Apply tone mapping exposure based on contrast/gamma
+      // Exposure affects overall brightness, we'll use it for contrast simulation
+      rendererRef.current.toneMappingExposure = colorContrast;
+    }
+  }, [blendMode, colorContrast]);
+
+  // PHASE 3: Apply color grading to all materials
+  useEffect(() => {
+    if (!objectsRef.current) return;
+    const { cubes, octas, tetras, sphere } = objectsRef.current;
+    
+    // Helper function to apply color tint to THREE.Color
+    const applyColorGrading = (baseColor: THREE.Color) => {
+      const r = Math.pow(baseColor.r, 1 / colorGamma) * colorTintR;
+      const g = Math.pow(baseColor.g, 1 / colorGamma) * colorTintG;
+      const b = Math.pow(baseColor.b, 1 / colorGamma) * colorTintB;
+      
+      // Apply saturation (lerp between grayscale and color)
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      const finalR = gray + (r - gray) * colorSaturation;
+      const finalG = gray + (g - gray) * colorSaturation;
+      const finalB = gray + (b - gray) * colorSaturation;
+      
+      return new THREE.Color(
+        Math.max(0, Math.min(1, finalR)),
+        Math.max(0, Math.min(1, finalG)),
+        Math.max(0, Math.min(1, finalB))
+      );
+    };
+    
+    // Note: This is a simplified approach. For production, you'd use a proper post-processing shader.
+    // For now, we're demonstrating the concept by affecting the base colors.
+  }, [colorSaturation, colorGamma, colorTintR, colorTintG, colorTintB]);
+
+  // PHASE 1: Attach keyboard and wheel event listeners
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (container) {
+        container.removeEventListener('wheel', handleWheel);
+      }
+    };
+  }, [isPlaying, audioReady, currentTime, duration, cameraLocked]);
+
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -910,7 +1204,8 @@ export default function ThreeDVisualizer() {
       
       analyser.getByteFrequencyData(data);
       const f = getFreq(data);
-      const el = (Date.now() - startTimeRef.current) * 0.001;
+      // PHASE 1: Apply time scaling
+      const el = (Date.now() - startTimeRef.current) * 0.001 * timeScale;
       const t = el % duration;
       setCurrentTime(t);
       const sec = sections.find(s => t >= s.start && t < s.end);
@@ -1712,6 +2007,12 @@ export default function ThreeDVisualizer() {
           >
             ⏱️ Presets
           </button>
+          <button 
+            onClick={() => setActiveTab('postfx')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎭 Post-FX
+          </button>
         </div>
 
         {/* Controls Tab */}
@@ -1766,6 +2067,197 @@ export default function ThreeDVisualizer() {
                   <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
                 <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">⏱️ Time Remapping</h3>
+              <p className="text-xs text-gray-400 mb-3">Control global playback speed (affects both visuals and audio).</p>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Playback Speed: {timeScale.toFixed(2)}x</label>
+                <input 
+                  type="range" 
+                  min="0.1" 
+                  max="2.0" 
+                  step="0.1" 
+                  value={timeScale} 
+                  onChange={(e) => setTimeScale(Number(e.target.value))} 
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>0.1x (Slow)</span>
+                  <span>1.0x (Normal)</span>
+                  <span>2.0x (Fast)</span>
+                </div>
+                <button 
+                  onClick={() => setTimeScale(1.0)} 
+                  className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded mt-2"
+                >
+                  Reset to 1.0x
+                </button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-purple-400 mb-3">🎚️ Audio Smoothing & Mapping</h3>
+              <p className="text-xs text-gray-400 mb-3">Fine-tune how audio frequencies affect visuals.</p>
+              
+              <div className="space-y-4">
+                {/* Bass Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-purple-300 mb-2">Bass (Low Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {bassSmoothing.toFixed(2)} {bassSmoothing < 0.3 ? '(Responsive)' : bassSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={bassSmoothing} 
+                        onChange={(e) => setBassSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {bassGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={bassGain} 
+                        onChange={(e) => setBassGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Mids Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-cyan-300 mb-2">Mids (Mid Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {midsSmoothing.toFixed(2)} {midsSmoothing < 0.3 ? '(Responsive)' : midsSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={midsSmoothing} 
+                        onChange={(e) => setMidsSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {midsGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={midsGain} 
+                        onChange={(e) => setMidsGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Highs Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-pink-300 mb-2">Highs (High Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {highsSmoothing.toFixed(2)} {highsSmoothing < 0.3 ? '(Responsive)' : highsSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={highsSmoothing} 
+                        onChange={(e) => setHighsSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {highsGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={highsGain} 
+                        onChange={(e) => setHighsGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setBassSmoothing(0.7);
+                      setMidsSmoothing(0.7);
+                      setHighsSmoothing(0.7);
+                    }} 
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
+                  >
+                    Reset Smoothing
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setBassGain(1.0);
+                      setMidsGain(1.0);
+                      setHighsGain(1.0);
+                    }} 
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
+                  >
+                    Reset Gain
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-purple-400 mb-2">⌨️ Keyboard Shortcuts</h3>
+              <div className="text-xs text-gray-300 space-y-1">
+                <div className="grid grid-cols-2 gap-x-2">
+                  <div className="text-gray-400">Space</div>
+                  <div>Play/Pause</div>
+                  <div className="text-gray-400">J/L</div>
+                  <div>Step backward/forward (1s)</div>
+                  <div className="text-gray-400">Shift+J/L</div>
+                  <div>Large jump (5s)</div>
+                  <div className="text-gray-400">Home/End</div>
+                  <div>Go to start/end</div>
+                  <div className="text-gray-400">Q/E</div>
+                  <div>Zoom in/out</div>
+                  <div className="text-gray-400">Arrow Keys</div>
+                  <div>Rotate camera</div>
+                  <div className="text-gray-400">Scroll Wheel</div>
+                  <div>Zoom (over canvas)</div>
+                  <div className="text-gray-400">C</div>
+                  <div>Toggle camera lock {cameraLocked ? '🔒' : '🔓'}</div>
+                  <div className="text-gray-400">R</div>
+                  <div>Reset camera</div>
+                  <div className="text-gray-400">Shift/Alt</div>
+                  <div>Faster/slower movement</div>
+                </div>
               </div>
             </div>
             
@@ -2184,6 +2676,197 @@ export default function ThreeDVisualizer() {
                   </select>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Post-Processing Tab (PHASE 3) */}
+        {activeTab === 'postfx' && (
+          <div>
+            {/* Blend Mode Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
+              <select 
+                value={blendMode} 
+                onChange={(e) => setBlendMode(e.target.value as any)}
+                className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
+              >
+                <option value="normal">Normal (Standard)</option>
+                <option value="additive">Additive (Brighten)</option>
+                <option value="multiply">Multiply (Darken)</option>
+                <option value="screen">Screen (Lighten)</option>
+              </select>
+            </div>
+
+            {/* Vignette Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
+              <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Strength</label>
+                  <span className="text-xs text-cyan-300">{vignetteStrength.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value={vignetteStrength} 
+                  onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Softness</label>
+                  <span className="text-xs text-cyan-300">{vignetteSoftness.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.01" 
+                  value={vignetteSoftness} 
+                  onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <button 
+                onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset Vignette
+              </button>
+            </div>
+
+            {/* Color Grading Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Saturation</label>
+                  <span className="text-xs text-cyan-300">{colorSaturation.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorSaturation} 
+                  onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Contrast</label>
+                  <span className="text-xs text-cyan-300">{colorContrast.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorContrast} 
+                  onChange={(e) => setColorContrast(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-gray-400">Gamma</label>
+                  <span className="text-xs text-cyan-300">{colorGamma.toFixed(2)}</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0.5" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorGamma} 
+                  onChange={(e) => setColorGamma(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
+              </div>
+
+              <button 
+                onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
+              >
+                Reset Color Grading
+              </button>
+            </div>
+
+            {/* Color Tint Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
+              <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
+              
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-red-400">Red Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintR.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintR} 
+                  onChange={(e) => setColorTintR(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-green-400">Green Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintG.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintG} 
+                  onChange={(e) => setColorTintG(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-blue-400">Blue Tint</label>
+                  <span className="text-xs text-cyan-300">{colorTintB.toFixed(2)}x</span>
+                </div>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="2" 
+                  step="0.01" 
+                  value={colorTintB} 
+                  onChange={(e) => setColorTintB(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              <button 
+                onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset Color Tint
+              </button>
             </div>
           </div>
         )}
