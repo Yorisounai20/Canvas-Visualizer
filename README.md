@@ -1,28 +1,39 @@
 # 🎵 3D Music Visualizer Editor - README
 
-## **⚠️ Development Status**
+## **✅ Development Status**
 
-**Version 2.0 - After Effects-Style UI (In Progress)**
+**Version 2.1 - Complete Architecture Refactor (Phase 10 + Phases 1-5 + Final Refactor)**
 
-This is a major UI redesign currently in active development. The new modular panel-based interface is functional, but some features from the original visualizer are not yet integrated.
+Professional music video editor with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, keyframe systems, parameter-driven presets, and comprehensive visual controls.
 
-**What's Working:**
-- ✅ Professional panel-based layout (Top Bar, Layers, Canvas, Properties, Timeline)
-- ✅ Layer management (select, reorder, lock, delete)
-- ✅ Timeline editing (drag sections, resize duration, seek)
-- ✅ 3D scene rendering (objects display correctly)
+**Core Features:**
+- ✅ Professional panel-based layout (Top Bar, Scene Explorer, Canvas, Properties, Timeline)
+- ✅ **NEW: Scene Explorer** - Blender-style object hierarchy panel
+- ✅ **NEW: Extended object types** - Support for cameras and lights as workspace objects
+- ✅ Layer management (select, reorder, lock, delete, duplicate, visibility toggle)
+- ✅ Timeline editing with multiple tabs (Sections, Presets, Camera, Text)
+- ✅ Complete keyframe systems (Presets, Camera, Text)
+- ✅ 3D scene rendering with audio-reactive animations
+- ✅ 3D text overlay with font loading
+- ✅ Waveform visualization in timeline
+- ✅ Debug console (toggle with `` ` `` key)
+- ✅ Right-click context menus
+- ✅ Manual control mode for non-audio-reactive animations
 - ✅ Color pickers and camera controls
-- ✅ Export modal (structure in place)
+- ✅ Export modal with resolution selection
+- ✅ **Phase 1:** Unified render loop and stabilized architecture
+- ✅ **Phase 2:** Project system with New Project modal
+- ✅ **Phase 3:** Blender-like 3D workspace (toggle with `W` key)
+- ✅ **Phase 4:** Parameter-driven presets (density, speed, intensity, spread)
+- ✅ **Phase 5:** Keyboard shortcuts modal, undo/redo functionality
+- ✅ **Final Refactor:** Scene Explorer, extended object types for multiple cameras
 
-**What's Not Working Yet:**
-- ⚠️ Animation playback (objects render but don't animate with music)
-- ⚠️ Audio-reactive visuals (frequency analysis not connected)
-- ⚠️ 3D song name overlay
-- ⚠️ Letterbox keyframe animations
-- ⚠️ Camera keyframes
-- ⚠️ Debug console
-
-**To use the original fully-functional visualizer**, check out the `visualizer-software.tsx` file which contains all working features.
+**Latest Additions (Final Architecture Refactor):**
+- ✨ Scene Explorer component - Blender-style object hierarchy
+- ✨ Camera and light support as workspace objects
+- ✨ Foundation for multiple cameras and camera animation
+- ✨ Extended WorkspaceObject type system
+- ✨ Improved architecture for complex scene management
 
 ---
 
@@ -35,28 +46,24 @@ A **personsal project music video editor** with an **After Effects-style interfa
 ## **Core Features**
 
 ### 🎨 **After Effects-Style Interface**
-- **Top Bar** - Playback controls, current section info, export button, undo/redo (coming soon)
+- **Top Bar** - Playback controls, current section info, undo/redo, keyboard shortcuts (?), export button
 - **Left Panel (Layers)** - Section/layer management with:
   - Visibility toggles (eye icon)
   - Lock/unlock layers
   - Drag-and-drop reordering
   - Delete layers
-  - Color tags (coming soon)
+  - Duplicate layers (right-click menu)
+  - Right-click context menu
 - **Center Canvas** - 3D visualization preview (960x540, 16:9 aspect ratio)
-- **Right Panel (Properties)** - Context-sensitive controls for selected layer:
-  - Animation preset picker
-  - Start/end time editing
-  - Color controls (bass, mids, highs)
-  - Camera settings
-  - Visual effects
-  - Lighting controls
-- **Bottom Timeline** - Visual timeline with:
-  - Section bars showing duration
-  - Drag to move sections
-  - Resize handles for trimming
-  - Click to scrub/seek
-  - Playhead indicator
-  - Add section button
+- **Right Panel (Properties)** - Tabbed interface with Layer and Canvas tabs:
+  - **Layer Tab:** Animation preset picker, start/end time editing, color controls (bass, mids, highs)
+  - **Canvas Tab:** Background & border, lighting, camera controls, letterbox, 3D text overlay, manual mode
+- **Bottom Timeline** - Multi-tab timeline system:
+  - **Sections Tab:** Section bars with waveform background, drag to move, resize handles
+  - **Presets Tab:** Keyframe markers for automated preset changes
+  - **Camera Tab:** Keyframe markers for camera animation
+  - **Text Tab:** Keyframe markers for text visibility
+  - Click timeline to add keyframes, hover for details, click markers to seek
 
 ### 🎬 **Timeline-Based Animation System**
 - Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
@@ -96,18 +103,43 @@ A **personsal project music video editor** with an **After Effects-style interfa
 - Letterbox toggle (basic on/off)
 - Ambient and directional lighting controls
 
-### ⚠️ **Features Not Yet Implemented in New UI**
+### ✨ **Advanced Features**
 
-The following features exist in the original visualizer but are not yet integrated into the new After Effects-style interface:
+**Keyframe System:**
+- **Preset Keyframes** - Automated animation changes at specific times with smooth transitions
+- **Camera Keyframes** - Animated camera movement with distance, height, and rotation control
+- **Text Keyframes** - Show/hide 3D text at specific moments
+- Visual markers on timeline (cyan for presets, purple for camera, green/red for text)
+- Click timeline to add, hover for details, delete with × button
 
-- **3D Song Name Overlay** - Custom 3D text with frequency-reactive bouncing
-- **Animated Letterbox System** - Timeline-based keyframe animation with curtain effects
-- **Camera Keyframes** - Timeline-based camera movement with easing
-- **Camera Shake Events** - Impact effects at specific timestamps
-- **Debug Console** - Real-time event logging
-- **HUD Overlays** - Preset display and time information
-- **Animation Playback** - Objects render but don't animate with music yet
-- **Reset Camera Button** - Quick return to default settings
+**3D Text Overlay:**
+- Custom 3D text with bevel effects
+- Font loading from CDN (Helvetiker font)
+- Text color follows bass frequency color
+- Show/hide toggle and custom text input
+
+**Debug Console:**
+- Toggle with `` ` `` (backtick) key
+- Color-coded log entries (info/success/error)
+- Last 10 messages displayed
+- Keyboard shortcuts (Escape to close)
+
+**Manual Control Mode:**
+- Non-audio-reactive animation option
+- Epilepsy-safe control for precise timing
+- Keyframe-based animations instead of frequency-reactive
+- Visual warning when active
+
+**Keyboard Shortcuts:**
+- Click **?** button in top bar to view all shortcuts
+- Comprehensive reference modal with categorized shortcuts
+- Includes playback, timeline, tools, editing, and workspace controls
+
+**Undo/Redo System:**
+- Full history tracking for section operations
+- **Ctrl+Z** (Cmd+Z on Mac) to undo
+- **Ctrl+Shift+Z** or **Ctrl+Y** (Cmd+Shift+Z or Cmd+Y on Mac) to redo
+- Visual indication of undo/redo availability in top bar
 
 ### 🎥 **Video Export System**
 - Export modal with format and resolution selection
@@ -172,14 +204,26 @@ src/
 ├── components/
 │   ├── Canvas/
 │   │   └── CanvasWrapper.tsx       # 3D preview wrapper
+│   ├── Common/
+│   │   └── ContextMenu.tsx         # Reusable context menu
 │   ├── Controls/
 │   │   ├── TopBar.tsx              # Top control bar
 │   │   └── ExportModal.tsx         # Video export dialog
+│   ├── Debug/
+│   │   └── DebugConsole.tsx        # Debug console panel
+│   ├── Modals/
+│   │   ├── NewProjectModal.tsx     # Project creation modal (Phase 2)
+│   │   └── KeyboardShortcutsModal.tsx  # Keyboard shortcuts reference (Phase 5)
 │   ├── Panels/
 │   │   ├── LeftPanel.tsx           # Layers/Sections panel
-│   │   └── RightPanel.tsx          # Properties/Effects panel
-│   └── Timeline/
-│       └── Timeline.tsx            # Bottom timeline
+│   │   └── RightPanel.tsx          # Properties/Effects panel (tabbed)
+│   ├── Timeline/
+│   │   ├── Timeline.tsx            # Multi-tab timeline
+│   │   └── WaveformVisualizer.tsx  # Audio waveform renderer
+│   └── Workspace/
+│       ├── WorkspaceControls.tsx   # Object creation toolbar (Phase 3)
+│       ├── ObjectPropertiesPanel.tsx # Object properties editor (Phase 3)
+│       └── SceneExplorer.tsx       # Blender-style object hierarchy (Final Refactor)
 ├── types/
 │   └── index.ts                    # TypeScript type definitions
 ├── VisualizerEditor.tsx            # Main editor component
@@ -220,10 +264,12 @@ src/
 - Layer management (selection, reordering, add/delete)
 
 ### **Debug Console:**
-- ⚠️ **Not available in new UI** - Feature exists in original visualizer
-- Shows font loading, audio loading, text creation
+- Toggle with `` ` `` (backtick) key - no floating button needed
+- Shows font loading, audio loading, text creation, keyframe operations
 - Color-coded by type (info/success/error)
 - Last 10 messages displayed
+- Timestamped entries
+- Visual hint in footer showing toggle key
 
 ---
 
@@ -249,7 +295,8 @@ The interface is divided into 5 main areas, inspired by professional video editi
    - Title and current section indicator
    - Time display
    - Play/Stop button
-   - Undo/Redo buttons (coming soon)
+   - Undo/Redo buttons (**PHASE 5:** Ctrl+Z / Ctrl+Shift+Z)
+   - Keyboard shortcuts button (? icon) (**PHASE 5**)
    - Export button (purple, top-right)
 
 2. **Left Panel - Layers/Sections (Dark Gray):**
@@ -302,6 +349,29 @@ npm run lint         # Run ESLint
 5. **Preview** - Click Play button in top bar to preview your composition
 6. **Export** - Click Export button to render and download the final video
 
+### **Keyboard Shortcuts:**
+
+**Click the ? button in the top bar** to view the complete keyboard shortcuts reference.
+
+| Category | Shortcut | Action |
+|----------|----------|--------|
+| **Playback** | Space | Play/Pause audio |
+| **Timeline** | ← / → | Navigate timeline (1 second) |
+| | Shift + ← / → | Navigate timeline (5 seconds) |
+| **Tools & Modes** | W | Toggle Workspace Mode |
+| | ` (backtick) | Toggle Debug Console |
+| | Esc | Close modals/panels |
+| **Editing** | Ctrl/Cmd + Z | Undo |
+| | Ctrl/Cmd + Shift + Z | Redo |
+| | Ctrl/Cmd + Y | Redo (alternative) |
+| **Workspace (W Mode)** | Left Click | Select object |
+| | Left Drag | Rotate camera |
+| | Right Drag | Pan camera |
+| | Scroll | Zoom camera |
+| | T | Translate mode |
+| | R | Rotate mode |
+| | S | Scale mode |
+
 ---
 
 ## **File Format Support**
@@ -339,46 +409,76 @@ npm run lint         # Run ESLint
 
 ## **Known Limitations**
 
-### **Current Implementation:**
-- Animation playback not yet integrated (objects render but don't animate)
-- No audio-reactive color changes (feature pending)
-- Layer visibility toggle doesn't affect rendering yet
-- Letterbox/camera keyframes exist in state but not exposed in UI
-- 3D song name overlay not integrated in new UI
-- Debug console not available in new interface
-
 ### **Browser/Environment:**
 - No localStorage/sessionStorage support (environment limitation)
 - All state is in-memory only (resets on refresh)
 - Cannot access local filesystem directly (must use file input)
-- Font loading not integrated in new UI
 
-### **Known Issues:**
-- Export functionality requires audio playback to work properly
-- Undo/redo buttons present but not wired up
-- Some original visualizer features temporarily unavailable during UI transition
+### **In Development (Final Architecture Refactor):**
+- Scene Explorer integration into main layout (created, not yet integrated)
+- Canvas resize based on timeline height (planned)
+- Camera settings migration to object properties (planned)
+- Preset menu relocation to workspace controls (planned)
+- Multiple camera implementation (type system ready)
+- Form field ID additions for accessibility (planned)
+
+---
+
+## **Recent Changes & Improvements**
+
+### **Final Architecture Refactor (Latest):**
+- ✨ **Scene Explorer Component** - Blender-style object hierarchy panel created
+- ✨ **Extended WorkspaceObject Types** - Support for camera and light objects
+- ✨ **Camera Object Properties** - Type system prepared for camera-specific settings
+- ✨ **Multiple Cameras Foundation** - Architecture supports multiple cameras for animation
+- 🔨 **Next:** Integration of Scene Explorer, canvas resize fixes, settings migration
+
+### **Phase 5 - UI Structure:**
+- ✨ Keyboard shortcuts modal with comprehensive reference
+- ✨ Undo/Redo functionality with full history tracking
+- ✨ After Effects-style layout refinements
+- ✨ Professional keyboard shortcut system
+
+### **Phase 4 - Preset Rework:**
+- ✨ Parameter-driven presets (density, speed, intensity, spread)
+- ✨ Real-time parameter editing with live preview
+- ✨ No hardcoded geometry or camera
+- ✨ Presets as starting configurations
+
+### **Phase 3 - Workspace:**
+- ✨ Blender-like 3D workspace mode (toggle with W key)
+- ✨ OrbitControls for camera navigation
+- ✨ TransformControls with visual gizmos
+- ✨ Manual object creation and editing
+
+### **Phase 2 - Project System:**
+- ✨ New Project modal before editor loads
+- ✨ Project settings schema for save/load
+- ✨ Resolution presets and FPS configuration
+
+### **Phase 1 - Core Stability:**
+- ✨ Single unified render loop
+- ✨ Stabilized Three.js lifecycle
+- ✨ Enhanced audio system with validation
+- ✨ Timeline as single source of truth
 
 ---
 
 ## **Future Enhancement Ideas**
 
-### **Priority (Complete New UI):**
-- **Animation Playback Integration** - Connect animation presets to audio reactivity
-- **Audio-Reactive Colors** - Objects change color based on frequency bands
-- **Layer Visibility Implementation** - Hide/show layers affects rendering
-- **3D Song Name Integration** - Add back custom text overlay feature
-- **Letterbox Keyframe UI** - Expose timeline-based letterbox animations
-- **Camera Keyframe UI** - Add camera movement timeline controls
-- **Debug Console Panel** - Collapsible logging panel
-- **Reset Camera Button** - Quick return to defaults
-
-### **Next Phase:**
-- **Keyboard Shortcuts** - Play/pause (Space), undo/redo (Ctrl+Z/Y), layer navigation
+### **Priority:**
 - **Undo/Redo System** - Full history management for all edits
-- **Collapsible Panels** - Maximize canvas by hiding panels
-- **Resizable Panels** - Drag panel edges to resize
+- **Letterbox Keyframe Animations** - Animated letterbox with curtain effects
 - **More Animation Presets** - Expand the visual library
 - **Color Tags** - Organize layers with color labels
+- **Camera Shake Events** - Impact effects at specific timestamps
+
+### **Next Phase:**
+- **Enhanced Keyboard Shortcuts** - Extended hotkey system for faster workflow
+- **Collapsible Panels** - Maximize canvas by hiding panels
+- **More Easing Functions** - Additional easing options for camera keyframes
+- **Preset Transition Controls** - Customize blend time between presets
+- **Multi-select Keyframes** - Select and edit multiple keyframes at once
 
 ### **Long-term:**
 - **Particle Systems** - Additional visual effects
@@ -394,7 +494,35 @@ npm run lint         # Run ESLint
 
 ---
 
-**Version:** 2.0 (After Effects-Style UI)  
-**Last Updated:** 12/31/2024  
-**License:** MIT (To be determined)  
-**Author:** YoriSounai01
+**Version:** 2.1 (Phase 10 + Phases 1-5 + Final Architecture Refactor)  
+**Last Updated:** 01/01/2026  
+**License:** MIT  
+**Author:** Yorisounai20
+
+---
+
+## **Development Roadmap**
+
+### **✅ Completed:**
+- Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
+- Phase 1: Core Stability (unified render loop, stabilized lifecycle)
+- Phase 2: Project System (new project modal, settings schema)
+- Phase 3: Workspace (Blender-like viewport, object creation, transform controls)
+- Phase 4: Preset Rework (parameter-driven templates)
+- Phase 5: UI Structure (keyboard shortcuts, undo/redo)
+- Final Refactor: Scene Explorer component, extended object types
+
+### **🔨 In Progress:**
+- Scene Explorer integration into main layout
+- Canvas resize based on timeline height
+- Camera settings migration to object properties
+- Preset menu relocation to workspace controls
+- Multiple camera implementation
+- Form field accessibility improvements
+
+### **📋 Planned:**
+- Database persistence with Neon
+- Save/Load project functionality
+- Advanced camera animation system
+- Enhanced lighting controls
+- More animation presets

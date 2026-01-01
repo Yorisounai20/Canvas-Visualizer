@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Video, Undo2, Redo2, Upload } from 'lucide-react';
+import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle } from 'lucide-react';
 
 interface TopBarProps {
   isPlaying: boolean;
@@ -8,6 +8,7 @@ interface TopBarProps {
   duration: number;
   currentPreset: string | null;
   audioFileName: string;
+  projectName?: string; // PHASE 2: Optional project name
   onPlay: () => void;
   onStop: () => void;
   onExport: () => void;
@@ -16,11 +17,14 @@ interface TopBarProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  onShowKeyboardShortcuts?: () => void; // PHASE 5: Keyboard shortcuts modal
 }
 
 /**
  * TopBar Component - After Effects-style top control bar
  * Contains playback controls, current section info, export button, and undo/redo
+ * PHASE 2: Now displays project name from project settings
+ * PHASE 5: Added keyboard shortcuts button
  */
 export default function TopBar({
   isPlaying,
@@ -29,6 +33,7 @@ export default function TopBar({
   duration,
   currentPreset,
   audioFileName,
+  projectName = '3D Music Visualizer Editor', // PHASE 2: Default name if not provided
   onPlay,
   onStop,
   onExport,
@@ -36,7 +41,8 @@ export default function TopBar({
   onUndo,
   onRedo,
   canUndo = false,
-  canRedo = false
+  canRedo = false,
+  onShowKeyboardShortcuts
 }: TopBarProps) {
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
@@ -45,7 +51,7 @@ export default function TopBar({
     <div className="bg-[#2B2B2B] border-b border-gray-700 px-4 py-3 flex items-center justify-between shadow-lg">
       {/* Left: Title and Current Info */}
       <div className="flex items-center gap-4">
-        <h1 className="text-lg font-bold text-purple-400">3D Music Visualizer Editor</h1>
+        <h1 className="text-lg font-bold text-purple-400">{projectName}</h1>
         <div className="text-sm text-gray-400">
           {currentPreset && (
             <span className="px-2 py-1 bg-gray-700 rounded text-cyan-400">
@@ -106,7 +112,7 @@ export default function TopBar({
         </div>
       </div>
 
-      {/* Right: Undo/Redo and Export */}
+      {/* Right: Undo/Redo, Keyboard Shortcuts, and Export */}
       <div className="flex items-center gap-2">
         {/* Undo/Redo Buttons */}
         <button
@@ -136,6 +142,17 @@ export default function TopBar({
 
         {/* Divider */}
         <div className="w-px h-6 bg-gray-700 mx-2" />
+
+        {/* PHASE 5: Keyboard Shortcuts Button */}
+        {onShowKeyboardShortcuts && (
+          <button
+            onClick={onShowKeyboardShortcuts}
+            className="p-2 rounded hover:bg-gray-700 text-gray-300 transition-colors"
+            title="Keyboard Shortcuts"
+          >
+            <HelpCircle size={18} />
+          </button>
+        )}
 
         {/* Export Button */}
         <button

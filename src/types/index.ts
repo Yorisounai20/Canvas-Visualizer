@@ -1,5 +1,52 @@
 // Type definitions for the visualizer application
 
+// PHASE 2: Project state schema for save/load functionality
+export interface ProjectSettings {
+  name: string;
+  resolution: {
+    width: number;
+    height: number;
+  };
+  fps: number;
+  backgroundColor: string;
+  createdAt: string;
+  lastModified: string;
+  audioFileName?: string;
+}
+
+// PHASE 2: Complete project state (everything that can be saved/loaded)
+export interface ProjectState {
+  settings: ProjectSettings;
+  sections: Section[];
+  presetKeyframes: PresetKeyframe[];
+  textKeyframes: TextKeyframe[];
+  // Camera, lighting, and other properties
+  cameraDistance: number;
+  cameraHeight: number;
+  cameraRotation: number;
+  cameraAutoRotate: boolean;
+  ambientLightIntensity: number;
+  directionalLightIntensity: number;
+  showBorder: boolean;
+  borderColor: string;
+  showLetterbox: boolean;
+  letterboxSize: number;
+  bassColor: string;
+  midsColor: string;
+  highsColor: string;
+  showSongName: boolean;
+  customSongName: string;
+  manualMode: boolean;
+}
+
+// PHASE 4: Preset parameters for parameter-driven animations
+export interface PresetParameters {
+  density: number;    // Object/particle count (1-100)
+  speed: number;      // Animation speed multiplier (0.1-10.0)
+  intensity: number;  // Audio reactivity strength (0-3.0)
+  spread: number;     // Spatial distribution/radius (1-50)
+}
+
 export interface Section {
   id: number;
   start: number;
@@ -8,6 +55,7 @@ export interface Section {
   visible?: boolean;
   locked?: boolean;
   colorTag?: string;
+  parameters?: PresetParameters; // PHASE 4: Editable preset parameters
 }
 
 export interface CameraKeyframe {
@@ -16,6 +64,19 @@ export interface CameraKeyframe {
   height: number;
   rotation: number;
   easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+}
+
+export interface PresetKeyframe {
+  id: number;
+  time: number;
+  preset: string;
+}
+
+export interface TextKeyframe {
+  id: number;
+  time: number;
+  show: boolean;
+  text?: string;
 }
 
 export interface LetterboxKeyframe {
@@ -42,6 +103,26 @@ export interface AnimationType {
   value: string;
   label: string;
   icon: string;
+}
+
+// PHASE 3: Workspace object schema for manual 3D object creation
+// FINAL ARCHITECTURE: Extended to support cameras and lights
+export interface WorkspaceObject {
+  id: string;
+  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light';
+  name: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  scale: { x: number; y: number; z: number };
+  color: string;
+  wireframe: boolean;
+  visible: boolean;
+  mesh?: any; // THREE.Mesh reference (not serialized)
+  // Camera-specific properties (when type === 'camera')
+  cameraDistance?: number;
+  cameraHeight?: number;
+  cameraRotation?: number;
+  isActiveCamera?: boolean;
 }
 
 export interface AppState {

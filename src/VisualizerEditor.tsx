@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import TopBar from './components/Controls/TopBar';
@@ -8,7 +10,11 @@ import RightPanel from './components/Panels/RightPanel';
 import Timeline from './components/Timeline/Timeline';
 import CanvasWrapper from './components/Canvas/CanvasWrapper';
 import ExportModal from './components/Controls/ExportModal';
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType } from './types';
+import DebugConsole from './components/Debug/DebugConsole';
+import WorkspaceControls from './components/Workspace/WorkspaceControls';
+import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
+import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -23,27 +29,182 @@ const ANIMATION_TYPES: AnimationType[] = [
   { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
 ];
 
+// PHASE 4: Default preset parameters for each animation type
+const DEFAULT_PRESET_PARAMETERS: Record<string, PresetParameters> = {
+  orbit: { density: 30, speed: 1.0, intensity: 1.0, spread: 15 },
+  explosion: { density: 30, speed: 1.0, intensity: 1.0, spread: 20 },
+  tunnel: { density: 30, speed: 2.0, intensity: 1.0, spread: 10 },
+  wave: { density: 30, speed: 1.5, intensity: 1.5, spread: 5 },
+  spiral: { density: 40, speed: 1.0, intensity: 1.0, spread: 20 },
+  chill: { density: 20, speed: 0.5, intensity: 0.7, spread: 15 },
+  pulse: { density: 10, speed: 1.5, intensity: 1.5, spread: 8 },
+  vortex: { density: 50, speed: 2.5, intensity: 1.5, spread: 25 },
+  seiryu: { density: 35, speed: 1.2, intensity: 1.0, spread: 18 }
+};
+
+// PHASE 4: Helper to get default parameters for a preset
+function getDefaultParameters(presetType: string): PresetParameters {
+  return DEFAULT_PRESET_PARAMETERS[presetType] || DEFAULT_PRESET_PARAMETERS.orbit;
+}
+
+// NEW REQUIREMENT: Helper function to create workspace objects from a preset
+// This makes presets actually CREATE their geometry as editable workspace objects
+function createPresetObjects(presetType: string, params: PresetParameters): WorkspaceObject[] {
+  const { density, spread } = params;
+  const objects: WorkspaceObject[] = [];
+  let idCounter = Date.now();
+  
+  const createObject = (
+    type: 'sphere' | 'box' | 'plane' | 'torus',
+    pos: { x: number; y: number; z: number },
+    scale: { x: number; y: number; z: number },
+    color: string,
+    name?: string
+  ): WorkspaceObject => ({
+    id: `preset-${presetType}-${idCounter++}`,
+    type,
+    name: name || `${type}-${idCounter}`,
+    position: pos,
+    rotation: { x: 0, y: 0, z: 0 },
+    scale,
+    color,
+    wireframe: type !== 'sphere',
+    visible: true,
+    mesh: null // Will be created when added to scene
+  });
+  
+  if (presetType === 'orbit') {
+    // Orbital Dance - Solar system
+    objects.push(createObject('sphere', { x: 0, y: 0, z: 0 }, { x: 3, y: 3, z: 3 }, '#ff6b35', 'Sun'));
+    
+    const planetCount = Math.min(Math.floor(density / 4), 8);
+    for (let i = 0; i < planetCount; i++) {
+      const orbitRadius = spread * 0.3 + i * (spread / planetCount);
+      const angle = (i / planetCount) * Math.PI * 2;
+      objects.push(createObject('box', 
+        { x: Math.cos(angle) * orbitRadius, y: 0, z: Math.sin(angle) * orbitRadius },
+        { x: 1, y: 1, z: 1 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Planet-${i + 1}`
+      ));
+    }
+  } else if (presetType === 'explosion') {
+    // Explosion - Expanding particles
+    const particleCount = Math.floor(density);
+    for (let i = 0; i < particleCount; i++) {
+      const phi = Math.acos(-1 + (2 * i) / particleCount);
+      const theta = Math.sqrt(particleCount * Math.PI) * phi;
+      const r = spread * 0.5;
+      objects.push(createObject('box',
+        { x: r * Math.cos(theta) * Math.sin(phi), y: r * Math.sin(theta) * Math.sin(phi), z: r * Math.cos(phi) },
+        { x: 0.5, y: 0.5, z: 0.5 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Particle-${i + 1}`
+      ));
+    }
+  } else if (presetType === 'pulse') {
+    // Pulse Grid - Grid of cubes
+    const gridSize = Math.ceil(Math.sqrt(density / 3));
+    const spacing = spread / gridSize;
+    for (let x = 0; x < gridSize; x++) {
+      for (let z = 0; z < gridSize; z++) {
+        objects.push(createObject('box',
+          { x: (x - gridSize / 2) * spacing, y: 0, z: (z - gridSize / 2) * spacing },
+          { x: 1, y: 1, z: 1 },
+          '#9333ea',
+          `Grid-${x}-${z}`
+        ));
+      }
+    }
+  } else if (presetType === 'wave') {
+    // Wave Motion - Wavy line of objects
+    const count = Math.floor(density);
+    for (let i = 0; i < count; i++) {
+      const x = (i - count / 2) * (spread / count);
+      const z = Math.sin((i / count) * Math.PI * 4) * spread * 0.3;
+      objects.push(createObject('box',
+        { x, y: 0, z },
+        { x: 0.8, y: 0.8, z: 0.8 },
+        '#40e0d0',
+        `Wave-${i + 1}`
+      ));
+    }
+  } else {
+    // Generic preset - circle of objects
+    const count = Math.floor(density / 2);
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const r = spread * 0.6;
+      objects.push(createObject('box',
+        { x: Math.cos(angle) * r, y: 0, z: Math.sin(angle) * r },
+        { x: 1, y: 1, z: 1 },
+        i % 3 === 0 ? '#ff6b35' : i % 3 === 1 ? '#40e0d0' : '#c8b4ff',
+        `Object-${i + 1}`
+      ));
+    }
+  }
+  
+  return objects;
+}
+
 // Default constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
 const DEFAULT_CAMERA_AUTO_ROTATE = true;
 
+interface VisualizerEditorProps {
+  projectSettings: ProjectSettings;
+  initialAudioFile?: File;
+}
+
 /**
  * VisualizerEditor - Main After Effects-style editor component
+ * 
+ * PHASE 1 ARCHITECTURE (CORE STABILITY):
+ * - Single unified render loop (runs continuously, checks isPlaying state)
+ * - Scene/Camera/Renderer lifecycle managed in one useEffect
+ * - Audio context created once, reused for all playback
+ * - Timeline sections are the single source of truth for animations
+ * - All errors/successes logged to debug console
+ * 
+ * PHASE 2 ARCHITECTURE (PROJECT SYSTEM):
+ * - Accepts ProjectSettings from NewProjectModal
+ * - Initializes editor with project configuration
+ * - Project state can be saved/loaded (persistence not yet implemented)
+ * 
+ * PHASE 3 ARCHITECTURE (WORKSPACE):
+ * - Blender-like 3D workspace with grid and axes helpers
+ * - OrbitControls for camera navigation
+ * - TransformControls for object manipulation
+ * - Manual object creation (sphere, box, plane, torus, instances)
+ * - Live parameter editing with real-time preview
+ * 
  * Coordinates all panels and manages the 3D visualization state
  */
-export default function VisualizerEditor() {
-  // Refs for Three.js
+export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
+  // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  
+  // PHASE 3: Workspace controls refs
+  const orbitControlsRef = useRef<OrbitControls | null>(null);
+  const transformControlsRef = useRef<TransformControls | null>(null);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
+  
+  // PHASE 1: Audio system refs (stable, single instances)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationRef = useRef<number | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  
+  // PHASE 1: Single unified render loop ref
+  const animationRef = useRef<number | null>(null);
+  
+  // PHASE 1: Playback timing refs
   const startTimeRef = useRef(0);
   const pauseTimeRef = useRef(0);
   const lightsRef = useRef<{ 
@@ -72,11 +233,11 @@ export default function VisualizerEditor() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Sections/Layers state
+  // Sections/Layers state (PHASE 4: Initialize with default preset parameters)
   const [sections, setSections] = useState<Section[]>([
-    { id: 1, start: 0, end: 20, animation: 'orbit', visible: true, locked: false },
-    { id: 2, start: 20, end: 40, animation: 'explosion', visible: true, locked: false },
-    { id: 3, start: 40, end: 60, animation: 'chill', visible: true, locked: false }
+    { id: 1, start: 0, end: 20, animation: 'orbit', visible: true, locked: false, parameters: getDefaultParameters('orbit') },
+    { id: 2, start: 20, end: 40, animation: 'explosion', visible: true, locked: false, parameters: getDefaultParameters('explosion') },
+    { id: 3, start: 40, end: 60, animation: 'chill', visible: true, locked: false, parameters: getDefaultParameters('chill') }
   ]);
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
 
@@ -91,12 +252,14 @@ export default function VisualizerEditor() {
     { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
   ]);
   const [cameraShakes, setCameraShakes] = useState<CameraShake[]>([]);
+  const [presetKeyframes, setPresetKeyframes] = useState<PresetKeyframe[]>([]);
+  const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
 
-  // Colors
+  // PHASE 2: Colors (initialized from project settings)
   const [bassColor, setBassColor] = useState('#8a2be2');
   const [midsColor, setMidsColor] = useState('#40e0d0');
   const [highsColor, setHighsColor] = useState('#c8b4ff');
-  const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
+  const [backgroundColor, setBackgroundColor] = useState(projectSettings.backgroundColor);
   const [borderColor, setBorderColor] = useState('#9333ea');
 
   // Effects
@@ -106,6 +269,9 @@ export default function VisualizerEditor() {
   const [letterboxKeyframes, setLetterboxKeyframes] = useState<LetterboxKeyframe[]>([]);
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270);
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false);
+
+  // Manual control mode
+  const [manualMode, setManualMode] = useState(false);
 
   // UI state
   const [showSongName, setShowSongName] = useState(false);
@@ -129,6 +295,14 @@ export default function VisualizerEditor() {
   const [errorLog, setErrorLog] = useState<LogEntry[]>([]);
   const [fps, setFps] = useState(0);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [showDebugConsole, setShowDebugConsole] = useState(false);
+
+  // PHASE 5: UI state
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+
+  // PHASE 5: Undo/Redo state
+  const [history, setHistory] = useState<Section[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // Panel resize state
   const [leftPanelWidth, setLeftPanelWidth] = useState(256); // 64 * 4 = 256px (w-64)
@@ -138,6 +312,28 @@ export default function VisualizerEditor() {
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isResizingTimeline, setIsResizingTimeline] = useState(false);
 
+  // PHASE 3: Workspace state
+  const [workspaceObjects, setWorkspaceObjects] = useState<WorkspaceObject[]>([]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [showWorkspaceGrid, setShowWorkspaceGrid] = useState(true);
+  const [showWorkspaceAxes, setShowWorkspaceAxes] = useState(true);
+  const [workspaceMode, setWorkspaceMode] = useState(false); // Toggle between animation and workspace mode
+
+  // PHASE 2: Log project initialization
+  useEffect(() => {
+    addLog(`Project "${projectSettings.name}" initialized`, 'success');
+    addLog(`Resolution: ${projectSettings.resolution.width}x${projectSettings.resolution.height} @ ${projectSettings.fps}fps`, 'info');
+    addLog(`Background: ${projectSettings.backgroundColor}`, 'info');
+  }, [projectSettings]);
+
+  // PHASE 5: Initialize history with initial sections
+  useEffect(() => {
+    if (history.length === 0) {
+      setHistory([JSON.parse(JSON.stringify(sections))]);
+      setHistoryIndex(0);
+    }
+  }, []); // Only run once on mount
+
   // Helper functions
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -146,6 +342,30 @@ export default function VisualizerEditor() {
 
   const getCurrentSection = (): Section | null => {
     return sections.find((s: Section) => currentTime >= s.start && currentTime < s.end) || null;
+  };
+
+  // PHASE 5: Undo/Redo functionality
+  const saveHistory = (newSections: Section[]) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.parse(JSON.stringify(newSections)));
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      setHistoryIndex(historyIndex - 1);
+      setSections(JSON.parse(JSON.stringify(history[historyIndex - 1])));
+      addLog('Undo performed', 'info');
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex(historyIndex + 1);
+      setSections(JSON.parse(JSON.stringify(history[historyIndex + 1])));
+      addLog('Redo performed', 'info');
+    }
   };
 
   // Section management
@@ -159,90 +379,448 @@ export default function VisualizerEditor() {
       end: endTime,
       animation: 'orbit',
       visible: true,
-      locked: false
+      locked: false,
+      parameters: getDefaultParameters('orbit') // PHASE 4: Add default preset parameters
     };
-    setSections([...sections, newSection]);
+    const newSections = [...sections, newSection];
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
     setSelectedSectionId(newSection.id);
   };
 
   const deleteSection = (id: number) => {
-    setSections(sections.filter((s: Section) => s.id !== id));
+    const newSections = sections.filter((s: Section) => s.id !== id);
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
     if (selectedSectionId === id) {
       setSelectedSectionId(null);
     }
   };
 
+  const duplicateSection = (id: number) => {
+    const sectionToDuplicate = sections.find((s: Section) => s.id === id);
+    if (!sectionToDuplicate) return;
+
+    const newSection: Section = {
+      ...sectionToDuplicate,
+      id: Date.now(),
+      start: sectionToDuplicate.end,
+      end: sectionToDuplicate.end + (sectionToDuplicate.end - sectionToDuplicate.start)
+    };
+    const newSections = [...sections, newSection];
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
+    setSelectedSectionId(newSection.id);
+    addLog(`Duplicated section "${ANIMATION_TYPES.find(a => a.value === newSection.animation)?.label}"`, 'success');
+  };
+
   const updateSection = (id: number, field: string, value: any) => {
-    setSections(sections.map((s: Section) => s.id === id ? { ...s, [field]: value } : s));
+    const newSections = sections.map((s: Section) => {
+      if (s.id !== id) return s;
+      
+      // PHASE 4: When animation type changes, reset parameters to preset defaults
+      if (field === 'animation') {
+        return { ...s, [field]: value, parameters: getDefaultParameters(value) };
+      }
+      
+      return { ...s, [field]: value };
+    });
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
+  };
+  
+  // PHASE 4: Update preset parameters for a section
+  const updateSectionParameters = (id: number, params: Partial<PresetParameters>) => {
+    const newSections = sections.map((s: Section) => 
+      s.id === id ? { ...s, parameters: { ...s.parameters, ...params } as PresetParameters } : s
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const toggleSectionVisibility = (id: number) => {
-    setSections(sections.map((s: Section) => 
+    const newSections = sections.map((s: Section) => 
       s.id === id ? { ...s, visible: !(s.visible !== false) } : s
-    ));
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const toggleSectionLock = (id: number) => {
-    setSections(sections.map((s: Section) => 
+    const newSections = sections.map((s: Section) => 
       s.id === id ? { ...s, locked: !(s.locked === true) } : s
-    ));
+    );
+    setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
   const reorderSections = (newSections: Section[]) => {
     setSections(newSections);
+    saveHistory(newSections); // PHASE 5: Save to history
   };
 
-  // Audio management
+  // Keyframe management
+  const addPresetKeyframe = (time: number) => {
+    const currentSection = getCurrentSection();
+    const preset = currentSection?.animation || 'orbit';
+    const newKeyframe: PresetKeyframe = {
+      id: Date.now(),
+      time: parseFloat(time.toFixed(2)),
+      preset
+    };
+    setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added preset keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deletePresetKeyframe = (id: number) => {
+    setPresetKeyframes(presetKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted preset keyframe', 'info');
+  };
+
+  const addCameraKeyframe = (time: number) => {
+    const newKeyframe: CameraKeyframe = {
+      time: parseFloat(time.toFixed(2)),
+      distance: cameraDistance,
+      height: cameraHeight,
+      rotation: cameraRotation,
+      easing: 'linear'
+    };
+    setCameraKeyframes([...cameraKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added camera keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteCameraKeyframe = (time: number) => {
+    setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
+    addLog('Deleted camera keyframe', 'info');
+  };
+
+  const addTextKeyframe = (time: number) => {
+    const newKeyframe: TextKeyframe = {
+      id: Date.now(),
+      time: parseFloat(time.toFixed(2)),
+      show: showSongName
+    };
+    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added text keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteTextKeyframe = (id: number) => {
+    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted text keyframe', 'info');
+  };
+
+  const formatTime = (s: number) => 
+    `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+
+  // PHASE 3: Workspace object management
+  const createWorkspaceObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => {
+    if (!sceneRef.current) return;
+    
+    const objectId = `${type}_${Date.now()}`;
+    let geometry: THREE.BufferGeometry;
+    let material: THREE.Material;
+    let mesh: THREE.Mesh;
+    
+    // Create geometry based on type
+    switch (type) {
+      case 'sphere':
+        geometry = new THREE.SphereGeometry(1, 32, 32);
+        break;
+      case 'box':
+        geometry = new THREE.BoxGeometry(2, 2, 2);
+        break;
+      case 'plane':
+        geometry = new THREE.PlaneGeometry(3, 3);
+        break;
+      case 'torus':
+        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+      case 'instances':
+        // Create an instanced mesh with 10 spheres
+        geometry = new THREE.SphereGeometry(0.5, 16, 16);
+        material = new THREE.MeshBasicMaterial({ color: '#00ff88', wireframe: true });
+        const instancedMesh = new THREE.InstancedMesh(geometry, material, 10);
+        
+        // Position instances in a circle
+        const matrix = new THREE.Matrix4();
+        for (let i = 0; i < 10; i++) {
+          const angle = (i / 10) * Math.PI * 2;
+          matrix.setPosition(Math.cos(angle) * 3, Math.sin(angle) * 3, 0);
+          instancedMesh.setMatrixAt(i, matrix);
+        }
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        
+        sceneRef.current.add(instancedMesh);
+        
+        const instancesObj: WorkspaceObject = {
+          id: objectId,
+          type: 'instances',
+          name: `Instances ${workspaceObjects.length + 1}`,
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+          color: '#00ff88',
+          wireframe: true,
+          visible: true,
+          mesh: instancedMesh
+        };
+        
+        setWorkspaceObjects(prev => [...prev, instancesObj]);
+        addLog(`Created ${type} with 10 instances`, 'success');
+        return;
+    }
+    
+    // Create material and mesh for non-instanced types
+    material = new THREE.MeshStandardMaterial({ color: '#00aaff', wireframe: false });
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(0, 2, 0);
+    sceneRef.current.add(mesh);
+    
+    const newObject: WorkspaceObject = {
+      id: objectId,
+      type,
+      name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${workspaceObjects.length + 1}`,
+      position: { x: 0, y: 2, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#00aaff',
+      wireframe: false,
+      visible: true,
+      mesh
+    };
+    
+    setWorkspaceObjects(prev => [...prev, newObject]);
+    setSelectedObjectId(objectId);
+    addLog(`Created ${type} object`, 'success');
+  };
+
+  const updateWorkspaceObject = (id: string, updates: Partial<WorkspaceObject>) => {
+    setWorkspaceObjects(prev => prev.map(obj => {
+      if (obj.id !== id) return obj;
+      
+      const updated = { ...obj, ...updates };
+      
+      // Update Three.js mesh
+      if (obj.mesh) {
+        if (updates.position) {
+          obj.mesh.position.set(updates.position.x, updates.position.y, updates.position.z);
+        }
+        if (updates.rotation) {
+          obj.mesh.rotation.set(
+            THREE.MathUtils.degToRad(updates.rotation.x),
+            THREE.MathUtils.degToRad(updates.rotation.y),
+            THREE.MathUtils.degToRad(updates.rotation.z)
+          );
+        }
+        if (updates.scale) {
+          obj.mesh.scale.set(updates.scale.x, updates.scale.y, updates.scale.z);
+        }
+        if (updates.color && obj.mesh.material) {
+          (obj.mesh.material as THREE.MeshStandardMaterial).color.setStyle(updates.color);
+        }
+        if (updates.wireframe !== undefined && obj.mesh.material) {
+          (obj.mesh.material as THREE.MeshStandardMaterial).wireframe = updates.wireframe;
+        }
+        if (updates.visible !== undefined) {
+          obj.mesh.visible = updates.visible;
+        }
+      }
+      
+      return updated;
+    }));
+  };
+
+  const deleteWorkspaceObject = (id: string) => {
+    const obj = workspaceObjects.find(o => o.id === id);
+    if (obj && obj.mesh && sceneRef.current) {
+      sceneRef.current.remove(obj.mesh);
+      obj.mesh.geometry.dispose();
+      if (obj.mesh.material) {
+        if (Array.isArray(obj.mesh.material)) {
+          obj.mesh.material.forEach(m => m.dispose());
+        } else {
+          obj.mesh.material.dispose();
+        }
+      }
+    }
+    setWorkspaceObjects(prev => prev.filter(o => o.id !== id));
+    if (selectedObjectId === id) {
+      setSelectedObjectId(null);
+    }
+    addLog(`Deleted workspace object`, 'info');
+  };
+
+  // NEW REQUIREMENT: Apply a preset - creates workspace objects from preset template
+  const applyPreset = (presetType: string) => {
+    if (!sceneRef.current) {
+      addLog('Scene not initialized', 'error');
+      return;
+    }
+
+    // Get current section or use defaults
+    const currentSection = getCurrentSection();
+    const params = currentSection?.parameters || getDefaultParameters(presetType);
+    
+    // Clear existing workspace objects
+    workspaceObjects.forEach(obj => deleteWorkspaceObject(obj.id));
+    
+    // Create preset objects
+    const presetObjects = createPresetObjects(presetType, params);
+    
+    // Add each object to the scene
+    presetObjects.forEach(objTemplate => {
+      let geometry: THREE.BufferGeometry;
+      let material: THREE.Material;
+      let mesh: THREE.Mesh;
+      
+      // Create geometry based on type
+      switch (objTemplate.type) {
+        case 'sphere':
+          geometry = new THREE.SphereGeometry(1, 32, 32);
+          break;
+        case 'box':
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+          break;
+        case 'plane':
+          geometry = new THREE.PlaneGeometry(1, 1);
+          break;
+        case 'torus':
+          geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+          break;
+        default:
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+      }
+      
+      // Create material
+      material = new THREE.MeshBasicMaterial({ 
+        color: objTemplate.color,
+        wireframe: objTemplate.wireframe,
+        transparent: true,
+        opacity: 1
+      });
+      
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(objTemplate.position.x, objTemplate.position.y, objTemplate.position.z);
+      mesh.scale.set(objTemplate.scale.x, objTemplate.scale.y, objTemplate.scale.z);
+      sceneRef.current!.add(mesh);
+      
+      // Add to workspace objects with mesh reference
+      setWorkspaceObjects(prev => [...prev, { ...objTemplate, mesh }]);
+    });
+    
+    addLog(`Applied preset: ${presetType} (${presetObjects.length} objects created)`, 'success');
+    
+    // Switch to workspace mode to see the objects
+    if (!workspaceMode) {
+      setWorkspaceMode(true);
+      addLog('Switched to workspace mode', 'info');
+    }
+  };
+
+
+  // PHASE 1: Audio management with robust error handling
   const initAudio = async (file: File) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
-      if (audioContextRef.current) audioContextRef.current.close();
+      
+      // PHASE 1: Clean up existing audio context properly
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+        addLog('Closed previous audio context', 'info');
+      }
+      
+      // PHASE 1: Create new audio context and analyser
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+      analyser.fftSize = 2048; // FFT size for frequency analysis
+      
+      // PHASE 1: Decode audio file
+      const arrayBuffer = await file.arrayBuffer();
+      const buf = await ctx.decodeAudioData(arrayBuffer);
+      
+      // PHASE 1: Store refs (single source of truth)
       audioBufferRef.current = buf;
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
+      
+      // PHASE 1: Update state
       setDuration(buf.duration);
       setAudioReady(true);
-      addLog('Audio loaded successfully!', 'success');
+      setCurrentTime(0);
+      pauseTimeRef.current = 0;
+      
+      addLog(`Audio loaded successfully! Duration: ${buf.duration.toFixed(2)}s`, 'success');
     } catch (e) {
-      console.error(e);
+      console.error('Audio init error:', e);
       const error = e as Error;
       addLog(`Audio load error: ${error.message}`, 'error');
+      setAudioReady(false);
     }
   };
 
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const f = e.target.files[0];
-      setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
-      initAudio(f);
+    const file = e.target.files?.[0];
+    if (!file) {
+      addLog('No file selected', 'error');
+      return;
     }
+    
+    // PHASE 1: Validate file type
+    if (!file.type.startsWith('audio/')) {
+      addLog(`Invalid file type: ${file.type}. Please select an audio file.`, 'error');
+      return;
+    }
+    
+    setAudioFileName(file.name.replace(/\.[^/.]+$/, ''));
+    initAudio(file);
   };
 
   const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
-    if (bufferSourceRef.current) bufferSourceRef.current.stop();
-    const src = audioContextRef.current.createBufferSource();
-    src.buffer = audioBufferRef.current;
-    src.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
-    src.start(0, pauseTimeRef.current);
-    bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
-    setIsPlaying(true);
+    // PHASE 1: Validate audio system is ready
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) {
+      addLog('Audio not ready for playback', 'error');
+      return;
+    }
+    
+    try {
+      // PHASE 1: Stop existing source if playing
+      if (bufferSourceRef.current) {
+        bufferSourceRef.current.stop();
+      }
+      
+      // PHASE 1: Create new buffer source
+      const src = audioContextRef.current.createBufferSource();
+      src.buffer = audioBufferRef.current;
+      src.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      src.start(0, pauseTimeRef.current);
+      
+      bufferSourceRef.current = src;
+      startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+      setIsPlaying(true);
+      
+      addLog(`Playback started at ${pauseTimeRef.current.toFixed(2)}s`, 'success');
+    } catch (e) {
+      console.error('Playback error:', e);
+      const error = e as Error;
+      addLog(`Playback error: ${error.message}`, 'error');
+    }
   };
 
   const stopAudio = () => {
-    if (bufferSourceRef.current) {
-      pauseTimeRef.current = currentTime;
-      bufferSourceRef.current.stop();
-      bufferSourceRef.current = null;
+    try {
+      if (bufferSourceRef.current) {
+        pauseTimeRef.current = currentTime;
+        bufferSourceRef.current.stop();
+        bufferSourceRef.current = null;
+      }
+      setIsPlaying(false);
+      addLog('Playback stopped', 'info');
+    } catch (e) {
+      console.error('Stop audio error:', e);
+      const error = e as Error;
+      addLog(`Stop error: ${error.message}`, 'error');
     }
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    setIsPlaying(false);
   };
 
   const seekTo = (t: number) => {
@@ -259,54 +837,76 @@ export default function VisualizerEditor() {
     // Full export logic from original file would go here
   };
 
-  // Frequency analysis helper
+  // PHASE 1: Frequency analysis helper (pure function, no side effects)
   const getFreq = (d: Uint8Array) => ({
     bass: d.slice(0, 10).reduce((a, b) => a + b, 0) / 10 / 255,
     mids: d.slice(10, 100).reduce((a, b) => a + b, 0) / 90 / 255,
     highs: d.slice(100, 200).reduce((a, b) => a + b, 0) / 100 / 255
   });
 
-  // Animation loop with audio-reactive presets
+  // PHASE 1: UNIFIED RENDER LOOP
+  // Replaces both the idle loop and the playing loop with a single continuous loop
+  // This loop runs continuously and checks isPlaying state internally
   useEffect(() => {
-    if (!isPlaying || !analyserRef.current) return;
-
     const scene = sceneRef.current;
     const cam = cameraRef.current;
     const rend = rendererRef.current;
-    const analyser = analyserRef.current;
     const obj = objectsRef.current;
 
+    // Don't start render loop until scene is initialized
     if (!scene || !cam || !rend || !obj) return;
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
+    addLog('Starting unified render loop', 'info');
+    
+    const data = new Uint8Array(analyserRef.current?.frequencyBinCount || 2048);
 
-    const anim = () => {
-      if (!isPlaying) return;
-      animationRef.current = requestAnimationFrame(anim);
+    const render = () => {
+      animationRef.current = requestAnimationFrame(render);
 
-      // Update time
+      // PHASE 1: Calculate elapsed time (always available, not just when playing)
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      const t = Math.min(elapsed, duration);
-      setCurrentTime(t);
 
-      if (t >= duration) {
-        stopAudio();
-        return;
+      // PHASE 1: Update time if playing
+      if (isPlaying && audioContextRef.current) {
+        const t = Math.min(elapsed, duration);
+        setCurrentTime(t);
+
+        if (t >= duration) {
+          stopAudio();
+          return;
+        }
+
+        // Get frequency data when playing
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(data);
+        }
       }
 
-      // Get frequency data
-      analyser.getByteFrequencyData(data);
-      const f = getFreq(data);
-
-      // Find current section/preset
+      // PHASE 1: Get current section from timeline (single source of truth)
+      const t = currentTime;
       const sec = sections.find((s: Section) => t >= s.start && t < s.end);
       const type = sec?.animation || 'orbit';
       const isVisible = sec?.visible !== false;
+      
+      // PHASE 4: Get preset parameters (use defaults if not set)
+      const params = sec?.parameters || getDefaultParameters(type);
+      const { density, speed, intensity, spread } = params;
+
+      // PHASE 1: Get frequency data (defaults to 0 when not playing)
+      const f = isPlaying && analyserRef.current ? getFreq(data) : { bass: 0, mids: 0, highs: 0 };
+      
+      // PHASE 4: Apply intensity multiplier to frequency data
+      const reactiveF = {
+        bass: f.bass * intensity,
+        mids: f.mids * intensity,
+        highs: f.highs * intensity
+      };
 
       // Handle preset transitions with cleanup
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
         prevAnimRef.current = type;
+        addLog(`Switching to preset: ${type}`, 'info');
         
         // CRITICAL FIX: Reset all object properties to default state when switching presets
         // This prevents visual artifacts from previous presets
@@ -365,57 +965,74 @@ export default function VisualizerEditor() {
       }
 
       // PRESET ANIMATIONS
+      // PHASE 4: All presets now use parameters (density, speed, intensity, spread)
+      // - density: controls number of visible objects (limiting loops)
+      // - speed: multiplies animation speeds and elapsed time
+      // - intensity: already applied to reactiveF
+      // - spread: controls spatial distribution/radii
+      
       if (type === 'orbit') {
         // Orbital Dance - Solar system with orbiting planets
-        const rotationSpeed = cameraAutoRotate ? el * 0.2 : 0;
-        const r = activeCameraDistance - f.bass * 5;
+        // PHASE 4: Uses speed for rotation, spread for orbit radii, density for object count
+        const rotationSpeed = cameraAutoRotate ? el * 0.2 * speed : 0;
+        const r = activeCameraDistance - reactiveF.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation) * r, 10 + activeCameraHeight, Math.sin(rotationSpeed + activeCameraRotation) * r);
         cam.lookAt(0, 0, 0);
         
         // Central sphere as sun
         obj.sphere.position.set(0, 0, 0);
-        const sunScale = 3 + f.bass * 2;
+        const sunScale = 3 + reactiveF.bass * 2;
         obj.sphere.scale.set(sunScale, sunScale, sunScale);
-        obj.sphere.rotation.y += 0.01;
+        obj.sphere.rotation.y += 0.01 * speed;
         (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.9 + f.bass * 0.1) * blend;
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.9 + reactiveF.bass * 0.1) * blend;
         (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
         
-        // Cubes as planets
+        // Cubes as planets (PHASE 4: limit by density parameter)
+        const planetCount = Math.min(Math.floor(density / 4), obj.cubes.length);
         obj.cubes.forEach((planet, i) => {
-          const orbitRadius = 5 + i * 1.8;
-          const orbitSpeed = 0.8 / (1 + i * 0.3);
+          if (i >= planetCount) {
+            planet.scale.set(0, 0, 0); // Hide extra planets
+            return;
+          }
+          const orbitRadius = spread * 0.3 + i * (spread / planetCount);
+          const orbitSpeed = (0.8 / (1 + i * 0.3)) * speed;
           const angle = el * orbitSpeed + i * 0.5;
           const tilt = Math.sin(i) * 0.3;
           planet.position.x = Math.cos(angle) * orbitRadius;
           planet.position.z = Math.sin(angle) * orbitRadius;
           planet.position.y = Math.sin(angle * 2) * tilt;
           const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i] || 1.0;
-          const planetSize = sizeVariation + f.bass * 0.3;
+          const planetSize = sizeVariation + reactiveF.bass * 0.3;
           planet.scale.set(planetSize, planetSize, planetSize);
-          planet.rotation.y += 0.02 + i * 0.005;
+          planet.rotation.y += (0.02 + i * 0.005) * speed;
           const colorIndex = i % 3;
           (planet.material as THREE.MeshBasicMaterial).color.setStyle(colorIndex === 0 ? bassColor : colorIndex === 1 ? midsColor : highsColor);
-          (planet.material as THREE.MeshBasicMaterial).opacity = (0.8 + f.bass * 0.2) * blend;
+          (planet.material as THREE.MeshBasicMaterial).opacity = (0.8 + reactiveF.bass * 0.2) * blend;
           (planet.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // Octas as moons and distant objects
+        // Octas as moons and distant objects (PHASE 4: limit by density)
+        const moonCount = Math.min(Math.floor(density * 0.8), 24);
         obj.octas.slice(0, 24).forEach((moon, i) => {
-          const planetIndex = Math.floor(i / 3) % obj.cubes.length;
+          if (i >= moonCount) {
+            moon.scale.set(0, 0, 0);
+            return;
+          }
+          const planetIndex = Math.floor(i / 3) % planetCount;
           const planet = obj.cubes[planetIndex];
           const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
-          const moonOrbitSpeed = 3 + (i % 3);
+          const moonOrbitSpeed = (3 + (i % 3)) * speed;
           const moonAngle = el * moonOrbitSpeed + i;
           moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
           moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
           moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
-          const moonSize = 0.3 + f.mids * 0.2;
+          const moonSize = 0.3 + reactiveF.mids * 0.2;
           moon.scale.set(moonSize, moonSize, moonSize);
-          moon.rotation.x += 0.05;
-          moon.rotation.y += 0.03;
+          moon.rotation.x += 0.05 * speed;
+          moon.rotation.y += 0.03 * speed;
           (moon.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
-          (moon.material as THREE.MeshBasicMaterial).opacity = (0.6 + f.mids * 0.4) * blend;
+          (moon.material as THREE.MeshBasicMaterial).opacity = (0.6 + reactiveF.mids * 0.4) * blend;
           (moon.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
@@ -825,18 +1442,28 @@ export default function VisualizerEditor() {
         });
       }
 
-      // Render
+      // PHASE 3: Update orbit controls if in workspace mode
+      if (orbitControlsRef.current && workspaceMode) {
+        orbitControlsRef.current.update();
+      }
+
+      // PHASE 1: Always render (whether playing or idle)
       rend.render(scene, cam);
     };
 
-    animationRef.current = requestAnimationFrame(anim);
+    // PHASE 1: Start the unified render loop immediately
+    animationRef.current = requestAnimationFrame(render);
+    addLog('Unified render loop started successfully', 'success');
 
     return () => {
+      // PHASE 1: Cleanup - cancel animation frame on unmount or dependency change
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+        addLog('Render loop stopped', 'info');
       }
     };
-  }, [isPlaying, sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration]);
+  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime, workspaceMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -951,6 +1578,32 @@ export default function VisualizerEditor() {
       } else if (e.key.toLowerCase() === 'b') {
         // B - Toggle border
         setShowBorder(!showBorder);
+      } else if (e.key.toLowerCase() === 'w' && !e.ctrlKey && !e.metaKey) {
+        // PHASE 3: W - Toggle workspace mode
+        setWorkspaceMode(!workspaceMode);
+        addLog(`Workspace mode: ${!workspaceMode ? 'ON' : 'OFF'}`, 'info');
+      }
+
+      // Debug console toggle
+      if (e.key === '`') {
+        // ` (backtick) - Toggle debug console
+        e.preventDefault();
+        setShowDebugConsole(!showDebugConsole);
+      }
+
+      // PHASE 5: Undo/Redo keyboard shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.shiftKey && e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
+        e.preventDefault();
+        handleRedo();
+      }
+
+      // PHASE 5: Keyboard shortcuts modal (Escape to close)
+      if (e.key === 'Escape' && showKeyboardShortcuts) {
+        e.preventDefault();
+        setShowKeyboardShortcuts(false);
       }
 
       // Camera controls
@@ -973,7 +1626,12 @@ export default function VisualizerEditor() {
     sections,
     selectedSectionId,
     showLetterbox,
-    showBorder
+    showBorder,
+    showDebugConsole,
+    workspaceMode,
+    showKeyboardShortcuts,
+    historyIndex,
+    history
   ]);
 
   // Handle panel resizing
@@ -1012,7 +1670,9 @@ export default function VisualizerEditor() {
     }
   }, [isResizingLeft, isResizingRight, isResizingTimeline]);
 
-  // Initialize Three.js scene
+  // PHASE 1: Initialize Three.js scene (lifecycle management)
+  // This effect runs once and sets up the stable scene/camera/renderer
+  // The unified render loop (above) handles all animation
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -1020,18 +1680,27 @@ export default function VisualizerEditor() {
     
     try {
       addLog('Initializing Three.js scene...', 'info');
+      
+      // PHASE 1: Create scene with fog
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
       
+      // PHASE 1: Create camera (960x540 = 16:9 aspect ratio)
       camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      // PHASE 1: Create renderer with required flags for video export
+      renderer = new THREE.WebGLRenderer({ 
+        antialias: true, 
+        alpha: true, 
+        preserveDrawingBuffer: true // Required for video capture
+      });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
 
+      // PHASE 1: Clean up any existing renderer before adding new one
       if (containerRef.current.children.length > 0) {
         containerRef.current.removeChild(containerRef.current.children[0]);
       }
@@ -1046,7 +1715,7 @@ export default function VisualizerEditor() {
       return;
     }
 
-    // Create 3D objects
+    // PHASE 1: Create 3D objects (geometry created once, animated by render loop)
     const cubes: THREE.Mesh[] = [];
     for (let i = 0; i < 8; i++) {
       const c = new THREE.Mesh(
@@ -1105,32 +1774,224 @@ export default function VisualizerEditor() {
     lightsRef.current.directional = directionalLight;
     
     objectsRef.current = { cubes, octas, tetras, sphere };
-    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
+    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'success');
 
-    // Idle render loop (when not playing)
-    let idleAnimFrame: number;
-    const idleRender = () => {
-      idleAnimFrame = requestAnimationFrame(idleRender);
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
-    };
-    idleAnimFrame = requestAnimationFrame(idleRender);
+    // PHASE 3: Initialize workspace features (grid, axes, orbit controls, transform controls)
+    try {
+      // Grid Helper
+      const gridHelper = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
+      gridHelper.visible = showWorkspaceGrid;
+      scene.add(gridHelper);
+      gridHelperRef.current = gridHelper;
+      
+      // Axes Helper (X=red, Y=green, Z=blue)
+      const axesHelper = new THREE.AxesHelper(10);
+      axesHelper.visible = showWorkspaceAxes;
+      scene.add(axesHelper);
+      axesHelperRef.current = axesHelper;
+      
+      // Orbit Controls (like Blender viewport)
+      const orbitControls = new OrbitControls(camera, renderer.domElement);
+      orbitControls.enableDamping = true;
+      orbitControls.dampingFactor = 0.05;
+      orbitControls.screenSpacePanning = false;
+      orbitControls.minDistance = 5;
+      orbitControls.maxDistance = 50;
+      orbitControls.maxPolarAngle = Math.PI / 2;
+      orbitControls.enabled = workspaceMode; // Only active in workspace mode
+      orbitControlsRef.current = orbitControls;
+      
+      // Transform Controls (for object manipulation)
+      const transformControls = new TransformControls(camera, renderer.domElement);
+      transformControls.addEventListener('dragging-changed', (event) => {
+        // Disable orbit controls while transforming
+        if (orbitControls) {
+          orbitControls.enabled = !event.value;
+        }
+      });
+      transformControls.addEventListener('objectChange', () => {
+        // Update workspace object when transformed
+        if (selectedObjectId && transformControls.object) {
+          const obj = workspaceObjects.find(o => o.id === selectedObjectId);
+          if (obj && obj.mesh) {
+            setWorkspaceObjects(prev => prev.map(o => 
+              o.id === selectedObjectId
+                ? {
+                    ...o,
+                    position: {
+                      x: obj.mesh.position.x,
+                      y: obj.mesh.position.y,
+                      z: obj.mesh.position.z
+                    },
+                    rotation: {
+                      x: THREE.MathUtils.radToDeg(obj.mesh.rotation.x),
+                      y: THREE.MathUtils.radToDeg(obj.mesh.rotation.y),
+                      z: THREE.MathUtils.radToDeg(obj.mesh.rotation.z)
+                    },
+                    scale: {
+                      x: obj.mesh.scale.x,
+                      y: obj.mesh.scale.y,
+                      z: obj.mesh.scale.z
+                    }
+                  }
+                : o
+            ));
+          }
+        }
+      });
+      transformControls.visible = false;
+      scene.add(transformControls);
+      transformControlsRef.current = transformControls;
+      
+      addLog('Workspace initialized (grid, axes, orbit controls, transform controls)', 'success');
+    } catch (e) {
+      console.error('Workspace initialization error:', e);
+      addLog(`Workspace error: ${(e as Error).message}`, 'error');
+    }
+
+    // PHASE 1: No idle render loop needed - the unified loop below handles both playing and idle states
 
     return () => {
-      if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
+      // PHASE 1: Cleanup - renderer disposal handled here
       if (rendererRef.current) {
         try {
           if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
             containerRef.current.removeChild(rendererRef.current.domElement);
           }
           rendererRef.current.dispose();
+          addLog('Renderer disposed successfully', 'info');
         } catch (e) {
           console.error('Cleanup error:', e);
+          addLog(`Cleanup error: ${(e as Error).message}`, 'error');
         }
       }
     };
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // PHASE 3: Update grid/axes visibility
+  useEffect(() => {
+    if (gridHelperRef.current) {
+      gridHelperRef.current.visible = showWorkspaceGrid;
+    }
+  }, [showWorkspaceGrid]);
+
+  useEffect(() => {
+    if (axesHelperRef.current) {
+      axesHelperRef.current.visible = showWorkspaceAxes;
+    }
+  }, [showWorkspaceAxes]);
+
+  // PHASE 3: Update transform controls when object is selected
+  useEffect(() => {
+    if (!transformControlsRef.current) return;
+    
+    if (selectedObjectId) {
+      const selectedObj = workspaceObjects.find(o => o.id === selectedObjectId);
+      if (selectedObj && selectedObj.mesh) {
+        transformControlsRef.current.attach(selectedObj.mesh);
+        transformControlsRef.current.visible = true;
+        addLog(`Selected: ${selectedObj.name}`, 'info');
+      }
+    } else {
+      transformControlsRef.current.detach();
+      transformControlsRef.current.visible = false;
+    }
+  }, [selectedObjectId, workspaceObjects]);
+
+  // PHASE 3: Update orbit controls based on workspace mode
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = workspaceMode;
+    }
+  }, [workspaceMode]);
+
+  // Load default font for 3D text
+  useEffect(() => {
+    const loader = new FontLoader();
+    
+    // Load Helvetiker font from CDN
+    addLog('Loading font for 3D text...', 'info');
+    loader.load(
+      'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
+      (font) => {
+        fontRef.current = font;
+        setFontLoaded(true);
+        addLog('Font loaded successfully', 'success');
+      },
+      undefined,
+      (error) => {
+        console.error('Font loading error:', error);
+        addLog('Failed to load font', 'error');
+      }
+    );
+  }, []);
+
+  // PHASE 2: Load initial audio file from project settings
+  useEffect(() => {
+    if (initialAudioFile) {
+      addLog(`Loading initial audio: ${initialAudioFile.name}`, 'info');
+      setAudioFileName(initialAudioFile.name.replace(/\.[^/.]+$/, ''));
+      initAudio(initialAudioFile);
+    }
+  }, [initialAudioFile]);
+
+  // Create/update 3D song name text
+  useEffect(() => {
+    if (!sceneRef.current || !fontRef.current || !fontLoaded) return;
+
+    // Remove existing text meshes
+    songNameMeshesRef.current.forEach(mesh => {
+      sceneRef.current?.remove(mesh);
+      mesh.geometry.dispose();
+      if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(m => m.dispose());
+      } else {
+        mesh.material.dispose();
+      }
+    });
+    songNameMeshesRef.current = [];
+
+    // Create new text if showSongName is true
+    if (showSongName) {
+      const textToDisplay = customSongName || audioFileName || '3D Music Visualizer';
+      
+      try {
+        const textGeometry = new TextGeometry(textToDisplay, {
+          font: fontRef.current,
+          size: 0.8,
+          depth: 0.2,
+          curveSegments: 12,
+          bevelEnabled: true,
+          bevelThickness: 0.03,
+          bevelSize: 0.02,
+          bevelSegments: 5
+        });
+
+        textGeometry.center();
+
+        const textMaterial = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(bassColor),
+          transparent: true,
+          opacity: 0.9
+        });
+
+        const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+        textMesh.position.set(0, 5, 0);
+        sceneRef.current.add(textMesh);
+        songNameMeshesRef.current.push(textMesh);
+        
+        addLog(`3D text created: "${textToDisplay}"`, 'success');
+      } catch (error) {
+        console.error('Text geometry error:', error);
+        addLog('Failed to create 3D text', 'error');
+      }
+    }
+
+    // Trigger a re-render if not playing
+    if (!isPlaying && rendererRef.current && sceneRef.current && cameraRef.current) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+  }, [showSongName, customSongName, audioFileName, fontLoaded, bassColor, isPlaying]);
 
   // Update scene background and lighting when settings change
   useEffect(() => {
@@ -1176,16 +2037,20 @@ export default function VisualizerEditor() {
         duration={duration}
         currentPreset={currentPreset}
         audioFileName={audioFileName}
+        projectName={projectSettings.name} // PHASE 2: Pass project name from settings
         onPlay={playAudio}
         onStop={stopAudio}
         onExport={() => setShowExportModal(true)}
         onAudioFileChange={handleAudioFileChange}
-        canUndo={false}
-        canRedo={false}
+        onUndo={handleUndo} // PHASE 5: Undo handler
+        onRedo={handleRedo} // PHASE 5: Redo handler
+        canUndo={historyIndex > 0} // PHASE 5: Can undo if history exists
+        canRedo={historyIndex < history.length - 1} // PHASE 5: Can redo if not at end
+        onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)} // PHASE 5: Keyboard shortcuts modal
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main Content Area - Calculate height based on available space minus timeline */}
+      <div className="flex-1 flex overflow-hidden" style={{ height: `calc(100vh - ${64 + timelineHeight}px)` }}>
         {/* Left Panel - Layers */}
         <div style={{ width: `${leftPanelWidth}px` }} className="flex-shrink-0 relative">
           <LeftPanel
@@ -1197,6 +2062,7 @@ export default function VisualizerEditor() {
             onToggleLock={toggleSectionLock}
             onDeleteSection={deleteSection}
             onReorderSections={reorderSections}
+            onDuplicateSection={duplicateSection}
           />
           {/* Resize handle for left panel */}
           <div
@@ -1207,7 +2073,7 @@ export default function VisualizerEditor() {
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 relative">
           <CanvasWrapper
             containerRef={containerRef}
             showBorder={showBorder}
@@ -1219,6 +2085,17 @@ export default function VisualizerEditor() {
             showFilename={showFilename}
             audioFileName={audioFileName}
           />
+          
+          {/* PHASE 3: Workspace Controls Overlay */}
+          {workspaceMode && (
+            <WorkspaceControls
+              onCreateObject={createWorkspaceObject}
+              showGrid={showWorkspaceGrid}
+              onToggleGrid={() => setShowWorkspaceGrid(!showWorkspaceGrid)}
+              showAxes={showWorkspaceAxes}
+              onToggleAxes={() => setShowWorkspaceAxes(!showWorkspaceAxes)}
+            />
+          )}
         </div>
 
         {/* Right Panel - Properties */}
@@ -1229,37 +2106,70 @@ export default function VisualizerEditor() {
             onMouseDown={() => setIsResizingRight(true)}
             title="Drag to resize"
           />
-          <RightPanel
-            selectedSection={selectedSection}
-            animationTypes={ANIMATION_TYPES}
-            bassColor={bassColor}
-            midsColor={midsColor}
-            highsColor={highsColor}
-            backgroundColor={backgroundColor}
-            borderColor={borderColor}
-            ambientLightIntensity={ambientLightIntensity}
-            directionalLightIntensity={directionalLightIntensity}
-            cameraDistance={cameraDistance}
-            cameraHeight={cameraHeight}
-            cameraRotation={cameraRotation}
-            cameraAutoRotate={cameraAutoRotate}
-            showLetterbox={showLetterbox}
-            letterboxSize={letterboxSize}
-            onUpdateSection={updateSection}
-            onSetBassColor={setBassColor}
-            onSetMidsColor={setMidsColor}
-            onSetHighsColor={setHighsColor}
-            onSetBackgroundColor={setBackgroundColor}
-            onSetBorderColor={setBorderColor}
-            onSetAmbientLight={setAmbientLightIntensity}
-            onSetDirectionalLight={setDirectionalLightIntensity}
-            onSetCameraDistance={setCameraDistance}
-            onSetCameraHeight={setCameraHeight}
-            onSetCameraRotation={setCameraRotation}
-            onSetCameraAutoRotate={setCameraAutoRotate}
-            onSetShowLetterbox={setShowLetterbox}
-            onSetLetterboxSize={setLetterboxSize}
-          />
+          
+          {/* PHASE 3: Show workspace properties when in workspace mode, otherwise show normal properties */}
+          {workspaceMode ? (
+            <div className="h-full bg-gray-900 overflow-y-auto">
+              <div className="p-4 bg-gray-800 border-b border-gray-700">
+                <h2 className="text-lg font-semibold text-white">Workspace Properties</h2>
+                <p className="text-xs text-gray-400 mt-1">Select an object to edit</p>
+              </div>
+              <ObjectPropertiesPanel
+                selectedObject={workspaceObjects.find(o => o.id === selectedObjectId) || null}
+                onUpdateObject={updateWorkspaceObject}
+                onDeleteObject={deleteWorkspaceObject}
+                cameraDistance={cameraDistance}
+                cameraHeight={cameraHeight}
+                cameraRotation={cameraRotation}
+                onSetCameraDistance={setCameraDistance}
+                onSetCameraHeight={setCameraHeight}
+                onSetCameraRotation={setCameraRotation}
+              />
+            </div>
+          ) : (
+            <RightPanel
+              selectedSection={selectedSection}
+              animationTypes={ANIMATION_TYPES}
+              bassColor={bassColor}
+              midsColor={midsColor}
+              highsColor={highsColor}
+              backgroundColor={backgroundColor}
+              borderColor={borderColor}
+              ambientLightIntensity={ambientLightIntensity}
+              directionalLightIntensity={directionalLightIntensity}
+              cameraDistance={cameraDistance}
+              cameraHeight={cameraHeight}
+              cameraRotation={cameraRotation}
+              cameraAutoRotate={cameraAutoRotate}
+              showLetterbox={showLetterbox}
+              letterboxSize={letterboxSize}
+              showBorder={showBorder}
+              showSongName={showSongName}
+              customSongName={customSongName}
+              fontLoaded={fontLoaded}
+              manualMode={manualMode}
+              onUpdateSection={updateSection}
+              onUpdateSectionParameters={updateSectionParameters} 
+              onApplyPreset={applyPreset}
+              onSetBassColor={setBassColor}
+              onSetMidsColor={setMidsColor}
+              onSetHighsColor={setHighsColor}
+              onSetBackgroundColor={setBackgroundColor}
+              onSetBorderColor={setBorderColor}
+              onSetAmbientLight={setAmbientLightIntensity}
+              onSetDirectionalLight={setDirectionalLightIntensity}
+              onSetCameraDistance={setCameraDistance}
+              onSetCameraHeight={setCameraHeight}
+              onSetCameraRotation={setCameraRotation}
+              onSetCameraAutoRotate={setCameraAutoRotate}
+              onSetShowLetterbox={setShowLetterbox}
+              onSetLetterboxSize={setLetterboxSize}
+              onSetShowBorder={setShowBorder}
+              onSetShowSongName={setShowSongName}
+              onSetCustomSongName={setCustomSongName}
+              onSetManualMode={setManualMode}
+            />
+          )}
         </div>
       </div>
 
@@ -1277,10 +2187,21 @@ export default function VisualizerEditor() {
           duration={duration}
           animationTypes={ANIMATION_TYPES}
           selectedSectionId={selectedSectionId}
+          audioBuffer={audioBufferRef.current}
+          showWaveform={true}
+          presetKeyframes={presetKeyframes}
+          cameraKeyframes={cameraKeyframes}
+          textKeyframes={textKeyframes}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
           onAddSection={addSection}
           onSeek={seekTo}
+          onAddPresetKeyframe={addPresetKeyframe}
+          onAddCameraKeyframe={addCameraKeyframe}
+          onAddTextKeyframe={addTextKeyframe}
+          onDeletePresetKeyframe={deletePresetKeyframe}
+          onDeleteCameraKeyframe={deleteCameraKeyframe}
+          onDeleteTextKeyframe={deleteTextKeyframe}
         />
       </div>
 
@@ -1296,6 +2217,19 @@ export default function VisualizerEditor() {
         onExport={exportVideo}
         onSetFormat={setExportFormat}
         onSetResolution={setExportResolution}
+      />
+
+      {/* Debug Console */}
+      <DebugConsole
+        logs={errorLog}
+        isOpen={showDebugConsole}
+        onToggle={() => setShowDebugConsole(!showDebugConsole)}
+      />
+
+      {/* PHASE 5: Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showKeyboardShortcuts}
+        onClose={() => setShowKeyboardShortcuts(false)}
       />
     </div>
   );

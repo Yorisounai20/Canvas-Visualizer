@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-import { Section, AnimationType } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe } from '../../types';
+import WaveformVisualizer from './WaveformVisualizer';
 
 interface TimelineProps {
   sections: Section[];
@@ -8,10 +9,21 @@ interface TimelineProps {
   duration: number;
   animationTypes: AnimationType[];
   selectedSectionId: number | null;
+  audioBuffer: AudioBuffer | null;
+  showWaveform?: boolean;
+  presetKeyframes: PresetKeyframe[];
+  cameraKeyframes: CameraKeyframe[];
+  textKeyframes: TextKeyframe[];
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onAddSection: () => void;
   onSeek: (time: number) => void;
+  onAddPresetKeyframe?: (time: number) => void;
+  onAddCameraKeyframe?: (time: number) => void;
+  onAddTextKeyframe?: (time: number) => void;
+  onDeletePresetKeyframe?: (id: number) => void;
+  onDeleteCameraKeyframe?: (time: number) => void;
+  onDeleteTextKeyframe?: (id: number) => void;
 }
 
 type TimelineTab = 'sections' | 'presets' | 'camera' | 'text';
@@ -27,10 +39,21 @@ export default function Timeline({
   duration,
   animationTypes,
   selectedSectionId,
+  audioBuffer,
+  showWaveform = true,
+  presetKeyframes,
+  cameraKeyframes,
+  textKeyframes,
   onSelectSection,
   onUpdateSection,
   onAddSection,
-  onSeek
+  onSeek,
+  onAddPresetKeyframe,
+  onAddCameraKeyframe,
+  onAddTextKeyframe,
+  onDeletePresetKeyframe,
+  onDeleteCameraKeyframe,
+  onDeleteTextKeyframe
 }: TimelineProps) {
   const [activeTab, setActiveTab] = useState<TimelineTab>('sections');
   const [dragState, setDragState] = useState<{
@@ -153,13 +176,18 @@ export default function Timeline({
 
     const handleMouseUp = () => {
       setDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      // Re-enable text selection
+      document.body.style.userSelect = '';
     };
 
     if (dragState.type) {
+      // Prevent text selection during drag
+      document.body.style.userSelect = 'none';
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       
       return () => {
+        document.body.style.userSelect = '';
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
       };
@@ -265,6 +293,17 @@ export default function Timeline({
           style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
           onClick={handleTimelineClick}
         >
+          {/* Waveform background */}
+          {showWaveform && audioBuffer && (
+            <WaveformVisualizer
+              audioBuffer={audioBuffer}
+              duration={duration}
+              width={timelineWidth}
+              height={Math.max(sections.length * (TIMELINE_HEIGHT + 4), 100)}
+              color="rgba(100, 180, 255, 0.15)"
+            />
+          )}
+
           {/* Playhead */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
@@ -349,29 +388,232 @@ export default function Timeline({
 
         {/* Presets Tab */}
         {activeTab === 'presets' && (
-          <div className="p-8 text-center text-gray-400">
-            <p className="text-lg mb-2">🎨 Preset Keyframes</p>
-            <p className="text-sm">Timeline-based preset automation coming soon</p>
-            <p className="text-xs mt-2 text-gray-500">Switch presets at specific timestamps for automated transitions</p>
-          </div>
+          <>
+            {/* Add Preset Keyframe Button */}
+            <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs text-gray-400">Click timeline to add preset keyframe</p>
+              {onAddPresetKeyframe && (
+                <button
+                  onClick={() => onAddPresetKeyframe(currentTime)}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                >
+                  <Plus size={12} className="inline mr-1" />
+                  Add at Current Time
+                </button>
+              )}
+            </div>
+
+            {/* Keyframe Timeline */}
+            <div 
+              className="relative cursor-pointer"
+              style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left + scrollOffset;
+                const clickedTime = pixelsToTime(x);
+                if (onAddPresetKeyframe) {
+                  onAddPresetKeyframe(clickedTime);
+                }
+              }}
+            >
+              {/* Playhead */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ left: `${timeToPixels(currentTime)}px` }}
+              >
+                <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
+              </div>
+
+              {/* Preset Keyframe Markers */}
+              {presetKeyframes.map((kf) => (
+                <div
+                  key={kf.id}
+                  className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-pointer group"
+                  style={{ left: `${timeToPixels(kf.time)}px` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(kf.time);
+                  }}
+                >
+                  <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-cyan-400 rounded-full" />
+                  <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
+                    {formatTime(kf.time)} - {animationTypes.find(a => a.value === kf.preset)?.label || kf.preset}
+                    {onDeletePresetKeyframe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeletePresetKeyframe(kf.id);
+                        }}
+                        className="ml-2 text-red-400 hover:text-red-300"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {presetKeyframes.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                  Click timeline to add preset keyframes
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Camera Tab */}
         {activeTab === 'camera' && (
-          <div className="p-8 text-center text-gray-400">
-            <p className="text-lg mb-2">📷 Camera Keyframes</p>
-            <p className="text-sm">Timeline-based camera animation coming soon</p>
-            <p className="text-xs mt-2 text-gray-500">Animate camera position, rotation, and distance over time</p>
-          </div>
+          <>
+            {/* Add Camera Keyframe Button */}
+            <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs text-gray-400">Click timeline to add camera keyframe</p>
+              {onAddCameraKeyframe && (
+                <button
+                  onClick={() => onAddCameraKeyframe(currentTime)}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                >
+                  <Plus size={12} className="inline mr-1" />
+                  Add at Current Time
+                </button>
+              )}
+            </div>
+
+            {/* Keyframe Timeline */}
+            <div 
+              className="relative cursor-pointer"
+              style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left + scrollOffset;
+                const clickedTime = pixelsToTime(x);
+                if (onAddCameraKeyframe) {
+                  onAddCameraKeyframe(clickedTime);
+                }
+              }}
+            >
+              {/* Playhead */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ left: `${timeToPixels(currentTime)}px` }}
+              >
+                <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
+              </div>
+
+              {/* Camera Keyframe Markers */}
+              {cameraKeyframes.map((kf, index) => (
+                <div
+                  key={index}
+                  className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-pointer group"
+                  style={{ left: `${timeToPixels(kf.time)}px` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(kf.time);
+                  }}
+                >
+                  <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
+                  <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
+                    {formatTime(kf.time)} - Dist: {kf.distance.toFixed(1)}, H: {kf.height.toFixed(1)}, Rot: {(kf.rotation * 180 / Math.PI).toFixed(0)}°
+                    <br />
+                    Easing: {kf.easing}
+                    {onDeleteCameraKeyframe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteCameraKeyframe(kf.time);
+                        }}
+                        className="ml-2 text-red-400 hover:text-red-300"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {cameraKeyframes.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                  Click timeline to add camera keyframes
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Text Tab */}
         {activeTab === 'text' && (
-          <div className="p-8 text-center text-gray-400">
-            <p className="text-lg mb-2">📝 Text Keyframes</p>
-            <p className="text-sm">3D text overlay animations coming soon</p>
-            <p className="text-xs mt-2 text-gray-500">Animate song name position, scale, rotation, and opacity</p>
-          </div>
+          <>
+            {/* Add Text Keyframe Button */}
+            <div className="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs text-gray-400">Click timeline to toggle text visibility keyframe</p>
+              {onAddTextKeyframe && (
+                <button
+                  onClick={() => onAddTextKeyframe(currentTime)}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                >
+                  <Plus size={12} className="inline mr-1" />
+                  Add at Current Time
+                </button>
+              )}
+            </div>
+
+            {/* Keyframe Timeline */}
+            <div 
+              className="relative cursor-pointer"
+              style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left + scrollOffset;
+                const clickedTime = pixelsToTime(x);
+                if (onAddTextKeyframe) {
+                  onAddTextKeyframe(clickedTime);
+                }
+              }}
+            >
+              {/* Playhead */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-20 pointer-events-none"
+                style={{ left: `${timeToPixels(currentTime)}px` }}
+              >
+                <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
+              </div>
+
+              {/* Text Keyframe Markers */}
+              {textKeyframes.map((kf) => (
+                <div
+                  key={kf.id}
+                  className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-pointer group`}
+                  style={{ left: `${timeToPixels(kf.time)}px` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSeek(kf.time);
+                  }}
+                >
+                  <div className={`absolute -top-1 -left-1.5 w-3 h-3 ${kf.show ? 'bg-green-400' : 'bg-red-400'} rounded-full`} />
+                  <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
+                    {formatTime(kf.time)} - {kf.show ? 'Show' : 'Hide'} Text
+                    {onDeleteTextKeyframe && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteTextKeyframe(kf.id);
+                        }}
+                        className="ml-2 text-red-400 hover:text-red-300"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {textKeyframes.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                  Click timeline to add text visibility keyframes
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </div>
