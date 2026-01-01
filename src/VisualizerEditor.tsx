@@ -32,19 +32,33 @@ const DEFAULT_CAMERA_AUTO_ROTATE = true;
 
 /**
  * VisualizerEditor - Main After Effects-style editor component
+ * 
+ * PHASE 1 ARCHITECTURE (CORE STABILITY):
+ * - Single unified render loop (runs continuously, checks isPlaying state)
+ * - Scene/Camera/Renderer lifecycle managed in one useEffect
+ * - Audio context created once, reused for all playback
+ * - Timeline sections are the single source of truth for animations
+ * - All errors/successes logged to debug console
+ * 
  * Coordinates all panels and manages the 3D visualization state
  */
 export default function VisualizerEditor() {
-  // Refs for Three.js
+  // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  
+  // PHASE 1: Audio system refs (stable, single instances)
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationRef = useRef<number | null>(null);
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  
+  // PHASE 1: Single unified render loop ref
+  const animationRef = useRef<number | null>(null);
+  
+  // PHASE 1: Playback timing refs
   const startTimeRef = useRef(0);
   const pauseTimeRef = useRef(0);
   const lightsRef = useRef<{ 
@@ -268,57 +282,109 @@ export default function VisualizerEditor() {
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
 
-  // Audio management
+  // PHASE 1: Audio management with robust error handling
   const initAudio = async (file: File) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
-      if (audioContextRef.current) audioContextRef.current.close();
+      
+      // PHASE 1: Clean up existing audio context properly
+      if (audioContextRef.current) {
+        await audioContextRef.current.close();
+        addLog('Closed previous audio context', 'info');
+      }
+      
+      // PHASE 1: Create new audio context and analyser
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+      analyser.fftSize = 2048; // FFT size for frequency analysis
+      
+      // PHASE 1: Decode audio file
+      const arrayBuffer = await file.arrayBuffer();
+      const buf = await ctx.decodeAudioData(arrayBuffer);
+      
+      // PHASE 1: Store refs (single source of truth)
       audioBufferRef.current = buf;
       audioContextRef.current = ctx;
       analyserRef.current = analyser;
+      
+      // PHASE 1: Update state
       setDuration(buf.duration);
       setAudioReady(true);
-      addLog('Audio loaded successfully!', 'success');
+      setCurrentTime(0);
+      pauseTimeRef.current = 0;
+      
+      addLog(`Audio loaded successfully! Duration: ${buf.duration.toFixed(2)}s`, 'success');
     } catch (e) {
-      console.error(e);
+      console.error('Audio init error:', e);
       const error = e as Error;
       addLog(`Audio load error: ${error.message}`, 'error');
+      setAudioReady(false);
     }
   };
 
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      const f = e.target.files[0];
-      setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
-      initAudio(f);
+    const file = e.target.files?.[0];
+    if (!file) {
+      addLog('No file selected', 'error');
+      return;
     }
+    
+    // PHASE 1: Validate file type
+    if (!file.type.startsWith('audio/')) {
+      addLog(`Invalid file type: ${file.type}. Please select an audio file.`, 'error');
+      return;
+    }
+    
+    setAudioFileName(file.name.replace(/\.[^/.]+$/, ''));
+    initAudio(file);
   };
 
   const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
-    if (bufferSourceRef.current) bufferSourceRef.current.stop();
-    const src = audioContextRef.current.createBufferSource();
-    src.buffer = audioBufferRef.current;
-    src.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
-    src.start(0, pauseTimeRef.current);
-    bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
-    setIsPlaying(true);
+    // PHASE 1: Validate audio system is ready
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) {
+      addLog('Audio not ready for playback', 'error');
+      return;
+    }
+    
+    try {
+      // PHASE 1: Stop existing source if playing
+      if (bufferSourceRef.current) {
+        bufferSourceRef.current.stop();
+      }
+      
+      // PHASE 1: Create new buffer source
+      const src = audioContextRef.current.createBufferSource();
+      src.buffer = audioBufferRef.current;
+      src.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      src.start(0, pauseTimeRef.current);
+      
+      bufferSourceRef.current = src;
+      startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+      setIsPlaying(true);
+      
+      addLog(`Playback started at ${pauseTimeRef.current.toFixed(2)}s`, 'success');
+    } catch (e) {
+      console.error('Playback error:', e);
+      const error = e as Error;
+      addLog(`Playback error: ${error.message}`, 'error');
+    }
   };
 
   const stopAudio = () => {
-    if (bufferSourceRef.current) {
-      pauseTimeRef.current = currentTime;
-      bufferSourceRef.current.stop();
-      bufferSourceRef.current = null;
+    try {
+      if (bufferSourceRef.current) {
+        pauseTimeRef.current = currentTime;
+        bufferSourceRef.current.stop();
+        bufferSourceRef.current = null;
+      }
+      setIsPlaying(false);
+      addLog('Playback stopped', 'info');
+    } catch (e) {
+      console.error('Stop audio error:', e);
+      const error = e as Error;
+      addLog(`Stop error: ${error.message}`, 'error');
     }
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    setIsPlaying(false);
   };
 
   const seekTo = (t: number) => {
@@ -335,54 +401,63 @@ export default function VisualizerEditor() {
     // Full export logic from original file would go here
   };
 
-  // Frequency analysis helper
+  // PHASE 1: Frequency analysis helper (pure function, no side effects)
   const getFreq = (d: Uint8Array) => ({
     bass: d.slice(0, 10).reduce((a, b) => a + b, 0) / 10 / 255,
     mids: d.slice(10, 100).reduce((a, b) => a + b, 0) / 90 / 255,
     highs: d.slice(100, 200).reduce((a, b) => a + b, 0) / 100 / 255
   });
 
-  // Animation loop with audio-reactive presets
+  // PHASE 1: UNIFIED RENDER LOOP
+  // Replaces both the idle loop and the playing loop with a single continuous loop
+  // This loop runs continuously and checks isPlaying state internally
   useEffect(() => {
-    if (!isPlaying || !analyserRef.current) return;
-
     const scene = sceneRef.current;
     const cam = cameraRef.current;
     const rend = rendererRef.current;
-    const analyser = analyserRef.current;
     const obj = objectsRef.current;
 
+    // Don't start render loop until scene is initialized
     if (!scene || !cam || !rend || !obj) return;
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
+    addLog('Starting unified render loop', 'info');
+    
+    const data = new Uint8Array(analyserRef.current?.frequencyBinCount || 2048);
 
-    const anim = () => {
-      if (!isPlaying) return;
-      animationRef.current = requestAnimationFrame(anim);
+    const render = () => {
+      animationRef.current = requestAnimationFrame(render);
 
-      // Update time
-      const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      const t = Math.min(elapsed, duration);
-      setCurrentTime(t);
+      // PHASE 1: Update time if playing
+      if (isPlaying && audioContextRef.current) {
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        const t = Math.min(elapsed, duration);
+        setCurrentTime(t);
 
-      if (t >= duration) {
-        stopAudio();
-        return;
+        if (t >= duration) {
+          stopAudio();
+          return;
+        }
+
+        // Get frequency data when playing
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(data);
+        }
       }
 
-      // Get frequency data
-      analyser.getByteFrequencyData(data);
-      const f = getFreq(data);
-
-      // Find current section/preset
+      // PHASE 1: Get current section from timeline (single source of truth)
+      const t = currentTime;
       const sec = sections.find((s: Section) => t >= s.start && t < s.end);
       const type = sec?.animation || 'orbit';
       const isVisible = sec?.visible !== false;
+
+      // PHASE 1: Get frequency data (defaults to 0 when not playing)
+      const f = isPlaying && analyserRef.current ? getFreq(data) : { bass: 0, mids: 0, highs: 0 };
 
       // Handle preset transitions with cleanup
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
         prevAnimRef.current = type;
+        addLog(`Switching to preset: ${type}`, 'info');
         
         // CRITICAL FIX: Reset all object properties to default state when switching presets
         // This prevents visual artifacts from previous presets
@@ -901,18 +976,23 @@ export default function VisualizerEditor() {
         });
       }
 
-      // Render
+      // PHASE 1: Always render (whether playing or idle)
       rend.render(scene, cam);
     };
 
-    animationRef.current = requestAnimationFrame(anim);
+    // PHASE 1: Start the unified render loop immediately
+    animationRef.current = requestAnimationFrame(render);
+    addLog('Unified render loop started successfully', 'success');
 
     return () => {
+      // PHASE 1: Cleanup - cancel animation frame on unmount or dependency change
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+        addLog('Render loop stopped', 'info');
       }
     };
-  }, [isPlaying, sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration]);
+  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1096,7 +1176,9 @@ export default function VisualizerEditor() {
     }
   }, [isResizingLeft, isResizingRight, isResizingTimeline]);
 
-  // Initialize Three.js scene
+  // PHASE 1: Initialize Three.js scene (lifecycle management)
+  // This effect runs once and sets up the stable scene/camera/renderer
+  // The unified render loop (above) handles all animation
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -1104,18 +1186,27 @@ export default function VisualizerEditor() {
     
     try {
       addLog('Initializing Three.js scene...', 'info');
+      
+      // PHASE 1: Create scene with fog
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
       
+      // PHASE 1: Create camera (960x540 = 16:9 aspect ratio)
       camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      // PHASE 1: Create renderer with required flags for video export
+      renderer = new THREE.WebGLRenderer({ 
+        antialias: true, 
+        alpha: true, 
+        preserveDrawingBuffer: true // Required for video capture
+      });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
 
+      // PHASE 1: Clean up any existing renderer before adding new one
       if (containerRef.current.children.length > 0) {
         containerRef.current.removeChild(containerRef.current.children[0]);
       }
@@ -1130,7 +1221,7 @@ export default function VisualizerEditor() {
       return;
     }
 
-    // Create 3D objects
+    // PHASE 1: Create 3D objects (geometry created once, animated by render loop)
     const cubes: THREE.Mesh[] = [];
     for (let i = 0; i < 8; i++) {
       const c = new THREE.Mesh(
@@ -1189,28 +1280,22 @@ export default function VisualizerEditor() {
     lightsRef.current.directional = directionalLight;
     
     objectsRef.current = { cubes, octas, tetras, sphere };
-    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
+    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'success');
 
-    // Idle render loop (when not playing)
-    let idleAnimFrame: number;
-    const idleRender = () => {
-      idleAnimFrame = requestAnimationFrame(idleRender);
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
-    };
-    idleAnimFrame = requestAnimationFrame(idleRender);
+    // PHASE 1: No idle render loop needed - the unified loop below handles both playing and idle states
 
     return () => {
-      if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
+      // PHASE 1: Cleanup - renderer disposal handled here
       if (rendererRef.current) {
         try {
           if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
             containerRef.current.removeChild(rendererRef.current.domElement);
           }
           rendererRef.current.dispose();
+          addLog('Renderer disposed successfully', 'info');
         } catch (e) {
           console.error('Cleanup error:', e);
+          addLog(`Cleanup error: ${(e as Error).message}`, 'error');
         }
       }
     };
