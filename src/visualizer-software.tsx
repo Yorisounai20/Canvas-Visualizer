@@ -9,6 +9,32 @@ interface LogEntry {
   type: string;
   timestamp: string;
 }
+
+interface AudioTrack {
+  id: string;
+  name: string;
+  buffer: AudioBuffer | null;
+  source: AudioBufferSourceNode | null;
+  analyser: AnalyserNode;
+  gainNode: GainNode;
+  volume: number; // 0-1
+  muted: boolean;
+  active: boolean; // true = this track's frequencies are visualized
+}
+
+interface ParameterEvent {
+  id: string;
+  time: number; // seconds - when the event triggers
+  duration: number; // seconds - how long the effect lasts
+  parameters: {
+    backgroundFlash?: number; // 0-1 intensity
+    cameraShake?: number; // 0-1 intensity
+    vignettePulse?: number; // 0-1 intensity
+    saturationBurst?: number; // 0-1 intensity
+    bloomBurst?: number; // 0-1 intensity (placeholder for future)
+    fogPulse?: number; // 0-1 intensity (placeholder for future)
+  };
+}
 // Default camera settings constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
@@ -99,7 +125,21 @@ export default function ThreeDVisualizer() {
   const [showExportModal, setShowExportModal] = useState(false);
   
   // NEW: Tab state
-  const [activeTab, setActiveTab] = useState('controls');
+  const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
+  
+  // PHASE 4: Multi-audio track system
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const audioTracksRef = useRef<AudioTrack[]>([]);
+  
+  // PHASE 4: Parameter events for flash effects
+  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  
+  // PHASE 4: Active parameter effect values (interpolated from events)
+  const [activeBackgroundFlash, setActiveBackgroundFlash] = useState(0);
+  const [activeVignettePulse, setActiveVignettePulse] = useState(0);
+  const [activeSaturationBurst, setActiveSaturationBurst] = useState(0);
   
   // NEW: Global camera keyframes (independent from presets)
   const [cameraKeyframes, setCameraKeyframes] = useState([
@@ -141,7 +181,11 @@ export default function ThreeDVisualizer() {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const seekPosition = (x / rect.width) * duration;
-    seekTo(seekPosition);
+    if (audioTracks.length > 0) {
+      seekMultiTrack(seekPosition);
+    } else {
+      seekTo(seekPosition);
+    }
   };
 
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -568,6 +612,242 @@ export default function ThreeDVisualizer() {
     if (play) playAudio();
   };
 
+  // PHASE 4: Multi-track audio functions
+  const addAudioTrack = async (file: File) => {
+    try {
+      addLog(`Loading audio track: ${file.name}`, 'info');
+      
+      // Initialize AudioContext if not exists
+      if (!audioContextRef.current) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = ctx;
+      }
+      
+      const ctx = audioContextRef.current;
+      const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+      
+      // Create audio nodes for this track
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 1.0; // Default volume at 100%
+      
+      const trackId = `track-${Date.now()}-${Math.random()}`;
+      const newTrack: AudioTrack = {
+        id: trackId,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        buffer: buffer,
+        source: null,
+        analyser: analyser,
+        gainNode: gainNode,
+        volume: 1.0,
+        muted: false,
+        active: audioTracks.length === 0 // First track is active by default
+      };
+      
+      const updatedTracks = [...audioTracks, newTrack];
+      setAudioTracks(updatedTracks);
+      audioTracksRef.current = updatedTracks;
+      
+      // Set duration from the first track or the longest track
+      if (audioTracks.length === 0) {
+        setDuration(buffer.duration);
+        setAudioReady(true);
+        // For backward compatibility, set the first track to the old refs
+        audioBufferRef.current = buffer;
+        analyserRef.current = analyser;
+      } else {
+        setDuration(Math.max(duration, buffer.duration));
+      }
+      
+      addLog(`Track "${newTrack.name}" loaded successfully!`, 'success');
+    } catch (e) {
+      console.error(e);
+      const error = e as Error;
+      addLog(`Track load error: ${error.message}`, 'error');
+    }
+  };
+
+  const removeAudioTrack = (trackId: string) => {
+    const track = audioTracks.find(t => t.id === trackId);
+    if (track?.source) {
+      track.source.stop();
+      track.source.disconnect();
+    }
+    
+    const updatedTracks = audioTracks.filter(t => t.id !== trackId);
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // If we removed the active track, make the first remaining track active
+    if (track?.active && updatedTracks.length > 0) {
+      updatedTracks[0].active = true;
+      setAudioTracks([...updatedTracks]);
+      audioTracksRef.current = [...updatedTracks];
+    }
+    
+    // Update refs for backward compatibility
+    if (updatedTracks.length > 0) {
+      const activeTrack = updatedTracks.find(t => t.active) || updatedTracks[0];
+      audioBufferRef.current = activeTrack.buffer;
+      analyserRef.current = activeTrack.analyser;
+    } else {
+      audioBufferRef.current = null;
+      analyserRef.current = null;
+      setAudioReady(false);
+    }
+    
+    addLog(`Track removed`, 'info');
+  };
+
+  const updateTrackVolume = (trackId: string, volume: number) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        track.gainNode.gain.value = track.muted ? 0 : volume;
+        return { ...track, volume };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const toggleTrackMute = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        const newMuted = !track.muted;
+        track.gainNode.gain.value = newMuted ? 0 : track.volume;
+        return { ...track, muted: newMuted };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const setActiveTrack = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => ({
+      ...track,
+      active: track.id === trackId
+    }));
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // Update refs for visualization
+    const activeTrack = updatedTracks.find(t => t.active);
+    if (activeTrack) {
+      analyserRef.current = activeTrack.analyser;
+      audioBufferRef.current = activeTrack.buffer;
+    }
+  };
+
+  const playMultiTrackAudio = () => {
+    if (!audioContextRef.current || audioTracks.length === 0) return;
+    
+    const ctx = audioContextRef.current;
+    const startOffset = pauseTimeRef.current;
+    
+    // Start all tracks synchronized
+    audioTracks.forEach(track => {
+      if (!track.buffer) return;
+      
+      // Stop existing source if any
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors from already stopped sources
+        }
+      }
+      
+      // Create new source
+      const source = ctx.createBufferSource();
+      source.buffer = track.buffer;
+      
+      // Connect: source -> gain -> analyser -> destination
+      source.connect(track.gainNode);
+      track.gainNode.connect(track.analyser);
+      track.analyser.connect(ctx.destination);
+      
+      // Set gain based on mute state
+      track.gainNode.gain.value = track.muted ? 0 : track.volume;
+      
+      // Start playback
+      source.start(0, startOffset);
+      track.source = source;
+    });
+    
+    // Update tracks state
+    setAudioTracks([...audioTracks]);
+    audioTracksRef.current = [...audioTracks];
+    
+    startTimeRef.current = Date.now() - (startOffset * 1000);
+    setIsPlaying(true);
+  };
+
+  const stopMultiTrackAudio = () => {
+    audioTracks.forEach(track => {
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors
+        }
+        track.source = null;
+      }
+    });
+    
+    setAudioTracks([...audioTracks]);
+    audioTracksRef.current = [...audioTracks];
+    
+    pauseTimeRef.current = currentTime;
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    setIsPlaying(false);
+  };
+
+  const seekMultiTrack = (t: number) => {
+    const play = isPlaying;
+    if (play) stopMultiTrackAudio();
+    pauseTimeRef.current = t;
+    setCurrentTime(t);
+    if (play) playMultiTrackAudio();
+  };
+
+  // PHASE 4: Parameter event functions
+  const addParameterEvent = () => {
+    const newEvent: ParameterEvent = {
+      id: `event-${Date.now()}-${Math.random()}`,
+      time: currentTime > 0 ? currentTime : 0,
+      duration: 0.2,
+      parameters: {
+        backgroundFlash: 0.5,
+        cameraShake: 0,
+        vignettePulse: 0,
+        saturationBurst: 0
+      }
+    };
+    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.time - b.time));
+    setEditingEventId(newEvent.id);
+    setShowEventModal(true);
+  };
+
+  const updateParameterEvent = (eventId: string, updates: Partial<ParameterEvent>) => {
+    setParameterEvents(parameterEvents.map(event => 
+      event.id === eventId ? { ...event, ...updates } : event
+    ).sort((a, b) => a.time - b.time));
+  };
+
+  const deleteParameterEvent = (eventId: string) => {
+    setParameterEvents(parameterEvents.filter(e => e.id !== eventId));
+    if (editingEventId === eventId) {
+      setShowEventModal(false);
+      setEditingEventId(null);
+    }
+  };
+
   // NEW: Recording functions
   const startRecording = () => {
     if (!rendererRef.current || !audioContextRef.current || !analyserRef.current) {
@@ -986,7 +1266,7 @@ export default function ThreeDVisualizer() {
         }
       }
 
-      // Calculate camera shake offset
+      // Calculate camera shake offset (from existing shake events)
       let shakeX = 0, shakeY = 0, shakeZ = 0;
       for (const shake of cameraShakes) {
         const timeSinceShake = t - shake.time;
@@ -1000,6 +1280,57 @@ export default function ThreeDVisualizer() {
           shakeZ += Math.sin(timeSinceShake * frequency * 0.7) * amplitude * 0.05;
         }
       }
+
+      // PHASE 4: Process parameter events for flash effects
+      let bgFlash = 0;
+      let vignetteFlash = 0;
+      let saturationFlash = 0;
+      let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
+      
+      for (const event of parameterEvents) {
+        const timeSinceEvent = t - event.time;
+        if (timeSinceEvent >= 0 && timeSinceEvent < event.duration) {
+          const progress = timeSinceEvent / event.duration;
+          // Ease out cubic for smooth return
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          const intensity = 1 - easeOut;
+          
+          // Background flash
+          if (event.parameters.backgroundFlash !== undefined) {
+            bgFlash += event.parameters.backgroundFlash * intensity;
+          }
+          
+          // Vignette pulse
+          if (event.parameters.vignettePulse !== undefined) {
+            vignetteFlash += event.parameters.vignettePulse * intensity;
+          }
+          
+          // Saturation burst
+          if (event.parameters.saturationBurst !== undefined) {
+            saturationFlash += event.parameters.saturationBurst * intensity;
+          }
+          
+          // Camera shake from events
+          if (event.parameters.cameraShake !== undefined) {
+            const decay = intensity;
+            const frequency = 50;
+            const amplitude = event.parameters.cameraShake * decay;
+            eventShakeX += Math.sin(timeSinceEvent * frequency) * amplitude * 0.1;
+            eventShakeY += Math.cos(timeSinceEvent * frequency * 1.3) * amplitude * 0.1;
+            eventShakeZ += Math.sin(timeSinceEvent * frequency * 0.7) * amplitude * 0.05;
+          }
+        }
+      }
+      
+      // Combine event shake with existing camera shake
+      shakeX += eventShakeX;
+      shakeY += eventShakeY;
+      shakeZ += eventShakeZ;
+      
+      // Update active parameter values for UI/effects
+      setActiveBackgroundFlash(bgFlash);
+      setActiveVignettePulse(vignetteFlash);
+      setActiveSaturationBurst(saturationFlash);
 
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
@@ -1431,6 +1762,19 @@ export default function ThreeDVisualizer() {
         });
       }
 
+      // PHASE 4: Apply background flash effect before rendering
+      if (bgFlash > 0) {
+        const baseColor = new THREE.Color(backgroundColor);
+        const flashColor = new THREE.Color(0xffffff);
+        const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
+        scene.background = blendedColor;
+        rend.setClearColor(blendedColor);
+      } else {
+        const baseColor = new THREE.Color(backgroundColor);
+        scene.background = baseColor;
+        rend.setClearColor(baseColor);
+      }
+
       rend.render(scene, cam);
     };
 
@@ -1560,17 +1904,22 @@ export default function ThreeDVisualizer() {
     };
   }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
-  // Handle ESC key to close export modal
+  // Handle ESC key to close modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showExportModal) {
-        setShowExportModal(false);
+      if (e.key === 'Escape') {
+        if (showExportModal) {
+          setShowExportModal(false);
+        } else if (showEventModal) {
+          setShowEventModal(false);
+          setEditingEventId(null);
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal]);
+  }, [showExportModal, showEventModal]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -1629,7 +1978,7 @@ export default function ThreeDVisualizer() {
             </div>
             
             {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
           </div>
           
           {/* Waveform - Made bigger, only shows when audio loaded */}
@@ -1683,6 +2032,12 @@ export default function ThreeDVisualizer() {
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="flex gap-2 mb-4 border-b border-gray-700">
           <button 
+            onClick={() => setActiveTab('waveforms')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'waveforms' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎵 Waveforms
+          </button>
+          <button 
             onClick={() => setActiveTab('controls')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'controls' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -1713,6 +2068,180 @@ export default function ThreeDVisualizer() {
             ⏱️ Presets
           </button>
         </div>
+
+        {/* Waveforms Tab - PHASE 4 */}
+        {activeTab === 'waveforms' && (
+          <div>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">🎵 Audio Tracks</h3>
+                <label className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded cursor-pointer flex items-center gap-1">
+                  <Plus size={14} /> Add Track
+                  <input 
+                    type="file" 
+                    accept="audio/*" 
+                    onChange={(e) => { if (e.target.files?.[0]) addAudioTrack(e.target.files[0]); }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              
+              {audioTracks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No audio tracks loaded. Click "Add Track" to upload audio files.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {audioTracks.map((track, index) => (
+                    <div key={track.id} className="bg-gray-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="activeTrack"
+                            checked={track.active}
+                            onChange={() => setActiveTrack(track.id)}
+                            className="cursor-pointer"
+                            title="Active track (frequencies drive visualization)"
+                          />
+                          <span className="text-sm text-white font-medium">{track.name}</span>
+                          {track.active && <span className="text-xs text-cyan-400 bg-cyan-900 px-2 py-0.5 rounded">Active</span>}
+                        </div>
+                        <button
+                          onClick={() => removeAudioTrack(track.id)}
+                          className="text-red-400 hover:text-red-300 p-1"
+                          title="Remove track"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      {/* Waveform visualization for this track */}
+                      <div className="bg-black rounded p-2 mb-2 h-16">
+                        <canvas
+                          ref={(canvas) => {
+                            if (canvas && track.buffer) {
+                              const ctx = canvas.getContext('2d');
+                              if (ctx) {
+                                const waveform = generateWaveformData(track.buffer, 200);
+                                canvas.width = canvas.offsetWidth;
+                                canvas.height = 64;
+                                ctx.fillStyle = '#000';
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = track.active ? '#06b6d4' : '#4b5563';
+                                const barWidth = canvas.width / waveform.length;
+                                waveform.forEach((val, i) => {
+                                  const height = val * canvas.height;
+                                  ctx.fillRect(i * barWidth, canvas.height - height, barWidth - 1, height);
+                                });
+                                // Playback indicator
+                                if (track.buffer) {
+                                  const progress = currentTime / track.buffer.duration;
+                                  ctx.strokeStyle = '#fff';
+                                  ctx.lineWidth = 2;
+                                  ctx.beginPath();
+                                  ctx.moveTo(progress * canvas.width, 0);
+                                  ctx.lineTo(progress * canvas.width, canvas.height);
+                                  ctx.stroke();
+                                }
+                              }
+                            }
+                          }}
+                          className="w-full h-full"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => toggleTrackMute(track.id)}
+                          className={`px-2 py-1 text-xs rounded ${track.muted ? 'bg-red-600 text-white' : 'bg-gray-600 text-gray-200'}`}
+                        >
+                          {track.muted ? '🔇 Muted' : '🔊 On'}
+                        </button>
+                        <label className="flex-1 flex items-center gap-2">
+                          <span className="text-xs text-gray-400">Vol</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={track.volume}
+                            onChange={(e) => updateTrackVolume(track.id, parseFloat(e.target.value))}
+                            className="flex-1"
+                          />
+                          <span className="text-xs text-gray-400 w-8">{Math.round(track.volume * 100)}%</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Parameter Events Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events</h3>
+                <button
+                  onClick={addParameterEvent}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add Event
+                </button>
+              </div>
+              
+              {parameterEvents.length === 0 ? (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  No events. Click "Add Event" to create flash effects.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {parameterEvents.map((event) => (
+                    <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white font-medium">
+                          Event @ {formatTime(event.time)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingEventId(event.id);
+                              setShowEventModal(true);
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteParameterEvent(event.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-gray-400 space-y-0.5">
+                        <div>Duration: {event.duration}s</div>
+                        {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
+                          <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
+                        )}
+                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
+                          <div>📷 Shake: {Math.round(event.parameters.cameraShake * 100)}%</div>
+                        )}
+                        {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
+                          <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
+                        )}
+                        {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
+                          <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Controls Tab */}
         {activeTab === 'controls' && (
@@ -2282,6 +2811,189 @@ export default function ThreeDVisualizer() {
               
               <p className="text-xs text-gray-400 text-center">Automatically renders full timeline with all presets & camera movements</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 4: Parameter Event Edit Modal */}
+      {showEventModal && editingEventId && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowEventModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-purple-400">⚡ Edit Event</h2>
+              <button
+                onClick={() => setShowEventModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {(() => {
+              const event = parameterEvents.find(e => e.id === editingEventId);
+              if (!event) return null;
+              
+              return (
+                <div className="space-y-4">
+                  {/* Time */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2">Time (seconds)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={duration}
+                      step="0.1"
+                      value={event.time}
+                      onChange={(e) => updateParameterEvent(editingEventId, { time: parseFloat(e.target.value) })}
+                      className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+                    />
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2">Duration (seconds)</label>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="2"
+                      step="0.05"
+                      value={event.duration}
+                      onChange={(e) => updateParameterEvent(editingEventId, { duration: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                    <span className="text-xs text-gray-400">{event.duration.toFixed(2)}s</span>
+                  </div>
+
+                  {/* Background Flash */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.backgroundFlash ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, backgroundFlash: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      ⚪ Background Flash
+                    </label>
+                    {(event.parameters.backgroundFlash ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.backgroundFlash ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, backgroundFlash: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.backgroundFlash ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera Shake */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.cameraShake ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      📷 Camera Shake
+                    </label>
+                    {(event.parameters.cameraShake ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.cameraShake ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, cameraShake: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.cameraShake ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vignette Pulse */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.vignettePulse ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, vignettePulse: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🌑 Vignette Pulse
+                    </label>
+                    {(event.parameters.vignettePulse ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.vignettePulse ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, vignettePulse: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.vignettePulse ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Saturation Burst */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.saturationBurst ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, saturationBurst: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🎨 Saturation Burst
+                    </label>
+                    {(event.parameters.saturationBurst ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.saturationBurst ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, saturationBurst: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.saturationBurst ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => deleteParameterEvent(editingEventId)}
+                    className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={16} /> Delete Event
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
