@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import TopBar from './components/Controls/TopBar';
@@ -9,7 +11,9 @@ import Timeline from './components/Timeline/Timeline';
 import CanvasWrapper from './components/Canvas/CanvasWrapper';
 import ExportModal from './components/Controls/ExportModal';
 import DebugConsole from './components/Debug/DebugConsole';
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings } from './types';
+import WorkspaceControls from './components/Workspace/WorkspaceControls';
+import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -50,6 +54,13 @@ interface VisualizerEditorProps {
  * - Initializes editor with project configuration
  * - Project state can be saved/loaded (persistence not yet implemented)
  * 
+ * PHASE 3 ARCHITECTURE (WORKSPACE):
+ * - Blender-like 3D workspace with grid and axes helpers
+ * - OrbitControls for camera navigation
+ * - TransformControls for object manipulation
+ * - Manual object creation (sphere, box, plane, torus, instances)
+ * - Live parameter editing with real-time preview
+ * 
  * Coordinates all panels and manages the 3D visualization state
  */
 export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
@@ -58,6 +69,12 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  
+  // PHASE 3: Workspace controls refs
+  const orbitControlsRef = useRef<OrbitControls | null>(null);
+  const transformControlsRef = useRef<TransformControls | null>(null);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
   // PHASE 1: Audio system refs (stable, single instances)
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -168,6 +185,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const [isResizingRight, setIsResizingRight] = useState(false);
   const [isResizingTimeline, setIsResizingTimeline] = useState(false);
+
+  // PHASE 3: Workspace state
+  const [workspaceObjects, setWorkspaceObjects] = useState<WorkspaceObject[]>([]);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [showWorkspaceGrid, setShowWorkspaceGrid] = useState(true);
+  const [showWorkspaceAxes, setShowWorkspaceAxes] = useState(true);
+  const [workspaceMode, setWorkspaceMode] = useState(false); // Toggle between animation and workspace mode
 
   // PHASE 2: Log project initialization
   useEffect(() => {
@@ -297,6 +321,144 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
 
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+
+  // PHASE 3: Workspace object management
+  const createWorkspaceObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => {
+    if (!sceneRef.current) return;
+    
+    const objectId = `${type}_${Date.now()}`;
+    let geometry: THREE.BufferGeometry;
+    let material: THREE.Material;
+    let mesh: THREE.Mesh;
+    
+    // Create geometry based on type
+    switch (type) {
+      case 'sphere':
+        geometry = new THREE.SphereGeometry(1, 32, 32);
+        break;
+      case 'box':
+        geometry = new THREE.BoxGeometry(2, 2, 2);
+        break;
+      case 'plane':
+        geometry = new THREE.PlaneGeometry(3, 3);
+        break;
+      case 'torus':
+        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+      case 'instances':
+        // Create an instanced mesh with 10 spheres
+        geometry = new THREE.SphereGeometry(0.5, 16, 16);
+        material = new THREE.MeshBasicMaterial({ color: '#00ff88', wireframe: true });
+        const instancedMesh = new THREE.InstancedMesh(geometry, material, 10);
+        
+        // Position instances in a circle
+        const matrix = new THREE.Matrix4();
+        for (let i = 0; i < 10; i++) {
+          const angle = (i / 10) * Math.PI * 2;
+          matrix.setPosition(Math.cos(angle) * 3, Math.sin(angle) * 3, 0);
+          instancedMesh.setMatrixAt(i, matrix);
+        }
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        
+        sceneRef.current.add(instancedMesh);
+        
+        const instancesObj: WorkspaceObject = {
+          id: objectId,
+          type: 'instances',
+          name: `Instances ${workspaceObjects.length + 1}`,
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+          color: '#00ff88',
+          wireframe: true,
+          visible: true,
+          mesh: instancedMesh
+        };
+        
+        setWorkspaceObjects(prev => [...prev, instancesObj]);
+        addLog(`Created ${type} with 10 instances`, 'success');
+        return;
+    }
+    
+    // Create material and mesh for non-instanced types
+    material = new THREE.MeshStandardMaterial({ color: '#00aaff', wireframe: false });
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(0, 2, 0);
+    sceneRef.current.add(mesh);
+    
+    const newObject: WorkspaceObject = {
+      id: objectId,
+      type,
+      name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${workspaceObjects.length + 1}`,
+      position: { x: 0, y: 2, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#00aaff',
+      wireframe: false,
+      visible: true,
+      mesh
+    };
+    
+    setWorkspaceObjects(prev => [...prev, newObject]);
+    setSelectedObjectId(objectId);
+    addLog(`Created ${type} object`, 'success');
+  };
+
+  const updateWorkspaceObject = (id: string, updates: Partial<WorkspaceObject>) => {
+    setWorkspaceObjects(prev => prev.map(obj => {
+      if (obj.id !== id) return obj;
+      
+      const updated = { ...obj, ...updates };
+      
+      // Update Three.js mesh
+      if (obj.mesh) {
+        if (updates.position) {
+          obj.mesh.position.set(updates.position.x, updates.position.y, updates.position.z);
+        }
+        if (updates.rotation) {
+          obj.mesh.rotation.set(
+            THREE.MathUtils.degToRad(updates.rotation.x),
+            THREE.MathUtils.degToRad(updates.rotation.y),
+            THREE.MathUtils.degToRad(updates.rotation.z)
+          );
+        }
+        if (updates.scale) {
+          obj.mesh.scale.set(updates.scale.x, updates.scale.y, updates.scale.z);
+        }
+        if (updates.color && obj.mesh.material) {
+          (obj.mesh.material as THREE.MeshStandardMaterial).color.setStyle(updates.color);
+        }
+        if (updates.wireframe !== undefined && obj.mesh.material) {
+          (obj.mesh.material as THREE.MeshStandardMaterial).wireframe = updates.wireframe;
+        }
+        if (updates.visible !== undefined) {
+          obj.mesh.visible = updates.visible;
+        }
+      }
+      
+      return updated;
+    }));
+  };
+
+  const deleteWorkspaceObject = (id: string) => {
+    const obj = workspaceObjects.find(o => o.id === id);
+    if (obj && obj.mesh && sceneRef.current) {
+      sceneRef.current.remove(obj.mesh);
+      obj.mesh.geometry.dispose();
+      if (obj.mesh.material) {
+        if (Array.isArray(obj.mesh.material)) {
+          obj.mesh.material.forEach(m => m.dispose());
+        } else {
+          obj.mesh.material.dispose();
+        }
+      }
+    }
+    setWorkspaceObjects(prev => prev.filter(o => o.id !== id));
+    if (selectedObjectId === id) {
+      setSelectedObjectId(null);
+    }
+    addLog(`Deleted workspace object`, 'info');
+  };
 
 
   // PHASE 1: Audio management with robust error handling
@@ -993,6 +1155,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         });
       }
 
+      // PHASE 3: Update orbit controls if in workspace mode
+      if (orbitControlsRef.current && workspaceMode) {
+        orbitControlsRef.current.update();
+      }
+
       // PHASE 1: Always render (whether playing or idle)
       rend.render(scene, cam);
     };
@@ -1009,7 +1176,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         addLog('Render loop stopped', 'info');
       }
     };
-  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime]);
+  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime, workspaceMode]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1124,6 +1291,10 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       } else if (e.key.toLowerCase() === 'b') {
         // B - Toggle border
         setShowBorder(!showBorder);
+      } else if (e.key.toLowerCase() === 'w' && !e.ctrlKey && !e.metaKey) {
+        // PHASE 3: W - Toggle workspace mode
+        setWorkspaceMode(!workspaceMode);
+        addLog(`Workspace mode: ${!workspaceMode ? 'ON' : 'OFF'}`, 'info');
       }
 
       // Debug console toggle
@@ -1299,6 +1470,79 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'success');
 
+    // PHASE 3: Initialize workspace features (grid, axes, orbit controls, transform controls)
+    try {
+      // Grid Helper
+      const gridHelper = new THREE.GridHelper(20, 20, 0x888888, 0x444444);
+      gridHelper.visible = showWorkspaceGrid;
+      scene.add(gridHelper);
+      gridHelperRef.current = gridHelper;
+      
+      // Axes Helper (X=red, Y=green, Z=blue)
+      const axesHelper = new THREE.AxesHelper(10);
+      axesHelper.visible = showWorkspaceAxes;
+      scene.add(axesHelper);
+      axesHelperRef.current = axesHelper;
+      
+      // Orbit Controls (like Blender viewport)
+      const orbitControls = new OrbitControls(camera, renderer.domElement);
+      orbitControls.enableDamping = true;
+      orbitControls.dampingFactor = 0.05;
+      orbitControls.screenSpacePanning = false;
+      orbitControls.minDistance = 5;
+      orbitControls.maxDistance = 50;
+      orbitControls.maxPolarAngle = Math.PI / 2;
+      orbitControls.enabled = workspaceMode; // Only active in workspace mode
+      orbitControlsRef.current = orbitControls;
+      
+      // Transform Controls (for object manipulation)
+      const transformControls = new TransformControls(camera, renderer.domElement);
+      transformControls.addEventListener('dragging-changed', (event) => {
+        // Disable orbit controls while transforming
+        if (orbitControls) {
+          orbitControls.enabled = !event.value;
+        }
+      });
+      transformControls.addEventListener('objectChange', () => {
+        // Update workspace object when transformed
+        if (selectedObjectId && transformControls.object) {
+          const obj = workspaceObjects.find(o => o.id === selectedObjectId);
+          if (obj && obj.mesh) {
+            setWorkspaceObjects(prev => prev.map(o => 
+              o.id === selectedObjectId
+                ? {
+                    ...o,
+                    position: {
+                      x: obj.mesh.position.x,
+                      y: obj.mesh.position.y,
+                      z: obj.mesh.position.z
+                    },
+                    rotation: {
+                      x: THREE.MathUtils.radToDeg(obj.mesh.rotation.x),
+                      y: THREE.MathUtils.radToDeg(obj.mesh.rotation.y),
+                      z: THREE.MathUtils.radToDeg(obj.mesh.rotation.z)
+                    },
+                    scale: {
+                      x: obj.mesh.scale.x,
+                      y: obj.mesh.scale.y,
+                      z: obj.mesh.scale.z
+                    }
+                  }
+                : o
+            ));
+          }
+        }
+      });
+      transformControls.visible = false;
+      scene.add(transformControls);
+      transformControlsRef.current = transformControls;
+      
+      addLog('Workspace initialized (grid, axes, orbit controls, transform controls)', 'success');
+    } catch (e) {
+      console.error('Workspace initialization error:', e);
+      addLog(`Workspace error: ${(e as Error).message}`, 'error');
+    }
+
     // PHASE 1: No idle render loop needed - the unified loop below handles both playing and idle states
 
     return () => {
@@ -1317,6 +1561,43 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
     };
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // PHASE 3: Update grid/axes visibility
+  useEffect(() => {
+    if (gridHelperRef.current) {
+      gridHelperRef.current.visible = showWorkspaceGrid;
+    }
+  }, [showWorkspaceGrid]);
+
+  useEffect(() => {
+    if (axesHelperRef.current) {
+      axesHelperRef.current.visible = showWorkspaceAxes;
+    }
+  }, [showWorkspaceAxes]);
+
+  // PHASE 3: Update transform controls when object is selected
+  useEffect(() => {
+    if (!transformControlsRef.current) return;
+    
+    if (selectedObjectId) {
+      const selectedObj = workspaceObjects.find(o => o.id === selectedObjectId);
+      if (selectedObj && selectedObj.mesh) {
+        transformControlsRef.current.attach(selectedObj.mesh);
+        transformControlsRef.current.visible = true;
+        addLog(`Selected: ${selectedObj.name}`, 'info');
+      }
+    } else {
+      transformControlsRef.current.detach();
+      transformControlsRef.current.visible = false;
+    }
+  }, [selectedObjectId, workspaceObjects]);
+
+  // PHASE 3: Update orbit controls based on workspace mode
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = workspaceMode;
+    }
+  }, [workspaceMode]);
 
   // Load default font for 3D text
   useEffect(() => {
@@ -1483,7 +1764,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 relative">
           <CanvasWrapper
             containerRef={containerRef}
             showBorder={showBorder}
@@ -1495,6 +1776,17 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
             showFilename={showFilename}
             audioFileName={audioFileName}
           />
+          
+          {/* PHASE 3: Workspace Controls Overlay */}
+          {workspaceMode && (
+            <WorkspaceControls
+              onCreateObject={createWorkspaceObject}
+              showGrid={showWorkspaceGrid}
+              onToggleGrid={() => setShowWorkspaceGrid(!showWorkspaceGrid)}
+              showAxes={showWorkspaceAxes}
+              onToggleAxes={() => setShowWorkspaceAxes(!showWorkspaceAxes)}
+            />
+          )}
         </div>
 
         {/* Right Panel - Properties */}
@@ -1505,46 +1797,62 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
             onMouseDown={() => setIsResizingRight(true)}
             title="Drag to resize"
           />
-          <RightPanel
-            selectedSection={selectedSection}
-            animationTypes={ANIMATION_TYPES}
-            bassColor={bassColor}
-            midsColor={midsColor}
-            highsColor={highsColor}
-            backgroundColor={backgroundColor}
-            borderColor={borderColor}
-            ambientLightIntensity={ambientLightIntensity}
-            directionalLightIntensity={directionalLightIntensity}
-            cameraDistance={cameraDistance}
-            cameraHeight={cameraHeight}
-            cameraRotation={cameraRotation}
-            cameraAutoRotate={cameraAutoRotate}
-            showLetterbox={showLetterbox}
-            letterboxSize={letterboxSize}
-            showBorder={showBorder}
-            showSongName={showSongName}
-            customSongName={customSongName}
-            fontLoaded={fontLoaded}
-            manualMode={manualMode}
-            onUpdateSection={updateSection}
-            onSetBassColor={setBassColor}
-            onSetMidsColor={setMidsColor}
-            onSetHighsColor={setHighsColor}
-            onSetBackgroundColor={setBackgroundColor}
-            onSetBorderColor={setBorderColor}
-            onSetAmbientLight={setAmbientLightIntensity}
-            onSetDirectionalLight={setDirectionalLightIntensity}
-            onSetCameraDistance={setCameraDistance}
-            onSetCameraHeight={setCameraHeight}
-            onSetCameraRotation={setCameraRotation}
-            onSetCameraAutoRotate={setCameraAutoRotate}
-            onSetShowLetterbox={setShowLetterbox}
-            onSetLetterboxSize={setLetterboxSize}
-            onSetShowBorder={setShowBorder}
-            onSetShowSongName={setShowSongName}
-            onSetCustomSongName={setCustomSongName}
-            onSetManualMode={setManualMode}
-          />
+          
+          {/* PHASE 3: Show workspace properties when in workspace mode, otherwise show normal properties */}
+          {workspaceMode ? (
+            <div className="h-full bg-gray-900 overflow-y-auto">
+              <div className="p-4 bg-gray-800 border-b border-gray-700">
+                <h2 className="text-lg font-semibold text-white">Workspace Properties</h2>
+                <p className="text-xs text-gray-400 mt-1">Select an object to edit</p>
+              </div>
+              <ObjectPropertiesPanel
+                selectedObject={workspaceObjects.find(o => o.id === selectedObjectId) || null}
+                onUpdateObject={updateWorkspaceObject}
+                onDeleteObject={deleteWorkspaceObject}
+              />
+            </div>
+          ) : (
+            <RightPanel
+              selectedSection={selectedSection}
+              animationTypes={ANIMATION_TYPES}
+              bassColor={bassColor}
+              midsColor={midsColor}
+              highsColor={highsColor}
+              backgroundColor={backgroundColor}
+              borderColor={borderColor}
+              ambientLightIntensity={ambientLightIntensity}
+              directionalLightIntensity={directionalLightIntensity}
+              cameraDistance={cameraDistance}
+              cameraHeight={cameraHeight}
+              cameraRotation={cameraRotation}
+              cameraAutoRotate={cameraAutoRotate}
+              showLetterbox={showLetterbox}
+              letterboxSize={letterboxSize}
+              showBorder={showBorder}
+              showSongName={showSongName}
+              customSongName={customSongName}
+              fontLoaded={fontLoaded}
+              manualMode={manualMode}
+              onUpdateSection={updateSection}
+              onSetBassColor={setBassColor}
+              onSetMidsColor={setMidsColor}
+              onSetHighsColor={setHighsColor}
+              onSetBackgroundColor={setBackgroundColor}
+              onSetBorderColor={setBorderColor}
+              onSetAmbientLight={setAmbientLightIntensity}
+              onSetDirectionalLight={setDirectionalLightIntensity}
+              onSetCameraDistance={setCameraDistance}
+              onSetCameraHeight={setCameraHeight}
+              onSetCameraRotation={setCameraRotation}
+              onSetCameraAutoRotate={setCameraAutoRotate}
+              onSetShowLetterbox={setShowLetterbox}
+              onSetLetterboxSize={setLetterboxSize}
+              onSetShowBorder={setShowBorder}
+              onSetShowSongName={setShowSongName}
+              onSetCustomSongName={setCustomSongName}
+              onSetManualMode={setManualMode}
+            />
+          )}
         </div>
       </div>
 
