@@ -106,9 +106,10 @@ export interface AnimationType {
 }
 
 // PHASE 3: Workspace object schema for manual 3D object creation
+// FINAL ARCHITECTURE: Extended to support cameras and lights
 export interface WorkspaceObject {
   id: string;
-  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances';
+  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light';
   name: string;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
@@ -117,6 +118,11 @@ export interface WorkspaceObject {
   wireframe: boolean;
   visible: boolean;
   mesh?: any; // THREE.Mesh reference (not serialized)
+  // Camera-specific properties (when type === 'camera')
+  cameraDistance?: number;
+  cameraHeight?: number;
+  cameraRotation?: number;
+  isActiveCamera?: boolean;
 }
 
 export interface AppState {
