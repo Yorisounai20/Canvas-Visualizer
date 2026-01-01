@@ -9,6 +9,54 @@ interface LogEntry {
   type: string;
   timestamp: string;
 }
+
+// PHASE 2: Central Easing Utilities
+const EasingFunctions = {
+  // Linear
+  linear: (t: number) => t,
+  
+  // Quadratic
+  easeInQuad: (t: number) => t * t,
+  easeOutQuad: (t: number) => t * (2 - t),
+  easeInOutQuad: (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
+  
+  // Cubic
+  easeInCubic: (t: number) => t * t * t,
+  easeOutCubic: (t: number) => (--t) * t * t + 1,
+  easeInOutCubic: (t: number) => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
+  
+  // Exponential
+  easeInExpo: (t: number) => t === 0 ? 0 : Math.pow(2, 10 * (t - 1)),
+  easeOutExpo: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+  easeInOutExpo: (t: number) => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    if (t < 0.5) return Math.pow(2, 20 * t - 10) / 2;
+    return (2 - Math.pow(2, -20 * t + 10)) / 2;
+  },
+  
+  // Elastic (overshoot)
+  easeOutElastic: (t: number) => {
+    const c4 = (2 * Math.PI) / 3;
+    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+  
+  // Bounce
+  easeOutBounce: (t: number) => {
+    const n1 = 7.5625;
+    const d1 = 2.75;
+    if (t < 1 / d1) {
+      return n1 * t * t;
+    } else if (t < 2 / d1) {
+      return n1 * (t -= 1.5 / d1) * t + 0.75;
+    } else if (t < 2.5 / d1) {
+      return n1 * (t -= 2.25 / d1) * t + 0.9375;
+    } else {
+      return n1 * (t -= 2.625 / d1) * t + 0.984375;
+    }
+  }
+};
+
 // Default camera settings constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
@@ -138,6 +186,17 @@ export default function ThreeDVisualizer() {
   // PHASE 1: Camera control state
   const [cameraLocked, setCameraLocked] = useState(false); // Toggle camera lock (C key)
   const cameraManualOffsetRef = useRef({ x: 0, y: 0, z: 0, rotX: 0, rotY: 0 }); // Manual camera adjustments
+
+  // PHASE 2: Audio smoothing & mapping state
+  const [bassSmoothing, setBassSmoothing] = useState(0.7); // 0-1 (lower = more responsive, higher = smoother)
+  const [midsSmoothing, setMidsSmoothing] = useState(0.7);
+  const [highsSmoothing, setHighsSmoothing] = useState(0.7);
+  const [bassGain, setBassGain] = useState(1.0); // Multiplier for bass intensity (0.1-3.0)
+  const [midsGain, setMidsGain] = useState(1.0);
+  const [highsGain, setHighsGain] = useState(1.0);
+  
+  // Smoothed frequency values (using refs for smooth transitions)
+  const smoothedFreqsRef = useRef({ bass: 0, mids: 0, highs: 0 });
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -311,18 +370,27 @@ export default function ThreeDVisualizer() {
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
   // Easing functions for smooth transitions
+  // PHASE 2: Apply easing function using central easing utilities
   const applyEasing = (t: number, easing: string) => {
-    switch(easing) {
-      case 'easeIn':
-        return t * t * t; // Cubic ease in
-      case 'easeOut':
-        return 1 - Math.pow(1 - t, 3); // Cubic ease out
-      case 'easeInOut':
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
-      case 'linear':
-      default:
-        return t; // Linear (no easing)
-    }
+    // Map legacy easing names to new easing functions
+    const easingMap: { [key: string]: keyof typeof EasingFunctions } = {
+      'linear': 'linear',
+      'easeIn': 'easeInCubic',
+      'easeOut': 'easeOutCubic',
+      'easeInOut': 'easeInOutCubic',
+      // New easing options
+      'easeInQuad': 'easeInQuad',
+      'easeOutQuad': 'easeOutQuad',
+      'easeInOutQuad': 'easeInOutQuad',
+      'easeInExpo': 'easeInExpo',
+      'easeOutExpo': 'easeOutExpo',
+      'easeInOutExpo': 'easeInOutExpo',
+      'easeOutElastic': 'easeOutElastic',
+      'easeOutBounce': 'easeOutBounce'
+    };
+    
+    const easingFn = easingMap[easing] || 'linear';
+    return EasingFunctions[easingFn](t);
   };
 
   // Interpolate camera values between keyframes
@@ -850,11 +918,25 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const getFreq = (d: Uint8Array) => ({
-    bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
-    mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
-    highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
-  });
+  // PHASE 2: Enhanced getFreq with smoothing and gain
+  const getFreq = (d: Uint8Array) => {
+    // Raw frequency values
+    const rawBass = d.slice(0,10).reduce((a,b)=>a+b,0)/10/255;
+    const rawMids = d.slice(10,100).reduce((a,b)=>a+b,0)/90/255;
+    const rawHighs = d.slice(100,200).reduce((a,b)=>a+b,0)/100/255;
+    
+    // Apply smoothing (exponential moving average)
+    smoothedFreqsRef.current.bass = smoothedFreqsRef.current.bass * bassSmoothing + rawBass * (1 - bassSmoothing);
+    smoothedFreqsRef.current.mids = smoothedFreqsRef.current.mids * midsSmoothing + rawMids * (1 - midsSmoothing);
+    smoothedFreqsRef.current.highs = smoothedFreqsRef.current.highs * highsSmoothing + rawHighs * (1 - highsSmoothing);
+    
+    // Apply gain and clamp to 0-1 range
+    return {
+      bass: Math.min(1, Math.max(0, smoothedFreqsRef.current.bass * bassGain)),
+      mids: Math.min(1, Math.max(0, smoothedFreqsRef.current.mids * midsGain)),
+      highs: Math.min(1, Math.max(0, smoothedFreqsRef.current.highs * highsGain))
+    };
+  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1912,6 +1994,141 @@ export default function ThreeDVisualizer() {
                 >
                   Reset to 1.0x
                 </button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-purple-400 mb-3">🎚️ Audio Smoothing & Mapping</h3>
+              <p className="text-xs text-gray-400 mb-3">Fine-tune how audio frequencies affect visuals.</p>
+              
+              <div className="space-y-4">
+                {/* Bass Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-purple-300 mb-2">Bass (Low Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {bassSmoothing.toFixed(2)} {bassSmoothing < 0.3 ? '(Responsive)' : bassSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={bassSmoothing} 
+                        onChange={(e) => setBassSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {bassGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={bassGain} 
+                        onChange={(e) => setBassGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Mids Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-cyan-300 mb-2">Mids (Mid Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {midsSmoothing.toFixed(2)} {midsSmoothing < 0.3 ? '(Responsive)' : midsSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={midsSmoothing} 
+                        onChange={(e) => setMidsSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {midsGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={midsGain} 
+                        onChange={(e) => setMidsGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Highs Controls */}
+                <div className="bg-gray-800 rounded p-2">
+                  <h4 className="text-xs font-semibold text-pink-300 mb-2">Highs (High Frequencies)</h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Smoothing: {highsSmoothing.toFixed(2)} {highsSmoothing < 0.3 ? '(Responsive)' : highsSmoothing > 0.7 ? '(Smooth)' : ''}
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="0.95" 
+                        step="0.05" 
+                        value={highsSmoothing} 
+                        onChange={(e) => setHighsSmoothing(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Gain: {highsGain.toFixed(1)}x
+                      </label>
+                      <input 
+                        type="range" 
+                        min="0.1" 
+                        max="3.0" 
+                        step="0.1" 
+                        value={highsGain} 
+                        onChange={(e) => setHighsGain(Number(e.target.value))} 
+                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      setBassSmoothing(0.7);
+                      setMidsSmoothing(0.7);
+                      setHighsSmoothing(0.7);
+                    }} 
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
+                  >
+                    Reset Smoothing
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setBassGain(1.0);
+                      setMidsGain(1.0);
+                      setHighsGain(1.0);
+                    }} 
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
+                  >
+                    Reset Gain
+                  </button>
+                </div>
               </div>
             </div>
             
