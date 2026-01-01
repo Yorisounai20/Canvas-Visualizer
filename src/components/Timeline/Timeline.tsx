@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
+import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 
 interface TimelineProps {
   sections: Section[];
@@ -24,6 +25,9 @@ interface TimelineProps {
   onDeletePresetKeyframe?: (id: number) => void;
   onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
+  onUpdatePresetKeyframe?: (id: number, preset: string) => void;
+  onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
+  onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
 }
 
 type TimelineTab = 'sections' | 'presets' | 'camera' | 'text';
@@ -53,7 +57,10 @@ export default function Timeline({
   onAddTextKeyframe,
   onDeletePresetKeyframe,
   onDeleteCameraKeyframe,
-  onDeleteTextKeyframe
+  onDeleteTextKeyframe,
+  onUpdatePresetKeyframe,
+  onUpdateCameraKeyframe,
+  onUpdateTextKeyframe
 }: TimelineProps) {
   const [activeTab, setActiveTab] = useState<TimelineTab>('sections');
   const [dragState, setDragState] = useState<{
@@ -63,6 +70,22 @@ export default function Timeline({
     initialStart: number;
     initialEnd: number;
   }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    type: 'preset' | 'camera' | 'text' | null;
+    keyframeId?: number;
+    keyframeTime?: number;
+  }>({ isOpen: false, x: 0, y: 0, type: null });
+
+  // Edit modal state for keyframes
+  const [editingKeyframe, setEditingKeyframe] = useState<{
+    type: 'preset' | 'camera' | 'text' | null;
+    data: any;
+  }>({ type: null, data: null });
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -89,6 +112,76 @@ export default function Timeline({
 
   // Convert pixel position to time
   const pixelsToTime = (pixels: number) => Math.max(0, pixels / PIXELS_PER_SECOND);
+
+  // Handle keyframe context menu
+  const handleKeyframeContextMenu = (
+    e: React.MouseEvent,
+    type: 'preset' | 'camera' | 'text',
+    keyframeId?: number,
+    keyframeTime?: number
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      type,
+      keyframeId,
+      keyframeTime
+    });
+  };
+
+  // Get context menu items for keyframes
+  const getKeyframeContextMenuItems = (): ContextMenuItem[] => {
+    const items: ContextMenuItem[] = [];
+    
+    if (contextMenu.type === 'preset' && contextMenu.keyframeId !== undefined) {
+      const keyframe = presetKeyframes.find(kf => kf.id === contextMenu.keyframeId);
+      if (keyframe) {
+        items.push({
+          label: 'Edit Preset',
+          icon: <Edit2 size={14} />,
+          onClick: () => setEditingKeyframe({ type: 'preset', data: keyframe })
+        });
+        items.push({
+          label: 'Delete Keyframe',
+          icon: <Trash2 size={14} />,
+          onClick: () => onDeletePresetKeyframe?.(contextMenu.keyframeId!)
+        });
+      }
+    } else if (contextMenu.type === 'camera' && contextMenu.keyframeTime !== undefined) {
+      const keyframe = cameraKeyframes.find(kf => kf.time === contextMenu.keyframeTime);
+      if (keyframe) {
+        items.push({
+          label: 'Edit Camera',
+          icon: <Edit2 size={14} />,
+          onClick: () => setEditingKeyframe({ type: 'camera', data: keyframe })
+        });
+        items.push({
+          label: 'Delete Keyframe',
+          icon: <Trash2 size={14} />,
+          onClick: () => onDeleteCameraKeyframe?.(contextMenu.keyframeTime!)
+        });
+      }
+    } else if (contextMenu.type === 'text' && contextMenu.keyframeId !== undefined) {
+      const keyframe = textKeyframes.find(kf => kf.id === contextMenu.keyframeId);
+      if (keyframe) {
+        items.push({
+          label: 'Edit Text',
+          icon: <Edit2 size={14} />,
+          onClick: () => setEditingKeyframe({ type: 'text', data: keyframe })
+        });
+        items.push({
+          label: 'Delete Keyframe',
+          icon: <Trash2 size={14} />,
+          onClick: () => onDeleteTextKeyframe?.(contextMenu.keyframeId!)
+        });
+      }
+    }
+
+    return items;
+  };
 
   // Handle playhead click/drag - CRITICAL FIX: Improved interaction like original slider
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -214,6 +307,7 @@ export default function Timeline({
   }, [timelineWidth]); // CRITICAL FIX: Changed from [duration] to [timelineWidth]
 
   return (
+    <>
     <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
       {/* Timeline Header */}
       <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
@@ -264,7 +358,7 @@ export default function Timeline({
       </div>
 
       {/* Timeline Content */}
-      <div className="flex-1 overflow-auto relative" style={{ scrollLeft: scrollOffset }}>
+      <div className="flex-1 overflow-auto relative">
         {activeTab === 'sections' && (
           <>
         {/* Time ruler */}
@@ -434,6 +528,7 @@ export default function Timeline({
                     e.stopPropagation();
                     onSeek(kf.time);
                   }}
+                  onContextMenu={(e) => handleKeyframeContextMenu(e, 'preset', kf.id)}
                 >
                   <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-cyan-400 rounded-full" />
                   <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
@@ -510,6 +605,7 @@ export default function Timeline({
                     e.stopPropagation();
                     onSeek(kf.time);
                   }}
+                  onContextMenu={(e) => handleKeyframeContextMenu(e, 'camera', undefined, kf.time)}
                 >
                   <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
                   <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
@@ -588,6 +684,7 @@ export default function Timeline({
                     e.stopPropagation();
                     onSeek(kf.time);
                   }}
+                  onContextMenu={(e) => handleKeyframeContextMenu(e, 'text', kf.id)}
                 >
                   <div className={`absolute -top-1 -left-1.5 w-3 h-3 ${kf.show ? 'bg-green-400' : 'bg-red-400'} rounded-full`} />
                   <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
@@ -617,5 +714,215 @@ export default function Timeline({
         )}
       </div>
     </div>
+
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={getKeyframeContextMenuItems()}
+        onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, type: null })}
+      />
+
+      {/* Edit Keyframe Modals */}
+      {editingKeyframe.type === 'preset' && editingKeyframe.data && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200]">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-600">
+            <h3 className="text-lg font-semibold text-white mb-4">Edit Preset Keyframe</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">Preset</label>
+              <select
+                value={editingKeyframe.data.preset}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, preset: e.target.value }
+                })}
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+              >
+                {animationTypes.map(anim => (
+                  <option key={anim.value} value={anim.value}>
+                    {anim.icon} {anim.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setEditingKeyframe({ type: null, data: null })}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (onUpdatePresetKeyframe) {
+                    onUpdatePresetKeyframe(editingKeyframe.data.id, editingKeyframe.data.preset);
+                  }
+                  setEditingKeyframe({ type: null, data: null });
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {editingKeyframe.type === 'camera' && editingKeyframe.data && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200]">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-600">
+          <h3 className="text-lg font-semibold text-white mb-4">Edit Camera Keyframe</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                Distance: {editingKeyframe.data.distance.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="5"
+                max="50"
+                step="0.5"
+                value={editingKeyframe.data.distance}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, distance: Number(e.target.value) }
+                })}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                Height: {editingKeyframe.data.height.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="-10"
+                max="10"
+                step="0.5"
+                value={editingKeyframe.data.height}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, height: Number(e.target.value) }
+                })}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">
+                Rotation: {(editingKeyframe.data.rotation * 180 / Math.PI).toFixed(0)}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max={2 * Math.PI}
+                step="0.1"
+                value={editingKeyframe.data.rotation}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, rotation: Number(e.target.value) }
+                })}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">Easing</label>
+              <select
+                value={editingKeyframe.data.easing}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, easing: e.target.value }
+                })}
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+              >
+                <option value="linear">Linear</option>
+                <option value="easeIn">Ease In</option>
+                <option value="easeOut">Ease Out</option>
+                <option value="easeInOut">Ease In Out</option>
+              </select>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setEditingKeyframe({ type: null, data: null })}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (onUpdateCameraKeyframe) {
+                    const { time, ...updates } = editingKeyframe.data;
+                    onUpdateCameraKeyframe(time, updates);
+                  }
+                  setEditingKeyframe({ type: null, data: null });
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {editingKeyframe.type === 'text' && editingKeyframe.data && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200]">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-600">
+          <h3 className="text-lg font-semibold text-white mb-4">Edit Text Keyframe</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">Visibility</label>
+              <select
+                value={editingKeyframe.data.show ? 'show' : 'hide'}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, show: e.target.value === 'show' }
+                })}
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+              >
+                <option value="show">Show Text</option>
+                <option value="hide">Hide Text</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-2">Custom Text (Optional)</label>
+              <input
+                type="text"
+                value={editingKeyframe.data.text || ''}
+                onChange={(e) => setEditingKeyframe({ 
+                  ...editingKeyframe, 
+                  data: { ...editingKeyframe.data, text: e.target.value }
+                })}
+                placeholder="Leave empty to use default"
+                className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setEditingKeyframe({ type: null, data: null })}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (onUpdateTextKeyframe) {
+                    onUpdateTextKeyframe(editingKeyframe.data.id, editingKeyframe.data.show, editingKeyframe.data.text);
+                  }
+                  setEditingKeyframe({ type: null, data: null });
+                }}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

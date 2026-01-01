@@ -509,6 +509,27 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     addLog('Deleted text keyframe', 'info');
   };
 
+  const updatePresetKeyframe = (id: number, preset: string) => {
+    setPresetKeyframes(presetKeyframes.map(kf => 
+      kf.id === id ? { ...kf, preset } : kf
+    ));
+    addLog('Updated preset keyframe', 'success');
+  };
+
+  const updateCameraKeyframe = (time: number, updates: Partial<CameraKeyframe>) => {
+    setCameraKeyframes(cameraKeyframes.map(kf => 
+      kf.time === time ? { ...kf, ...updates } : kf
+    ));
+    addLog('Updated camera keyframe', 'success');
+  };
+
+  const updateTextKeyframe = (id: number, show: boolean, text?: string) => {
+    setTextKeyframes(textKeyframes.map(kf => 
+      kf.id === id ? { ...kf, show, text } : kf
+    ));
+    addLog('Updated text keyframe', 'success');
+  };
+
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
@@ -2202,6 +2223,9 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           onDeletePresetKeyframe={deletePresetKeyframe}
           onDeleteCameraKeyframe={deleteCameraKeyframe}
           onDeleteTextKeyframe={deleteTextKeyframe}
+          onUpdatePresetKeyframe={updatePresetKeyframe}
+          onUpdateCameraKeyframe={updateCameraKeyframe}
+          onUpdateTextKeyframe={updateTextKeyframe}
         />
       </div>
 
