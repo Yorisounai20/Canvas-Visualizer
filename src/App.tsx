@@ -1,31 +1,60 @@
 import { useState } from 'react';
 import VisualizerEditor from './VisualizerEditor';
+import ThreeDVisualizer from './visualizer-software';
 import NewProjectModal from './components/Modals/NewProjectModal';
+import MainDashboard from './components/Dashboard/MainDashboard';
 import { ProjectSettings } from './types';
 
 /**
- * PHASE 2: App Component
- * Manages project creation flow:
- * 1. Shows NewProjectModal first
- * 2. Once project is created, loads VisualizerEditor with settings
+ * App Component
+ * Manages the main application flow:
+ * 1. Shows MainDashboard to select between Editor or Software mode
+ * 2. Shows NewProjectModal for project settings (Editor mode only)
+ * 3. Loads the selected mode (VisualizerEditor or ThreeDVisualizer)
  */
 function App() {
+  const [selectedMode, setSelectedMode] = useState<'editor' | 'software' | null>(null);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
   const [initialAudioFile, setInitialAudioFile] = useState<File | undefined>(undefined);
 
+  const handleSelectMode = (mode: 'editor' | 'software') => {
+    setSelectedMode(mode);
+    
+    // Software mode goes directly to the visualizer (no project modal needed)
+    if (mode === 'software') {
+      // ThreeDVisualizer doesn't need project settings, it's self-contained
+      return;
+    }
+  };
+
   const handleCreateProject = (settings: ProjectSettings, audioFile?: File) => {
-    // PHASE 2: Store project settings and transition to editor
     setProjectSettings(settings);
     setInitialAudioFile(audioFile);
     console.log('Project created:', settings);
   };
 
-  // PHASE 2: Show modal until project is created
+  const handleBackToDashboard = () => {
+    setSelectedMode(null);
+    setProjectSettings(null);
+    setInitialAudioFile(undefined);
+  };
+
+  // Step 1: Show mode selection dashboard
+  if (!selectedMode) {
+    return <MainDashboard onSelectMode={handleSelectMode} />;
+  }
+
+  // Step 2a: Software mode - directly show the simple visualizer
+  if (selectedMode === 'software') {
+    return <ThreeDVisualizer />;
+  }
+
+  // Step 2b: Editor mode - show project modal first
   if (!projectSettings) {
     return <NewProjectModal onCreateProject={handleCreateProject} />;
   }
 
-  // PHASE 2: Once project exists, show editor with settings
+  // Step 3: Show the editor with project settings
   return (
     <VisualizerEditor 
       projectSettings={projectSettings}
