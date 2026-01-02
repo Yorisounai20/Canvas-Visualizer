@@ -271,7 +271,7 @@ export default function ThreeDVisualizer() {
     { id: 2, start: 20, end: 40, animation: 'explosion' },
     { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
-  const prevAnimRef = useRef('orbit');
+  const prevAnimRef = useRef<string | null>(null); // Start with null to detect first animation
   const transitionRef = useRef(1);
   
   // FPS tracking
@@ -1858,7 +1858,13 @@ export default function ThreeDVisualizer() {
       activeVignettePulseRef.current = vignetteFlash;
       activeSaturationBurstRef.current = saturationFlash;
 
-      if (type !== prevAnimRef.current) {
+      // Handle preset transitions with blend effect
+      if (prevAnimRef.current === null) {
+        // First animation - no fade in, start at full opacity
+        prevAnimRef.current = type;
+        transitionRef.current = 1;
+      } else if (type !== prevAnimRef.current) {
+        // Transitioning to a new preset - fade in from 0
         transitionRef.current = 0;
         prevAnimRef.current = type;
       }
