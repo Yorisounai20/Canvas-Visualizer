@@ -4,26 +4,53 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
-import { 
-  LogEntry, 
-  AudioTrack, 
-  ParameterEvent,
-  DEFAULT_CAMERA_DISTANCE,
-  DEFAULT_CAMERA_HEIGHT,
-  DEFAULT_CAMERA_ROTATION,
-  KEYFRAME_ONLY_ROTATION_SPEED,
-  WAVEFORM_SAMPLES,
-  WAVEFORM_THROTTLE_MS,
-  FPS_UPDATE_INTERVAL_MS
-} from './components/VisualizerSoftware/types';
-import { 
-  formatTime, 
-  formatTimeInput, 
-  parseTime, 
-  parseTimeInput,
-  applyEasing,
-  interpolateCameraKeyframes
-} from './components/VisualizerSoftware/utils';
+
+interface LogEntry {
+  message: string;
+  type: string;
+  timestamp: string;
+}
+
+interface AudioTrack {
+  id: string;
+  name: string;
+  buffer: AudioBuffer | null;
+  source: AudioBufferSourceNode | null;
+  analyser: AnalyserNode;
+  gainNode: GainNode;
+  volume: number; // 0-1
+  muted: boolean;
+  active: boolean; // true = this track's frequencies are visualized
+}
+
+interface ParameterEvent {
+  id: string;
+  startTime: number; // seconds - when the event starts
+  endTime: number; // seconds - when the event ends
+  mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
+  audioTrackId?: string; // which track to react to (for automated mode)
+  threshold?: number; // frequency threshold for automated triggering (0-1)
+  parameters: {
+    backgroundFlash?: number; // 0-1 intensity
+    cameraShake?: number; // 0-1 intensity
+    vignettePulse?: number; // 0-1 intensity
+    saturationBurst?: number; // 0-1 intensity
+    bloomBurst?: number; // 0-1 intensity (placeholder for future)
+    fogPulse?: number; // 0-1 intensity (placeholder for future)
+    // Post-FX parameters
+    vignetteStrengthPulse?: number; // 0-1 intensity - temporarily increase vignette
+    contrastBurst?: number; // 0-1 intensity - temporarily boost contrast
+    colorTintFlash?: { r: number; g: number; b: number; intensity: number }; // RGB color flash
+  };
+}
+// Default camera settings constants
+const DEFAULT_CAMERA_DISTANCE = 15;
+const DEFAULT_CAMERA_HEIGHT = 0;
+const DEFAULT_CAMERA_ROTATION = 0;
+const KEYFRAME_ONLY_ROTATION_SPEED = 0; // Rotation now controlled by keyframes or camera rigs only
+const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
+const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
+const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -228,6 +255,24 @@ export default function ThreeDVisualizer() {
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
+  // Helper function to convert seconds to MM:SS format
+  const formatTimeInput = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to parse MM:SS format to seconds
+  const parseTimeInput = (timeStr: string): number => {
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0]) || 0;
+      const secs = parseInt(parts[1]) || 0;
+      return mins * 60 + secs;
+    }
+    return 0;
+  };
+
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -395,7 +440,81 @@ export default function ThreeDVisualizer() {
     { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
   ];
 
+  const formatTime = (s: number) => `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+  const parseTime = (t: string) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
+
+  // Easing functions for smooth transitions
+  const applyEasing = (t: number, easing: string) => {
+    switch(easing) {
+      case 'easeIn':
+        return t * t * t; // Cubic ease in
+      case 'easeOut':
+        return 1 - Math.pow(1 - t, 3); // Cubic ease out
+      case 'easeInOut':
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
+      case 'linear':
+      default:
+        return t; // Linear (no easing)
+    }
+  };
+
+  // Interpolate camera values between keyframes
+  const interpolateCameraKeyframes = (keyframes, currentTime) => {
+    if (!keyframes || keyframes.length === 0) {
+      return {
+        distance: DEFAULT_CAMERA_DISTANCE,
+        height: DEFAULT_CAMERA_HEIGHT,
+        rotation: DEFAULT_CAMERA_ROTATION
+      };
+    }
+
+    // Sort keyframes by time
+    const sortedKeyframes = [...keyframes].sort((a, b) => a.time - b.time);
+
+    // Find the two keyframes to interpolate between
+    let prevKeyframe = sortedKeyframes[0];
+    let nextKeyframe = sortedKeyframes[sortedKeyframes.length - 1];
+
+    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
+      if (currentTime >= sortedKeyframes[i].time && currentTime <= sortedKeyframes[i + 1].time) {
+        prevKeyframe = sortedKeyframes[i];
+        nextKeyframe = sortedKeyframes[i + 1];
+        break;
+      }
+    }
+
+    // If we're before the first keyframe or after the last, use the boundary values
+    if (currentTime <= sortedKeyframes[0].time) {
+      return {
+        distance: sortedKeyframes[0].distance,
+        height: sortedKeyframes[0].height,
+        rotation: sortedKeyframes[0].rotation
+      };
+    }
+    if (currentTime >= sortedKeyframes[sortedKeyframes.length - 1].time) {
+      const last = sortedKeyframes[sortedKeyframes.length - 1];
+      return {
+        distance: last.distance,
+        height: last.height,
+        rotation: last.rotation
+      };
+    }
+
+    // Interpolation between keyframes with easing
+    const timeDiff = nextKeyframe.time - prevKeyframe.time;
+    const linearProgress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    
+    // Apply easing function to the progress
+    const easing = prevKeyframe.easing || 'linear';
+    const easedProgress = applyEasing(linearProgress, easing);
+
+    return {
+      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * easedProgress,
+      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * easedProgress,
+      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * easedProgress
+    };
+  };
 
   const addSection = () => {
     const last = sections[sections.length-1];
