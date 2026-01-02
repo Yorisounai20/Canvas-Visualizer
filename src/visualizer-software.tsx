@@ -167,6 +167,7 @@ export default function ThreeDVisualizer() {
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
@@ -2659,7 +2660,9 @@ export default function ThreeDVisualizer() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showExportModal) {
+        if (showKeyboardShortcuts) {
+          setShowKeyboardShortcuts(false);
+        } else if (showExportModal) {
           setShowExportModal(false);
         } else if (showEventModal) {
           setShowEventModal(false);
@@ -2673,7 +2676,7 @@ export default function ThreeDVisualizer() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -2682,15 +2685,27 @@ export default function ThreeDVisualizer() {
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
           
-          {/* Export Button - Top Right */}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="absolute top-0 right-0 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            title="Video Export"
-          >
-            <Video size={18} />
-            <span className="text-sm font-semibold">Export</span>
-          </button>
+          {/* Export and Help Buttons - Top Right */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            {/* Keyboard Shortcuts Button */}
+            <button
+              onClick={() => setShowKeyboardShortcuts(true)}
+              className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
+              title="Keyboard Shortcuts (?)"
+            >
+              <HelpCircle size={18} />
+            </button>
+            
+            {/* Export Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              title="Video Export"
+            >
+              <Video size={18} />
+              <span className="text-sm font-semibold">Export</span>
+            </button>
+          </div>
         </div>
 
         <div className="relative">
@@ -4999,6 +5014,70 @@ export default function ThreeDVisualizer() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardShortcuts && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onClick={() => setShowKeyboardShortcuts(false)}>
+          <div className="bg-gray-900 rounded-lg w-[500px] max-h-[70vh] overflow-hidden border border-gray-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
+              <h2 className="text-xl font-bold text-white">⌨️ Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowKeyboardShortcuts(false)}
+                className="p-1 rounded hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
+                title="Close (Esc)"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(70vh-140px)]">
+              <div className="space-y-6">
+                {/* Playback */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Playback</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Play/Pause audio</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Space</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controls */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Controls</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Close modals/dialogs</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Esc</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Camera */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Camera</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle camera rig hints</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">G</kbd>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-700 bg-gray-800">
+              <p className="text-sm text-gray-400 text-center">
+                Press <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded">Esc</kbd> to close
+              </p>
+            </div>
           </div>
         </div>
       )}

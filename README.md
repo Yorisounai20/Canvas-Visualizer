@@ -524,8 +524,9 @@ npm run lint         # Run ESLint
 6. **Preview** - Click Play to watch your visualization in real-time
 7. **Export** - Click Export button to render and download
 
-### **Keyboard Shortcuts (Editor Mode):**
+### **Keyboard Shortcuts:**
 
+#### **Editor Mode:**
 **Click the ? button in the top bar** to view the complete keyboard shortcuts reference.
 
 | Category | Shortcut | Action |
@@ -533,12 +534,21 @@ npm run lint         # Run ESLint
 | **Playback** | Space | Play/Pause audio |
 | **Timeline** | ← / → | Navigate timeline (1 second) |
 | | Shift + ← / → | Navigate timeline (5 seconds) |
+| | [ | Previous section |
+| | ] | Next section |
+| | Home | Go to start |
+| | End | Go to end |
 | **Tools & Modes** | W | Toggle Workspace Mode |
 | | ` (backtick) | Toggle Debug Console |
 | | Esc | Close modals/panels |
 | **Editing** | Ctrl/Cmd + Z | Undo |
 | | Ctrl/Cmd + Shift + Z | Redo |
 | | Ctrl/Cmd + Y | Redo (alternative) |
+| **Sections** | 1-9 | Change selected section preset |
+| | ↑ / ↓ | Navigate sections |
+| **Effects** | G | Toggle letterbox |
+| | B | Toggle border |
+| | R | Reset camera (when no section selected) |
 | **Workspace (W Mode)** | Left Click | Select object |
 | | Left Drag | Rotate camera |
 | | Right Drag | Pan camera |
@@ -546,6 +556,17 @@ npm run lint         # Run ESLint
 | | T | Translate mode |
 | | R | Rotate mode |
 | | S | Scale mode |
+
+#### **Software Mode:**
+**Click the ? button next to Export** to view available keyboard shortcuts.
+
+| Shortcut | Action |
+|----------|--------|
+| Space | Play/Pause audio |
+| Esc | Close modals/dialogs |
+| G | Toggle camera rig visual hints |
+
+*Software Mode has a streamlined set of shortcuts focused on essential playback and camera controls.*
 
 ---
 
@@ -601,7 +622,18 @@ npm run lint         # Run ESLint
 
 ## **Recent Changes & Improvements**
 
-### **Version 2.2 - Dual-Mode Architecture (Latest):**
+### **Version 2.3 - UI/UX Enhancements & Keyframe Architecture (Latest):**
+- ✨ **Keyboard Shortcuts Modal** - Software Mode now has ? button to show available shortcuts
+- ✨ **Camera Rig Visual Hints** - Toggleable position markers, target indicators, path preview, reference grid
+- ✨ **Keyframe-Based Camera Rotation** - Removed global rotation slider, now exclusively keyframe-controlled
+- ✨ **Keyframe-Based Parameter Events** - Changed from time+duration to startTime+endTime model
+- ✨ **Camera Rig Documentation** - Comprehensive documentation (1,377 lines) covering all rig systems
+- ✨ **Frequency Gain Controls** - Restored bass/mids/highs gain multipliers (0-3x range)
+- 🐛 **Audio Duplication Fix** - Fixed bug where dragging time slider during playback caused audio duplication
+- 🐛 **Post-FX Tab Fix** - Fixed ReferenceError crash, documented unimplemented features
+- 📝 **Enhanced README** - Added detailed keyboard shortcuts for both modes, organized by category
+
+### **Version 2.2 - Dual-Mode Architecture:**
 - ✨ **Main Dashboard** - Mode selection screen for Editor vs Software modes
 - ✨ **Software Mode** - Complete streamlined visualizer with tabbed interface
 - ✨ **Multiple Audio Tracks** - Software mode supports mixing multiple audio files
@@ -691,7 +723,7 @@ npm run lint         # Run ESLint
 
 ---
 
-**Version:** 2.2 (Dual-Mode Architecture)  
+**Version:** 2.3 (UI/UX Enhancements & Keyframe Architecture)  
 **Last Updated:** 01/02/2026  
 **License:** MIT  
 **Author:** Yorisounai20
@@ -701,6 +733,7 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
+- Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
 - Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
 - Version 2.1: Scene Explorer, extended object types, camera/light support
 - Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
