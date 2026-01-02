@@ -1531,21 +1531,21 @@ export default function ThreeDVisualizer() {
         }
         
         // Update camera rig hints visibility and position
-        if (rigHintsRef.current.positionMarker && enableRigHints && showRigPosition) {
+        if (rigHintsRef.current.positionMarker && showRigHints && showRigPosition) {
           rigHintsRef.current.positionMarker.visible = true;
           rigHintsRef.current.positionMarker.position.copy(cam.position);
         } else if (rigHintsRef.current.positionMarker) {
           rigHintsRef.current.positionMarker.visible = false;
         }
         
-        if (rigHintsRef.current.targetMarker && enableRigHints && showRigTarget) {
+        if (rigHintsRef.current.targetMarker && showRigHints && showRigTarget) {
           rigHintsRef.current.targetMarker.visible = true;
           rigHintsRef.current.targetMarker.position.set(0, 0, 0);
         } else if (rigHintsRef.current.targetMarker) {
           rigHintsRef.current.targetMarker.visible = false;
         }
         
-        if (rigHintsRef.current.connectionLine && enableRigHints && showRigPosition && showRigTarget) {
+        if (rigHintsRef.current.connectionLine && showRigHints && showRigPosition && showRigTarget) {
           rigHintsRef.current.connectionLine.visible = true;
           const positions = new Float32Array([
             cam.position.x, cam.position.y, cam.position.z,
@@ -1556,14 +1556,14 @@ export default function ThreeDVisualizer() {
           rigHintsRef.current.connectionLine.visible = false;
         }
         
-        if (rigHintsRef.current.gridHelper && enableRigHints && showRigGrid) {
+        if (rigHintsRef.current.gridHelper && showRigHints && showRigGrid) {
           rigHintsRef.current.gridHelper.visible = true;
         } else if (rigHintsRef.current.gridHelper) {
           rigHintsRef.current.gridHelper.visible = false;
         }
         
         // Update path preview
-        if (rigHintsRef.current.pathLine && enableRigHints && showRigPath && cameraKeyframes && cameraKeyframes.length >= 2) {
+        if (rigHintsRef.current.pathLine && showRigHints && showRigPath && cameraKeyframes && cameraKeyframes.length >= 2) {
           rigHintsRef.current.pathLine.visible = true;
           const pathPoints: THREE.Vector3[] = [];
           for (let i = 0; i < cameraKeyframes.length - 1; i++) {
@@ -1614,7 +1614,7 @@ export default function ThreeDVisualizer() {
         }
       }
     };
-  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, enableRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
+  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
