@@ -1,51 +1,118 @@
-# 🎵 3D Music Visualizer Editor - README
+# 🎵 Canvas Visualizer - 3D Music Video Creator
 
 ## **✅ Development Status**
 
-**Version 2.1 - Complete Architecture Refactor (Phase 10 + Phases 1-5 + Final Refactor)**
+**Version 2.2 - Dual-Mode Architecture (Editor + Software Modes)**
 
-Professional music video editor with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, keyframe systems, parameter-driven presets, and comprehensive visual controls.
+Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations.
 
-**Core Features:**
+**Dual-Mode Architecture:**
+- 🎬 **Editor Mode** - Professional interface with layers, timeline, workspace, and advanced controls
+- ⚡ **Software Mode** - Simple, streamlined interface for quick visualizations
+- 🎨 Main Dashboard for mode selection at startup
+
+**Editor Mode Features:**
 - ✅ Professional panel-based layout (Top Bar, Scene Explorer, Canvas, Properties, Timeline)
-- ✅ **NEW: Scene Explorer** - Blender-style object hierarchy panel
-- ✅ **NEW: Extended object types** - Support for cameras and lights as workspace objects
+- ✅ Scene Explorer - Blender-style object hierarchy panel
+- ✅ Extended object types - Support for cameras and lights as workspace objects
 - ✅ Layer management (select, reorder, lock, delete, duplicate, visibility toggle)
 - ✅ Timeline editing with multiple tabs (Sections, Presets, Camera, Text)
 - ✅ Complete keyframe systems (Presets, Camera, Text)
-- ✅ 3D scene rendering with audio-reactive animations
+- ✅ Blender-like 3D workspace (toggle with `W` key)
+- ✅ Keyboard shortcuts modal, undo/redo functionality
+- ✅ Parameter-driven presets (density, speed, intensity, spread)
+
+**Software Mode Features:**
+- ✅ Simple, streamlined interface for quick setup
+- ✅ Direct audio upload and instant preview
+- ✅ Animated letterbox with keyframe system
+- ✅ Camera shake events and visual effects
+- ✅ Parameter events (background flash, vignette pulse, saturation burst)
+- ✅ Multiple audio track support with mixing
+- ✅ Scrolling and static waveform visualization modes
+
+**Shared Features (Both Modes):**
+- ✅ 9 animation presets with audio-reactive 3D visuals
 - ✅ 3D text overlay with font loading
-- ✅ Waveform visualization in timeline
+- ✅ Waveform visualization
 - ✅ Debug console (toggle with `` ` `` key)
-- ✅ Right-click context menus
-- ✅ Manual control mode for non-audio-reactive animations
 - ✅ Color pickers and camera controls
 - ✅ Export modal with resolution selection
-- ✅ **Phase 1:** Unified render loop and stabilized architecture
-- ✅ **Phase 2:** Project system with New Project modal
-- ✅ **Phase 3:** Blender-like 3D workspace (toggle with `W` key)
-- ✅ **Phase 4:** Parameter-driven presets (density, speed, intensity, spread)
-- ✅ **Phase 5:** Keyboard shortcuts modal, undo/redo functionality
-- ✅ **Final Refactor:** Scene Explorer, extended object types for multiple cameras
-
-**Latest Additions (Final Architecture Refactor):**
-- ✨ Scene Explorer component - Blender-style object hierarchy
-- ✨ Camera and light support as workspace objects
-- ✨ Foundation for multiple cameras and camera animation
-- ✨ Extended WorkspaceObject type system
-- ✨ Improved architecture for complex scene management
+- ✅ Manual control mode for non-audio-reactive animations
 
 ---
 
 ## **What Is This?**
 
-A **personsal project music video editor** with an **After Effects-style interface** that creates 3D animated visualizations synced to audio. Features a modular panel-based UI with layers, timeline, properties inspector, and real-time 3D preview. Upload a song, compose sections with different animations, customize every detail, and export high-quality videos.
+**Canvas Visualizer** is a web-based 3D music video creation tool with two workflow modes:
+
+- **🎬 Editor Mode** - A professional music video editor with an After Effects-style interface featuring layers, timeline, properties inspector, workspace mode, and real-time 3D preview. Perfect for complex projects with precise control over every detail.
+
+- **⚡ Software Mode** - A streamlined, simplified visualizer for quick music visualizations. Upload audio, choose a preset, customize colors, and export. Ideal for rapid prototyping and simple projects.
+
+Both modes create audio-reactive 3D animations synchronized to music, with support for 9 different animation presets, custom colors, camera controls, and high-quality video export.
+
+---
+
+## **Mode Selection**
+
+When you launch Canvas Visualizer, you're greeted with a **Main Dashboard** where you choose your workflow:
+
+### **🎬 Editor Mode (Advanced)**
+Best for:
+- Complex music video projects
+- Precise timeline control with multiple sections
+- Layer-based composition
+- Professional editing workflow
+- Keyframe animation systems
+- Workspace mode for manual object editing
+- Projects requiring detailed property control
+
+Features:
+- After Effects-style interface with panels
+- Layer management and organization
+- Multi-tab timeline (Sections, Presets, Camera, Text)
+- Scene Explorer with object hierarchy
+- Blender-like workspace mode (W key)
+- Keyboard shortcuts and undo/redo
+- Context menus and advanced controls
+
+### **⚡ Software Mode (Simple)**
+Best for:
+- Quick visualizations
+- Simple, direct workflow
+- Rapid prototyping
+- Learning the basics
+- Single-preset projects
+- Fast exports
+
+Features:
+- Streamlined interface with tabs
+- Direct audio upload
+- Animated letterbox with keyframes
+- Camera shake events
+- Parameter events (flashes, pulses)
+- Multiple audio track mixing
+- Waveform mode selection
+
+### **Comparison**
+
+| Feature | Editor Mode | Software Mode |
+|---------|-------------|---------------|
+| Interface | Multi-panel, professional | Single-view, simplified |
+| Timeline | Multiple sections, multi-tab | Single timeline |
+| Layers | Full layer management | No layers |
+| Workspace | Blender-like 3D editing | N/A |
+| Keyframes | Preset, Camera, Text | Letterbox, Camera Shake, Events |
+| Audio Tracks | Single | Multiple with mixing |
+| Learning Curve | Steep | Easy |
+| Best For | Complex projects | Quick visualizations |
 
 ---
 
 ## **Core Features**
 
-### 🎨 **After Effects-Style Interface**
+### 🎨 **Editor Mode Interface**
 - **Top Bar** - Playback controls, current section info, undo/redo, keyboard shortcuts (?), export button
 - **Left Panel (Layers)** - Section/layer management with:
   - Visibility toggles (eye icon)
@@ -83,13 +150,47 @@ A **personsal project music video editor** with an **After Effects-style interfa
 8. **Vortex Storm** 🌪️ - Swirling vortex with dynamic rotation
 9. **Azure Dragon** 🐉 - Serpentine dragon flying through mountains (most complex)
 
-### 🎨 **Customization Options**
+*Available in both Editor and Software modes*
+
+### ⚡ **Software Mode Interface**
+
+- **Left Panel (Presets & Audio):**
+  - Animation preset selector with icons
+  - Audio file upload
+  - Multiple audio track management
+  - Volume and mute controls per track
+  - Active track selection for visualization
+  
+- **Center Canvas:**
+  - 960x540 3D visualization preview
+  - Optional border and letterbox effects
+  - Filename overlay (toggleable)
+  - Preset display (toggleable)
+  
+- **Right Panel (Controls):**
+  - **Colors Tab:** Bass, mids, highs color pickers
+  - **Camera Tab:** Distance, height, rotation, auto-rotate
+  - **Text Tab:** 3D text overlay with custom font loading
+  - **Effects Tab:** Letterbox keyframes, camera shake events, parameter events
+  - **Settings Tab:** Background, border, lighting, waveform mode, HUD toggles
+  
+- **Bottom Timeline:**
+  - Scrolling or static waveform visualization
+  - Playback controls and time display
+  - Export button with resolution options
+
+### 🎬 **Editor Mode: Timeline-Based Animation System**
+- Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
+- Assign different animation presets to each section
+- Smooth transitions between animation styles
+- Real-time audio frequency analysis (bass, mids, highs)
+
+### 🎨 **Customization Options (Both Modes)**
 
 **Colors:**
 - Bass frequency color (low sounds)
 - Mids frequency color (vocals, melody)
 - Highs frequency color (cymbals, hi-hats)
-- ⚠️ *Note: Color reactivity to audio not yet implemented in new UI*
 
 **Camera Controls:**
 - Zoom distance (5-50 units)
@@ -103,7 +204,7 @@ A **personsal project music video editor** with an **After Effects-style interfa
 - Letterbox toggle (basic on/off)
 - Ambient and directional lighting controls
 
-### ✨ **Advanced Features**
+### ✨ **Advanced Features (Editor Mode)**
 
 **Keyframe System:**
 - **Preset Keyframes** - Automated animation changes at specific times with smooth transitions
@@ -141,7 +242,35 @@ A **personsal project music video editor** with an **After Effects-style interfa
 - **Ctrl+Shift+Z** or **Ctrl+Y** (Cmd+Shift+Z or Cmd+Y on Mac) to redo
 - Visual indication of undo/redo availability in top bar
 
-### 🎥 **Video Export System**
+### ✨ **Advanced Features (Software Mode)**
+
+**Parameter Events System:**
+- Manual or automated event triggering
+- Background flash effects
+- Camera shake with intensity control
+- Vignette pulse effects
+- Saturation bursts
+- Color tint flashes
+- Time-based and audio-reactive triggers
+
+**Multi-Track Audio:**
+- Support for multiple audio files simultaneously
+- Independent volume control per track
+- Mute/unmute individual tracks
+- Select which track drives the visualization
+- Mix multiple sources for complex compositions
+
+**Animated Letterbox:**
+- Keyframe-based letterbox animation
+- Curtain-style opening/closing effects
+- Customizable timing and transitions
+
+**Camera Shake Events:**
+- Time-triggered shake effects
+- Adjustable intensity
+- Impact effects synchronized to audio
+
+### 🎥 **Video Export System (Both Modes)**
 - Export modal with format and resolution selection
 - Supports WebM format (VP9 video + Opus audio)
 - MP4 support (if browser supports it)
@@ -203,31 +332,34 @@ Each preset controls:
 src/
 ├── components/
 │   ├── Canvas/
-│   │   └── CanvasWrapper.tsx       # 3D preview wrapper
+│   │   └── CanvasWrapper.tsx       # 3D preview wrapper (Editor mode)
 │   ├── Common/
 │   │   └── ContextMenu.tsx         # Reusable context menu
 │   ├── Controls/
-│   │   ├── TopBar.tsx              # Top control bar
-│   │   └── ExportModal.tsx         # Video export dialog
+│   │   ├── TopBar.tsx              # Top control bar (Editor mode)
+│   │   └── ExportModal.tsx         # Video export dialog (both modes)
+│   ├── Dashboard/
+│   │   └── MainDashboard.tsx       # Mode selection screen
 │   ├── Debug/
 │   │   └── DebugConsole.tsx        # Debug console panel
 │   ├── Modals/
-│   │   ├── NewProjectModal.tsx     # Project creation modal (Phase 2)
-│   │   └── KeyboardShortcutsModal.tsx  # Keyboard shortcuts reference (Phase 5)
+│   │   ├── NewProjectModal.tsx     # Project creation modal (Editor mode)
+│   │   └── KeyboardShortcutsModal.tsx  # Keyboard shortcuts reference (Editor mode)
 │   ├── Panels/
-│   │   ├── LeftPanel.tsx           # Layers/Sections panel
-│   │   └── RightPanel.tsx          # Properties/Effects panel (tabbed)
+│   │   ├── LeftPanel.tsx           # Layers/Sections panel (Editor mode)
+│   │   └── RightPanel.tsx          # Properties/Effects panel (Editor mode)
 │   ├── Timeline/
-│   │   ├── Timeline.tsx            # Multi-tab timeline
+│   │   ├── Timeline.tsx            # Multi-tab timeline (Editor mode)
 │   │   └── WaveformVisualizer.tsx  # Audio waveform renderer
 │   └── Workspace/
-│       ├── WorkspaceControls.tsx   # Object creation toolbar (Phase 3)
-│       ├── ObjectPropertiesPanel.tsx # Object properties editor (Phase 3)
-│       └── SceneExplorer.tsx       # Blender-style object hierarchy (Final Refactor)
+│       ├── WorkspaceControls.tsx   # Object creation toolbar (Editor mode)
+│       ├── ObjectPropertiesPanel.tsx # Object properties editor (Editor mode)
+│       └── SceneExplorer.tsx       # Blender-style object hierarchy (Editor mode)
 ├── types/
 │   └── index.ts                    # TypeScript type definitions
-├── VisualizerEditor.tsx            # Main editor component
-└── App.tsx                         # Application entry point
+├── VisualizerEditor.tsx            # Main editor component (Editor mode)
+├── visualizer-software.tsx         # Simple visualizer component (Software mode)
+└── App.tsx                         # Application entry point & mode router
 ```
 
 ### **Design System:**
@@ -287,9 +419,21 @@ src/
 
 ## **Getting Started**
 
-### **UI Overview:**
+### **1. Mode Selection:**
 
-The interface is divided into 5 main areas, inspired by professional video editing software:
+When you first launch Canvas Visualizer, you'll see the **Main Dashboard** with two options:
+
+- **🎬 Editor Mode** - Click to launch the professional interface
+  - You'll then see the **New Project Modal** to configure your project settings (resolution, FPS, etc.)
+  - After configuration, the full Editor interface loads with panels and timeline
+  
+- **⚡ Software Mode** - Click to launch the simplified visualizer
+  - Loads directly into the visualization interface
+  - No project configuration needed - just start creating
+
+### **2. Editor Mode Overview:**
+
+The Editor interface is divided into 5 main areas, inspired by professional video editing software:
 
 1. **Top Bar (Purple/Dark):**
    - Title and current section indicator
@@ -331,6 +475,15 @@ The interface is divided into 5 main areas, inspired by professional video editi
    - Time ruler at top
    - "Add Section" button (purple, top-right)
 
+### **3. Software Mode Overview:**
+
+The Software interface is streamlined with tabbed controls:
+
+- **Left Panel:** Preset selection and audio track management
+- **Center Canvas:** 960x540 3D preview with optional overlays
+- **Right Panel:** Tabbed controls (Colors, Camera, Text, Effects, Settings)
+- **Bottom:** Waveform visualization and playback controls
+
 ### **Development:**
 ```bash
 npm install          # Install dependencies
@@ -341,15 +494,26 @@ npm run typecheck    # Run TypeScript type checking
 npm run lint         # Run ESLint
 ```
 
-### **Basic Workflow:**
-1. **Upload Audio** - Click "Choose File" in bottom-right to load an audio file
-2. **Select Layer** - Click on a layer in the left panel to edit its properties
-3. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
-4. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
-5. **Preview** - Click Play button in top bar to preview your composition
-6. **Export** - Click Export button to render and download the final video
+### **Basic Workflow (Editor Mode):**
+1. **Select Mode** - Choose Editor Mode from the Main Dashboard
+2. **Configure Project** - Set resolution and FPS in the New Project Modal
+3. **Upload Audio** - Click "Choose File" to load an audio file
+4. **Select Layer** - Click on a layer in the left panel to edit its properties
+5. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
+6. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
+7. **Preview** - Click Play button in top bar to preview your composition
+8. **Export** - Click Export button to render and download the final video
 
-### **Keyboard Shortcuts:**
+### **Basic Workflow (Software Mode):**
+1. **Select Mode** - Choose Software Mode from the Main Dashboard
+2. **Upload Audio** - Click to upload your audio file in the left panel
+3. **Choose Preset** - Select an animation preset from the left panel
+4. **Customize** - Adjust colors, camera, and effects in the right panel tabs
+5. **Add Effects** - Set up letterbox, camera shakes, or parameter events as desired
+6. **Preview** - Click Play to watch your visualization in real-time
+7. **Export** - Click Export button to render and download
+
+### **Keyboard Shortcuts (Editor Mode):**
 
 **Click the ? button in the top bar** to view the complete keyboard shortcuts reference.
 
@@ -426,12 +590,20 @@ npm run lint         # Run ESLint
 
 ## **Recent Changes & Improvements**
 
-### **Final Architecture Refactor (Latest):**
-- ✨ **Scene Explorer Component** - Blender-style object hierarchy panel created
-- ✨ **Extended WorkspaceObject Types** - Support for camera and light objects
-- ✨ **Camera Object Properties** - Type system prepared for camera-specific settings
-- ✨ **Multiple Cameras Foundation** - Architecture supports multiple cameras for animation
-- 🔨 **Next:** Integration of Scene Explorer, canvas resize fixes, settings migration
+### **Version 2.2 - Dual-Mode Architecture (Latest):**
+- ✨ **Main Dashboard** - Mode selection screen for Editor vs Software modes
+- ✨ **Software Mode** - Complete streamlined visualizer with tabbed interface
+- ✨ **Multiple Audio Tracks** - Software mode supports mixing multiple audio files
+- ✨ **Parameter Events System** - Advanced effects in Software mode
+- ✨ **Animated Letterbox** - Keyframe-based letterbox in Software mode
+- ✨ **Camera Shake Events** - Time-triggered shake effects
+- ✨ **Dual Workflow** - Professional and simple modes for different use cases
+
+### **Version 2.1 - Architecture Refactor:**
+- ✨ Scene Explorer Component - Blender-style object hierarchy panel
+- ✨ Extended WorkspaceObject Types - Support for camera and light objects
+- ✨ Camera Object Properties - Type system for camera-specific settings
+- ✨ Multiple Cameras Foundation - Architecture supports camera animation
 
 ### **Phase 5 - UI Structure:**
 - ✨ Keyboard shortcuts modal with comprehensive reference
@@ -467,35 +639,33 @@ npm run lint         # Run ESLint
 ## **Future Enhancement Ideas**
 
 ### **Priority:**
-- **Undo/Redo System** - Full history management for all edits
-- **Letterbox Keyframe Animations** - Animated letterbox with curtain effects
+- **Database Persistence** - Save/load projects with Neon
 - **More Animation Presets** - Expand the visual library
-- **Color Tags** - Organize layers with color labels
-- **Camera Shake Events** - Impact effects at specific timestamps
+- **Color Tags** - Organize layers with color labels (Editor mode)
+- **Enhanced Post-Processing** - Bloom, chromatic aberration effects
 
 ### **Next Phase:**
 - **Enhanced Keyboard Shortcuts** - Extended hotkey system for faster workflow
-- **Collapsible Panels** - Maximize canvas by hiding panels
+- **Collapsible Panels** - Maximize canvas by hiding panels (Editor mode)
 - **More Easing Functions** - Additional easing options for camera keyframes
 - **Preset Transition Controls** - Customize blend time between presets
 - **Multi-select Keyframes** - Select and edit multiple keyframes at once
 
 ### **Long-term:**
 - **Particle Systems** - Additional visual effects
-- **Post-Processing** - Bloom, chromatic aberration, vignette
 - **MIDI Controller Support** - Hardware control integration
 - **Real-time Microphone Input** - Live audio visualization
 - **Multiple Export Formats** - MP4, GIF, image sequences
 - **Preset Saving/Loading** - Save compositions as templates
 - **Beat Detection** - Automated section creation
 - **Lyrics Overlay System** - Synchronized text display
-- **Layer Grouping** - Organize complex compositions
+- **Layer Grouping** - Organize complex compositions (Editor mode)
 - **Effect Stack** - Multiple effects per layer
 
 ---
 
-**Version:** 2.1 (Phase 10 + Phases 1-5 + Final Architecture Refactor)  
-**Last Updated:** 01/01/2026  
+**Version:** 2.2 (Dual-Mode Architecture)  
+**Last Updated:** 01/02/2026  
 **License:** MIT  
 **Author:** Yorisounai20
 
@@ -504,6 +674,8 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
+- Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
+- Version 2.1: Scene Explorer, extended object types, camera/light support
 - Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
 - Phase 1: Core Stability (unified render loop, stabilized lifecycle)
 - Phase 2: Project System (new project modal, settings schema)
