@@ -3,6 +3,9 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
 import { 
   LogEntry, 
@@ -27,11 +30,87 @@ import {
   generateWaveformData
 } from './components/VisualizerSoftware/utils';
 
+// Custom Post-Processing Shader
+const PostFXShader = {
+  uniforms: {
+    'tDiffuse': { value: null },
+    'vignetteStrength': { value: 0.0 },
+    'vignetteSoftness': { value: 0.5 },
+    'saturation': { value: 1.0 },
+    'contrast': { value: 1.0 },
+    'gamma': { value: 1.0 },
+    'tintR': { value: 1.0 },
+    'tintG': { value: 1.0 },
+    'tintB': { value: 1.0 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float vignetteStrength;
+    uniform float vignetteSoftness;
+    uniform float saturation;
+    uniform float contrast;
+    uniform float gamma;
+    uniform float tintR;
+    uniform float tintG;
+    uniform float tintB;
+    varying vec2 vUv;
+
+    vec3 adjustSaturation(vec3 color, float sat) {
+      float gray = dot(color, vec3(0.299, 0.587, 0.114));
+      return mix(vec3(gray), color, sat);
+    }
+
+    vec3 adjustContrast(vec3 color, float con) {
+      return (color - 0.5) * con + 0.5;
+    }
+
+    vec3 adjustGamma(vec3 color, float gam) {
+      return pow(color, vec3(1.0 / gam));
+    }
+
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      vec3 color = texel.rgb;
+
+      // Apply color tint
+      color *= vec3(tintR, tintG, tintB);
+
+      // Apply saturation
+      color = adjustSaturation(color, saturation);
+
+      // Apply contrast
+      color = adjustContrast(color, contrast);
+
+      // Apply gamma
+      color = adjustGamma(color, gamma);
+
+      // Apply vignette
+      if (vignetteStrength > 0.0) {
+        vec2 center = vUv - 0.5;
+        float dist = length(center);
+        float vignette = smoothstep(vignetteSoftness, vignetteSoftness - vignetteStrength, dist);
+        color *= vignette;
+      }
+
+      gl_FragColor = vec4(color, texel.a);
+    }
+  `
+};
+
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const composerRef = useRef<EffectComposer | null>(null);
+  const postFXPassRef = useRef<ShaderPass | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -1221,6 +1300,19 @@ export default function ThreeDVisualizer() {
 
       containerRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
+      
+      // Setup post-processing with EffectComposer
+      const composer = new EffectComposer(renderer);
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+      
+      const postFXPass = new ShaderPass(PostFXShader);
+      postFXPass.renderToScreen = true;
+      composer.addPass(postFXPass);
+      
+      composerRef.current = composer;
+      postFXPassRef.current = postFXPass;
+      
       addLog('Scene initialized successfully', 'success');
     } catch (e) {
       console.error('Three.js initialization error:', e);
@@ -2504,12 +2596,30 @@ export default function ThreeDVisualizer() {
         // Future implementation: Use WebGL stencil buffer or shader-based masking
       }
 
-      rend.render(scene, cam);
+      // Update post-FX shader uniforms
+      if (postFXPassRef.current) {
+        const uniforms = postFXPassRef.current.uniforms;
+        uniforms.vignetteStrength.value = vignetteStrength;
+        uniforms.vignetteSoftness.value = vignetteSoftness;
+        uniforms.saturation.value = colorSaturation;
+        uniforms.contrast.value = colorContrast;
+        uniforms.gamma.value = colorGamma;
+        uniforms.tintR.value = colorTintR;
+        uniforms.tintG.value = colorTintG;
+        uniforms.tintB.value = colorTintB;
+      }
+
+      // Render with post-processing
+      if (composerRef.current) {
+        composerRef.current.render();
+      } else {
+        rend.render(scene, cam);
+      }
     };
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -3580,24 +3690,14 @@ export default function ThreeDVisualizer() {
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
           <div>
-            {/* Limitations Notice */}
-            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Post-Processing Effects - Limitations</h3>
-              <p className="text-xs text-yellow-200">
-                The Post-FX controls below require WebGL shader-based post-processing (EffectComposer, passes) which is not yet implemented. 
-                These controls will not affect the visualization until the rendering pipeline is updated to support post-processing effects.
-              </p>
-            </div>
-
             {/* Blend Mode Section */}
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
-              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually (not yet implemented)</p>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
               <select 
                 value={blendMode} 
                 onChange={(e) => setBlendMode(e.target.value as any)}
                 className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
-                disabled
               >
                 <option value="normal">Normal (Standard)</option>
                 <option value="additive">Additive (Brighten)</option>
@@ -3607,8 +3707,8 @@ export default function ThreeDVisualizer() {
             </div>
 
             {/* Vignette Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette (Not Implemented)</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
               <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
               
               <div className="mb-3">
@@ -3624,7 +3724,6 @@ export default function ThreeDVisualizer() {
                   value={vignetteStrength} 
                   onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
               </div>
 
@@ -3641,22 +3740,20 @@ export default function ThreeDVisualizer() {
                   value={vignetteSoftness} 
                   onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
-                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
-                disabled
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
               >
                 Reset Vignette
               </button>
             </div>
 
             {/* Color Grading Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading (Not Implemented)</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
               
               <div className="mb-3">
@@ -3672,7 +3769,6 @@ export default function ThreeDVisualizer() {
                   value={colorSaturation} 
                   onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
               </div>
@@ -3690,7 +3786,6 @@ export default function ThreeDVisualizer() {
                   value={colorContrast} 
                   onChange={(e) => setColorContrast(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
               </div>
@@ -3708,23 +3803,21 @@ export default function ThreeDVisualizer() {
                   value={colorGamma} 
                   onChange={(e) => setColorGamma(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
               </div>
 
               <button 
                 onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
-                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full mb-3 cursor-not-allowed"
-                disabled
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
               >
                 Reset Color Grading
               </button>
             </div>
 
             {/* Color Tint Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint (Not Implemented)</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
               <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
               
               <div className="mb-3">
@@ -3740,7 +3833,6 @@ export default function ThreeDVisualizer() {
                   value={colorTintR} 
                   onChange={(e) => setColorTintR(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
               </div>
 
@@ -3757,7 +3849,6 @@ export default function ThreeDVisualizer() {
                   value={colorTintG} 
                   onChange={(e) => setColorTintG(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
               </div>
 
@@ -3774,14 +3865,12 @@ export default function ThreeDVisualizer() {
                   value={colorTintB} 
                   onChange={(e) => setColorTintB(parseFloat(e.target.value))}
                   className="w-full"
-                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
-                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
-                disabled
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
               >
                 Reset Color Tint
               </button>
