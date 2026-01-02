@@ -18,6 +18,11 @@ interface ObjectPropertiesPanelProps {
   onSetCameraDistance?: (value: number) => void;
   onSetCameraHeight?: (value: number) => void;
   onSetCameraRotation?: (value: number) => void;
+  // Letterbox settings (for camera objects)
+  showLetterbox?: boolean;
+  letterboxSize?: number;
+  onSetShowLetterbox?: (value: boolean) => void;
+  onSetLetterboxSize?: (value: number) => void;
 }
 
 export default function ObjectPropertiesPanel({
@@ -29,7 +34,11 @@ export default function ObjectPropertiesPanel({
   cameraRotation,
   onSetCameraDistance,
   onSetCameraHeight,
-  onSetCameraRotation
+  onSetCameraRotation,
+  showLetterbox,
+  letterboxSize,
+  onSetShowLetterbox,
+  onSetLetterboxSize
 }: ObjectPropertiesPanelProps) {
   if (!selectedObject) {
     return (
@@ -249,6 +258,44 @@ export default function ObjectPropertiesPanel({
               />
             </div>
           )}
+
+          {/* Letterbox Controls */}
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <div className="text-xs font-semibold text-gray-300 mb-3">Letterbox (Curtain Effect)</div>
+            
+            <div className="flex items-center gap-2 mb-3">
+              <input
+                type="checkbox"
+                id="cameraLetterbox"
+                checked={showLetterbox || false}
+                onChange={(e) => onSetShowLetterbox?.(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="cameraLetterbox" className="text-sm text-white cursor-pointer">
+                Show Letterbox
+              </label>
+            </div>
+
+            {showLetterbox && (
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Size: {letterboxSize || 0}px
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={letterboxSize || 0}
+                  onChange={(e) => onSetLetterboxSize?.(Number(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Animatable curtain effect - opens/closes like cinema letterbox
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

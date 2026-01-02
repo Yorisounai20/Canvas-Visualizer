@@ -453,45 +453,14 @@ export default function RightPanel({
             </div>
           </div>
 
-          {/* Letterbox Controls */}
-          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
-              Letterbox
-            </h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="showLetterbox"
-                  checked={showLetterbox}
-                  onChange={(e) => onSetShowLetterbox(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer">
-                  Show Letterbox
-                </label>
-              </div>
-
-              {showLetterbox && (
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">
-                    Size: {letterboxSize}px
-                  </label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={letterboxSize}
-                    onChange={(e) => onSetLetterboxSize(Number(e.target.value))}
-                    className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Use keyframes in timeline for animated letterbox
-                  </p>
-                </div>
-              )}
-            </div>
+          {/* Note about Letterbox */}
+          <div className="bg-blue-900 bg-opacity-20 border border-blue-600 rounded-lg p-3">
+            <p className="text-xs text-blue-300">
+              💡 <strong>Letterbox moved to Camera Properties</strong>
+            </p>
+            <p className="text-xs text-blue-400 mt-1">
+              Press <kbd className="px-1 py-0.5 bg-gray-700 rounded text-xs">W</kbd> for Workspace mode, select a camera object to access letterbox (curtain) controls.
+            </p>
           </div>
 
           {/* 3D Text Overlay Controls */}
