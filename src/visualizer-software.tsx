@@ -917,6 +917,7 @@ export default function ThreeDVisualizer() {
       threshold: 0.5, // Default threshold for automated mode
       parameters: {
         backgroundFlash: 0.5,
+        cameraShake: 0,
         vignettePulse: 0,
         saturationBurst: 0
       }
@@ -1566,6 +1567,7 @@ export default function ThreeDVisualizer() {
       let bgFlash = 0;
       let vignetteFlash = 0;
       let saturationFlash = 0;
+      let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
       
       // Reset Post-FX event accumulation values
       let vignetteStrengthPulse = 0;
@@ -1630,6 +1632,16 @@ export default function ThreeDVisualizer() {
             saturationFlash += event.parameters.saturationBurst * intensity;
           }
           
+          // Camera shake from automated parameter events
+          if (event.parameters.cameraShake !== undefined) {
+            const decay = intensity;
+            const frequency = 50;
+            const amplitude = event.parameters.cameraShake * decay;
+            eventShakeX += Math.sin(timeSinceEvent * frequency) * amplitude * 0.1;
+            eventShakeY += Math.cos(timeSinceEvent * frequency * 1.3) * amplitude * 0.1;
+            eventShakeZ += Math.sin(timeSinceEvent * frequency * 0.7) * amplitude * 0.05;
+          }
+          
           // Post-FX: Vignette strength pulse
           if (event.parameters.vignetteStrengthPulse !== undefined) {
             vignetteStrengthPulse += event.parameters.vignetteStrengthPulse * intensity;
@@ -1654,6 +1666,11 @@ export default function ThreeDVisualizer() {
       activeVignetteStrengthPulseRef.current = vignetteStrengthPulse;
       activeContrastBurstRef.current = contrastBurst;
       activeColorTintFlashRef.current = colorTintFlash;
+      
+      // Combine manual shake events with automated parameter event shakes
+      shakeX += eventShakeX;
+      shakeY += eventShakeY;
+      shakeZ += eventShakeZ;
       
       // Store active parameter values in refs (not state to avoid re-renders)
       activeBackgroundFlashRef.current = bgFlash;
@@ -2825,6 +2842,9 @@ export default function ThreeDVisualizer() {
                         <div>Duration: {event.duration}s</div>
                         {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
                           <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
+                        )}
+                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
+                          <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
                         )}
                         {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
                           <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
@@ -4467,6 +4487,36 @@ export default function ThreeDVisualizer() {
                           className="w-full"
                         />
                         <span className="text-xs text-gray-400">{Math.round((event.parameters.backgroundFlash ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera Shake (Automated) */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.cameraShake ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      📷 Camera Shake (Automated)
+                    </label>
+                    {(event.parameters.cameraShake ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.cameraShake ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, cameraShake: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.cameraShake ?? 0) * 100)}%</span>
                       </div>
                     )}
                   </div>
