@@ -308,6 +308,17 @@ Each preset controls:
 - Material colors from user-selected palette
 - Smooth blending when switching between presets
 
+### **Camera Rig System:**
+Professional camera control with:
+- **Keyframe animation** - Smooth interpolation between camera positions
+- **Four rig types** - Orbit, Dolly, Crane, and Custom rigs
+- **Easing functions** - Linear, Ease In, Ease Out, Ease In-Out
+- **Camera shake** - Impact effects synchronized to audio
+- **Null object hierarchy** - Professional transform composition
+
+📚 **[Complete Camera Rig Documentation](CAMERA_RIG_DOCUMENTATION.md)**  
+📖 **[Quick Reference Guide](docs/CAMERA_RIG_QUICK_REFERENCE.md)**
+
 ⚠️ **Current Status:** Animation presets are defined and objects are rendered, but the animation playback logic is not yet integrated into the new UI. Objects appear static. This is a priority for the next development phase.
 
 ---
@@ -661,6 +672,22 @@ npm run lint         # Run ESLint
 - **Lyrics Overlay System** - Synchronized text display
 - **Layer Grouping** - Organize complex compositions (Editor mode)
 - **Effect Stack** - Multiple effects per layer
+
+---
+
+## **Documentation**
+
+### **Core Documentation:**
+- **[README.md](README.md)** - Project overview and getting started guide
+- **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig documentation
+- **[Camera Rig Quick Reference](docs/CAMERA_RIG_QUICK_REFERENCE.md)** - Quick reference for developers
+
+### **Technical Guides:**
+- Camera keyframe animation with smooth interpolation
+- Four camera rig types (Orbit, Dolly, Crane, Custom)
+- Easing functions and motion curves
+- Camera shake system for impact effects
+- Audio-reactive camera positioning
 
 ---
 
