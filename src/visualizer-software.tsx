@@ -192,7 +192,8 @@ export default function ThreeDVisualizer() {
     if (e.target.files?.[0]) {
       const f = e.target.files[0];
       setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
-      initAudio(f);
+      // Use multi-track system for all audio loading
+      addAudioTrack(f);
     }
   };
 
@@ -657,6 +658,9 @@ export default function ThreeDVisualizer() {
         // For backward compatibility, set the first track to the old refs
         audioBufferRef.current = buffer;
         analyserRef.current = analyser;
+        // Generate waveform data for the main waveform display
+        const waveform = generateWaveformData(buffer);
+        setWaveformData(waveform);
       } else {
         setDuration(Math.max(duration, buffer.duration));
       }
