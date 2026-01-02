@@ -508,7 +508,7 @@ export default function ThreeDVisualizer() {
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
-    setCameraRotation(DEFAULT_CAMERA_ROTATION);
+    // Rotation is now keyframe-only, don't reset it here
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
   };
 
@@ -1489,7 +1489,7 @@ export default function ThreeDVisualizer() {
       } else {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
-        activeCameraRotation = cameraRotation;
+        activeCameraRotation = 0; // Default to 0 when no keyframes (rotation only via keyframes)
       }
 
       // Animate letterbox based on keyframes (only if animation is enabled)
@@ -2961,11 +2961,8 @@ export default function ThreeDVisualizer() {
                   <label className="text-xs text-gray-400 block mb-1">Height Offset: {cameraHeight}</label>
                   <input type="range" min="-10" max="10" step="1" value={cameraHeight} onChange={(e) => setCameraHeight(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Rotation Offset: {(cameraRotation * 180 / Math.PI).toFixed(0)}°</label>
-                  <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-                <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+                <p className="text-xs text-gray-400 mt-2">ℹ️ Camera rotation is controlled via keyframes below. Use distance and height as defaults when no keyframes are active.</p>
+                <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded mt-2">Reset Camera</button>
               </div>
             </div>
             
