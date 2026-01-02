@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
 
 interface LogEntry {
@@ -59,6 +60,8 @@ export default function ThreeDVisualizer() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const idleAnimationRef = useRef<number | null>(null);
+  const orbitControlsRef = useRef<OrbitControls | null>(null);
   const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -1470,20 +1473,136 @@ export default function ThreeDVisualizer() {
       pathLine
     };
     
+    // Initialize OrbitControls for mouse camera control (like Editor/Blender)
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.05;
+    orbitControls.screenSpacePanning = false;
+    orbitControls.minDistance = 5;
+    orbitControls.maxDistance = 50;
+    orbitControls.target.set(0, 0, 0); // Look at scene origin
+    orbitControls.enabled = !isPlaying; // Disable when playing (keyframes/auto-rotate take over)
+    orbitControlsRef.current = orbitControls;
+    
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
-    let idleAnimFrame: number;
+    // Continuous idle render loop - keeps canvas live like Blender/Editor mode
     const idleRender = () => {
-      idleAnimFrame = requestAnimationFrame(idleRender);
+      // Stop idle render when playing (main animation loop takes over)
+      if (isPlaying) {
+        if (idleAnimationRef.current) {
+          cancelAnimationFrame(idleAnimationRef.current);
+          idleAnimationRef.current = null;
+        }
+        return;
+      }
+      
+      idleAnimationRef.current = requestAnimationFrame(idleRender);
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        const cam = cameraRef.current;
+        
+        // Update OrbitControls (for damping)
+        if (orbitControlsRef.current) {
+          orbitControlsRef.current.update();
+        }
+        
+        // Only apply keyframe/manual camera positioning if OrbitControls hasn't been used
+        // (Once user interacts with mouse, OrbitControls takes over until play is pressed)
+        if (!orbitControlsRef.current || !orbitControlsRef.current.enabled) {
+          // Update camera position based on current settings (even when not playing)
+          const currentDist = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).distance 
+            : cameraDistance;
+          const currentHeight = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).height 
+            : cameraHeight;
+          const currentRot = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).rotation 
+            : 0;
+          
+          // Simple orbital camera positioning
+          cam.position.set(
+            Math.cos(currentRot) * currentDist,
+            10 + currentHeight,
+            Math.sin(currentRot) * currentDist
+          );
+          cam.lookAt(0, 0, 0);
+        }
+        
+        // Update camera rig hints visibility and position
+        if (rigHintsRef.current.positionMarker && enableRigHints && showRigPosition) {
+          rigHintsRef.current.positionMarker.visible = true;
+          rigHintsRef.current.positionMarker.position.copy(cam.position);
+        } else if (rigHintsRef.current.positionMarker) {
+          rigHintsRef.current.positionMarker.visible = false;
+        }
+        
+        if (rigHintsRef.current.targetMarker && enableRigHints && showRigTarget) {
+          rigHintsRef.current.targetMarker.visible = true;
+          rigHintsRef.current.targetMarker.position.set(0, 0, 0);
+        } else if (rigHintsRef.current.targetMarker) {
+          rigHintsRef.current.targetMarker.visible = false;
+        }
+        
+        if (rigHintsRef.current.connectionLine && enableRigHints && showRigPosition && showRigTarget) {
+          rigHintsRef.current.connectionLine.visible = true;
+          const positions = new Float32Array([
+            cam.position.x, cam.position.y, cam.position.z,
+            0, 0, 0
+          ]);
+          rigHintsRef.current.connectionLine.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        } else if (rigHintsRef.current.connectionLine) {
+          rigHintsRef.current.connectionLine.visible = false;
+        }
+        
+        if (rigHintsRef.current.gridHelper && enableRigHints && showRigGrid) {
+          rigHintsRef.current.gridHelper.visible = true;
+        } else if (rigHintsRef.current.gridHelper) {
+          rigHintsRef.current.gridHelper.visible = false;
+        }
+        
+        // Update path preview
+        if (rigHintsRef.current.pathLine && enableRigHints && showRigPath && cameraKeyframes && cameraKeyframes.length >= 2) {
+          rigHintsRef.current.pathLine.visible = true;
+          const pathPoints: THREE.Vector3[] = [];
+          for (let i = 0; i < cameraKeyframes.length - 1; i++) {
+            const kf1 = cameraKeyframes[i];
+            const kf2 = cameraKeyframes[i + 1];
+            for (let j = 0; j <= 10; j++) {
+              const t = kf1.time + (kf2.time - kf1.time) * (j / 10);
+              const interp = interpolateCameraKeyframes(cameraKeyframes, t);
+              const rot = interp.rotation;
+              const dist = interp.distance;
+              const height = interp.height;
+              pathPoints.push(new THREE.Vector3(
+                Math.cos(rot) * dist,
+                10 + height,
+                Math.sin(rot) * dist
+              ));
+            }
+          }
+          rigHintsRef.current.pathLine.geometry.setFromPoints(pathPoints);
+        } else if (rigHintsRef.current.pathLine) {
+          rigHintsRef.current.pathLine.visible = false;
+        }
+        
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
     };
-    idleAnimFrame = requestAnimationFrame(idleRender);
+    
+    // Start idle render loop
+    idleAnimationRef.current = requestAnimationFrame(idleRender);
 
     return () => {
-      if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
+      if (idleAnimationRef.current) {
+        cancelAnimationFrame(idleAnimationRef.current);
+        idleAnimationRef.current = null;
+      }
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.dispose();
+        orbitControlsRef.current = null;
+      }
       if (rendererRef.current) {
         try {
           if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
@@ -1495,7 +1614,7 @@ export default function ThreeDVisualizer() {
         }
       }
     };
-  }, []);
+  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, enableRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
@@ -1515,6 +1634,13 @@ export default function ThreeDVisualizer() {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // Enable/disable OrbitControls based on play state
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = !isPlaying;
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
