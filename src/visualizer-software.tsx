@@ -2,7 +2,8 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { Trash2, Plus, Play, Square, Video, X } from 'lucide-react';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
 
 interface LogEntry {
   message: string;
@@ -24,8 +25,8 @@ interface AudioTrack {
 
 interface ParameterEvent {
   id: string;
-  time: number; // seconds - when the event triggers
-  duration: number; // seconds - how long the effect lasts
+  startTime: number; // seconds - when the event starts
+  endTime: number; // seconds - when the event ends
   mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
   audioTrackId?: string; // which track to react to (for automated mode)
   threshold?: number; // frequency threshold for automated triggering (0-1)
@@ -46,7 +47,7 @@ interface ParameterEvent {
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
-const DEFAULT_CAMERA_AUTO_ROTATE = true;
+const KEYFRAME_ONLY_ROTATION_SPEED = 0; // Rotation now controlled by keyframes or camera rigs only
 const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
 const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
 const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
@@ -59,6 +60,8 @@ export default function ThreeDVisualizer() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
+  const idleAnimationRef = useRef<number | null>(null);
+  const orbitControlsRef = useRef<OrbitControls | null>(null);
   const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -73,11 +76,30 @@ export default function ThreeDVisualizer() {
     tetras: THREE.Mesh[];
     sphere: THREE.Mesh;
   } | null>(null);
+  
+  // Camera Rig Hint objects
+  const rigHintsRef = useRef<{
+    positionMarker: THREE.Mesh | null;
+    targetMarker: THREE.Mesh | null;
+    pathLine: THREE.Line | null;
+    gridHelper: THREE.GridHelper | null;
+    connectionLine: THREE.Line | null;
+  }>({
+    positionMarker: null,
+    targetMarker: null,
+    pathLine: null,
+    gridHelper: null,
+    connectionLine: null
+  });
+  
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bassColor, setBassColor] = useState('#8a2be2');
   const [midsColor, setMidsColor] = useState('#40e0d0');
   const [highsColor, setHighsColor] = useState('#c8b4ff');
+  const [bassGain, setBassGain] = useState(1.0);
+  const [midsGain, setMidsGain] = useState(1.0);
+  const [highsGain, setHighsGain] = useState(1.0);
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
@@ -88,7 +110,13 @@ export default function ThreeDVisualizer() {
   const [cameraDistance, setCameraDistance] = useState(DEFAULT_CAMERA_DISTANCE);
   const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
-  const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
+  
+  // Camera Rig Visual Hints
+  const [showRigHints, setShowRigHints] = useState(false);
+  const [showRigPosition, setShowRigPosition] = useState(true);
+  const [showRigTarget, setShowRigTarget] = useState(true);
+  const [showRigPath, setShowRigPath] = useState(true);
+  const [showRigGrid, setShowRigGrid] = useState(true);
   
   // NEW: HUD visibility controls
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
@@ -108,6 +136,17 @@ export default function ThreeDVisualizer() {
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
+  
+  // NEW: Post-FX controls
+  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
+  const [vignetteStrength, setVignetteStrength] = useState(0);
+  const [vignetteSoftness, setVignetteSoftness] = useState(0.5);
+  const [colorSaturation, setColorSaturation] = useState(1.0);
+  const [colorContrast, setColorContrast] = useState(1.0);
+  const [colorGamma, setColorGamma] = useState(1.0);
+  const [colorTintR, setColorTintR] = useState(1.0);
+  const [colorTintG, setColorTintG] = useState(1.0);
+  const [colorTintB, setColorTintB] = useState(1.0);
   
   // NEW: Letterbox animation keyframes
   const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
@@ -130,6 +169,7 @@ export default function ThreeDVisualizer() {
   const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
@@ -494,8 +534,7 @@ export default function ThreeDVisualizer() {
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
-    setCameraRotation(DEFAULT_CAMERA_ROTATION);
-    setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
+    // Rotation is now keyframe-only, don't reset it here
   };
 
   // Global keyframe management functions
@@ -805,16 +844,20 @@ export default function ThreeDVisualizer() {
   };
 
   const playMultiTrackAudio = () => {
-    if (!audioContextRef.current || audioTracks.length === 0) return;
+    if (!audioContextRef.current) return;
+    
+    // Use ref to get current tracks
+    const tracks = audioTracksRef.current;
+    if (tracks.length === 0) return;
     
     const ctx = audioContextRef.current;
     const startOffset = pauseTimeRef.current;
     
     // Start all tracks synchronized
-    audioTracks.forEach(track => {
+    tracks.forEach(track => {
       if (!track.buffer) return;
       
-      // Stop existing source if any
+      // Stop existing source if any to prevent duplicates
       if (track.source) {
         try {
           track.source.stop();
@@ -822,6 +865,7 @@ export default function ThreeDVisualizer() {
         } catch (e) {
           // Ignore errors from already stopped sources
         }
+        track.source = null;
       }
       
       // Create new source
@@ -841,28 +885,24 @@ export default function ThreeDVisualizer() {
       track.source = source;
     });
     
-    // Update ref for internal tracking
-    audioTracksRef.current = audioTracks;
-    
     startTimeRef.current = Date.now() - (startOffset * 1000);
     setIsPlaying(true);
   };
 
   const stopMultiTrackAudio = () => {
-    audioTracks.forEach(track => {
+    // Use ref to get current tracks with their sources
+    const tracks = audioTracksRef.current;
+    tracks.forEach(track => {
       if (track.source) {
         try {
           track.source.stop();
           track.source.disconnect();
         } catch (e) {
-          // Ignore errors
+          // Ignore errors from already stopped sources
         }
         track.source = null;
       }
     });
-    
-    // Update ref for internal tracking
-    audioTracksRef.current = audioTracks;
     
     pauseTimeRef.current = currentTime;
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -870,19 +910,34 @@ export default function ThreeDVisualizer() {
   };
 
   const seekMultiTrack = (t: number) => {
-    const play = isPlaying;
-    if (play) stopMultiTrackAudio();
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop all tracks to prevent duplicates
+    if (wasPlaying) {
+      stopMultiTrackAudio();
+    }
+    
+    // Set new position
     pauseTimeRef.current = t;
     setCurrentTime(t);
-    if (play) playMultiTrackAudio();
+    
+    // Restart if it was playing
+    if (wasPlaying) {
+      // Need to use a microtask to ensure state updates have propagated
+      Promise.resolve().then(() => {
+        playMultiTrackAudio();
+      });
+    }
   };
 
   // PHASE 4: Parameter event functions
   const addParameterEvent = () => {
+    const start = currentTime > 0 ? currentTime : 0;
     const newEvent: ParameterEvent = {
       id: `event-${Date.now()}-${Math.random()}`,
-      time: currentTime > 0 ? currentTime : 0,
-      duration: 0.2,
+      startTime: start,
+      endTime: start + 0.2, // Default 200ms duration
       mode: 'manual', // Default to manual mode
       audioTrackId: audioTracks.length > 0 ? audioTracks.find(t => t.active)?.id : undefined,
       threshold: 0.5, // Default threshold for automated mode
@@ -893,7 +948,7 @@ export default function ThreeDVisualizer() {
         saturationBurst: 0
       }
     };
-    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.time - b.time));
+    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.startTime - b.startTime));
     setEditingEventId(newEvent.id);
     setShowEventModal(true);
   };
@@ -1094,9 +1149,9 @@ export default function ThreeDVisualizer() {
   };
 
   const getFreq = (d: Uint8Array) => ({
-    bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
-    mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
-    highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
+    bass: (d.slice(0,10).reduce((a,b)=>a+b,0)/10/255) * bassGain,
+    mids: (d.slice(10,100).reduce((a,b)=>a+b,0)/90/255) * midsGain,
+    highs: (d.slice(100,200).reduce((a,b)=>a+b,0)/100/255) * highsGain
   });
 
   // PHASE 5: Text Animator Functions
@@ -1365,20 +1420,187 @@ export default function ThreeDVisualizer() {
     scene.add(directionalLight);
     lightsRef.current.directional = directionalLight;
     
+    // Create camera rig hint objects
+    // Position marker (camera location)
+    const positionMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true })
+    );
+    positionMarker.visible = false;
+    scene.add(positionMarker);
+    
+    // Target marker (look-at point)
+    const targetMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true })
+    );
+    targetMarker.visible = false;
+    scene.add(targetMarker);
+    
+    // Connection line (from camera to target)
+    const connectionLineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0)
+    ]);
+    const connectionLine = new THREE.Line(
+      connectionLineGeometry,
+      new THREE.LineBasicMaterial({ color: 0x00ff00, opacity: 0.5, transparent: true })
+    );
+    connectionLine.visible = false;
+    scene.add(connectionLine);
+    
+    // Grid helper (reference grid)
+    const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+    gridHelper.visible = false;
+    scene.add(gridHelper);
+    
+    // Path preview line (camera keyframe path)
+    const pathLineGeometry = new THREE.BufferGeometry();
+    const pathLine = new THREE.Line(
+      pathLineGeometry,
+      new THREE.LineBasicMaterial({ color: 0xff00ff, opacity: 0.7, transparent: true, linewidth: 2 })
+    );
+    pathLine.visible = false;
+    scene.add(pathLine);
+    
+    rigHintsRef.current = {
+      positionMarker,
+      targetMarker,
+      connectionLine,
+      gridHelper,
+      pathLine
+    };
+    
+    // Initialize OrbitControls for mouse camera control (like Editor/Blender)
+    const orbitControls = new OrbitControls(camera, renderer.domElement);
+    orbitControls.enableDamping = true;
+    orbitControls.dampingFactor = 0.05;
+    orbitControls.screenSpacePanning = false;
+    orbitControls.minDistance = 5;
+    orbitControls.maxDistance = 50;
+    orbitControls.target.set(0, 0, 0); // Look at scene origin
+    orbitControls.enabled = !isPlaying; // Disable when playing (keyframes/auto-rotate take over)
+    orbitControlsRef.current = orbitControls;
+    
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
-    let idleAnimFrame: number;
+    // Continuous idle render loop - keeps canvas live like Blender/Editor mode
     const idleRender = () => {
-      idleAnimFrame = requestAnimationFrame(idleRender);
+      // Stop idle render when playing (main animation loop takes over)
+      if (isPlaying) {
+        if (idleAnimationRef.current) {
+          cancelAnimationFrame(idleAnimationRef.current);
+          idleAnimationRef.current = null;
+        }
+        return;
+      }
+      
+      idleAnimationRef.current = requestAnimationFrame(idleRender);
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        const cam = cameraRef.current;
+        
+        // Update OrbitControls (for damping)
+        if (orbitControlsRef.current) {
+          orbitControlsRef.current.update();
+        }
+        
+        // Only apply keyframe/manual camera positioning if OrbitControls hasn't been used
+        // (Once user interacts with mouse, OrbitControls takes over until play is pressed)
+        if (!orbitControlsRef.current || !orbitControlsRef.current.enabled) {
+          // Update camera position based on current settings (even when not playing)
+          const currentDist = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).distance 
+            : cameraDistance;
+          const currentHeight = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).height 
+            : cameraHeight;
+          const currentRot = cameraKeyframes && cameraKeyframes.length > 0 
+            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).rotation 
+            : 0;
+          
+          // Simple orbital camera positioning
+          cam.position.set(
+            Math.cos(currentRot) * currentDist,
+            10 + currentHeight,
+            Math.sin(currentRot) * currentDist
+          );
+          cam.lookAt(0, 0, 0);
+        }
+        
+        // Update camera rig hints visibility and position
+        if (rigHintsRef.current.positionMarker && showRigHints && showRigPosition) {
+          rigHintsRef.current.positionMarker.visible = true;
+          rigHintsRef.current.positionMarker.position.copy(cam.position);
+        } else if (rigHintsRef.current.positionMarker) {
+          rigHintsRef.current.positionMarker.visible = false;
+        }
+        
+        if (rigHintsRef.current.targetMarker && showRigHints && showRigTarget) {
+          rigHintsRef.current.targetMarker.visible = true;
+          rigHintsRef.current.targetMarker.position.set(0, 0, 0);
+        } else if (rigHintsRef.current.targetMarker) {
+          rigHintsRef.current.targetMarker.visible = false;
+        }
+        
+        if (rigHintsRef.current.connectionLine && showRigHints && showRigPosition && showRigTarget) {
+          rigHintsRef.current.connectionLine.visible = true;
+          const positions = new Float32Array([
+            cam.position.x, cam.position.y, cam.position.z,
+            0, 0, 0
+          ]);
+          rigHintsRef.current.connectionLine.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        } else if (rigHintsRef.current.connectionLine) {
+          rigHintsRef.current.connectionLine.visible = false;
+        }
+        
+        if (rigHintsRef.current.gridHelper && showRigHints && showRigGrid) {
+          rigHintsRef.current.gridHelper.visible = true;
+        } else if (rigHintsRef.current.gridHelper) {
+          rigHintsRef.current.gridHelper.visible = false;
+        }
+        
+        // Update path preview
+        if (rigHintsRef.current.pathLine && showRigHints && showRigPath && cameraKeyframes && cameraKeyframes.length >= 2) {
+          rigHintsRef.current.pathLine.visible = true;
+          const pathPoints: THREE.Vector3[] = [];
+          for (let i = 0; i < cameraKeyframes.length - 1; i++) {
+            const kf1 = cameraKeyframes[i];
+            const kf2 = cameraKeyframes[i + 1];
+            for (let j = 0; j <= 10; j++) {
+              const t = kf1.time + (kf2.time - kf1.time) * (j / 10);
+              const interp = interpolateCameraKeyframes(cameraKeyframes, t);
+              const rot = interp.rotation;
+              const dist = interp.distance;
+              const height = interp.height;
+              pathPoints.push(new THREE.Vector3(
+                Math.cos(rot) * dist,
+                10 + height,
+                Math.sin(rot) * dist
+              ));
+            }
+          }
+          rigHintsRef.current.pathLine.geometry.setFromPoints(pathPoints);
+        } else if (rigHintsRef.current.pathLine) {
+          rigHintsRef.current.pathLine.visible = false;
+        }
+        
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
     };
-    idleAnimFrame = requestAnimationFrame(idleRender);
+    
+    // Start idle render loop
+    idleAnimationRef.current = requestAnimationFrame(idleRender);
 
     return () => {
-      if (idleAnimFrame) cancelAnimationFrame(idleAnimFrame);
+      if (idleAnimationRef.current) {
+        cancelAnimationFrame(idleAnimationRef.current);
+        idleAnimationRef.current = null;
+      }
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.dispose();
+        orbitControlsRef.current = null;
+      }
       if (rendererRef.current) {
         try {
           if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
@@ -1390,7 +1612,7 @@ export default function ThreeDVisualizer() {
         }
       }
     };
-  }, []);
+  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
@@ -1410,6 +1632,13 @@ export default function ThreeDVisualizer() {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // Enable/disable OrbitControls based on play state
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      orbitControlsRef.current.enabled = !isPlaying;
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
@@ -1460,7 +1689,7 @@ export default function ThreeDVisualizer() {
       } else {
         activeCameraDistance = cameraDistance;
         activeCameraHeight = cameraHeight;
-        activeCameraRotation = cameraRotation;
+        activeCameraRotation = 0; // Default to 0 when no keyframes (rotation only via keyframes)
       }
 
       // Animate letterbox based on keyframes (only if animation is enabled)
@@ -1519,7 +1748,7 @@ export default function ThreeDVisualizer() {
         }
       }
 
-      // Calculate camera shake offset (from existing shake events)
+      // Calculate camera shake offset (from Effects tab shake events only)
       let shakeX = 0, shakeY = 0, shakeZ = 0;
       for (const shake of cameraShakes) {
         const timeSinceShake = t - shake.time;
@@ -1547,12 +1776,12 @@ export default function ThreeDVisualizer() {
       
       for (const event of parameterEvents) {
         let shouldTrigger = false;
-        let effectStartTime = event.time;
+        let effectStartTime = event.startTime;
+        const eventDuration = event.endTime - event.startTime;
         
         if (event.mode === 'manual') {
-          // Manual mode: trigger at specific time
-          const timeSinceEvent = t - event.time;
-          shouldTrigger = timeSinceEvent >= 0 && timeSinceEvent < event.duration;
+          // Manual mode: trigger between startTime and endTime
+          shouldTrigger = t >= event.startTime && t < event.endTime;
         } else if (event.mode === 'automated') {
           // Automated mode: trigger when audio track exceeds threshold
           if (event.audioTrackId) {
@@ -1572,7 +1801,7 @@ export default function ThreeDVisualizer() {
                 }
                 effectStartTime = activeAutomatedEventsRef.current.get(event.id)!;
                 const timeSinceStart = t - effectStartTime;
-                shouldTrigger = timeSinceStart < event.duration;
+                shouldTrigger = timeSinceStart < eventDuration;
               } else {
                 // Bass dropped below threshold, clean up if effect was active
                 activeAutomatedEventsRef.current.delete(event.id);
@@ -1583,7 +1812,7 @@ export default function ThreeDVisualizer() {
         
         if (shouldTrigger) {
           const timeSinceEvent = t - effectStartTime;
-          const progress = timeSinceEvent / event.duration;
+          const progress = timeSinceEvent / eventDuration;
           // Ease out cubic for smooth return
           const easeOut = 1 - Math.pow(1 - progress, 3);
           const intensity = 1 - easeOut;
@@ -1603,7 +1832,7 @@ export default function ThreeDVisualizer() {
             saturationFlash += event.parameters.saturationBurst * intensity;
           }
           
-          // Camera shake from events
+          // Camera shake from automated parameter events
           if (event.parameters.cameraShake !== undefined) {
             const decay = intensity;
             const frequency = 50;
@@ -1638,7 +1867,7 @@ export default function ThreeDVisualizer() {
       activeContrastBurstRef.current = contrastBurst;
       activeColorTintFlashRef.current = colorTintFlash;
       
-      // Combine event shake with existing camera shake
+      // Combine manual shake events with automated parameter event shakes
       shakeX += eventShakeX;
       shakeY += eventShakeY;
       shakeZ += eventShakeZ;
@@ -1658,7 +1887,7 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         const r = activeCameraDistance - f.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
         cam.lookAt(0,0,0);
@@ -1892,8 +2121,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
-        const a = rotationSpeed + activeCameraRotation;
+        const a = activeCameraRotation;
         cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
@@ -1975,7 +2203,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
@@ -2329,6 +2557,89 @@ export default function ThreeDVisualizer() {
         rend.setClearColor(baseColor);
       }
 
+      // Update camera rig visual hints
+      if (showRigHints && rigHintsRef.current) {
+        const hints = rigHintsRef.current;
+        
+        // Update position marker (camera location)
+        if (hints.positionMarker && showRigPosition) {
+          hints.positionMarker.visible = true;
+          hints.positionMarker.position.copy(cam.position);
+        } else if (hints.positionMarker) {
+          hints.positionMarker.visible = false;
+        }
+        
+        // Update target marker (look-at point - scene origin)
+        if (hints.targetMarker && showRigTarget) {
+          hints.targetMarker.visible = true;
+          hints.targetMarker.position.set(0, 0, 0);
+        } else if (hints.targetMarker) {
+          hints.targetMarker.visible = false;
+        }
+        
+        // Update connection line
+        if (hints.connectionLine && showRigPosition && showRigTarget) {
+          hints.connectionLine.visible = true;
+          const positions = hints.connectionLine.geometry.attributes.position;
+          if (positions) {
+            positions.setXYZ(0, cam.position.x, cam.position.y, cam.position.z);
+            positions.setXYZ(1, 0, 0, 0);
+            positions.needsUpdate = true;
+          }
+        } else if (hints.connectionLine) {
+          hints.connectionLine.visible = false;
+        }
+        
+        // Update grid helper
+        if (hints.gridHelper && showRigGrid) {
+          hints.gridHelper.visible = true;
+        } else if (hints.gridHelper) {
+          hints.gridHelper.visible = false;
+        }
+        
+        // Update keyframe path preview
+        if (hints.pathLine && showRigPath && cameraKeyframes.length >= 2) {
+          hints.pathLine.visible = true;
+          // Generate path from camera keyframes
+          const pathPoints: THREE.Vector3[] = [];
+          const sortedKf = [...cameraKeyframes].sort((a, b) => a.time - b.time);
+          
+          // Sample points along the interpolated path
+          for (let i = 0; i < sortedKf.length - 1; i++) {
+            const kf1 = sortedKf[i];
+            const kf2 = sortedKf[i + 1];
+            const steps = 10;
+            
+            for (let s = 0; s <= steps; s++) {
+              const progress = s / steps;
+              const interpolated = interpolateCameraKeyframes(cameraKeyframes, kf1.time + (kf2.time - kf1.time) * progress);
+              const angle = interpolated.rotation;
+              const dist = interpolated.distance;
+              const height = interpolated.height;
+              
+              const x = Math.cos(angle) * dist;
+              const y = height;
+              const z = Math.sin(angle) * dist;
+              pathPoints.push(new THREE.Vector3(x, y, z));
+            }
+          }
+          
+          if (pathPoints.length > 0) {
+            hints.pathLine.geometry.setFromPoints(pathPoints);
+            hints.pathLine.geometry.attributes.position.needsUpdate = true;
+          }
+        } else if (hints.pathLine) {
+          hints.pathLine.visible = false;
+        }
+      } else if (rigHintsRef.current) {
+        // Hide all hints
+        if (rigHintsRef.current.positionMarker) rigHintsRef.current.positionMarker.visible = false;
+        if (rigHintsRef.current.targetMarker) rigHintsRef.current.targetMarker.visible = false;
+        if (rigHintsRef.current.connectionLine) rigHintsRef.current.connectionLine.visible = false;
+        if (rigHintsRef.current.gridHelper) rigHintsRef.current.gridHelper.visible = false;
+        if (rigHintsRef.current.pathLine) rigHintsRef.current.pathLine.visible = false;
+      }
+
       // PHASE 5: Mask Reveals - Apply masks to renderer (post-render effect)
       // Note: Full mask implementation would require shader-based rendering or stencil buffer
       // For now, we'll prepare the mask data and apply basic visibility controls
@@ -2468,22 +2779,27 @@ export default function ThreeDVisualizer() {
     };
   }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
-  // Handle ESC key to close modals
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showExportModal) {
+        if (showKeyboardShortcuts) {
+          setShowKeyboardShortcuts(false);
+        } else if (showExportModal) {
           setShowExportModal(false);
         } else if (showEventModal) {
           setShowEventModal(false);
           setEditingEventId(null);
         }
+      } else if (e.key === 'g' || e.key === 'G') {
+        // Toggle camera rig hints
+        setShowRigHints(prev => !prev);
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -2492,15 +2808,27 @@ export default function ThreeDVisualizer() {
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
           
-          {/* Export Button - Top Right */}
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="absolute top-0 right-0 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-            title="Video Export"
-          >
-            <Video size={18} />
-            <span className="text-sm font-semibold">Export</span>
-          </button>
+          {/* Export and Help Buttons - Top Right */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            {/* Keyboard Shortcuts Button */}
+            <button
+              onClick={() => setShowKeyboardShortcuts(true)}
+              className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
+              title="Keyboard Shortcuts (?)"
+            >
+              <BadgeHelp size={18} />
+            </button>
+            
+            {/* Export Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              title="Video Export"
+            >
+              <Video size={18} />
+              <span className="text-sm font-semibold">Export</span>
+            </button>
+          </div>
         </div>
 
         <div className="relative">
@@ -2560,7 +2888,7 @@ export default function ThreeDVisualizer() {
             {audioReady && duration > 0 && (
               <div className="flex items-center gap-3">
                 <input 
-                  type="range" 
+                  type="range" id="currentTime" name="currentTime" 
                   min="0" 
                   max={duration} 
                   step="0.1" 
@@ -2660,7 +2988,7 @@ export default function ThreeDVisualizer() {
                 <label className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded cursor-pointer flex items-center gap-1">
                   <Plus size={14} /> Add Track
                   <input 
-                    type="file" 
+                    type="file" id="file-field-2867" name="file-field-2867" 
                     accept="audio/*" 
                     onChange={(e) => { if (e.target.files?.[0]) addAudioTrack(e.target.files[0]); }}
                     className="hidden"
@@ -2743,7 +3071,7 @@ export default function ThreeDVisualizer() {
                         <label className="flex-1 flex items-center gap-2">
                           <span className="text-xs text-gray-400">Vol</span>
                           <input
-                            type="range"
+                            type="range" id="range-field-2950" name="range-field-2950"
                             min="0"
                             max="1"
                             step="0.01"
@@ -2783,7 +3111,7 @@ export default function ThreeDVisualizer() {
                       <div className="flex items-center justify-between mb-1">
                         <div>
                           <span className="text-white font-medium">
-                            {event.mode === 'manual' ? `@ ${formatTimeInput(event.time)}` : '🤖 Automated'}
+                            {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
                           </span>
                           {event.mode === 'automated' && event.audioTrackId && (
                             <span className="text-gray-400 ml-2">
@@ -2810,12 +3138,12 @@ export default function ThreeDVisualizer() {
                         </div>
                       </div>
                       <div className="text-gray-400 space-y-0.5">
-                        <div>Duration: {event.duration}s</div>
+                        <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
                         {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
                           <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
                         )}
                         {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
-                          <div>📷 Shake: {Math.round(event.parameters.cameraShake * 100)}%</div>
+                          <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
                         )}
                         {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
                           <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
@@ -2845,25 +3173,69 @@ export default function ThreeDVisualizer() {
         {activeTab === 'controls' && (
           <div>
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
-              <div className="mb-3 pb-3 border-b border-gray-600">
-                <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-                <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
-                <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
-              </div>
-              <div className="flex gap-2 mb-2">
-                <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
-                <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
-              </div>
-              <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
-            </div>
-
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" id="bassColor" name="bassColor" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" id="midsColor" name="midsColor" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+                <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" id="highsColor" name="highsColor" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+              </div>
+            </div>
+            
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Bass Gain</label>
+                    <span className="text-xs text-cyan-300">{bassGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" id="bassGain" name="bassGain" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={bassGain} 
+                    onChange={(e) => setBassGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Mids Gain</label>
+                    <span className="text-xs text-cyan-300">{midsGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" id="midsGain" name="midsGain" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={midsGain} 
+                    onChange={(e) => setMidsGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Highs Gain</label>
+                    <span className="text-xs text-cyan-300">{highsGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" id="highsGain" name="highsGain" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={highsGain} 
+                    onChange={(e) => setHighsGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <button 
+                  onClick={() => { setBassGain(1.0); setMidsGain(1.0); setHighsGain(1.0); }}
+                  className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                >
+                  Reset Frequency Gains
+                </button>
               </div>
             </div>
           </div>
@@ -2876,23 +3248,16 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">📷 Global Camera Controls</h3>
               <p className="text-xs text-gray-400 mb-3">These settings apply when no keyframes are active.</p>
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="autoRotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">Auto-Rotate Camera</label>
-                </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Zoom Distance: {cameraDistance}</label>
-                  <input type="range" min="5" max="50" step="1" value={cameraDistance} onChange={(e) => setCameraDistance(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  <input type="range" id="cameraDistance" name="cameraDistance" min="5" max="50" step="1" value={cameraDistance} onChange={(e) => setCameraDistance(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Height Offset: {cameraHeight}</label>
-                  <input type="range" min="-10" max="10" step="1" value={cameraHeight} onChange={(e) => setCameraHeight(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  <input type="range" id="cameraHeight" name="cameraHeight" min="-10" max="10" step="1" value={cameraHeight} onChange={(e) => setCameraHeight(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Rotation Offset: {(cameraRotation * 180 / Math.PI).toFixed(0)}°</label>
-                  <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-                <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
+                <p className="text-xs text-gray-400 mt-2">ℹ️ Camera rotation is controlled via keyframes below. Use distance and height as defaults when no keyframes are active.</p>
+                <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded mt-2">Reset Camera</button>
               </div>
             </div>
             
@@ -2901,10 +3266,6 @@ export default function ThreeDVisualizer() {
               <p className="text-xs text-gray-400 mb-3">Control what information is shown on the visualization canvas.</p>
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showPresetDisplay" className="text-sm text-white cursor-pointer">Show Current Preset</label>
-                </div>
-                <div className="flex items-center gap-3">
                   <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
                 </div>
@@ -2912,6 +3273,80 @@ export default function ThreeDVisualizer() {
                   <input type="checkbox" id="showBorder" checked={showBorder} onChange={(e) => setShowBorder(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showBorder" className="text-sm text-white cursor-pointer">Show Canvas Border</label>
                 </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🔍 Camera Rig Visual Hints</h3>
+              <p className="text-xs text-gray-400 mb-3">Toggle visual guides to help understand camera positioning and movement.</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="showRigHints" 
+                    checked={showRigHints} 
+                    onChange={(e) => setShowRigHints(e.target.checked)} 
+                    className="w-4 h-4 cursor-pointer" 
+                  />
+                  <label htmlFor="showRigHints" className="text-sm text-white cursor-pointer font-semibold">Enable Visual Hints</label>
+                </div>
+                
+                {showRigHints && (
+                  <div className="ml-6 space-y-2 mt-2 border-l-2 border-cyan-500 pl-3">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigPosition" 
+                        checked={showRigPosition} 
+                        onChange={(e) => setShowRigPosition(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigPosition" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-cyan-400">●</span> Camera Position Marker
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigTarget" 
+                        checked={showRigTarget} 
+                        onChange={(e) => setShowRigTarget(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigTarget" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-yellow-400">●</span> Look-At Target Marker
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigPath" 
+                        checked={showRigPath} 
+                        onChange={(e) => setShowRigPath(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigPath" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-purple-400">━</span> Keyframe Path Preview
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigGrid" 
+                        checked={showRigGrid} 
+                        onChange={(e) => setShowRigGrid(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigGrid" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-gray-500">▦</span> Reference Grid
+                      </label>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-2">
+                  <strong>Tip:</strong> Use 'G' key to quickly toggle hints on/off during playback
+                </p>
               </div>
             </div>
           </div>
@@ -2947,7 +3382,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(shake.time)}</label>
                         <input 
-                          type="text" 
+                          type="text" id="time-formattime-shake-time" name="time-formattime-shake-time" 
                           value={formatTime(shake.time)} 
                           onChange={(e) => updateCameraShake(index, 'time', parseTime(e.target.value))} 
                           className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
@@ -2957,7 +3392,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Intensity: {shake.intensity.toFixed(1)}</label>
                         <input 
-                          type="range" 
+                          type="range" id="intensity-shake-intensity-tofixed-1" name="intensity-shake-intensity-tofixed-1" 
                           min="1" 
                           max="20" 
                           step="0.5" 
@@ -2970,7 +3405,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Duration: {shake.duration.toFixed(2)}s</label>
                         <input 
-                          type="range" 
+                          type="range" id="duration-shake-duration-tofixed-2-s" name="duration-shake-duration-tofixed-2-s" 
                           min="0.05" 
                           max="1" 
                           step="0.05" 
@@ -2993,11 +3428,11 @@ export default function ThreeDVisualizer() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Background Color</label>
-                  <input type="color" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  <input type="color" id="backgroundColor" name="backgroundColor" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Border Color</label>
-                  <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  <input type="color" id="borderColor" name="borderColor" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
               </div>
             </div>
@@ -3029,7 +3464,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Max Curtain Height (px) - affects both top & bottom bars</label>
                       <input 
-                        type="number" 
+                        type="number" id="maxLetterboxHeight" name="maxLetterboxHeight" 
                         min="50" 
                         max="500" 
                         step="10" 
@@ -3080,7 +3515,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
                           <input 
-                            type="number" 
+                            type="number" id="time-s" name="time-s" 
                             min="0" 
                             max={duration}
                             step="0.1" 
@@ -3092,7 +3527,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
                           <input 
-                            type="number" 
+                            type="number" id="size-px" name="size-px" 
                             min="0" 
                             max="100" 
                             step="5" 
@@ -3107,7 +3542,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
                           <input 
-                            type="number" 
+                            type="number" id="duration-s-1" name="duration-s-1" 
                             min="0" 
                             max="10" 
                             step="0.1" 
@@ -3163,7 +3598,7 @@ export default function ThreeDVisualizer() {
               {showLetterbox && letterboxKeyframes.length === 0 && (
                 <div className="mt-3">
                   <label className="text-xs text-gray-400 block mb-1">Manual Size: {letterboxSize}px</label>
-                  <input type="range" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  <input type="range" id="letterboxSize" name="letterboxSize" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
               )}
             </div>
@@ -3174,11 +3609,11 @@ export default function ThreeDVisualizer() {
               <div className="space-y-3">
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Ambient Light: {(ambientLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  <input type="range" id="ambientLightIntensity" name="ambientLightIntensity" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Directional Light: {(directionalLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  <input type="range" id="directionalLightIntensity" name="directionalLightIntensity" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
               </div>
             </div>
@@ -3220,7 +3655,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
                       <input 
-                        type="text" 
+                        type="text" id="time-formattime-kf-time" name="time-formattime-kf-time" 
                         value={formatTime(kf.time)} 
                         onChange={(e) => updateKeyframe(kfIndex, 'time', parseTime(e.target.value))} 
                         className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded" 
@@ -3244,7 +3679,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
                       <input 
-                        type="range" 
+                        type="range" id="distance-kf-distance-tofixed-1" name="distance-kf-distance-tofixed-1" 
                         min="5" 
                         max="50" 
                         step="0.5" 
@@ -3257,7 +3692,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
                       <input 
-                        type="range" 
+                        type="range" id="height-kf-height-tofixed-1" name="height-kf-height-tofixed-1" 
                         min="-10" 
                         max="10" 
                         step="0.5" 
@@ -3270,7 +3705,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
                       <input 
-                        type="range" 
+                        type="range" id="rotation-kf-rotation-180-math-pi-tofixed-0" name="rotation-kf-rotation-180-math-pi-tofixed-0" 
                         min="0" 
                         max={Math.PI * 2} 
                         step="0.05" 
@@ -3291,14 +3726,24 @@ export default function ThreeDVisualizer() {
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
           <div>
+            {/* Limitations Notice */}
+            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Post-Processing Effects - Limitations</h3>
+              <p className="text-xs text-yellow-200">
+                The Post-FX controls below require WebGL shader-based post-processing (EffectComposer, passes) which is not yet implemented. 
+                These controls will not affect the visualization until the rendering pipeline is updated to support post-processing effects.
+              </p>
+            </div>
+
             {/* Blend Mode Section */}
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
-              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually (not yet implemented)</p>
               <select 
                 value={blendMode} 
                 onChange={(e) => setBlendMode(e.target.value as any)}
                 className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
+                disabled
               >
                 <option value="normal">Normal (Standard)</option>
                 <option value="additive">Additive (Brighten)</option>
@@ -3308,8 +3753,8 @@ export default function ThreeDVisualizer() {
             </div>
 
             {/* Vignette Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
               
               <div className="mb-3">
@@ -3318,13 +3763,14 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{vignetteStrength.toFixed(2)}</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="vignetteStrength" name="vignetteStrength" 
                   min="0" 
                   max="1" 
                   step="0.01" 
                   value={vignetteStrength} 
                   onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3334,27 +3780,29 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{vignetteSoftness.toFixed(2)}</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="vignetteSoftness" name="vignetteSoftness" 
                   min="0" 
                   max="1" 
                   step="0.01" 
                   value={vignetteSoftness} 
                   onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Vignette
               </button>
             </div>
 
             {/* Color Grading Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
               
               <div className="mb-3">
@@ -3363,13 +3811,14 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorSaturation.toFixed(2)}x</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorSaturation" name="colorSaturation" 
                   min="0" 
                   max="2" 
                   step="0.01" 
                   value={colorSaturation} 
                   onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
               </div>
@@ -3380,13 +3829,14 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorContrast.toFixed(2)}x</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorContrast" name="colorContrast" 
                   min="0.5" 
                   max="2" 
                   step="0.01" 
                   value={colorContrast} 
                   onChange={(e) => setColorContrast(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
               </div>
@@ -3397,28 +3847,30 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorGamma.toFixed(2)}</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorGamma" name="colorGamma" 
                   min="0.5" 
                   max="2" 
                   step="0.01" 
                   value={colorGamma} 
                   onChange={(e) => setColorGamma(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
               </div>
 
               <button 
                 onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full mb-3 cursor-not-allowed"
+                disabled
               >
                 Reset Color Grading
               </button>
             </div>
 
             {/* Color Tint Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
               
               <div className="mb-3">
@@ -3427,13 +3879,14 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorTintR.toFixed(2)}x</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorTintR" name="colorTintR" 
                   min="0" 
                   max="2" 
                   step="0.01" 
                   value={colorTintR} 
                   onChange={(e) => setColorTintR(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3443,13 +3896,14 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorTintG.toFixed(2)}x</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorTintG" name="colorTintG" 
                   min="0" 
                   max="2" 
                   step="0.01" 
                   value={colorTintG} 
                   onChange={(e) => setColorTintG(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3459,19 +3913,21 @@ export default function ThreeDVisualizer() {
                   <span className="text-xs text-cyan-300">{colorTintB.toFixed(2)}x</span>
                 </div>
                 <input 
-                  type="range" 
+                  type="range" id="colorTintB" name="colorTintB" 
                   min="0" 
                   max="2" 
                   step="0.01" 
                   value={colorTintB} 
                   onChange={(e) => setColorTintB(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Color Tint
               </button>
@@ -3494,8 +3950,8 @@ export default function ThreeDVisualizer() {
                     <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div><label className="text-xs text-gray-400">Start</label><input type="text" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                    <div><label className="text-xs text-gray-400">End</label><input type="text" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">Start</label><input type="text" id="start" name="start" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">End</label><input type="text" id="text-input-2" name="text-input-2" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
                   </div>
                   <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
                     {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
@@ -3509,6 +3965,22 @@ export default function ThreeDVisualizer() {
         {/* PHASE 5: Text Animator Tab */}
         {activeTab === 'textAnimator' && (
           <div>
+            {/* Song Name Overlay Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
+              <div className="mb-3 pb-3 border-b border-gray-600">
+                <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
+                <input type="file" id="custom-font-typeface-json" name="custom-font-typeface-json" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
+                <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <input type="text" id="customSongName" name="customSongName" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
+                <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
+              </div>
+              <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
+            </div>
+
+            {/* Text Animator Section */}
             <div className="mb-4">
               <h3 className="text-lg font-bold text-purple-400 mb-2">📝 Text Animator</h3>
               <p className="text-sm text-gray-400 mb-4">Create per-character animated text with customizable offsets and stagger timing</p>
@@ -3550,7 +4022,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Text</label>
                         <input 
-                          type="text" 
+                          type="text" id="text" name="text" 
                           value={kf.text}
                           onChange={(e) => updateTextAnimatorKeyframe(kf.id, { text: e.target.value })}
                           className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
@@ -3592,7 +4064,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Stagger (s)</label>
                         <input 
-                          type="number" 
+                          type="number" id="stagger-s" name="stagger-s" 
                           step="0.01"
                           min="0"
                           max="1"
@@ -3604,7 +4076,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Duration (s)</label>
                         <input 
-                          type="number" 
+                          type="number" id="duration-s-2" name="duration-s-2" 
                           step="0.1"
                           min="0.1"
                           max="5"
@@ -3618,7 +4090,7 @@ export default function ThreeDVisualizer() {
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm text-gray-300">
                         <input 
-                          type="checkbox" 
+                          type="checkbox" id="checkbox-field-3973" name="checkbox-field-3973" 
                           checked={kf.visible}
                           onChange={(e) => updateTextAnimatorKeyframe(kf.id, { visible: e.target.checked })}
                           className="rounded"
@@ -3642,6 +4114,17 @@ export default function ThreeDVisualizer() {
         {/* PHASE 5: Masks Tab */}
         {activeTab === 'masks' && (
           <div>
+            {/* Implementation Status Notice */}
+            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Masks - Advanced Feature (Not Yet Implemented)</h3>
+              <p className="text-xs text-yellow-200 mb-2">
+                The Masks feature requires WebGL shader-based rendering or stencil buffer implementation, which is not currently available in the rendering pipeline.
+              </p>
+              <p className="text-xs text-yellow-200">
+                UI controls below allow you to configure mask properties, but they won't affect the visualization until the rendering system is updated with WebGL post-processing support.
+              </p>
+            </div>
+
             <div className="mb-4">
               <h3 className="text-lg font-bold text-purple-400 mb-2">🎭 Mask Reveals</h3>
               <p className="text-sm text-gray-400 mb-4">Create shape-based masks with animated reveals and feathering</p>
@@ -3650,18 +4133,21 @@ export default function ThreeDVisualizer() {
                 <button 
                   onClick={() => createMask('circle')} 
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  disabled
                 >
                   ⭕ Circle Mask
                 </button>
                 <button 
                   onClick={() => createMask('rectangle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
+                  disabled
                 >
                   ◻️ Rectangle Mask
                 </button>
                 <button 
                   onClick={() => createMask('custom')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
+                  disabled
                 >
                   ✏️ Custom Path
                 </button>
@@ -3674,13 +4160,13 @@ export default function ThreeDVisualizer() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
-                          type="checkbox" 
+                          type="checkbox" id="checkbox-field-4043" name="checkbox-field-4043" 
                           checked={mask.enabled}
                           onChange={(e) => updateMask(mask.id, { enabled: e.target.checked })}
                           className="rounded"
                         />
                         <input 
-                          type="text" 
+                          type="text" id="text-field-4049" name="text-field-4049" 
                           value={mask.name}
                           onChange={(e) => updateMask(mask.id, { name: e.target.value })}
                           className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
@@ -3719,7 +4205,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Feather: {mask.feather}</label>
                         <input 
-                          type="range" 
+                          type="range" id="feather-mask-feather" name="feather-mask-feather" 
                           min="0" 
                           max="100"
                           value={mask.feather}
@@ -3734,7 +4220,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Center X</label>
                           <input 
-                            type="number" 
+                            type="number" id="center-x" name="center-x" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3746,7 +4232,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Center Y</label>
                           <input 
-                            type="number" 
+                            type="number" id="center-y" name="center-y" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3758,7 +4244,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Radius</label>
                           <input 
-                            type="number" 
+                            type="number" id="radius-1" name="radius-1" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3775,7 +4261,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">X</label>
                           <input 
-                            type="number" 
+                            type="number" id="x" name="x" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3787,7 +4273,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Y</label>
                           <input 
-                            type="number" 
+                            type="number" id="y" name="y" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3799,7 +4285,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Width</label>
                           <input 
-                            type="number" 
+                            type="number" id="width" name="width" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3811,7 +4297,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Height</label>
                           <input 
-                            type="number" 
+                            type="number" id="height-1" name="height-1" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -3826,7 +4312,7 @@ export default function ThreeDVisualizer() {
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm text-gray-300">
                         <input 
-                          type="checkbox" 
+                          type="checkbox" id="checkbox-field-4195" name="checkbox-field-4195" 
                           checked={mask.inverted}
                           onChange={(e) => updateMask(mask.id, { inverted: e.target.checked })}
                           className="rounded"
@@ -3919,7 +4405,7 @@ export default function ThreeDVisualizer() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
-                          type="checkbox" 
+                          type="checkbox" id="checkbox-field-4288" name="checkbox-field-4288" 
                           checked={rig.enabled}
                           onChange={(e) => {
                             updateCameraRig(rig.id, { enabled: e.target.checked });
@@ -3932,7 +4418,7 @@ export default function ThreeDVisualizer() {
                           className="rounded"
                         />
                         <input 
-                          type="text" 
+                          type="text" id="text-field-4301" name="text-field-4301" 
                           value={rig.name}
                           onChange={(e) => updateCameraRig(rig.id, { name: e.target.value })}
                           className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
@@ -3961,7 +4447,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Radius</label>
                           <input 
-                            type="number" 
+                            type="number" id="radius-2" name="radius-2" 
                             step="0.5"
                             value={rig.orbitRadius || 15}
                             onChange={(e) => updateCameraRig(rig.id, { orbitRadius: parseFloat(e.target.value) })}
@@ -3971,7 +4457,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Speed</label>
                           <input 
-                            type="number" 
+                            type="number" id="speed-1" name="speed-1" 
                             step="0.1"
                             value={rig.orbitSpeed || 0.5}
                             onChange={(e) => updateCameraRig(rig.id, { orbitSpeed: parseFloat(e.target.value) })}
@@ -3998,7 +4484,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Speed</label>
                           <input 
-                            type="number" 
+                            type="number" id="speed-2" name="speed-2" 
                             step="0.1"
                             value={rig.dollySpeed || 1.0}
                             onChange={(e) => updateCameraRig(rig.id, { dollySpeed: parseFloat(e.target.value) })}
@@ -4025,7 +4511,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Height</label>
                           <input 
-                            type="number" 
+                            type="number" id="height-2" name="height-2" 
                             step="0.5"
                             value={rig.craneHeight || 10}
                             onChange={(e) => updateCameraRig(rig.id, { craneHeight: parseFloat(e.target.value) })}
@@ -4035,7 +4521,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Tilt</label>
                           <input 
-                            type="number" 
+                            type="number" id="tilt" name="tilt" 
                             step="0.1"
                             value={rig.craneTilt || 0}
                             onChange={(e) => updateCameraRig(rig.id, { craneTilt: parseFloat(e.target.value) })}
@@ -4050,7 +4536,7 @@ export default function ThreeDVisualizer() {
                       <div className="text-xs text-gray-400 mb-2">Base Position</div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4419" name="number-field-4419" 
                           placeholder="X"
                           step="0.5"
                           value={rig.position.x}
@@ -4058,7 +4544,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4427" name="number-field-4427" 
                           placeholder="Y"
                           step="0.5"
                           value={rig.position.y}
@@ -4066,7 +4552,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4435" name="number-field-4435" 
                           placeholder="Z"
                           step="0.5"
                           value={rig.position.z}
@@ -4077,7 +4563,7 @@ export default function ThreeDVisualizer() {
                       <div className="text-xs text-gray-400 mb-2">Base Rotation</div>
                       <div className="grid grid-cols-3 gap-2">
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4446" name="number-field-4446" 
                           placeholder="X"
                           step="0.1"
                           value={rig.rotation.x}
@@ -4085,7 +4571,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4454" name="number-field-4454" 
                           placeholder="Y"
                           step="0.1"
                           value={rig.rotation.y}
@@ -4093,7 +4579,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" 
+                          type="number" id="number-field-4462" name="number-field-4462" 
                           placeholder="Z"
                           step="0.1"
                           value={rig.rotation.z}
@@ -4286,25 +4772,45 @@ export default function ThreeDVisualizer() {
                     </p>
                   </div>
 
-                  {/* Time (only for manual mode) */}
+                  {/* Start Time and End Time (only for manual mode) */}
                   {event.mode === 'manual' && (
-                    <div>
-                      <label className="text-sm text-gray-300 block mb-2">Time (MM:SS)</label>
-                      <input
-                        type="text"
-                        pattern="[0-9]+:[0-9]{2}"
-                        value={formatTimeInput(event.time)}
-                        onChange={(e) => {
-                          const newTime = parseTimeInput(e.target.value);
-                          if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
-                            updateParameterEvent(editingEventId, { time: newTime });
-                          }
-                        }}
-                        placeholder="0:00"
-                        className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Format: minutes:seconds (e.g., 1:30 for 1 minute 30 seconds)</p>
-                    </div>
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">Start Time (MM:SS)</label>
+                        <input
+                          type="text" id="start-time-mm-ss" name="start-time-mm-ss"
+                          pattern="[0-9]+:[0-9]{2}"
+                          value={formatTimeInput(event.startTime)}
+                          onChange={(e) => {
+                            const newTime = parseTimeInput(e.target.value);
+                            if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
+                              updateParameterEvent(editingEventId, { startTime: newTime });
+                            }
+                          }}
+                          placeholder="0:00"
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">When the event starts</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">End Time (MM:SS)</label>
+                        <input
+                          type="text" id="end-time-mm-ss" name="end-time-mm-ss"
+                          pattern="[0-9]+:[0-9]{2}"
+                          value={formatTimeInput(event.endTime)}
+                          onChange={(e) => {
+                            const newTime = parseTimeInput(e.target.value);
+                            if (!isNaN(newTime) && newTime >= event.startTime && newTime <= duration) {
+                              updateParameterEvent(editingEventId, { endTime: newTime });
+                            }
+                          }}
+                          placeholder="0:00"
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">When the event ends (must be after start time)</p>
+                      </div>
+                    </>
                   )}
 
                   {/* Audio Track Selection (for automated mode) */}
@@ -4327,7 +4833,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-sm text-gray-300 block mb-2">Frequency Threshold</label>
                         <input
-                          type="range"
+                          type="range" id="frequency-threshold" name="frequency-threshold"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4340,26 +4846,31 @@ export default function ThreeDVisualizer() {
                     </>
                   )}
 
-                  {/* Duration */}
-                  <div>
-                    <label className="text-sm text-gray-300 block mb-2">Duration (seconds)</label>
-                    <input
-                      type="range"
-                      min="0.05"
-                      max="2"
-                      step="0.05"
-                      value={event.duration}
-                      onChange={(e) => updateParameterEvent(editingEventId, { duration: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                    <span className="text-xs text-gray-400">{event.duration.toFixed(2)}s</span>
-                  </div>
+                  {/* Duration for automated mode */}
+                  {event.mode === 'automated' && (
+                    <div>
+                      <label className="text-sm text-gray-300 block mb-2">Effect Duration (seconds)</label>
+                      <input
+                        type="range" id="effect-duration-seconds" name="effect-duration-seconds"
+                        min="0.05"
+                        max="2"
+                        step="0.05"
+                        value={event.endTime - event.startTime}
+                        onChange={(e) => {
+                          const duration = parseFloat(e.target.value);
+                          updateParameterEvent(editingEventId, { endTime: event.startTime + duration });
+                        }}
+                        className="w-full"
+                      />
+                      <span className="text-xs text-gray-400">{(event.endTime - event.startTime).toFixed(2)}s (how long the effect lasts after triggering)</span>
+                    </div>
+                  )}
 
                   {/* Background Flash */}
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4753" name="checkbox-field-4753"
                         checked={(event.parameters.backgroundFlash ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, backgroundFlash: e.target.checked ? 0.5 : 0 }
@@ -4370,7 +4881,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.backgroundFlash ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="range-field-4764" name="range-field-4764"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4385,22 +4896,22 @@ export default function ThreeDVisualizer() {
                     )}
                   </div>
 
-                  {/* Camera Shake */}
+                  {/* Camera Shake (Automated) */}
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="shake-checkbox-4783" name="shake-checkbox-4783"
                         checked={(event.parameters.cameraShake ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
                         })}
                       />
-                      📷 Camera Shake
+                      📷 Camera Shake (Automated)
                     </label>
                     {(event.parameters.cameraShake ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="shake-range-4794" name="shake-range-4794"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4419,7 +4930,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4813" name="checkbox-field-4813"
                         checked={(event.parameters.vignettePulse ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, vignettePulse: e.target.checked ? 0.5 : 0 }
@@ -4430,7 +4941,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.vignettePulse ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="range-field-4824" name="range-field-4824"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4449,7 +4960,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4843" name="checkbox-field-4843"
                         checked={(event.parameters.saturationBurst ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, saturationBurst: e.target.checked ? 0.5 : 0 }
@@ -4460,7 +4971,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.saturationBurst ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="range-field-4854" name="range-field-4854"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4479,7 +4990,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4873" name="checkbox-field-4873"
                         checked={(event.parameters.vignetteStrengthPulse ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, vignetteStrengthPulse: e.target.checked ? 0.5 : 0 }
@@ -4490,7 +5001,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.vignetteStrengthPulse ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="range-field-4884" name="range-field-4884"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4509,7 +5020,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4903" name="checkbox-field-4903"
                         checked={(event.parameters.contrastBurst ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, contrastBurst: e.target.checked ? 0.5 : 0 }
@@ -4520,7 +5031,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.contrastBurst ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range"
+                          type="range" id="range-field-4914" name="range-field-4914"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4539,7 +5050,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox"
+                        type="checkbox" id="checkbox-field-4933" name="checkbox-field-4933"
                         checked={(event.parameters.colorTintFlash?.intensity ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, colorTintFlash: e.target.checked ? { r: 1, g: 0, b: 0, intensity: 0.5 } : undefined }
@@ -4553,7 +5064,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-red-400 block mb-1">R</label>
                             <input
-                              type="range"
+                              type="range" id="r" name="r"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4567,7 +5078,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-green-400 block mb-1">G</label>
                             <input
-                              type="range"
+                              type="range" id="g" name="g"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4581,7 +5092,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-blue-400 block mb-1">B</label>
                             <input
-                              type="range"
+                              type="range" id="b" name="b"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4596,7 +5107,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Intensity</label>
                           <input
-                            type="range"
+                            type="range" id="intensity" name="intensity"
                             min="0"
                             max="1"
                             step="0.05"
@@ -4622,6 +5133,90 @@ export default function ThreeDVisualizer() {
                 </div>
               );
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcuts Modal */}
+      {showKeyboardShortcuts && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50" onClick={() => setShowKeyboardShortcuts(false)}>
+          <div className="bg-gray-900 rounded-lg w-[500px] max-h-[70vh] overflow-hidden border border-gray-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
+              <h2 className="text-xl font-bold text-white">⌨️ Keyboard Shortcuts</h2>
+              <button
+                onClick={() => setShowKeyboardShortcuts(false)}
+                className="p-1 rounded hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
+                title="Close (Esc)"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(70vh-140px)]">
+              <div className="space-y-6">
+                {/* Playback */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Playback</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Play/Pause audio</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Space</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Controls */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Controls</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Close modals/dialogs</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Esc</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Camera */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Camera</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle camera rig hints</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">G</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mouse Controls */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mouse Controls (When Paused)</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Rotate camera around scene</span>
+                      <span className="text-xs text-gray-500">Left drag</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Pan camera</span>
+                      <span className="text-xs text-gray-500">Right drag</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Zoom in/out</span>
+                      <span className="text-xs text-gray-500">Mouse wheel</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 italic">Mouse controls disable during playback</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-700 bg-gray-800">
+              <p className="text-sm text-gray-400 text-center">
+                Press <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded">Esc</kbd> to close
+              </p>
+            </div>
           </div>
         </div>
       )}
