@@ -36,6 +36,10 @@ interface ParameterEvent {
     saturationBurst?: number; // 0-1 intensity
     bloomBurst?: number; // 0-1 intensity (placeholder for future)
     fogPulse?: number; // 0-1 intensity (placeholder for future)
+    // Post-FX parameters
+    vignetteStrengthPulse?: number; // 0-1 intensity - temporarily increase vignette
+    contrastBurst?: number; // 0-1 intensity - temporarily boost contrast
+    colorTintFlash?: { r: number; g: number; b: number; intensity: number }; // RGB color flash
   };
 }
 // Default camera settings constants
@@ -143,6 +147,11 @@ export default function ThreeDVisualizer() {
   const activeBackgroundFlashRef = useRef(0);
   const activeVignettePulseRef = useRef(0);
   const activeSaturationBurstRef = useRef(0);
+  
+  // PHASE 4 (Enhanced): Active Post-FX parameter values
+  const activeVignetteStrengthPulseRef = useRef(0);
+  const activeContrastBurstRef = useRef(0);
+  const activeColorTintFlashRef = useRef({ r: 0, g: 0, b: 0 });
   
   // PHASE 4: Track active automated events
   const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
@@ -1319,6 +1328,11 @@ export default function ThreeDVisualizer() {
       let saturationFlash = 0;
       let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
       
+      // Reset Post-FX event accumulation values
+      let vignetteStrengthPulse = 0;
+      let contrastBurst = 0;
+      let colorTintFlash = { r: 0, g: 0, b: 0 };
+      
       for (const event of parameterEvents) {
         let shouldTrigger = false;
         let effectStartTime = event.time;
@@ -1386,8 +1400,31 @@ export default function ThreeDVisualizer() {
             eventShakeY += Math.cos(timeSinceEvent * frequency * 1.3) * amplitude * 0.1;
             eventShakeZ += Math.sin(timeSinceEvent * frequency * 0.7) * amplitude * 0.05;
           }
+          
+          // Post-FX: Vignette strength pulse
+          if (event.parameters.vignetteStrengthPulse !== undefined) {
+            vignetteStrengthPulse += event.parameters.vignetteStrengthPulse * intensity;
+          }
+          
+          // Post-FX: Contrast burst
+          if (event.parameters.contrastBurst !== undefined) {
+            contrastBurst += event.parameters.contrastBurst * intensity;
+          }
+          
+          // Post-FX: Color tint flash
+          if (event.parameters.colorTintFlash !== undefined) {
+            const tint = event.parameters.colorTintFlash;
+            colorTintFlash.r += tint.r * tint.intensity * intensity;
+            colorTintFlash.g += tint.g * tint.intensity * intensity;
+            colorTintFlash.b += tint.b * tint.intensity * intensity;
+          }
         }
       }
+      
+      // Store Post-FX values in refs for potential use in rendering
+      activeVignetteStrengthPulseRef.current = vignetteStrengthPulse;
+      activeContrastBurstRef.current = contrastBurst;
+      activeColorTintFlashRef.current = colorTintFlash;
       
       // Combine event shake with existing camera shake
       shakeX += eventShakeX;
@@ -2307,6 +2344,15 @@ export default function ThreeDVisualizer() {
                         )}
                         {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
                           <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
+                        )}
+                        {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
+                          <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
+                        )}
+                        {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
+                          <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
+                        )}
+                        {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
+                          <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
                         )}
                       </div>
                     </div>
@@ -3307,6 +3353,143 @@ export default function ThreeDVisualizer() {
                           className="w-full"
                         />
                         <span className="text-xs text-gray-400">{Math.round((event.parameters.saturationBurst ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vignette Strength Pulse */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.vignetteStrengthPulse ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, vignetteStrengthPulse: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🌫️ Vignette Pulse
+                    </label>
+                    {(event.parameters.vignetteStrengthPulse ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.vignetteStrengthPulse ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, vignetteStrengthPulse: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.vignetteStrengthPulse ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contrast Burst */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.contrastBurst ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, contrastBurst: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🔆 Contrast Burst
+                    </label>
+                    {(event.parameters.contrastBurst ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.contrastBurst ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, contrastBurst: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.contrastBurst ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Color Tint Flash */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.colorTintFlash?.intensity ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, colorTintFlash: e.target.checked ? { r: 1, g: 0, b: 0, intensity: 0.5 } : undefined }
+                        })}
+                      />
+                      🌈 Color Tint Flash
+                    </label>
+                    {(event.parameters.colorTintFlash?.intensity ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-xs text-red-400 block mb-1">R</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.r ?? 1}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, r: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-green-400 block mb-1">G</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.g ?? 0}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, g: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-blue-400 block mb-1">B</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.b ?? 0}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, b: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Intensity</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={event.parameters.colorTintFlash?.intensity ?? 0.5}
+                            onChange={(e) => updateParameterEvent(editingEventId, {
+                              parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, intensity: parseFloat(e.target.value) } }
+                            })}
+                            className="w-full"
+                          />
+                          <span className="text-xs text-gray-400">{Math.round((event.parameters.colorTintFlash?.intensity ?? 0) * 100)}%</span>
+                        </div>
                       </div>
                     )}
                   </div>
