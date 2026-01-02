@@ -106,6 +106,94 @@ export interface AnimationType {
   icon: string;
 }
 
+// PHASE 5: Text Animator - Per-character animation system
+export interface TextAnimatorKeyframe {
+  id: string;
+  time: number;
+  text: string;
+  visible: boolean;
+  animation: 'fade' | 'slide' | 'scale' | 'bounce' | 'none';
+  direction?: 'up' | 'down' | 'left' | 'right'; // For slide animation
+  stagger: number; // Delay between each character (in seconds)
+  duration: number; // Duration per character animation
+  characterOffsets?: CharacterOffset[]; // Per-character position/rotation/scale
+}
+
+export interface CharacterOffset {
+  index: number;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  scale: { x: number; y: number; z: number };
+}
+
+// PHASE 5: Mask Reveals - Mask/matte system
+export interface Mask {
+  id: string;
+  name: string;
+  type: 'circle' | 'rectangle' | 'custom';
+  enabled: boolean;
+  inverted: boolean; // Invert mask (show inside vs outside)
+  blendMode: 'normal' | 'add' | 'subtract' | 'multiply';
+  feather: number; // Edge softness (0-100)
+  // Circle-specific
+  center?: { x: number; y: number }; // Normalized 0-1
+  radius?: number; // Normalized 0-1
+  // Rectangle-specific
+  rect?: { x: number; y: number; width: number; height: number }; // Normalized 0-1
+  // Custom path-specific
+  path?: Array<{ x: number; y: number }>; // Normalized 0-1
+}
+
+export interface MaskRevealKeyframe {
+  id: string;
+  time: number;
+  maskId: string;
+  animation: 'wipe-left' | 'wipe-right' | 'wipe-up' | 'wipe-down' | 'expand-circle' | 'shrink-circle' | 'none';
+  duration: number;
+  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  // Target values for animation
+  targetCenter?: { x: number; y: number };
+  targetRadius?: number;
+  targetRect?: { x: number; y: number; width: number; height: number };
+}
+
+// PHASE 5: Camera Rig - Null object parenting system
+export interface CameraRig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  type: 'orbit' | 'dolly' | 'crane' | 'custom';
+  // Null object transforms
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  // Target tracking
+  trackingTarget?: string; // ID of object to follow
+  trackingOffset: { x: number; y: number; z: number };
+  trackingSmooth: number; // Smoothing factor (0-1)
+  // Orbit parameters
+  orbitRadius?: number;
+  orbitSpeed?: number;
+  orbitAxis?: 'x' | 'y' | 'z';
+  // Dolly parameters
+  dollySpeed?: number;
+  dollyAxis?: 'x' | 'y' | 'z';
+  // Crane parameters
+  craneHeight?: number;
+  craneTilt?: number;
+}
+
+export interface CameraRigKeyframe {
+  id: string;
+  time: number;
+  rigId: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  duration: number;
+  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  // Optional preset application
+  preset?: 'orbit' | 'dolly' | 'crane';
+}
+
 // PHASE 3: Workspace object schema for manual 3D object creation
 // FINAL ARCHITECTURE: Extended to support cameras and lights
 export interface WorkspaceObject {
