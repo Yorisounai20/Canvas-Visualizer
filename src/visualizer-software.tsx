@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { Trash2, Plus, Play, Square, Video, X } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
 
 interface LogEntry {
   message: string;
@@ -2693,7 +2693,7 @@ export default function ThreeDVisualizer() {
               className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
               title="Keyboard Shortcuts (?)"
             >
-              <HelpCircle size={18} />
+              <BadgeHelp size={18} />
             </button>
             
             {/* Export Button */}
