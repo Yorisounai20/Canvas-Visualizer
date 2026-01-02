@@ -24,8 +24,8 @@ interface AudioTrack {
 
 interface ParameterEvent {
   id: string;
-  time: number; // seconds - when the event triggers
-  duration: number; // seconds - how long the effect lasts
+  startTime: number; // seconds - when the event starts
+  endTime: number; // seconds - when the event ends
   mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
   audioTrackId?: string; // which track to react to (for automated mode)
   threshold?: number; // frequency threshold for automated triggering (0-1)
@@ -908,10 +908,11 @@ export default function ThreeDVisualizer() {
 
   // PHASE 4: Parameter event functions
   const addParameterEvent = () => {
+    const start = currentTime > 0 ? currentTime : 0;
     const newEvent: ParameterEvent = {
       id: `event-${Date.now()}-${Math.random()}`,
-      time: currentTime > 0 ? currentTime : 0,
-      duration: 0.2,
+      startTime: start,
+      endTime: start + 0.2, // Default 200ms duration
       mode: 'manual', // Default to manual mode
       audioTrackId: audioTracks.length > 0 ? audioTracks.find(t => t.active)?.id : undefined,
       threshold: 0.5, // Default threshold for automated mode
@@ -922,7 +923,7 @@ export default function ThreeDVisualizer() {
         saturationBurst: 0
       }
     };
-    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.time - b.time));
+    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.startTime - b.startTime));
     setEditingEventId(newEvent.id);
     setShowEventModal(true);
   };
@@ -1576,12 +1577,12 @@ export default function ThreeDVisualizer() {
       
       for (const event of parameterEvents) {
         let shouldTrigger = false;
-        let effectStartTime = event.time;
+        let effectStartTime = event.startTime;
+        const eventDuration = event.endTime - event.startTime;
         
         if (event.mode === 'manual') {
-          // Manual mode: trigger at specific time
-          const timeSinceEvent = t - event.time;
-          shouldTrigger = timeSinceEvent >= 0 && timeSinceEvent < event.duration;
+          // Manual mode: trigger between startTime and endTime
+          shouldTrigger = t >= event.startTime && t < event.endTime;
         } else if (event.mode === 'automated') {
           // Automated mode: trigger when audio track exceeds threshold
           if (event.audioTrackId) {
@@ -1601,7 +1602,7 @@ export default function ThreeDVisualizer() {
                 }
                 effectStartTime = activeAutomatedEventsRef.current.get(event.id)!;
                 const timeSinceStart = t - effectStartTime;
-                shouldTrigger = timeSinceStart < event.duration;
+                shouldTrigger = timeSinceStart < eventDuration;
               } else {
                 // Bass dropped below threshold, clean up if effect was active
                 activeAutomatedEventsRef.current.delete(event.id);
@@ -1612,7 +1613,7 @@ export default function ThreeDVisualizer() {
         
         if (shouldTrigger) {
           const timeSinceEvent = t - effectStartTime;
-          const progress = timeSinceEvent / event.duration;
+          const progress = timeSinceEvent / eventDuration;
           // Ease out cubic for smooth return
           const easeOut = 1 - Math.pow(1 - progress, 3);
           const intensity = 1 - easeOut;
@@ -2812,7 +2813,7 @@ export default function ThreeDVisualizer() {
                       <div className="flex items-center justify-between mb-1">
                         <div>
                           <span className="text-white font-medium">
-                            {event.mode === 'manual' ? `@ ${formatTimeInput(event.time)}` : '🤖 Automated'}
+                            {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
                           </span>
                           {event.mode === 'automated' && event.audioTrackId && (
                             <span className="text-gray-400 ml-2">
@@ -2839,7 +2840,7 @@ export default function ThreeDVisualizer() {
                         </div>
                       </div>
                       <div className="text-gray-400 space-y-0.5">
-                        <div>Duration: {event.duration}s</div>
+                        <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
                         {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
                           <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
                         )}
@@ -4403,25 +4404,45 @@ export default function ThreeDVisualizer() {
                     </p>
                   </div>
 
-                  {/* Time (only for manual mode) */}
+                  {/* Start Time and End Time (only for manual mode) */}
                   {event.mode === 'manual' && (
-                    <div>
-                      <label className="text-sm text-gray-300 block mb-2">Time (MM:SS)</label>
-                      <input
-                        type="text"
-                        pattern="[0-9]+:[0-9]{2}"
-                        value={formatTimeInput(event.time)}
-                        onChange={(e) => {
-                          const newTime = parseTimeInput(e.target.value);
-                          if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
-                            updateParameterEvent(editingEventId, { time: newTime });
-                          }
-                        }}
-                        placeholder="0:00"
-                        className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Format: minutes:seconds (e.g., 1:30 for 1 minute 30 seconds)</p>
-                    </div>
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">Start Time (MM:SS)</label>
+                        <input
+                          type="text"
+                          pattern="[0-9]+:[0-9]{2}"
+                          value={formatTimeInput(event.startTime)}
+                          onChange={(e) => {
+                            const newTime = parseTimeInput(e.target.value);
+                            if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
+                              updateParameterEvent(editingEventId, { startTime: newTime });
+                            }
+                          }}
+                          placeholder="0:00"
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">When the event starts</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">End Time (MM:SS)</label>
+                        <input
+                          type="text"
+                          pattern="[0-9]+:[0-9]{2}"
+                          value={formatTimeInput(event.endTime)}
+                          onChange={(e) => {
+                            const newTime = parseTimeInput(e.target.value);
+                            if (!isNaN(newTime) && newTime >= event.startTime && newTime <= duration) {
+                              updateParameterEvent(editingEventId, { endTime: newTime });
+                            }
+                          }}
+                          placeholder="0:00"
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">When the event ends (must be after start time)</p>
+                      </div>
+                    </>
                   )}
 
                   {/* Audio Track Selection (for automated mode) */}
@@ -4457,20 +4478,25 @@ export default function ThreeDVisualizer() {
                     </>
                   )}
 
-                  {/* Duration */}
-                  <div>
-                    <label className="text-sm text-gray-300 block mb-2">Duration (seconds)</label>
-                    <input
-                      type="range"
-                      min="0.05"
-                      max="2"
-                      step="0.05"
-                      value={event.duration}
-                      onChange={(e) => updateParameterEvent(editingEventId, { duration: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                    <span className="text-xs text-gray-400">{event.duration.toFixed(2)}s</span>
-                  </div>
+                  {/* Duration for automated mode */}
+                  {event.mode === 'automated' && (
+                    <div>
+                      <label className="text-sm text-gray-300 block mb-2">Effect Duration (seconds)</label>
+                      <input
+                        type="range"
+                        min="0.05"
+                        max="2"
+                        step="0.05"
+                        value={event.endTime - event.startTime}
+                        onChange={(e) => {
+                          const duration = parseFloat(e.target.value);
+                          updateParameterEvent(editingEventId, { endTime: event.startTime + duration });
+                        }}
+                        className="w-full"
+                      />
+                      <span className="text-xs text-gray-400">{(event.endTime - event.startTime).toFixed(2)}s (how long the effect lasts after triggering)</span>
+                    </div>
+                  )}
 
                   {/* Background Flash */}
                   <div>
