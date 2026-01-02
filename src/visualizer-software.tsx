@@ -73,6 +73,22 @@ export default function ThreeDVisualizer() {
     tetras: THREE.Mesh[];
     sphere: THREE.Mesh;
   } | null>(null);
+  
+  // Camera Rig Hint objects
+  const rigHintsRef = useRef<{
+    positionMarker: THREE.Mesh | null;
+    targetMarker: THREE.Mesh | null;
+    pathLine: THREE.Line | null;
+    gridHelper: THREE.GridHelper | null;
+    connectionLine: THREE.Line | null;
+  }>({
+    positionMarker: null,
+    targetMarker: null,
+    pathLine: null,
+    gridHelper: null,
+    connectionLine: null
+  });
+  
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [bassColor, setBassColor] = useState('#8a2be2');
@@ -92,6 +108,13 @@ export default function ThreeDVisualizer() {
   const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
   const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
+  
+  // Camera Rig Visual Hints
+  const [showRigHints, setShowRigHints] = useState(false);
+  const [showRigPosition, setShowRigPosition] = useState(true);
+  const [showRigTarget, setShowRigTarget] = useState(true);
+  const [showRigPath, setShowRigPath] = useState(true);
+  const [showRigGrid, setShowRigGrid] = useState(true);
   
   // NEW: HUD visibility controls
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
@@ -1395,6 +1418,57 @@ export default function ThreeDVisualizer() {
     scene.add(directionalLight);
     lightsRef.current.directional = directionalLight;
     
+    // Create camera rig hint objects
+    // Position marker (camera location)
+    const positionMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true })
+    );
+    positionMarker.visible = false;
+    scene.add(positionMarker);
+    
+    // Target marker (look-at point)
+    const targetMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true })
+    );
+    targetMarker.visible = false;
+    scene.add(targetMarker);
+    
+    // Connection line (from camera to target)
+    const connectionLineGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0)
+    ]);
+    const connectionLine = new THREE.Line(
+      connectionLineGeometry,
+      new THREE.LineBasicMaterial({ color: 0x00ff00, opacity: 0.5, transparent: true })
+    );
+    connectionLine.visible = false;
+    scene.add(connectionLine);
+    
+    // Grid helper (reference grid)
+    const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+    gridHelper.visible = false;
+    scene.add(gridHelper);
+    
+    // Path preview line (camera keyframe path)
+    const pathLineGeometry = new THREE.BufferGeometry();
+    const pathLine = new THREE.Line(
+      pathLineGeometry,
+      new THREE.LineBasicMaterial({ color: 0xff00ff, opacity: 0.7, transparent: true, linewidth: 2 })
+    );
+    pathLine.visible = false;
+    scene.add(pathLine);
+    
+    rigHintsRef.current = {
+      positionMarker,
+      targetMarker,
+      connectionLine,
+      gridHelper,
+      pathLine
+    };
+    
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
@@ -2359,6 +2433,89 @@ export default function ThreeDVisualizer() {
         rend.setClearColor(baseColor);
       }
 
+      // Update camera rig visual hints
+      if (showRigHints && rigHintsRef.current) {
+        const hints = rigHintsRef.current;
+        
+        // Update position marker (camera location)
+        if (hints.positionMarker && showRigPosition) {
+          hints.positionMarker.visible = true;
+          hints.positionMarker.position.copy(cam.position);
+        } else if (hints.positionMarker) {
+          hints.positionMarker.visible = false;
+        }
+        
+        // Update target marker (look-at point - scene origin)
+        if (hints.targetMarker && showRigTarget) {
+          hints.targetMarker.visible = true;
+          hints.targetMarker.position.set(0, 0, 0);
+        } else if (hints.targetMarker) {
+          hints.targetMarker.visible = false;
+        }
+        
+        // Update connection line
+        if (hints.connectionLine && showRigPosition && showRigTarget) {
+          hints.connectionLine.visible = true;
+          const positions = hints.connectionLine.geometry.attributes.position;
+          if (positions) {
+            positions.setXYZ(0, cam.position.x, cam.position.y, cam.position.z);
+            positions.setXYZ(1, 0, 0, 0);
+            positions.needsUpdate = true;
+          }
+        } else if (hints.connectionLine) {
+          hints.connectionLine.visible = false;
+        }
+        
+        // Update grid helper
+        if (hints.gridHelper && showRigGrid) {
+          hints.gridHelper.visible = true;
+        } else if (hints.gridHelper) {
+          hints.gridHelper.visible = false;
+        }
+        
+        // Update keyframe path preview
+        if (hints.pathLine && showRigPath && cameraKeyframes.length >= 2) {
+          hints.pathLine.visible = true;
+          // Generate path from camera keyframes
+          const pathPoints: THREE.Vector3[] = [];
+          const sortedKf = [...cameraKeyframes].sort((a, b) => a.time - b.time);
+          
+          // Sample points along the interpolated path
+          for (let i = 0; i < sortedKf.length - 1; i++) {
+            const kf1 = sortedKf[i];
+            const kf2 = sortedKf[i + 1];
+            const steps = 10;
+            
+            for (let s = 0; s <= steps; s++) {
+              const progress = s / steps;
+              const interpolated = interpolateCameraKeyframes(cameraKeyframes, kf1.time + (kf2.time - kf1.time) * progress);
+              const angle = interpolated.rotation;
+              const dist = interpolated.distance;
+              const height = interpolated.height;
+              
+              const x = Math.cos(angle) * dist;
+              const y = height;
+              const z = Math.sin(angle) * dist;
+              pathPoints.push(new THREE.Vector3(x, y, z));
+            }
+          }
+          
+          if (pathPoints.length > 0) {
+            hints.pathLine.geometry.setFromPoints(pathPoints);
+            hints.pathLine.geometry.attributes.position.needsUpdate = true;
+          }
+        } else if (hints.pathLine) {
+          hints.pathLine.visible = false;
+        }
+      } else if (rigHintsRef.current) {
+        // Hide all hints
+        if (rigHintsRef.current.positionMarker) rigHintsRef.current.positionMarker.visible = false;
+        if (rigHintsRef.current.targetMarker) rigHintsRef.current.targetMarker.visible = false;
+        if (rigHintsRef.current.connectionLine) rigHintsRef.current.connectionLine.visible = false;
+        if (rigHintsRef.current.gridHelper) rigHintsRef.current.gridHelper.visible = false;
+        if (rigHintsRef.current.pathLine) rigHintsRef.current.pathLine.visible = false;
+      }
+
       // PHASE 5: Mask Reveals - Apply masks to renderer (post-render effect)
       // Note: Full mask implementation would require shader-based rendering or stencil buffer
       // For now, we'll prepare the mask data and apply basic visibility controls
@@ -2498,7 +2655,7 @@ export default function ThreeDVisualizer() {
     };
   }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
-  // Handle ESC key to close modals
+  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -2508,6 +2665,9 @@ export default function ThreeDVisualizer() {
           setShowEventModal(false);
           setEditingEventId(null);
         }
+      } else if (e.key === 'g' || e.key === 'G') {
+        // Toggle camera rig hints
+        setShowRigHints(prev => !prev);
       }
     };
     
@@ -2979,6 +3139,80 @@ export default function ThreeDVisualizer() {
                   <input type="checkbox" id="showBorder" checked={showBorder} onChange={(e) => setShowBorder(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showBorder" className="text-sm text-white cursor-pointer">Show Canvas Border</label>
                 </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🔍 Camera Rig Visual Hints</h3>
+              <p className="text-xs text-gray-400 mb-3">Toggle visual guides to help understand camera positioning and movement.</p>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="showRigHints" 
+                    checked={showRigHints} 
+                    onChange={(e) => setShowRigHints(e.target.checked)} 
+                    className="w-4 h-4 cursor-pointer" 
+                  />
+                  <label htmlFor="showRigHints" className="text-sm text-white cursor-pointer font-semibold">Enable Visual Hints</label>
+                </div>
+                
+                {showRigHints && (
+                  <div className="ml-6 space-y-2 mt-2 border-l-2 border-cyan-500 pl-3">
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigPosition" 
+                        checked={showRigPosition} 
+                        onChange={(e) => setShowRigPosition(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigPosition" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-cyan-400">●</span> Camera Position Marker
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigTarget" 
+                        checked={showRigTarget} 
+                        onChange={(e) => setShowRigTarget(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigTarget" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-yellow-400">●</span> Look-At Target Marker
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigPath" 
+                        checked={showRigPath} 
+                        onChange={(e) => setShowRigPath(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigPath" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-purple-400">━</span> Keyframe Path Preview
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigGrid" 
+                        checked={showRigGrid} 
+                        onChange={(e) => setShowRigGrid(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigGrid" className="text-xs text-gray-300 cursor-pointer">
+                        <span className="text-gray-500">▦</span> Reference Grid
+                      </label>
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-xs text-gray-500 mt-2">
+                  <strong>Tip:</strong> Use 'G' key to quickly toggle hints on/off during playback
+                </p>
               </div>
             </div>
           </div>
