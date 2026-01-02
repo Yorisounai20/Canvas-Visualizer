@@ -234,6 +234,9 @@ export default function ThreeDVisualizer() {
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
   
+  // Default frequency values when no audio is loaded (maintains visual rendering without audio response)
+  const DEFAULT_FREQUENCY_VALUES = { bass: 0, mids: 0, highs: 0 };
+  
   // PHASE 4: Multi-audio track system
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const audioTracksRef = useRef<AudioTrack[]>([]);
@@ -1643,8 +1646,8 @@ export default function ThreeDVisualizer() {
         fpsLastTime.current = now;
       }
       
-      // Get frequency data if analyser exists, otherwise use default values
-      let f = { bass: 0, mids: 0, highs: 0 };
+      // Use default frequency values (no audio response) when analyser is unavailable to maintain visual rendering
+      let f = DEFAULT_FREQUENCY_VALUES;
       if (analyser) {
         const data = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(data);
