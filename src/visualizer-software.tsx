@@ -231,6 +231,9 @@ export default function ThreeDVisualizer() {
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
   const TAB_ORDER = ['waveforms', 'controls', 'camera', 'keyframes', 'effects', 'postfx', 'presets', 'textAnimator', 'masks', 'cameraRig'] as const;
   
+  // Golden angle constant for natural spiral patterns (used in hourglass preset)
+  const GOLDEN_ANGLE_DEGREES = 137.5;
+  
   // PHASE 4: Multi-audio track system
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const audioTracksRef = useRef<AudioTrack[]>([]);
@@ -2852,7 +2855,7 @@ export default function ThreeDVisualizer() {
           c.rotation.x = petalAngle;
           c.rotation.y = el * 0.3;
           c.rotation.z = Math.sin(el + i) * 0.5;
-          const s = (1.5 + bloomProgress + f.bass * 0.8) * (i % petals < petals ? 1 : 0.7);
+          const s = 1.5 + bloomProgress + f.bass * 0.8;
           c.scale.set(s * 0.5, s * 2, s);
           c.material.color.setStyle(i < petals ? bassColor : midsColor);
           c.material.opacity = (0.7 + f.bass * 0.3) * blend;
@@ -2980,7 +2983,9 @@ export default function ThreeDVisualizer() {
         const edgeCount = 12;
         obj.octas.forEach((o, i) => {
           const edge = i % edgeCount;
-          const t = (i / edgeCount) % 1;
+          const segmentOnEdge = Math.floor(i / edgeCount);
+          const segmentsPerEdge = Math.ceil(obj.octas.length / edgeCount);
+          const t = segmentsPerEdge > 1 ? (segmentOnEdge / (segmentsPerEdge - 1)) : 0;
           const corners = [
             [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
             [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]
@@ -3214,7 +3219,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = false;
         });
         obj.octas.forEach((o, i) => {
-          const cubeIndex = Math.floor((i / obj.octas.length) * ribbonLength);
+          const cubeIndex = Math.min(Math.floor((i / obj.octas.length) * ribbonLength), ribbonLength - 1);
           const attachedCube = obj.cubes[cubeIndex];
           const side = (i % 2) === 0 ? 1 : -1;
           const offset = (1 + f.mids) * side;
@@ -3284,7 +3289,7 @@ export default function ThreeDVisualizer() {
             y = neckY - bottomProgress * (neckY - bottomY);
             radius = 0.5 + bottomProgress * 2.5;
           }
-          const angle = i * 137.5 * (Math.PI / 180) + el;
+          const angle = i * GOLDEN_ANGLE_DEGREES * (Math.PI / 180) + el;
           t.position.x = Math.cos(angle) * radius * f.mids;
           t.position.y = y;
           t.position.z = Math.sin(angle) * radius * f.mids;
