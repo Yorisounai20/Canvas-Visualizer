@@ -1282,6 +1282,7 @@ export default function ThreeDVisualizer() {
     addLog(`Deleted camera rig keyframe`, 'info');
   };
 
+  // Scene initialization - runs once on mount
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -1437,6 +1438,37 @@ export default function ThreeDVisualizer() {
     objectsRef.current = { cubes, octas, tetras, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
 
+    return () => {
+      // Cleanup on unmount only
+      if (idleAnimationRef.current) {
+        cancelAnimationFrame(idleAnimationRef.current);
+        idleAnimationRef.current = null;
+      }
+      if (orbitControlsRef.current) {
+        orbitControlsRef.current.dispose();
+        orbitControlsRef.current = null;
+      }
+      if (rendererRef.current) {
+        try {
+          if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
+            containerRef.current.removeChild(rendererRef.current.domElement);
+          }
+          rendererRef.current.dispose();
+          rendererRef.current = null;
+        } catch (e) {
+          console.error('Cleanup error:', e);
+        }
+      }
+      // Clear refs to help garbage collection
+      sceneRef.current = null;
+      cameraRef.current = null;
+      composerRef.current = null;
+      postFXPassRef.current = null;
+    };
+  }, []); // Empty dependency array - only run once on mount
+
+  // Idle render loop - manages rendering when not playing
+  useEffect(() => {
     // Continuous idle render loop - keeps canvas live like Blender/Editor mode
     const idleRender = () => {
       // Stop idle render when playing (main animation loop takes over)
@@ -1541,27 +1573,18 @@ export default function ThreeDVisualizer() {
       }
     };
     
-    // Start idle render loop
-    idleAnimationRef.current = requestAnimationFrame(idleRender);
+    // Start or restart idle render loop when not playing
+    if (!isPlaying) {
+      if (!idleAnimationRef.current) {
+        idleAnimationRef.current = requestAnimationFrame(idleRender);
+      }
+    }
 
     return () => {
+      // Don't cleanup renderer here - only cancel animation frame
       if (idleAnimationRef.current) {
         cancelAnimationFrame(idleAnimationRef.current);
         idleAnimationRef.current = null;
-      }
-      if (orbitControlsRef.current) {
-        orbitControlsRef.current.dispose();
-        orbitControlsRef.current = null;
-      }
-      if (rendererRef.current) {
-        try {
-          if (containerRef.current && containerRef.current.contains(rendererRef.current.domElement)) {
-            containerRef.current.removeChild(rendererRef.current.domElement);
-          }
-          rendererRef.current.dispose();
-        } catch (e) {
-          console.error('Cleanup error:', e);
-        }
       }
     };
   }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
