@@ -3,114 +3,60 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
-import { 
-  LogEntry, 
-  AudioTrack, 
-  ParameterEvent,
-  DEFAULT_CAMERA_DISTANCE,
-  DEFAULT_CAMERA_HEIGHT,
-  DEFAULT_CAMERA_ROTATION,
-  KEYFRAME_ONLY_ROTATION_SPEED,
-  WAVEFORM_SAMPLES,
-  WAVEFORM_THROTTLE_MS,
-  FPS_UPDATE_INTERVAL_MS
-} from './components/VisualizerSoftware/types';
-import { 
-  formatTime, 
-  formatTimeInput, 
-  parseTime, 
-  parseTimeInput,
-  applyEasing,
-  interpolateCameraKeyframes,
-  animationTypes,
-  generateWaveformData
-} from './components/VisualizerSoftware/utils';
 
-// Custom Post-Processing Shader
-const PostFXShader = {
-  uniforms: {
-    'tDiffuse': { value: null },
-    'vignetteStrength': { value: 0.0 },
-    'vignetteSoftness': { value: 0.5 },
-    'saturation': { value: 1.0 },
-    'contrast': { value: 1.0 },
-    'gamma': { value: 1.0 },
-    'tintR': { value: 1.0 },
-    'tintG': { value: 1.0 },
-    'tintB': { value: 1.0 }
-  },
-  vertexShader: `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float vignetteStrength;
-    uniform float vignetteSoftness;
-    uniform float saturation;
-    uniform float contrast;
-    uniform float gamma;
-    uniform float tintR;
-    uniform float tintG;
-    uniform float tintB;
-    varying vec2 vUv;
+interface LogEntry {
+  message: string;
+  type: string;
+  timestamp: string;
+}
 
-    vec3 adjustSaturation(vec3 color, float sat) {
-      float gray = dot(color, vec3(0.299, 0.587, 0.114));
-      return mix(vec3(gray), color, sat);
-    }
+interface AudioTrack {
+  id: string;
+  name: string;
+  buffer: AudioBuffer | null;
+  source: AudioBufferSourceNode | null;
+  analyser: AnalyserNode;
+  gainNode: GainNode;
+  volume: number; // 0-1
+  muted: boolean;
+  active: boolean; // true = this track's frequencies are visualized
+}
 
-    vec3 adjustContrast(vec3 color, float con) {
-      return (color - 0.5) * con + 0.5;
-    }
-
-    vec3 adjustGamma(vec3 color, float gam) {
-      return pow(color, vec3(1.0 / gam));
-    }
-
-    void main() {
-      vec4 texel = texture2D(tDiffuse, vUv);
-      vec3 color = texel.rgb;
-
-      // Apply color tint
-      color *= vec3(tintR, tintG, tintB);
-
-      // Apply saturation
-      color = adjustSaturation(color, saturation);
-
-      // Apply contrast
-      color = adjustContrast(color, contrast);
-
-      // Apply gamma
-      color = adjustGamma(color, gamma);
-
-      // Apply vignette
-      if (vignetteStrength > 0.0) {
-        vec2 center = vUv - 0.5;
-        float dist = length(center);
-        float vignette = smoothstep(vignetteSoftness, vignetteSoftness - vignetteStrength, dist);
-        color *= vignette;
-      }
-
-      gl_FragColor = vec4(color, texel.a);
-    }
-  `
-};
+interface ParameterEvent {
+  id: string;
+  startTime: number; // seconds - when the event starts
+  endTime: number; // seconds - when the event ends
+  mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
+  audioTrackId?: string; // which track to react to (for automated mode)
+  threshold?: number; // frequency threshold for automated triggering (0-1)
+  parameters: {
+    backgroundFlash?: number; // 0-1 intensity
+    cameraShake?: number; // 0-1 intensity
+    vignettePulse?: number; // 0-1 intensity
+    saturationBurst?: number; // 0-1 intensity
+    bloomBurst?: number; // 0-1 intensity (placeholder for future)
+    fogPulse?: number; // 0-1 intensity (placeholder for future)
+    // Post-FX parameters
+    vignetteStrengthPulse?: number; // 0-1 intensity - temporarily increase vignette
+    contrastBurst?: number; // 0-1 intensity - temporarily boost contrast
+    colorTintFlash?: { r: number; g: number; b: number; intensity: number }; // RGB color flash
+  };
+}
+// Default camera settings constants
+const DEFAULT_CAMERA_DISTANCE = 15;
+const DEFAULT_CAMERA_HEIGHT = 0;
+const DEFAULT_CAMERA_ROTATION = 0;
+const KEYFRAME_ONLY_ROTATION_SPEED = 0; // Rotation now controlled by keyframes or camera rigs only
+const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
+const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
+const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
 
 export default function ThreeDVisualizer() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const composerRef = useRef<EffectComposer | null>(null);
-  const postFXPassRef = useRef<ShaderPass | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -309,6 +255,24 @@ export default function ThreeDVisualizer() {
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
+  // Helper function to convert seconds to MM:SS format
+  const formatTimeInput = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to parse MM:SS format to seconds
+  const parseTimeInput = (timeStr: string): number => {
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0]) || 0;
+      const secs = parseInt(parts[1]) || 0;
+      return mins * 60 + secs;
+    }
+    return 0;
+  };
+
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -464,7 +428,93 @@ export default function ThreeDVisualizer() {
     }
   };
 
+  const animationTypes = [
+    { value: 'orbit', label: 'Orbital Dance', icon: '🌀' },
+    { value: 'explosion', label: 'Explosion', icon: '💥' },
+    { value: 'tunnel', label: 'Tunnel Rush', icon: '🚀' },
+    { value: 'wave', label: 'Wave Motion', icon: '🌊' },
+    { value: 'spiral', label: 'Spiral Galaxy', icon: '🌌' },
+    { value: 'chill', label: 'Chill Vibes', icon: '🎵' },
+    { value: 'pulse', label: 'Pulse Grid', icon: '⚡' },
+    { value: 'vortex', label: 'Vortex Storm', icon: '🌪️' },
+    { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
+  ];
+
+  const formatTime = (s: number) => `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+  const parseTime = (t: string) => { const [m,s]=t.split(':').map(Number); return m*60+s; };
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
+
+  // Easing functions for smooth transitions
+  const applyEasing = (t: number, easing: string) => {
+    switch(easing) {
+      case 'easeIn':
+        return t * t * t; // Cubic ease in
+      case 'easeOut':
+        return 1 - Math.pow(1 - t, 3); // Cubic ease out
+      case 'easeInOut':
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
+      case 'linear':
+      default:
+        return t; // Linear (no easing)
+    }
+  };
+
+  // Interpolate camera values between keyframes
+  const interpolateCameraKeyframes = (keyframes, currentTime) => {
+    if (!keyframes || keyframes.length === 0) {
+      return {
+        distance: DEFAULT_CAMERA_DISTANCE,
+        height: DEFAULT_CAMERA_HEIGHT,
+        rotation: DEFAULT_CAMERA_ROTATION
+      };
+    }
+
+    // Sort keyframes by time
+    const sortedKeyframes = [...keyframes].sort((a, b) => a.time - b.time);
+
+    // Find the two keyframes to interpolate between
+    let prevKeyframe = sortedKeyframes[0];
+    let nextKeyframe = sortedKeyframes[sortedKeyframes.length - 1];
+
+    for (let i = 0; i < sortedKeyframes.length - 1; i++) {
+      if (currentTime >= sortedKeyframes[i].time && currentTime <= sortedKeyframes[i + 1].time) {
+        prevKeyframe = sortedKeyframes[i];
+        nextKeyframe = sortedKeyframes[i + 1];
+        break;
+      }
+    }
+
+    // If we're before the first keyframe or after the last, use the boundary values
+    if (currentTime <= sortedKeyframes[0].time) {
+      return {
+        distance: sortedKeyframes[0].distance,
+        height: sortedKeyframes[0].height,
+        rotation: sortedKeyframes[0].rotation
+      };
+    }
+    if (currentTime >= sortedKeyframes[sortedKeyframes.length - 1].time) {
+      const last = sortedKeyframes[sortedKeyframes.length - 1];
+      return {
+        distance: last.distance,
+        height: last.height,
+        rotation: last.rotation
+      };
+    }
+
+    // Interpolation between keyframes with easing
+    const timeDiff = nextKeyframe.time - prevKeyframe.time;
+    const linearProgress = timeDiff > 0 ? (currentTime - prevKeyframe.time) / timeDiff : 0;
+    
+    // Apply easing function to the progress
+    const easing = prevKeyframe.easing || 'linear';
+    const easedProgress = applyEasing(linearProgress, easing);
+
+    return {
+      distance: prevKeyframe.distance + (nextKeyframe.distance - prevKeyframe.distance) * easedProgress,
+      height: prevKeyframe.height + (nextKeyframe.height - prevKeyframe.height) * easedProgress,
+      rotation: prevKeyframe.rotation + (nextKeyframe.rotation - prevKeyframe.rotation) * easedProgress
+    };
+  };
 
   const addSection = () => {
     const last = sections[sections.length-1];
@@ -582,6 +632,23 @@ export default function ThreeDVisualizer() {
     setCameraShakes(cameraShakes.map((shake, i) => 
       i === index ? { ...shake, [field]: value } : shake
     ));
+  };
+
+  const generateWaveformData = (buffer: AudioBuffer, samples = WAVEFORM_SAMPLES) => {
+    const rawData = buffer.getChannelData(0); // Get mono or first channel
+    const blockSize = Math.floor(rawData.length / samples);
+    const waveform: number[] = [];
+    
+    for (let i = 0; i < samples; i++) {
+      let blockStart = blockSize * i;
+      let sum = 0;
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[blockStart + j]);
+      }
+      waveform.push(sum / blockSize);
+    }
+    
+    return waveform;
   };
 
   const initAudio = async (file) => {
@@ -1300,19 +1367,6 @@ export default function ThreeDVisualizer() {
 
       containerRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
-      
-      // Setup post-processing with EffectComposer
-      const composer = new EffectComposer(renderer);
-      const renderPass = new RenderPass(scene, camera);
-      composer.addPass(renderPass);
-      
-      const postFXPass = new ShaderPass(PostFXShader);
-      postFXPass.renderToScreen = true;
-      composer.addPass(postFXPass);
-      
-      composerRef.current = composer;
-      postFXPassRef.current = postFXPass;
-      
       addLog('Scene initialized successfully', 'success');
     } catch (e) {
       console.error('Three.js initialization error:', e);
@@ -2596,30 +2650,12 @@ export default function ThreeDVisualizer() {
         // Future implementation: Use WebGL stencil buffer or shader-based masking
       }
 
-      // Update post-FX shader uniforms
-      if (postFXPassRef.current) {
-        const uniforms = postFXPassRef.current.uniforms;
-        uniforms.vignetteStrength.value = vignetteStrength;
-        uniforms.vignetteSoftness.value = vignetteSoftness;
-        uniforms.saturation.value = colorSaturation;
-        uniforms.contrast.value = colorContrast;
-        uniforms.gamma.value = colorGamma;
-        uniforms.tintR.value = colorTintR;
-        uniforms.tintG.value = colorTintG;
-        uniforms.tintB.value = colorTintB;
-      }
-
-      // Render with post-processing
-      if (composerRef.current) {
-        composerRef.current.render();
-      } else {
-        rend.render(scene, cam);
-      }
+      rend.render(scene, cam);
     };
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -3690,14 +3726,24 @@ export default function ThreeDVisualizer() {
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
           <div>
+            {/* Limitations Notice */}
+            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Post-Processing Effects - Limitations</h3>
+              <p className="text-xs text-yellow-200">
+                The Post-FX controls below require WebGL shader-based post-processing (EffectComposer, passes) which is not yet implemented. 
+                These controls will not affect the visualization until the rendering pipeline is updated to support post-processing effects.
+              </p>
+            </div>
+
             {/* Blend Mode Section */}
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
-              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually (not yet implemented)</p>
               <select 
                 value={blendMode} 
                 onChange={(e) => setBlendMode(e.target.value as any)}
                 className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
+                disabled
               >
                 <option value="normal">Normal (Standard)</option>
                 <option value="additive">Additive (Brighten)</option>
@@ -3707,8 +3753,8 @@ export default function ThreeDVisualizer() {
             </div>
 
             {/* Vignette Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
               
               <div className="mb-3">
@@ -3724,6 +3770,7 @@ export default function ThreeDVisualizer() {
                   value={vignetteStrength} 
                   onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3740,20 +3787,22 @@ export default function ThreeDVisualizer() {
                   value={vignetteSoftness} 
                   onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Vignette
               </button>
             </div>
 
             {/* Color Grading Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
               
               <div className="mb-3">
@@ -3769,6 +3818,7 @@ export default function ThreeDVisualizer() {
                   value={colorSaturation} 
                   onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
               </div>
@@ -3786,6 +3836,7 @@ export default function ThreeDVisualizer() {
                   value={colorContrast} 
                   onChange={(e) => setColorContrast(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
               </div>
@@ -3803,21 +3854,23 @@ export default function ThreeDVisualizer() {
                   value={colorGamma} 
                   onChange={(e) => setColorGamma(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
               </div>
 
               <button 
                 onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full mb-3 cursor-not-allowed"
+                disabled
               >
                 Reset Color Grading
               </button>
             </div>
 
             {/* Color Tint Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
               
               <div className="mb-3">
@@ -3833,6 +3886,7 @@ export default function ThreeDVisualizer() {
                   value={colorTintR} 
                   onChange={(e) => setColorTintR(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3849,6 +3903,7 @@ export default function ThreeDVisualizer() {
                   value={colorTintG} 
                   onChange={(e) => setColorTintG(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3865,12 +3920,14 @@ export default function ThreeDVisualizer() {
                   value={colorTintB} 
                   onChange={(e) => setColorTintB(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Color Tint
               </button>
