@@ -1297,7 +1297,7 @@ export default function ThreeDVisualizer() {
       camera.position.z = 15;
       cameraRef.current = camera;
 
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
 
