@@ -237,6 +237,10 @@ export default function ThreeDVisualizer() {
   // Default frequency values when no audio is loaded (maintains visual rendering without audio response)
   const DEFAULT_FREQUENCY_VALUES = { bass: 0, mids: 0, highs: 0 };
   
+  // Preset transition opacity constants
+  const FULL_OPACITY = 1;
+  const TRANSITION_SPEED = 0.02; // Rate at which blend increases per frame
+  
   // PHASE 4: Multi-audio track system
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const audioTracksRef = useRef<AudioTrack[]>([]);
@@ -271,8 +275,10 @@ export default function ThreeDVisualizer() {
     { id: 2, start: 20, end: 40, animation: 'explosion' },
     { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
-  const prevAnimRef = useRef<string | null>(null); // Start with null to detect first animation
-  const transitionRef = useRef(1);
+  // Start with null to prevent canvas disappearing on first preset
+  // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
+  const prevAnimRef = useRef<string | null>(null);
+  const transitionRef = useRef(FULL_OPACITY);
   
   // FPS tracking
   const [fps, setFps] = useState<number>(0);
@@ -1862,14 +1868,14 @@ export default function ThreeDVisualizer() {
       if (prevAnimRef.current === null) {
         // First animation - no fade in, start at full opacity
         prevAnimRef.current = type;
-        transitionRef.current = 1;
+        transitionRef.current = FULL_OPACITY;
       } else if (type !== prevAnimRef.current) {
         // Transitioning to a new preset - fade in from 0
         transitionRef.current = 0;
         prevAnimRef.current = type;
       }
-      if (transitionRef.current < 1) {
-        transitionRef.current = Math.min(1, transitionRef.current + 0.02);
+      if (transitionRef.current < FULL_OPACITY) {
+        transitionRef.current = Math.min(FULL_OPACITY, transitionRef.current + TRANSITION_SPEED);
       }
       const blend = transitionRef.current;
 
