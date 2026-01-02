@@ -22,7 +22,9 @@ import {
   parseTime, 
   parseTimeInput,
   applyEasing,
-  interpolateCameraKeyframes
+  interpolateCameraKeyframes,
+  animationTypes,
+  generateWaveformData
 } from './components/VisualizerSoftware/utils';
 
 export default function ThreeDVisualizer() {
@@ -383,18 +385,6 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  const animationTypes = [
-    { value: 'orbit', label: 'Orbital Dance', icon: '🌀' },
-    { value: 'explosion', label: 'Explosion', icon: '💥' },
-    { value: 'tunnel', label: 'Tunnel Rush', icon: '🚀' },
-    { value: 'wave', label: 'Wave Motion', icon: '🌊' },
-    { value: 'spiral', label: 'Spiral Galaxy', icon: '🌌' },
-    { value: 'chill', label: 'Chill Vibes', icon: '🎵' },
-    { value: 'pulse', label: 'Pulse Grid', icon: '⚡' },
-    { value: 'vortex', label: 'Vortex Storm', icon: '🌪️' },
-    { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
-  ];
-
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
   const addSection = () => {
@@ -513,23 +503,6 @@ export default function ThreeDVisualizer() {
     setCameraShakes(cameraShakes.map((shake, i) => 
       i === index ? { ...shake, [field]: value } : shake
     ));
-  };
-
-  const generateWaveformData = (buffer: AudioBuffer, samples = WAVEFORM_SAMPLES) => {
-    const rawData = buffer.getChannelData(0); // Get mono or first channel
-    const blockSize = Math.floor(rawData.length / samples);
-    const waveform: number[] = [];
-    
-    for (let i = 0; i < samples; i++) {
-      let blockStart = blockSize * i;
-      let sum = 0;
-      for (let j = 0; j < blockSize; j++) {
-        sum += Math.abs(rawData[blockStart + j]);
-      }
-      waveform.push(sum / blockSize);
-    }
-    
-    return waveform;
   };
 
   const initAudio = async (file) => {
