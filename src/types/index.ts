@@ -64,6 +64,7 @@ export interface CameraKeyframe {
   height: number;
   rotation: number;
   easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  cameraId?: string; // Optional: ID of the camera object to use, if not specified uses main camera
 }
 
 export interface PresetKeyframe {
@@ -123,6 +124,9 @@ export interface WorkspaceObject {
   cameraHeight?: number;
   cameraRotation?: number;
   isActiveCamera?: boolean;
+  // Letterbox properties (when type === 'camera')
+  showLetterbox?: boolean;
+  letterboxSize?: number; // 0-100 pixels
 }
 
 export interface AppState {
