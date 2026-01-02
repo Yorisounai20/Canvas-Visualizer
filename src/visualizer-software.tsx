@@ -2865,7 +2865,7 @@ export default function ThreeDVisualizer() {
                 <label className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded cursor-pointer flex items-center gap-1">
                   <Plus size={14} /> Add Track
                   <input 
-                    type="file" id="file-input" name="file-input" 
+                    type="file" id="file-field-2867" name="file-field-2867" 
                     accept="audio/*" 
                     onChange={(e) => { if (e.target.files?.[0]) addAudioTrack(e.target.files[0]); }}
                     className="hidden"
@@ -2948,7 +2948,7 @@ export default function ThreeDVisualizer() {
                         <label className="flex-1 flex items-center gap-2">
                           <span className="text-xs text-gray-400">Vol</span>
                           <input
-                            type="range" id="range-input" name="range-input"
+                            type="range" id="range-field-2950" name="range-field-2950"
                             min="0"
                             max="1"
                             step="0.01"
@@ -3263,7 +3263,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(shake.time)}</label>
                         <input 
-                          type="text" id="text-input" name="text-input" 
+                          type="text" id="time-formattime-shake-time" name="time-formattime-shake-time" 
                           value={formatTime(shake.time)} 
                           onChange={(e) => updateCameraShake(index, 'time', parseTime(e.target.value))} 
                           className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
@@ -3273,7 +3273,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Intensity: {shake.intensity.toFixed(1)}</label>
                         <input 
-                          type="range" id="range-input" name="range-input" 
+                          type="range" id="intensity-shake-intensity-tofixed-1" name="intensity-shake-intensity-tofixed-1" 
                           min="1" 
                           max="20" 
                           step="0.5" 
@@ -3286,7 +3286,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-300 block mb-1">Duration: {shake.duration.toFixed(2)}s</label>
                         <input 
-                          type="range" id="range-input" name="range-input" 
+                          type="range" id="duration-shake-duration-tofixed-2-s" name="duration-shake-duration-tofixed-2-s" 
                           min="0.05" 
                           max="1" 
                           step="0.05" 
@@ -3396,7 +3396,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="time-s" name="time-s" 
                             min="0" 
                             max={duration}
                             step="0.1" 
@@ -3408,7 +3408,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="size-px" name="size-px" 
                             min="0" 
                             max="100" 
                             step="5" 
@@ -3423,7 +3423,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="duration-s-1" name="duration-s-1" 
                             min="0" 
                             max="10" 
                             step="0.1" 
@@ -3536,7 +3536,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
                       <input 
-                        type="text" id="text-input" name="text-input" 
+                        type="text" id="time-formattime-kf-time" name="time-formattime-kf-time" 
                         value={formatTime(kf.time)} 
                         onChange={(e) => updateKeyframe(kfIndex, 'time', parseTime(e.target.value))} 
                         className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded" 
@@ -3560,7 +3560,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
                       <input 
-                        type="range" id="range-input" name="range-input" 
+                        type="range" id="distance-kf-distance-tofixed-1" name="distance-kf-distance-tofixed-1" 
                         min="5" 
                         max="50" 
                         step="0.5" 
@@ -3573,7 +3573,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
                       <input 
-                        type="range" id="range-input" name="range-input" 
+                        type="range" id="height-kf-height-tofixed-1" name="height-kf-height-tofixed-1" 
                         min="-10" 
                         max="10" 
                         step="0.5" 
@@ -3586,7 +3586,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
                       <input 
-                        type="range" id="range-input" name="range-input" 
+                        type="range" id="rotation-kf-rotation-180-math-pi-tofixed-0" name="rotation-kf-rotation-180-math-pi-tofixed-0" 
                         min="0" 
                         max={Math.PI * 2} 
                         step="0.05" 
@@ -3831,8 +3831,8 @@ export default function ThreeDVisualizer() {
                     <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div><label className="text-xs text-gray-400">Start</label><input type="text" id="text-input" name="text-input" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                    <div><label className="text-xs text-gray-400">End</label><input type="text" id="text-input" name="text-input" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">Start</label><input type="text" id="start" name="start" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">End</label><input type="text" id="text-input-2" name="text-input-2" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
                   </div>
                   <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
                     {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
@@ -3851,7 +3851,7 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
               <div className="mb-3 pb-3 border-b border-gray-600">
                 <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-                <input type="file" id="file-input" name="file-input" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
+                <input type="file" id="custom-font-typeface-json" name="custom-font-typeface-json" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
                 <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
               </div>
               <div className="flex gap-2 mb-2">
@@ -3903,7 +3903,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Text</label>
                         <input 
-                          type="text" id="text-input" name="text-input" 
+                          type="text" id="text" name="text" 
                           value={kf.text}
                           onChange={(e) => updateTextAnimatorKeyframe(kf.id, { text: e.target.value })}
                           className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
@@ -3945,7 +3945,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Stagger (s)</label>
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="stagger-s" name="stagger-s" 
                           step="0.01"
                           min="0"
                           max="1"
@@ -3957,7 +3957,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Duration (s)</label>
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="duration-s-2" name="duration-s-2" 
                           step="0.1"
                           min="0.1"
                           max="5"
@@ -3971,7 +3971,7 @@ export default function ThreeDVisualizer() {
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm text-gray-300">
                         <input 
-                          type="checkbox" id="checkbox-input" name="checkbox-input" 
+                          type="checkbox" id="checkbox-field-3973" name="checkbox-field-3973" 
                           checked={kf.visible}
                           onChange={(e) => updateTextAnimatorKeyframe(kf.id, { visible: e.target.checked })}
                           className="rounded"
@@ -4041,13 +4041,13 @@ export default function ThreeDVisualizer() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
-                          type="checkbox" id="checkbox-input" name="checkbox-input" 
+                          type="checkbox" id="checkbox-field-4043" name="checkbox-field-4043" 
                           checked={mask.enabled}
                           onChange={(e) => updateMask(mask.id, { enabled: e.target.checked })}
                           className="rounded"
                         />
                         <input 
-                          type="text" id="text-input" name="text-input" 
+                          type="text" id="text-field-4049" name="text-field-4049" 
                           value={mask.name}
                           onChange={(e) => updateMask(mask.id, { name: e.target.value })}
                           className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
@@ -4086,7 +4086,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">Feather: {mask.feather}</label>
                         <input 
-                          type="range" id="range-input" name="range-input" 
+                          type="range" id="feather-mask-feather" name="feather-mask-feather" 
                           min="0" 
                           max="100"
                           value={mask.feather}
@@ -4101,7 +4101,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Center X</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="center-x" name="center-x" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4113,7 +4113,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Center Y</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="center-y" name="center-y" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4125,7 +4125,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Radius</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="radius-1" name="radius-1" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4142,7 +4142,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">X</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="x" name="x" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4154,7 +4154,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Y</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="y" name="y" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4166,7 +4166,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Width</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="width" name="width" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4178,7 +4178,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Height</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="height-1" name="height-1" 
                             step="0.01"
                             min="0"
                             max="1"
@@ -4193,7 +4193,7 @@ export default function ThreeDVisualizer() {
                     <div className="mt-3">
                       <label className="flex items-center gap-2 text-sm text-gray-300">
                         <input 
-                          type="checkbox" id="checkbox-input" name="checkbox-input" 
+                          type="checkbox" id="checkbox-field-4195" name="checkbox-field-4195" 
                           checked={mask.inverted}
                           onChange={(e) => updateMask(mask.id, { inverted: e.target.checked })}
                           className="rounded"
@@ -4286,7 +4286,7 @@ export default function ThreeDVisualizer() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
-                          type="checkbox" id="checkbox-input" name="checkbox-input" 
+                          type="checkbox" id="checkbox-field-4288" name="checkbox-field-4288" 
                           checked={rig.enabled}
                           onChange={(e) => {
                             updateCameraRig(rig.id, { enabled: e.target.checked });
@@ -4299,7 +4299,7 @@ export default function ThreeDVisualizer() {
                           className="rounded"
                         />
                         <input 
-                          type="text" id="text-input" name="text-input" 
+                          type="text" id="text-field-4301" name="text-field-4301" 
                           value={rig.name}
                           onChange={(e) => updateCameraRig(rig.id, { name: e.target.value })}
                           className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
@@ -4328,7 +4328,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Radius</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="radius-2" name="radius-2" 
                             step="0.5"
                             value={rig.orbitRadius || 15}
                             onChange={(e) => updateCameraRig(rig.id, { orbitRadius: parseFloat(e.target.value) })}
@@ -4338,7 +4338,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Speed</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="speed-1" name="speed-1" 
                             step="0.1"
                             value={rig.orbitSpeed || 0.5}
                             onChange={(e) => updateCameraRig(rig.id, { orbitSpeed: parseFloat(e.target.value) })}
@@ -4365,7 +4365,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Speed</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="speed-2" name="speed-2" 
                             step="0.1"
                             value={rig.dollySpeed || 1.0}
                             onChange={(e) => updateCameraRig(rig.id, { dollySpeed: parseFloat(e.target.value) })}
@@ -4392,7 +4392,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Height</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="height-2" name="height-2" 
                             step="0.5"
                             value={rig.craneHeight || 10}
                             onChange={(e) => updateCameraRig(rig.id, { craneHeight: parseFloat(e.target.value) })}
@@ -4402,7 +4402,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Tilt</label>
                           <input 
-                            type="number" id="number-input" name="number-input" 
+                            type="number" id="tilt" name="tilt" 
                             step="0.1"
                             value={rig.craneTilt || 0}
                             onChange={(e) => updateCameraRig(rig.id, { craneTilt: parseFloat(e.target.value) })}
@@ -4417,7 +4417,7 @@ export default function ThreeDVisualizer() {
                       <div className="text-xs text-gray-400 mb-2">Base Position</div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4419" name="number-field-4419" 
                           placeholder="X"
                           step="0.5"
                           value={rig.position.x}
@@ -4425,7 +4425,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4427" name="number-field-4427" 
                           placeholder="Y"
                           step="0.5"
                           value={rig.position.y}
@@ -4433,7 +4433,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4435" name="number-field-4435" 
                           placeholder="Z"
                           step="0.5"
                           value={rig.position.z}
@@ -4444,7 +4444,7 @@ export default function ThreeDVisualizer() {
                       <div className="text-xs text-gray-400 mb-2">Base Rotation</div>
                       <div className="grid grid-cols-3 gap-2">
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4446" name="number-field-4446" 
                           placeholder="X"
                           step="0.1"
                           value={rig.rotation.x}
@@ -4452,7 +4452,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4454" name="number-field-4454" 
                           placeholder="Y"
                           step="0.1"
                           value={rig.rotation.y}
@@ -4460,7 +4460,7 @@ export default function ThreeDVisualizer() {
                           className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                         />
                         <input 
-                          type="number" id="number-input" name="number-input" 
+                          type="number" id="number-field-4462" name="number-field-4462" 
                           placeholder="Z"
                           step="0.1"
                           value={rig.rotation.z}
@@ -4659,7 +4659,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-sm text-gray-300 block mb-2">Start Time (MM:SS)</label>
                         <input
-                          type="text" id="text-input" name="text-input"
+                          type="text" id="start-time-mm-ss" name="start-time-mm-ss"
                           pattern="[0-9]+:[0-9]{2}"
                           value={formatTimeInput(event.startTime)}
                           onChange={(e) => {
@@ -4677,7 +4677,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-sm text-gray-300 block mb-2">End Time (MM:SS)</label>
                         <input
-                          type="text" id="text-input" name="text-input"
+                          type="text" id="end-time-mm-ss" name="end-time-mm-ss"
                           pattern="[0-9]+:[0-9]{2}"
                           value={formatTimeInput(event.endTime)}
                           onChange={(e) => {
@@ -4714,7 +4714,7 @@ export default function ThreeDVisualizer() {
                       <div>
                         <label className="text-sm text-gray-300 block mb-2">Frequency Threshold</label>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="frequency-threshold" name="frequency-threshold"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4732,7 +4732,7 @@ export default function ThreeDVisualizer() {
                     <div>
                       <label className="text-sm text-gray-300 block mb-2">Effect Duration (seconds)</label>
                       <input
-                        type="range" id="range-input" name="range-input"
+                        type="range" id="effect-duration-seconds" name="effect-duration-seconds"
                         min="0.05"
                         max="2"
                         step="0.05"
@@ -4751,7 +4751,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4753" name="checkbox-field-4753"
                         checked={(event.parameters.backgroundFlash ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, backgroundFlash: e.target.checked ? 0.5 : 0 }
@@ -4762,7 +4762,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.backgroundFlash ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="range-field-4764" name="range-field-4764"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4781,7 +4781,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="shake-checkbox-4783" name="shake-checkbox-4783"
                         checked={(event.parameters.cameraShake ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
@@ -4792,7 +4792,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.cameraShake ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="shake-range-4794" name="shake-range-4794"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4811,7 +4811,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4813" name="checkbox-field-4813"
                         checked={(event.parameters.vignettePulse ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, vignettePulse: e.target.checked ? 0.5 : 0 }
@@ -4822,7 +4822,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.vignettePulse ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="range-field-4824" name="range-field-4824"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4841,7 +4841,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4843" name="checkbox-field-4843"
                         checked={(event.parameters.saturationBurst ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, saturationBurst: e.target.checked ? 0.5 : 0 }
@@ -4852,7 +4852,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.saturationBurst ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="range-field-4854" name="range-field-4854"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4871,7 +4871,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4873" name="checkbox-field-4873"
                         checked={(event.parameters.vignetteStrengthPulse ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, vignetteStrengthPulse: e.target.checked ? 0.5 : 0 }
@@ -4882,7 +4882,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.vignetteStrengthPulse ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="range-field-4884" name="range-field-4884"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4901,7 +4901,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4903" name="checkbox-field-4903"
                         checked={(event.parameters.contrastBurst ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, contrastBurst: e.target.checked ? 0.5 : 0 }
@@ -4912,7 +4912,7 @@ export default function ThreeDVisualizer() {
                     {(event.parameters.contrastBurst ?? 0) > 0 && (
                       <div>
                         <input
-                          type="range" id="range-input" name="range-input"
+                          type="range" id="range-field-4914" name="range-field-4914"
                           min="0"
                           max="1"
                           step="0.05"
@@ -4931,7 +4931,7 @@ export default function ThreeDVisualizer() {
                   <div>
                     <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
                       <input
-                        type="checkbox" id="checkbox-input" name="checkbox-input"
+                        type="checkbox" id="checkbox-field-4933" name="checkbox-field-4933"
                         checked={(event.parameters.colorTintFlash?.intensity ?? 0) > 0}
                         onChange={(e) => updateParameterEvent(editingEventId, {
                           parameters: { ...event.parameters, colorTintFlash: e.target.checked ? { r: 1, g: 0, b: 0, intensity: 0.5 } : undefined }
@@ -4945,7 +4945,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-red-400 block mb-1">R</label>
                             <input
-                              type="range" id="range-input" name="range-input"
+                              type="range" id="r" name="r"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4959,7 +4959,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-green-400 block mb-1">G</label>
                             <input
-                              type="range" id="range-input" name="range-input"
+                              type="range" id="g" name="g"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4973,7 +4973,7 @@ export default function ThreeDVisualizer() {
                           <div>
                             <label className="text-xs text-blue-400 block mb-1">B</label>
                             <input
-                              type="range" id="range-input" name="range-input"
+                              type="range" id="b" name="b"
                               min="0"
                               max="2"
                               step="0.1"
@@ -4988,7 +4988,7 @@ export default function ThreeDVisualizer() {
                         <div>
                           <label className="text-xs text-gray-400 block mb-1">Intensity</label>
                           <input
-                            type="range" id="range-input" name="range-input"
+                            type="range" id="intensity" name="intensity"
                             min="0"
                             max="1"
                             step="0.05"
