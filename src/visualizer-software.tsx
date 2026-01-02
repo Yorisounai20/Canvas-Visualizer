@@ -109,6 +109,17 @@ export default function ThreeDVisualizer() {
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
+  // NEW: Post-FX controls
+  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
+  const [vignetteStrength, setVignetteStrength] = useState(0);
+  const [vignetteSoftness, setVignetteSoftness] = useState(0.5);
+  const [colorSaturation, setColorSaturation] = useState(1.0);
+  const [colorContrast, setColorContrast] = useState(1.0);
+  const [colorGamma, setColorGamma] = useState(1.0);
+  const [colorTintR, setColorTintR] = useState(1.0);
+  const [colorTintG, setColorTintG] = useState(1.0);
+  const [colorTintB, setColorTintB] = useState(1.0);
+  
   // NEW: Letterbox animation keyframes
   const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
     time: number;        // Time in seconds when this keyframe activates
