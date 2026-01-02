@@ -162,7 +162,7 @@ export interface CameraRig {
   id: string;
   name: string;
   enabled: boolean;
-  type: 'orbit' | 'dolly' | 'crane' | 'custom';
+  type: 'orbit' | 'dolly' | 'crane' | 'custom' | 'rotation' | 'pan' | 'zoom';
   // Null object transforms
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
@@ -180,6 +180,16 @@ export interface CameraRig {
   // Crane parameters
   craneHeight?: number;
   craneTilt?: number;
+  // Rotation parameters (always faces center)
+  rotationDistance?: number;
+  rotationSpeed?: number;
+  // Pan parameters (horizontal sweeping)
+  panSpeed?: number;
+  panRange?: number; // Degrees of horizontal movement
+  // Zoom parameters (smooth in/out)
+  zoomSpeed?: number;
+  zoomMinDistance?: number;
+  zoomMaxDistance?: number;
 }
 
 export interface CameraRigKeyframe {
