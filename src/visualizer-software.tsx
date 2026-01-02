@@ -26,6 +26,9 @@ interface ParameterEvent {
   id: string;
   time: number; // seconds - when the event triggers
   duration: number; // seconds - how long the effect lasts
+  mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
+  audioTrackId?: string; // which track to react to (for automated mode)
+  threshold?: number; // frequency threshold for automated triggering (0-1)
   parameters: {
     backgroundFlash?: number; // 0-1 intensity
     cameraShake?: number; // 0-1 intensity
@@ -141,6 +144,9 @@ export default function ThreeDVisualizer() {
   const activeVignettePulseRef = useRef(0);
   const activeSaturationBurstRef = useRef(0);
   
+  // PHASE 4: Track active automated events
+  const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
+  
   // NEW: Global camera keyframes (independent from presets)
   const [cameraKeyframes, setCameraKeyframes] = useState([
     { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
@@ -175,6 +181,24 @@ export default function ThreeDVisualizer() {
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // Helper function to convert seconds to MM:SS format
+  const formatTimeInput = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to parse MM:SS format to seconds
+  const parseTimeInput = (timeStr: string): number => {
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0]) || 0;
+      const secs = parseInt(parts[1]) || 0;
+      return mins * 60 + secs;
+    }
+    return 0;
   };
 
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -827,6 +851,9 @@ export default function ThreeDVisualizer() {
       id: `event-${Date.now()}-${Math.random()}`,
       time: currentTime > 0 ? currentTime : 0,
       duration: 0.2,
+      mode: 'manual', // Default to manual mode
+      audioTrackId: audioTracks.length > 0 ? audioTracks.find(t => t.active)?.id : undefined,
+      threshold: 0.5, // Default threshold for automated mode
       parameters: {
         backgroundFlash: 0.5,
         cameraShake: 0,
@@ -1293,8 +1320,43 @@ export default function ThreeDVisualizer() {
       let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
       
       for (const event of parameterEvents) {
-        const timeSinceEvent = t - event.time;
-        if (timeSinceEvent >= 0 && timeSinceEvent < event.duration) {
+        let shouldTrigger = false;
+        let effectStartTime = event.time;
+        
+        if (event.mode === 'manual') {
+          // Manual mode: trigger at specific time
+          const timeSinceEvent = t - event.time;
+          shouldTrigger = timeSinceEvent >= 0 && timeSinceEvent < event.duration;
+        } else if (event.mode === 'automated') {
+          // Automated mode: trigger when audio track exceeds threshold
+          if (event.audioTrackId) {
+            const track = audioTracksRef.current.find(tr => tr.id === event.audioTrackId);
+            if (track && track.analyser) {
+              // Get frequency data from the specific track
+              const trackData = new Uint8Array(track.analyser.frequencyBinCount);
+              track.analyser.getByteFrequencyData(trackData);
+              const trackFreq = getFreq(trackData);
+              
+              // Check if bass frequency exceeds threshold
+              const threshold = event.threshold || 0.5;
+              if (trackFreq.bass > threshold) {
+                // Start or continue the effect
+                if (!activeAutomatedEventsRef.current.has(event.id)) {
+                  activeAutomatedEventsRef.current.set(event.id, t);
+                }
+                effectStartTime = activeAutomatedEventsRef.current.get(event.id)!;
+                const timeSinceStart = t - effectStartTime;
+                shouldTrigger = timeSinceStart < event.duration;
+              } else {
+                // Bass dropped below threshold, clean up if effect was active
+                activeAutomatedEventsRef.current.delete(event.id);
+              }
+            }
+          }
+        }
+        
+        if (shouldTrigger) {
+          const timeSinceEvent = t - effectStartTime;
           const progress = timeSinceEvent / event.duration;
           // Ease out cubic for smooth return
           const easeOut = 1 - Math.pow(1 - progress, 3);
@@ -1967,7 +2029,7 @@ export default function ThreeDVisualizer() {
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="flex items-center gap-4">
-          {/* Time Display and Audio Upload */}
+          {/* Time Display and Preset Info - No Audio Upload */}
           <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
             <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
             {showPresetDisplay && getCurrentSection() && (
@@ -1976,20 +2038,14 @@ export default function ThreeDVisualizer() {
               </p>
             )}
             
-            {/* Audio File Upload - Always visible */}
-            <div className="mt-3 pt-3 border-t border-gray-600">
-              <label className="text-cyan-400 text-xs font-semibold block mb-2">Audio File</label>
-              <input type="file" accept="audio/*" onChange={handleAudioFileChange} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
-            </div>
-            
             {/* Play/Stop Button */}
             {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
           </div>
           
-          {/* Waveform - Made bigger, only shows when audio loaded */}
+          {/* Combined Waveform from all tracks */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && waveformData.length > 0 ? (
+              {audioReady && audioTracks.length > 0 ? (
                 <canvas 
                   ref={waveformCanvasRef} 
                   width={800} 
@@ -1998,7 +2054,7 @@ export default function ThreeDVisualizer() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  Upload an audio file to see the waveform
+                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
                 </div>
               )}
             </div>
@@ -2204,9 +2260,16 @@ export default function ThreeDVisualizer() {
                   {parameterEvents.map((event) => (
                     <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-white font-medium">
-                          Event @ {formatTime(event.time)}
-                        </span>
+                        <div>
+                          <span className="text-white font-medium">
+                            {event.mode === 'manual' ? `@ ${formatTimeInput(event.time)}` : '🤖 Automated'}
+                          </span>
+                          {event.mode === 'automated' && event.audioTrackId && (
+                            <span className="text-gray-400 ml-2">
+                              → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => {
@@ -2840,19 +2903,81 @@ export default function ThreeDVisualizer() {
               
               return (
                 <div className="space-y-4">
-                  {/* Time */}
+                  {/* Mode Selection */}
                   <div>
-                    <label className="text-sm text-gray-300 block mb-2">Time (seconds)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max={duration}
-                      step="0.1"
-                      value={event.time}
-                      onChange={(e) => updateParameterEvent(editingEventId, { time: parseFloat(e.target.value) })}
-                      className="w-full px-3 py-2 bg-gray-700 rounded text-white"
-                    />
+                    <label className="text-sm text-gray-300 block mb-2">Event Mode</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => updateParameterEvent(editingEventId, { mode: 'manual' })}
+                        className={`flex-1 px-3 py-2 rounded ${event.mode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                      >
+                        ⏱️ Manual (Fixed Time)
+                      </button>
+                      <button
+                        onClick={() => updateParameterEvent(editingEventId, { mode: 'automated' })}
+                        className={`flex-1 px-3 py-2 rounded ${event.mode === 'automated' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                      >
+                        🤖 Automated (Reactive)
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {event.mode === 'manual' ? 'Triggers at a specific time' : 'Triggers when audio track hits threshold'}
+                    </p>
                   </div>
+
+                  {/* Time (only for manual mode) */}
+                  {event.mode === 'manual' && (
+                    <div>
+                      <label className="text-sm text-gray-300 block mb-2">Time (MM:SS)</label>
+                      <input
+                        type="text"
+                        pattern="[0-9]+:[0-9]{2}"
+                        value={formatTimeInput(event.time)}
+                        onChange={(e) => {
+                          const newTime = parseTimeInput(e.target.value);
+                          if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
+                            updateParameterEvent(editingEventId, { time: newTime });
+                          }
+                        }}
+                        placeholder="0:00"
+                        className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Format: minutes:seconds (e.g., 1:30 for 1 minute 30 seconds)</p>
+                    </div>
+                  )}
+
+                  {/* Audio Track Selection (for automated mode) */}
+                  {event.mode === 'automated' && (
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">React to Audio Track</label>
+                        <select
+                          value={event.audioTrackId || ''}
+                          onChange={(e) => updateParameterEvent(editingEventId, { audioTrackId: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+                        >
+                          <option value="">Select a track...</option>
+                          {audioTracks.map(track => (
+                            <option key={track.id} value={track.id}>{track.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">Frequency Threshold</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.threshold || 0.5}
+                          onChange={(e) => updateParameterEvent(editingEventId, { threshold: parseFloat(e.target.value) })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.threshold || 0.5) * 100)}% - Triggers when bass frequency exceeds this level</span>
+                      </div>
+                    </>
+                  )}
 
                   {/* Duration */}
                   <div>
