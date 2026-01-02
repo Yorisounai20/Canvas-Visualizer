@@ -228,6 +228,9 @@ export default function ThreeDVisualizer() {
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
+  // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
+  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'keyframes', 'effects', 'postfx', 'presets', 'textAnimator', 'masks', 'cameraRig'] as const;
+  
   // PHASE 4: Multi-audio track system
   const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
   const audioTracksRef = useRef<AudioTrack[]>([]);
@@ -3365,13 +3368,12 @@ export default function ThreeDVisualizer() {
       } else if (e.key >= '1' && e.key <= '9') {
         // Number keys 1-9 for tab navigation
         const tabIndex = parseInt(e.key) - 1;
-        const tabs = ['waveforms', 'controls', 'camera', 'keyframes', 'effects', 'postfx', 'presets', 'textAnimator', 'masks'];
-        if (tabIndex < tabs.length) {
-          setActiveTab(tabs[tabIndex]);
+        if (tabIndex < TAB_ORDER.length) {
+          setActiveTab(TAB_ORDER[tabIndex]);
         }
       } else if (e.key === '0') {
-        // Number key 0 for the 10th tab (Camera Rig)
-        setActiveTab('cameraRig');
+        // Number key 0 for the 10th tab (last tab in TAB_ORDER)
+        setActiveTab(TAB_ORDER[TAB_ORDER.length - 1]);
       }
     };
     
