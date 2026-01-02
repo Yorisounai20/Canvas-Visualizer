@@ -10,53 +10,38 @@ interface LogEntry {
   timestamp: string;
 }
 
-// PHASE 2: Central Easing Utilities
-const EasingFunctions = {
-  // Linear
-  linear: (t: number) => t,
-  
-  // Quadratic
-  easeInQuad: (t: number) => t * t,
-  easeOutQuad: (t: number) => t * (2 - t),
-  easeInOutQuad: (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-  
-  // Cubic
-  easeInCubic: (t: number) => t * t * t,
-  easeOutCubic: (t: number) => (--t) * t * t + 1,
-  easeInOutCubic: (t: number) => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
-  
-  // Exponential
-  easeInExpo: (t: number) => t === 0 ? 0 : Math.pow(2, 10 * (t - 1)),
-  easeOutExpo: (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
-  easeInOutExpo: (t: number) => {
-    if (t === 0) return 0;
-    if (t === 1) return 1;
-    if (t < 0.5) return Math.pow(2, 20 * t - 10) / 2;
-    return (2 - Math.pow(2, -20 * t + 10)) / 2;
-  },
-  
-  // Elastic (overshoot)
-  easeOutElastic: (t: number) => {
-    const c4 = (2 * Math.PI) / 3;
-    return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
-  },
-  
-  // Bounce
-  easeOutBounce: (t: number) => {
-    const n1 = 7.5625;
-    const d1 = 2.75;
-    if (t < 1 / d1) {
-      return n1 * t * t;
-    } else if (t < 2 / d1) {
-      return n1 * (t -= 1.5 / d1) * t + 0.75;
-    } else if (t < 2.5 / d1) {
-      return n1 * (t -= 2.25 / d1) * t + 0.9375;
-    } else {
-      return n1 * (t -= 2.625 / d1) * t + 0.984375;
-    }
-  }
-};
+interface AudioTrack {
+  id: string;
+  name: string;
+  buffer: AudioBuffer | null;
+  source: AudioBufferSourceNode | null;
+  analyser: AnalyserNode;
+  gainNode: GainNode;
+  volume: number; // 0-1
+  muted: boolean;
+  active: boolean; // true = this track's frequencies are visualized
+}
 
+interface ParameterEvent {
+  id: string;
+  time: number; // seconds - when the event triggers
+  duration: number; // seconds - how long the effect lasts
+  mode: 'manual' | 'automated'; // manual = fixed time, automated = react to audio
+  audioTrackId?: string; // which track to react to (for automated mode)
+  threshold?: number; // frequency threshold for automated triggering (0-1)
+  parameters: {
+    backgroundFlash?: number; // 0-1 intensity
+    cameraShake?: number; // 0-1 intensity
+    vignettePulse?: number; // 0-1 intensity
+    saturationBurst?: number; // 0-1 intensity
+    bloomBurst?: number; // 0-1 intensity (placeholder for future)
+    fogPulse?: number; // 0-1 intensity (placeholder for future)
+    // Post-FX parameters
+    vignetteStrengthPulse?: number; // 0-1 intensity - temporarily increase vignette
+    contrastBurst?: number; // 0-1 intensity - temporarily boost contrast
+    colorTintFlash?: { r: number; g: number; b: number; intensity: number }; // RGB color flash
+  };
+}
 // Default camera settings constants
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
@@ -147,7 +132,29 @@ export default function ThreeDVisualizer() {
   const [showExportModal, setShowExportModal] = useState(false);
   
   // NEW: Tab state
-  const [activeTab, setActiveTab] = useState('controls');
+  const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
+  
+  // PHASE 4: Multi-audio track system
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const audioTracksRef = useRef<AudioTrack[]>([]);
+  
+  // PHASE 4: Parameter events for flash effects
+  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  
+  // PHASE 4: Active parameter effect values (stored in refs for performance)
+  const activeBackgroundFlashRef = useRef(0);
+  const activeVignettePulseRef = useRef(0);
+  const activeSaturationBurstRef = useRef(0);
+  
+  // PHASE 4 (Enhanced): Active Post-FX parameter values
+  const activeVignetteStrengthPulseRef = useRef(0);
+  const activeContrastBurstRef = useRef(0);
+  const activeColorTintFlashRef = useRef({ r: 0, g: 0, b: 0 });
+  
+  // PHASE 4: Track active automated events
+  const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
   
   // NEW: Global camera keyframes (independent from presets)
   const [cameraKeyframes, setCameraKeyframes] = useState([
@@ -180,95 +187,46 @@ export default function ThreeDVisualizer() {
     return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
   }, [letterboxKeyframes]);
 
-  // PHASE 1: Time remapping state
-  const [timeScale, setTimeScale] = useState(1.0); // Global playback speed (0.1 to 2.0)
-  
-  // PHASE 1: Camera control state
-  const [cameraLocked, setCameraLocked] = useState(false); // Toggle camera lock (C key)
-  const cameraManualOffsetRef = useRef({ x: 0, y: 0, z: 0, rotX: 0, rotY: 0 }); // Manual camera adjustments
-
-  // PHASE 2: Audio smoothing & mapping state
-  const [bassSmoothing, setBassSmoothing] = useState(0.7); // 0-1 (lower = more responsive, higher = smoother)
-  const [midsSmoothing, setMidsSmoothing] = useState(0.7);
-  const [highsSmoothing, setHighsSmoothing] = useState(0.7);
-  const [bassGain, setBassGain] = useState(1.0); // Multiplier for bass intensity (0.1-3.0)
-  const [midsGain, setMidsGain] = useState(1.0);
-  const [highsGain, setHighsGain] = useState(1.0);
-  
-  // Smoothed frequency values (using refs for smooth transitions)
-  const smoothedFreqsRef = useRef({ bass: 0, mids: 0, highs: 0 });
-
-  // PHASE 3: Post-processing effects state
-  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal'); // Layer blend modes
-  const [vignetteStrength, setVignetteStrength] = useState(0.0); // Vignette intensity (0-1)
-  const [vignetteSoftness, setVignetteSoftness] = useState(0.5); // Vignette edge softness (0-1)
-  const [colorSaturation, setColorSaturation] = useState(1.0); // Color saturation (0-2)
-  const [colorContrast, setColorContrast] = useState(1.0); // Contrast (0.5-2)
-  const [colorGamma, setColorGamma] = useState(1.0); // Gamma correction (0.5-2)
-  const [colorTintR, setColorTintR] = useState(1.0); // Red tint (0-2)
-  const [colorTintG, setColorTintG] = useState(1.0); // Green tint (0-2)
-  const [colorTintB, setColorTintB] = useState(1.0); // Blue tint (0-2)
-
-  // PHASE 4: Multi-audio system types and state
-  interface AudioTrack {
-    id: string;
-    name: string;
-    buffer: AudioBuffer | null;
-    source: AudioBufferSourceNode | null;
-    analyser: AnalyserNode;
-    gainNode: GainNode;
-    volume: number;
-    muted: boolean;
-    active: boolean; // Which track's frequencies to visualize
-  }
-
-  interface ParameterEvent {
-    id: string;
-    time: number; // When to trigger (in seconds)
-    duration: number; // How long the effect lasts (in seconds)
-    parameters: {
-      backgroundFlash?: number; // 0-1 intensity
-      bloomBurst?: number; // 0-1 intensity (currently unused, for future bloom effect)
-      fogPulse?: number; // 0-1 intensity (currently unused, for future fog effect)
-      cameraShake?: number; // 0-1 intensity
-      vignettePulse?: number; // 0-1 intensity
-      saturationBurst?: number; // 0-1 intensity
-    };
-  }
-
-  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
-  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null); // Which track to visualize
-  
-  // Event UI state
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<ParameterEvent | null>(null);
-  
-  // Temporary event parameter values (for active events)
-  const activeEventValuesRef = useRef({
-    backgroundFlash: 0,
-    cameraShake: 0,
-    vignettePulse: 0,
-    saturationBurst: 0
-  });
-
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // Helper function to convert seconds to MM:SS format
+  const formatTimeInput = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to parse MM:SS format to seconds
+  const parseTimeInput = (timeStr: string): number => {
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0]) || 0;
+      const secs = parseInt(parts[1]) || 0;
+      return mins * 60 + secs;
+    }
+    return 0;
   };
 
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const seekPosition = (x / rect.width) * duration;
-    seekTo(seekPosition);
+    if (audioTracks.length > 0) {
+      seekMultiTrack(seekPosition);
+    } else {
+      seekTo(seekPosition);
+    }
   };
 
   const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
       const f = e.target.files[0];
       setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
-      initAudio(f);
+      // Use multi-track system for all audio loading
+      addAudioTrack(f);
     }
   };
 
@@ -424,27 +382,18 @@ export default function ThreeDVisualizer() {
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
 
   // Easing functions for smooth transitions
-  // PHASE 2: Apply easing function using central easing utilities
   const applyEasing = (t: number, easing: string) => {
-    // Map legacy easing names to new easing functions
-    const easingMap: { [key: string]: keyof typeof EasingFunctions } = {
-      'linear': 'linear',
-      'easeIn': 'easeInCubic',
-      'easeOut': 'easeOutCubic',
-      'easeInOut': 'easeInOutCubic',
-      // New easing options
-      'easeInQuad': 'easeInQuad',
-      'easeOutQuad': 'easeOutQuad',
-      'easeInOutQuad': 'easeInOutQuad',
-      'easeInExpo': 'easeInExpo',
-      'easeOutExpo': 'easeOutExpo',
-      'easeInOutExpo': 'easeInOutExpo',
-      'easeOutElastic': 'easeOutElastic',
-      'easeOutBounce': 'easeOutBounce'
-    };
-    
-    const easingFn = easingMap[easing] || 'linear';
-    return EasingFunctions[easingFn](t);
+    switch(easing) {
+      case 'easeIn':
+        return t * t * t; // Cubic ease in
+      case 'easeOut':
+        return 1 - Math.pow(1 - t, 3); // Cubic ease out
+      case 'easeInOut':
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // Cubic ease in-out
+      case 'linear':
+      default:
+        return t; // Linear (no easing)
+    }
   };
 
   // Interpolate camera values between keyframes
@@ -524,10 +473,6 @@ export default function ThreeDVisualizer() {
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
     setCameraRotation(DEFAULT_CAMERA_ROTATION);
     setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
-    // PHASE 1: Also reset manual camera offsets and lock
-    cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
-    setCameraLocked(false);
-    addLog('Camera reset', 'success');
   };
 
   // Global keyframe management functions
@@ -675,13 +620,11 @@ export default function ThreeDVisualizer() {
     if (bufferSourceRef.current) bufferSourceRef.current.stop();
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
-    // PHASE 1: Apply time scale to audio playback rate
-    src.playbackRate.value = timeScale;
     src.connect(analyserRef.current);
     analyserRef.current.connect(audioContextRef.current.destination);
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000 / timeScale);
+    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
     setIsPlaying(true);
   };
 
@@ -703,91 +646,246 @@ export default function ThreeDVisualizer() {
     if (play) playAudio();
   };
 
-  // PHASE 1: Keyboard controls - Transport controls
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // Don't trigger shortcuts when typing in text inputs
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
-    }
-
-    const key = e.key;
-    const shift = e.shiftKey;
-    const alt = e.altKey;
-
-    // Transport controls
-    if (key === ' ') {
-      e.preventDefault();
-      if (audioReady) {
-        if (isPlaying) stopAudio();
-        else playAudio();
+  // PHASE 4: Multi-track audio functions
+  const addAudioTrack = async (file: File) => {
+    try {
+      addLog(`Loading audio track: ${file.name}`, 'info');
+      
+      // Initialize AudioContext if not exists
+      if (!audioContextRef.current) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = ctx;
       }
-    } else if (key === 'j' || key === 'J') {
-      e.preventDefault();
-      const step = shift ? 5 : 1; // Large jump vs small step
-      seekTo(Math.max(0, currentTime - step));
-    } else if (key === 'l' || key === 'L') {
-      e.preventDefault();
-      const step = shift ? 5 : 1;
-      seekTo(Math.min(duration, currentTime + step));
-    } else if (key === 'Home') {
-      e.preventDefault();
-      seekTo(0);
-    } else if (key === 'End') {
-      e.preventDefault();
-      seekTo(duration);
-    }
-    // Camera controls
-    else if (key === 'c' || key === 'C') {
-      e.preventDefault();
-      setCameraLocked(!cameraLocked);
-      addLog(cameraLocked ? 'Camera unlocked' : 'Camera locked', 'info');
-    } else if (key === 'r' || key === 'R') {
-      e.preventDefault();
-      // Reset camera to defaults
-      setCameraDistance(DEFAULT_CAMERA_DISTANCE);
-      setCameraHeight(DEFAULT_CAMERA_HEIGHT);
-      setCameraRotation(DEFAULT_CAMERA_ROTATION);
-      cameraManualOffsetRef.current = { x: 0, y: 0, z: 0, rotX: 0, rotY: 0 };
-      addLog('Camera reset to defaults', 'info');
-    } else if (!cameraLocked) {
-      // Camera movement controls (only when not locked)
-      const moveSpeed = shift ? 2.0 : (alt ? 0.1 : 0.5);
-      const rotSpeed = shift ? 10 : (alt ? 1 : 5);
-
-      if (key === 'q' || key === 'Q') {
-        e.preventDefault();
-        setCameraDistance(prev => Math.max(5, Math.min(50, prev - moveSpeed)));
-      } else if (key === 'e' || key === 'E') {
-        e.preventDefault();
-        setCameraDistance(prev => Math.max(5, Math.min(50, prev + moveSpeed)));
-      } else if (key === 'ArrowUp') {
-        e.preventDefault();
-        cameraManualOffsetRef.current.rotX += rotSpeed;
-      } else if (key === 'ArrowDown') {
-        e.preventDefault();
-        cameraManualOffsetRef.current.rotX -= rotSpeed;
-      } else if (key === 'ArrowLeft') {
-        e.preventDefault();
-        setCameraRotation(prev => (prev - rotSpeed + 360) % 360);
-      } else if (key === 'ArrowRight') {
-        e.preventDefault();
-        setCameraRotation(prev => (prev + rotSpeed) % 360);
+      
+      const ctx = audioContextRef.current;
+      const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+      
+      // Create audio nodes for this track
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 1.0; // Default volume at 100%
+      
+      const trackId = `track-${Date.now()}-${Math.random()}`;
+      const newTrack: AudioTrack = {
+        id: trackId,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        buffer: buffer,
+        source: null,
+        analyser: analyser,
+        gainNode: gainNode,
+        volume: 1.0,
+        muted: false,
+        active: audioTracks.length === 0 // First track is active by default
+      };
+      
+      const updatedTracks = [...audioTracks, newTrack];
+      setAudioTracks(updatedTracks);
+      audioTracksRef.current = updatedTracks;
+      
+      // Set duration from the first track or the longest track
+      if (audioTracks.length === 0) {
+        setDuration(buffer.duration);
+        setAudioReady(true);
+        // For backward compatibility, set the first track to the old refs
+        audioBufferRef.current = buffer;
+        analyserRef.current = analyser;
+        // Generate waveform data for the main waveform display
+        const waveform = generateWaveformData(buffer);
+        setWaveformData(waveform);
+      } else {
+        setDuration(Math.max(duration, buffer.duration));
       }
+      
+      addLog(`Track "${newTrack.name}" loaded successfully!`, 'success');
+    } catch (e) {
+      console.error(e);
+      const error = e as Error;
+      addLog(`Track load error: ${error.message}`, 'error');
     }
   };
 
-  // PHASE 1: Wheel zoom control
-  const handleWheel = (e: WheelEvent) => {
-    if (cameraLocked) return;
+  const removeAudioTrack = (trackId: string) => {
+    const track = audioTracks.find(t => t.id === trackId);
+    if (track?.source) {
+      track.source.stop();
+      track.source.disconnect();
+    }
     
-    const target = e.target as HTMLElement;
-    // Only zoom when scrolling over the canvas container
-    if (containerRef.current && containerRef.current.contains(target)) {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 1 : -1;
-      const zoomSpeed = e.shiftKey ? 2 : (e.altKey ? 0.1 : 0.5);
-      setCameraDistance(prev => Math.max(5, Math.min(50, prev + delta * zoomSpeed)));
+    let updatedTracks = audioTracks.filter(t => t.id !== trackId);
+    
+    // If we removed the active track, make the first remaining track active
+    if (track?.active && updatedTracks.length > 0) {
+      updatedTracks = updatedTracks.map((t, i) => ({
+        ...t,
+        active: i === 0
+      }));
+    }
+    
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // Update refs for backward compatibility
+    if (updatedTracks.length > 0) {
+      const activeTrack = updatedTracks.find(t => t.active) || updatedTracks[0];
+      audioBufferRef.current = activeTrack.buffer;
+      analyserRef.current = activeTrack.analyser;
+    } else {
+      audioBufferRef.current = null;
+      analyserRef.current = null;
+      setAudioReady(false);
+    }
+    
+    addLog(`Track removed`, 'info');
+  };
+
+  const updateTrackVolume = (trackId: string, volume: number) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        track.gainNode.gain.value = track.muted ? 0 : volume;
+        return { ...track, volume };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const toggleTrackMute = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        const newMuted = !track.muted;
+        track.gainNode.gain.value = newMuted ? 0 : track.volume;
+        return { ...track, muted: newMuted };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const setActiveTrack = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => ({
+      ...track,
+      active: track.id === trackId
+    }));
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // Update refs for visualization
+    const activeTrack = updatedTracks.find(t => t.active);
+    if (activeTrack) {
+      analyserRef.current = activeTrack.analyser;
+      audioBufferRef.current = activeTrack.buffer;
+    }
+  };
+
+  const playMultiTrackAudio = () => {
+    if (!audioContextRef.current || audioTracks.length === 0) return;
+    
+    const ctx = audioContextRef.current;
+    const startOffset = pauseTimeRef.current;
+    
+    // Start all tracks synchronized
+    audioTracks.forEach(track => {
+      if (!track.buffer) return;
+      
+      // Stop existing source if any
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors from already stopped sources
+        }
+      }
+      
+      // Create new source
+      const source = ctx.createBufferSource();
+      source.buffer = track.buffer;
+      
+      // Connect: source -> gain -> analyser -> destination
+      source.connect(track.gainNode);
+      track.gainNode.connect(track.analyser);
+      track.analyser.connect(ctx.destination);
+      
+      // Set gain based on mute state
+      track.gainNode.gain.value = track.muted ? 0 : track.volume;
+      
+      // Start playback
+      source.start(0, startOffset);
+      track.source = source;
+    });
+    
+    // Update ref for internal tracking
+    audioTracksRef.current = audioTracks;
+    
+    startTimeRef.current = Date.now() - (startOffset * 1000);
+    setIsPlaying(true);
+  };
+
+  const stopMultiTrackAudio = () => {
+    audioTracks.forEach(track => {
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors
+        }
+        track.source = null;
+      }
+    });
+    
+    // Update ref for internal tracking
+    audioTracksRef.current = audioTracks;
+    
+    pauseTimeRef.current = currentTime;
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    setIsPlaying(false);
+  };
+
+  const seekMultiTrack = (t: number) => {
+    const play = isPlaying;
+    if (play) stopMultiTrackAudio();
+    pauseTimeRef.current = t;
+    setCurrentTime(t);
+    if (play) playMultiTrackAudio();
+  };
+
+  // PHASE 4: Parameter event functions
+  const addParameterEvent = () => {
+    const newEvent: ParameterEvent = {
+      id: `event-${Date.now()}-${Math.random()}`,
+      time: currentTime > 0 ? currentTime : 0,
+      duration: 0.2,
+      mode: 'manual', // Default to manual mode
+      audioTrackId: audioTracks.length > 0 ? audioTracks.find(t => t.active)?.id : undefined,
+      threshold: 0.5, // Default threshold for automated mode
+      parameters: {
+        backgroundFlash: 0.5,
+        cameraShake: 0,
+        vignettePulse: 0,
+        saturationBurst: 0
+      }
+    };
+    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.time - b.time));
+    setEditingEventId(newEvent.id);
+    setShowEventModal(true);
+  };
+
+  const updateParameterEvent = (eventId: string, updates: Partial<ParameterEvent>) => {
+    setParameterEvents(parameterEvents.map(event => 
+      event.id === eventId ? { ...event, ...updates } : event
+    ).sort((a, b) => a.time - b.time));
+  };
+
+  const deleteParameterEvent = (eventId: string) => {
+    setParameterEvents(parameterEvents.filter(e => e.id !== eventId));
+    if (editingEventId === eventId) {
+      setShowEventModal(false);
+      setEditingEventId(null);
     }
   };
 
@@ -972,25 +1070,11 @@ export default function ThreeDVisualizer() {
     }
   };
 
-  // PHASE 2: Enhanced getFreq with smoothing and gain
-  const getFreq = (d: Uint8Array) => {
-    // Raw frequency values
-    const rawBass = d.slice(0,10).reduce((a,b)=>a+b,0)/10/255;
-    const rawMids = d.slice(10,100).reduce((a,b)=>a+b,0)/90/255;
-    const rawHighs = d.slice(100,200).reduce((a,b)=>a+b,0)/100/255;
-    
-    // Apply smoothing (exponential moving average)
-    smoothedFreqsRef.current.bass = smoothedFreqsRef.current.bass * bassSmoothing + rawBass * (1 - bassSmoothing);
-    smoothedFreqsRef.current.mids = smoothedFreqsRef.current.mids * midsSmoothing + rawMids * (1 - midsSmoothing);
-    smoothedFreqsRef.current.highs = smoothedFreqsRef.current.highs * highsSmoothing + rawHighs * (1 - highsSmoothing);
-    
-    // Apply gain and clamp to 0-1 range
-    return {
-      bass: Math.min(1, Math.max(0, smoothedFreqsRef.current.bass * bassGain)),
-      mids: Math.min(1, Math.max(0, smoothedFreqsRef.current.mids * midsGain)),
-      highs: Math.min(1, Math.max(0, smoothedFreqsRef.current.highs * highsGain))
-    };
-  };
+  const getFreq = (d: Uint8Array) => ({
+    bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
+    mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
+    highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
+  });
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1009,10 +1093,6 @@ export default function ThreeDVisualizer() {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       renderer.setSize(960, 540);
       renderer.setClearColor(0x0a0a14);
-      
-      // PHASE 3: Tone mapping for color grading support
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
 
       if (containerRef.current.children.length > 0) {
         containerRef.current.removeChild(containerRef.current.children[0]);
@@ -1119,59 +1199,6 @@ export default function ThreeDVisualizer() {
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
 
-  // PHASE 3: Apply post-processing settings (blend mode, tone mapping exposure)
-  useEffect(() => {
-    if (rendererRef.current) {
-      // Apply tone mapping exposure based on contrast/gamma
-      // Exposure affects overall brightness, we'll use it for contrast simulation
-      rendererRef.current.toneMappingExposure = colorContrast;
-    }
-  }, [blendMode, colorContrast]);
-
-  // PHASE 3: Apply color grading to all materials
-  useEffect(() => {
-    if (!objectsRef.current) return;
-    const { cubes, octas, tetras, sphere } = objectsRef.current;
-    
-    // Helper function to apply color tint to THREE.Color
-    const applyColorGrading = (baseColor: THREE.Color) => {
-      const r = Math.pow(baseColor.r, 1 / colorGamma) * colorTintR;
-      const g = Math.pow(baseColor.g, 1 / colorGamma) * colorTintG;
-      const b = Math.pow(baseColor.b, 1 / colorGamma) * colorTintB;
-      
-      // Apply saturation (lerp between grayscale and color)
-      const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      const finalR = gray + (r - gray) * colorSaturation;
-      const finalG = gray + (g - gray) * colorSaturation;
-      const finalB = gray + (b - gray) * colorSaturation;
-      
-      return new THREE.Color(
-        Math.max(0, Math.min(1, finalR)),
-        Math.max(0, Math.min(1, finalG)),
-        Math.max(0, Math.min(1, finalB))
-      );
-    };
-    
-    // Note: This is a simplified approach. For production, you'd use a proper post-processing shader.
-    // For now, we're demonstrating the concept by affecting the base colors.
-  }, [colorSaturation, colorGamma, colorTintR, colorTintG, colorTintB]);
-
-  // PHASE 1: Attach keyboard and wheel event listeners
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-    }
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
-    };
-  }, [isPlaying, audioReady, currentTime, duration, cameraLocked]);
-
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -1204,8 +1231,7 @@ export default function ThreeDVisualizer() {
       
       analyser.getByteFrequencyData(data);
       const f = getFreq(data);
-      // PHASE 1: Apply time scaling
-      const el = (Date.now() - startTimeRef.current) * 0.001 * timeScale;
+      const el = (Date.now() - startTimeRef.current) * 0.001;
       const t = el % duration;
       setCurrentTime(t);
       const sec = sections.find(s => t >= s.start && t < s.end);
@@ -1281,7 +1307,7 @@ export default function ThreeDVisualizer() {
         }
       }
 
-      // Calculate camera shake offset
+      // Calculate camera shake offset (from existing shake events)
       let shakeX = 0, shakeY = 0, shakeZ = 0;
       for (const shake of cameraShakes) {
         const timeSinceShake = t - shake.time;
@@ -1295,6 +1321,120 @@ export default function ThreeDVisualizer() {
           shakeZ += Math.sin(timeSinceShake * frequency * 0.7) * amplitude * 0.05;
         }
       }
+
+      // PHASE 4: Process parameter events for flash effects
+      let bgFlash = 0;
+      let vignetteFlash = 0;
+      let saturationFlash = 0;
+      let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
+      
+      // Reset Post-FX event accumulation values
+      let vignetteStrengthPulse = 0;
+      let contrastBurst = 0;
+      let colorTintFlash = { r: 0, g: 0, b: 0 };
+      
+      for (const event of parameterEvents) {
+        let shouldTrigger = false;
+        let effectStartTime = event.time;
+        
+        if (event.mode === 'manual') {
+          // Manual mode: trigger at specific time
+          const timeSinceEvent = t - event.time;
+          shouldTrigger = timeSinceEvent >= 0 && timeSinceEvent < event.duration;
+        } else if (event.mode === 'automated') {
+          // Automated mode: trigger when audio track exceeds threshold
+          if (event.audioTrackId) {
+            const track = audioTracksRef.current.find(tr => tr.id === event.audioTrackId);
+            if (track && track.analyser) {
+              // Get frequency data from the specific track
+              const trackData = new Uint8Array(track.analyser.frequencyBinCount);
+              track.analyser.getByteFrequencyData(trackData);
+              const trackFreq = getFreq(trackData);
+              
+              // Check if bass frequency exceeds threshold
+              const threshold = event.threshold || 0.5;
+              if (trackFreq.bass > threshold) {
+                // Start or continue the effect
+                if (!activeAutomatedEventsRef.current.has(event.id)) {
+                  activeAutomatedEventsRef.current.set(event.id, t);
+                }
+                effectStartTime = activeAutomatedEventsRef.current.get(event.id)!;
+                const timeSinceStart = t - effectStartTime;
+                shouldTrigger = timeSinceStart < event.duration;
+              } else {
+                // Bass dropped below threshold, clean up if effect was active
+                activeAutomatedEventsRef.current.delete(event.id);
+              }
+            }
+          }
+        }
+        
+        if (shouldTrigger) {
+          const timeSinceEvent = t - effectStartTime;
+          const progress = timeSinceEvent / event.duration;
+          // Ease out cubic for smooth return
+          const easeOut = 1 - Math.pow(1 - progress, 3);
+          const intensity = 1 - easeOut;
+          
+          // Background flash
+          if (event.parameters.backgroundFlash !== undefined) {
+            bgFlash += event.parameters.backgroundFlash * intensity;
+          }
+          
+          // Vignette pulse
+          if (event.parameters.vignettePulse !== undefined) {
+            vignetteFlash += event.parameters.vignettePulse * intensity;
+          }
+          
+          // Saturation burst
+          if (event.parameters.saturationBurst !== undefined) {
+            saturationFlash += event.parameters.saturationBurst * intensity;
+          }
+          
+          // Camera shake from events
+          if (event.parameters.cameraShake !== undefined) {
+            const decay = intensity;
+            const frequency = 50;
+            const amplitude = event.parameters.cameraShake * decay;
+            eventShakeX += Math.sin(timeSinceEvent * frequency) * amplitude * 0.1;
+            eventShakeY += Math.cos(timeSinceEvent * frequency * 1.3) * amplitude * 0.1;
+            eventShakeZ += Math.sin(timeSinceEvent * frequency * 0.7) * amplitude * 0.05;
+          }
+          
+          // Post-FX: Vignette strength pulse
+          if (event.parameters.vignetteStrengthPulse !== undefined) {
+            vignetteStrengthPulse += event.parameters.vignetteStrengthPulse * intensity;
+          }
+          
+          // Post-FX: Contrast burst
+          if (event.parameters.contrastBurst !== undefined) {
+            contrastBurst += event.parameters.contrastBurst * intensity;
+          }
+          
+          // Post-FX: Color tint flash
+          if (event.parameters.colorTintFlash !== undefined) {
+            const tint = event.parameters.colorTintFlash;
+            colorTintFlash.r += tint.r * tint.intensity * intensity;
+            colorTintFlash.g += tint.g * tint.intensity * intensity;
+            colorTintFlash.b += tint.b * tint.intensity * intensity;
+          }
+        }
+      }
+      
+      // Store Post-FX values in refs for potential use in rendering
+      activeVignetteStrengthPulseRef.current = vignetteStrengthPulse;
+      activeContrastBurstRef.current = contrastBurst;
+      activeColorTintFlashRef.current = colorTintFlash;
+      
+      // Combine event shake with existing camera shake
+      shakeX += eventShakeX;
+      shakeY += eventShakeY;
+      shakeZ += eventShakeZ;
+      
+      // Store active parameter values in refs (not state to avoid re-renders)
+      activeBackgroundFlashRef.current = bgFlash;
+      activeVignettePulseRef.current = vignetteFlash;
+      activeSaturationBurstRef.current = saturationFlash;
 
       if (type !== prevAnimRef.current) {
         transitionRef.current = 0;
@@ -1726,6 +1866,19 @@ export default function ThreeDVisualizer() {
         });
       }
 
+      // PHASE 4: Apply background flash effect before rendering
+      if (bgFlash > 0) {
+        const baseColor = new THREE.Color(backgroundColor);
+        const flashColor = new THREE.Color(0xffffff);
+        const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
+        scene.background = blendedColor;
+        rend.setClearColor(blendedColor);
+      } else {
+        const baseColor = new THREE.Color(backgroundColor);
+        scene.background = baseColor;
+        rend.setClearColor(baseColor);
+      }
+
       rend.render(scene, cam);
     };
 
@@ -1855,17 +2008,22 @@ export default function ThreeDVisualizer() {
     };
   }, [waveformData, currentTime, duration, waveformMode, isPlaying]);
 
-  // Handle ESC key to close export modal
+  // Handle ESC key to close modals
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showExportModal) {
-        setShowExportModal(false);
+      if (e.key === 'Escape') {
+        if (showExportModal) {
+          setShowExportModal(false);
+        } else if (showEventModal) {
+          setShowEventModal(false);
+          setEditingEventId(null);
+        }
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal]);
+  }, [showExportModal, showEventModal]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -1908,7 +2066,7 @@ export default function ThreeDVisualizer() {
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="flex items-center gap-4">
-          {/* Time Display and Audio Upload */}
+          {/* Time Display and Preset Info - No Audio Upload */}
           <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
             <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
             {showPresetDisplay && getCurrentSection() && (
@@ -1917,20 +2075,14 @@ export default function ThreeDVisualizer() {
               </p>
             )}
             
-            {/* Audio File Upload - Always visible */}
-            <div className="mt-3 pt-3 border-t border-gray-600">
-              <label className="text-cyan-400 text-xs font-semibold block mb-2">Audio File</label>
-              <input type="file" accept="audio/*" onChange={handleAudioFileChange} className="block w-full text-xs text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" />
-            </div>
-            
             {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? stopAudio : playAudio} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
           </div>
           
-          {/* Waveform - Made bigger, only shows when audio loaded */}
+          {/* Combined Waveform from all tracks */}
           <div className="flex-1 flex flex-col gap-2">
             <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && waveformData.length > 0 ? (
+              {audioReady && audioTracks.length > 0 ? (
                 <canvas 
                   ref={waveformCanvasRef} 
                   width={800} 
@@ -1939,7 +2091,7 @@ export default function ThreeDVisualizer() {
                 />
               ) : (
                 <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  Upload an audio file to see the waveform
+                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
                 </div>
               )}
             </div>
@@ -1978,6 +2130,12 @@ export default function ThreeDVisualizer() {
       <div className="bg-gray-800 rounded-lg p-4">
         <div className="flex gap-2 mb-4 border-b border-gray-700">
           <button 
+            onClick={() => setActiveTab('waveforms')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'waveforms' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎵 Waveforms
+          </button>
+          <button 
             onClick={() => setActiveTab('controls')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'controls' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -2002,18 +2160,208 @@ export default function ThreeDVisualizer() {
             ✨ Effects
           </button>
           <button 
-            onClick={() => setActiveTab('presets')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            ⏱️ Presets
-          </button>
-          <button 
             onClick={() => setActiveTab('postfx')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             🎭 Post-FX
           </button>
+          <button 
+            onClick={() => setActiveTab('presets')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            ⏱️ Presets
+          </button>
         </div>
+
+        {/* Waveforms Tab - PHASE 4 */}
+        {activeTab === 'waveforms' && (
+          <div>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">🎵 Audio Tracks</h3>
+                <label className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded cursor-pointer flex items-center gap-1">
+                  <Plus size={14} /> Add Track
+                  <input 
+                    type="file" 
+                    accept="audio/*" 
+                    onChange={(e) => { if (e.target.files?.[0]) addAudioTrack(e.target.files[0]); }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+              
+              {audioTracks.length === 0 ? (
+                <div className="text-center py-8 text-gray-400 text-sm">
+                  No audio tracks loaded. Click "Add Track" to upload audio files.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {audioTracks.map((track, index) => (
+                    <div key={track.id} className="bg-gray-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="activeTrack"
+                            checked={track.active}
+                            onChange={() => setActiveTrack(track.id)}
+                            className="cursor-pointer"
+                            title="Active track (frequencies drive visualization)"
+                          />
+                          <span className="text-sm text-white font-medium">{track.name}</span>
+                          {track.active && <span className="text-xs text-cyan-400 bg-cyan-900 px-2 py-0.5 rounded">Active</span>}
+                        </div>
+                        <button
+                          onClick={() => removeAudioTrack(track.id)}
+                          className="text-red-400 hover:text-red-300 p-1"
+                          title="Remove track"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      {/* Waveform visualization for this track */}
+                      <div className="bg-black rounded p-2 mb-2 h-16">
+                        <canvas
+                          ref={(canvas) => {
+                            if (canvas && track.buffer) {
+                              const ctx = canvas.getContext('2d');
+                              if (ctx) {
+                                const waveform = generateWaveformData(track.buffer, 200);
+                                canvas.width = canvas.offsetWidth;
+                                canvas.height = 64;
+                                ctx.fillStyle = '#000';
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                ctx.fillStyle = track.active ? '#06b6d4' : '#4b5563';
+                                const barWidth = canvas.width / waveform.length;
+                                waveform.forEach((val, i) => {
+                                  const height = val * canvas.height;
+                                  ctx.fillRect(i * barWidth, canvas.height - height, barWidth - 1, height);
+                                });
+                                // Playback indicator
+                                if (track.buffer) {
+                                  const progress = currentTime / track.buffer.duration;
+                                  ctx.strokeStyle = '#fff';
+                                  ctx.lineWidth = 2;
+                                  ctx.beginPath();
+                                  ctx.moveTo(progress * canvas.width, 0);
+                                  ctx.lineTo(progress * canvas.width, canvas.height);
+                                  ctx.stroke();
+                                }
+                              }
+                            }
+                          }}
+                          className="w-full h-full"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => toggleTrackMute(track.id)}
+                          className={`px-2 py-1 text-xs rounded ${track.muted ? 'bg-red-600 text-white' : 'bg-gray-600 text-gray-200'}`}
+                        >
+                          {track.muted ? '🔇 Muted' : '🔊 On'}
+                        </button>
+                        <label className="flex-1 flex items-center gap-2">
+                          <span className="text-xs text-gray-400">Vol</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={track.volume}
+                            onChange={(e) => updateTrackVolume(track.id, parseFloat(e.target.value))}
+                            className="flex-1"
+                          />
+                          <span className="text-xs text-gray-400 w-8">{Math.round(track.volume * 100)}%</span>
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Parameter Events Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events</h3>
+                <button
+                  onClick={addParameterEvent}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add Event
+                </button>
+              </div>
+              
+              {parameterEvents.length === 0 ? (
+                <div className="text-center py-4 text-gray-400 text-xs">
+                  No events. Click "Add Event" to create flash effects.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {parameterEvents.map((event) => (
+                    <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <div>
+                          <span className="text-white font-medium">
+                            {event.mode === 'manual' ? `@ ${formatTimeInput(event.time)}` : '🤖 Automated'}
+                          </span>
+                          {event.mode === 'automated' && event.audioTrackId && (
+                            <span className="text-gray-400 ml-2">
+                              → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingEventId(event.id);
+                              setShowEventModal(true);
+                            }}
+                            className="text-cyan-400 hover:text-cyan-300"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteParameterEvent(event.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-gray-400 space-y-0.5">
+                        <div>Duration: {event.duration}s</div>
+                        {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
+                          <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
+                        )}
+                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
+                          <div>📷 Shake: {Math.round(event.parameters.cameraShake * 100)}%</div>
+                        )}
+                        {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
+                          <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
+                        )}
+                        {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
+                          <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
+                        )}
+                        {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
+                          <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
+                        )}
+                        {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
+                          <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
+                        )}
+                        {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
+                          <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Controls Tab */}
         {activeTab === 'controls' && (
@@ -2067,197 +2415,6 @@ export default function ThreeDVisualizer() {
                   <input type="range" min="0" max={Math.PI * 2} step="0.1" value={cameraRotation} onChange={(e) => setCameraRotation(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                 </div>
                 <button onClick={resetCamera} className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-2 rounded">Reset Camera</button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">⏱️ Time Remapping</h3>
-              <p className="text-xs text-gray-400 mb-3">Control global playback speed (affects both visuals and audio).</p>
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Playback Speed: {timeScale.toFixed(2)}x</label>
-                <input 
-                  type="range" 
-                  min="0.1" 
-                  max="2.0" 
-                  step="0.1" 
-                  value={timeScale} 
-                  onChange={(e) => setTimeScale(Number(e.target.value))} 
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>0.1x (Slow)</span>
-                  <span>1.0x (Normal)</span>
-                  <span>2.0x (Fast)</span>
-                </div>
-                <button 
-                  onClick={() => setTimeScale(1.0)} 
-                  className="w-full bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded mt-2"
-                >
-                  Reset to 1.0x
-                </button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-semibold text-purple-400 mb-3">🎚️ Audio Smoothing & Mapping</h3>
-              <p className="text-xs text-gray-400 mb-3">Fine-tune how audio frequencies affect visuals.</p>
-              
-              <div className="space-y-4">
-                {/* Bass Controls */}
-                <div className="bg-gray-800 rounded p-2">
-                  <h4 className="text-xs font-semibold text-purple-300 mb-2">Bass (Low Frequencies)</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Smoothing: {bassSmoothing.toFixed(2)} {bassSmoothing < 0.3 ? '(Responsive)' : bassSmoothing > 0.7 ? '(Smooth)' : ''}
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="0.95" 
-                        step="0.05" 
-                        value={bassSmoothing} 
-                        onChange={(e) => setBassSmoothing(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Gain: {bassGain.toFixed(1)}x
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0.1" 
-                        max="3.0" 
-                        step="0.1" 
-                        value={bassGain} 
-                        onChange={(e) => setBassGain(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Mids Controls */}
-                <div className="bg-gray-800 rounded p-2">
-                  <h4 className="text-xs font-semibold text-cyan-300 mb-2">Mids (Mid Frequencies)</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Smoothing: {midsSmoothing.toFixed(2)} {midsSmoothing < 0.3 ? '(Responsive)' : midsSmoothing > 0.7 ? '(Smooth)' : ''}
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="0.95" 
-                        step="0.05" 
-                        value={midsSmoothing} 
-                        onChange={(e) => setMidsSmoothing(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Gain: {midsGain.toFixed(1)}x
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0.1" 
-                        max="3.0" 
-                        step="0.1" 
-                        value={midsGain} 
-                        onChange={(e) => setMidsGain(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Highs Controls */}
-                <div className="bg-gray-800 rounded p-2">
-                  <h4 className="text-xs font-semibold text-pink-300 mb-2">Highs (High Frequencies)</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Smoothing: {highsSmoothing.toFixed(2)} {highsSmoothing < 0.3 ? '(Responsive)' : highsSmoothing > 0.7 ? '(Smooth)' : ''}
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="0.95" 
-                        step="0.05" 
-                        value={highsSmoothing} 
-                        onChange={(e) => setHighsSmoothing(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 block mb-1">
-                        Gain: {highsGain.toFixed(1)}x
-                      </label>
-                      <input 
-                        type="range" 
-                        min="0.1" 
-                        max="3.0" 
-                        step="0.1" 
-                        value={highsGain} 
-                        onChange={(e) => setHighsGain(Number(e.target.value))} 
-                        className="w-full h-1 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => {
-                      setBassSmoothing(0.7);
-                      setMidsSmoothing(0.7);
-                      setHighsSmoothing(0.7);
-                    }} 
-                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
-                  >
-                    Reset Smoothing
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setBassGain(1.0);
-                      setMidsGain(1.0);
-                      setHighsGain(1.0);
-                    }} 
-                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded"
-                  >
-                    Reset Gain
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-semibold text-purple-400 mb-2">⌨️ Keyboard Shortcuts</h3>
-              <div className="text-xs text-gray-300 space-y-1">
-                <div className="grid grid-cols-2 gap-x-2">
-                  <div className="text-gray-400">Space</div>
-                  <div>Play/Pause</div>
-                  <div className="text-gray-400">J/L</div>
-                  <div>Step backward/forward (1s)</div>
-                  <div className="text-gray-400">Shift+J/L</div>
-                  <div>Large jump (5s)</div>
-                  <div className="text-gray-400">Home/End</div>
-                  <div>Go to start/end</div>
-                  <div className="text-gray-400">Q/E</div>
-                  <div>Zoom in/out</div>
-                  <div className="text-gray-400">Arrow Keys</div>
-                  <div>Rotate camera</div>
-                  <div className="text-gray-400">Scroll Wheel</div>
-                  <div>Zoom (over canvas)</div>
-                  <div className="text-gray-400">C</div>
-                  <div>Toggle camera lock {cameraLocked ? '🔒' : '🔓'}</div>
-                  <div className="text-gray-400">R</div>
-                  <div>Reset camera</div>
-                  <div className="text-gray-400">Shift/Alt</div>
-                  <div>Faster/slower movement</div>
-                </div>
               </div>
             </div>
             
@@ -2653,34 +2810,7 @@ export default function ThreeDVisualizer() {
           </div>
         )}
 
-        {/* Presets Tab */}
-        {activeTab === 'presets' && (
-          <div>
-            <div className="mb-4 flex gap-2">
-              <button onClick={addSection} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Preset</button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {sections.map((s) => (
-                <div key={s.id} className="bg-gray-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
-                    <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div><label className="text-xs text-gray-400">Start</label><input type="text" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                    <div><label className="text-xs text-gray-400">End</label><input type="text" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                  </div>
-                  <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
-                    {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Post-Processing Tab (PHASE 3) */}
+        {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
           <div>
             {/* Blend Mode Section */}
@@ -2870,6 +3000,33 @@ export default function ThreeDVisualizer() {
             </div>
           </div>
         )}
+
+        {/* Presets Tab */}
+        {activeTab === 'presets' && (
+          <div>
+            <div className="mb-4 flex gap-2">
+              <button onClick={addSection} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Preset</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {sections.map((s) => (
+                <div key={s.id} className="bg-gray-700 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
+                    <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div><label className="text-xs text-gray-400">Start</label><input type="text" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                    <div><label className="text-xs text-gray-400">End</label><input type="text" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
+                  </div>
+                  <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
+                    {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Debugger - Always visible at bottom */}
@@ -2965,6 +3122,388 @@ export default function ThreeDVisualizer() {
               
               <p className="text-xs text-gray-400 text-center">Automatically renders full timeline with all presets & camera movements</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHASE 4: Parameter Event Edit Modal */}
+      {showEventModal && editingEventId && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={() => setShowEventModal(false)}>
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-purple-400">⚡ Edit Event</h2>
+              <button
+                onClick={() => setShowEventModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {(() => {
+              const event = parameterEvents.find(e => e.id === editingEventId);
+              if (!event) return null;
+              
+              return (
+                <div className="space-y-4">
+                  {/* Mode Selection */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2">Event Mode</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => updateParameterEvent(editingEventId, { mode: 'manual' })}
+                        className={`flex-1 px-3 py-2 rounded ${event.mode === 'manual' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                      >
+                        ⏱️ Manual (Fixed Time)
+                      </button>
+                      <button
+                        onClick={() => updateParameterEvent(editingEventId, { mode: 'automated' })}
+                        className={`flex-1 px-3 py-2 rounded ${event.mode === 'automated' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+                      >
+                        🤖 Automated (Reactive)
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {event.mode === 'manual' ? 'Triggers at a specific time' : 'Triggers when audio track hits threshold'}
+                    </p>
+                  </div>
+
+                  {/* Time (only for manual mode) */}
+                  {event.mode === 'manual' && (
+                    <div>
+                      <label className="text-sm text-gray-300 block mb-2">Time (MM:SS)</label>
+                      <input
+                        type="text"
+                        pattern="[0-9]+:[0-9]{2}"
+                        value={formatTimeInput(event.time)}
+                        onChange={(e) => {
+                          const newTime = parseTimeInput(e.target.value);
+                          if (!isNaN(newTime) && newTime >= 0 && newTime <= duration) {
+                            updateParameterEvent(editingEventId, { time: newTime });
+                          }
+                        }}
+                        placeholder="0:00"
+                        className="w-full px-3 py-2 bg-gray-700 rounded text-white font-mono"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Format: minutes:seconds (e.g., 1:30 for 1 minute 30 seconds)</p>
+                    </div>
+                  )}
+
+                  {/* Audio Track Selection (for automated mode) */}
+                  {event.mode === 'automated' && (
+                    <>
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">React to Audio Track</label>
+                        <select
+                          value={event.audioTrackId || ''}
+                          onChange={(e) => updateParameterEvent(editingEventId, { audioTrackId: e.target.value })}
+                          className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+                        >
+                          <option value="">Select a track...</option>
+                          {audioTracks.map(track => (
+                            <option key={track.id} value={track.id}>{track.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm text-gray-300 block mb-2">Frequency Threshold</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.threshold || 0.5}
+                          onChange={(e) => updateParameterEvent(editingEventId, { threshold: parseFloat(e.target.value) })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.threshold || 0.5) * 100)}% - Triggers when bass frequency exceeds this level</span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Duration */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2">Duration (seconds)</label>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="2"
+                      step="0.05"
+                      value={event.duration}
+                      onChange={(e) => updateParameterEvent(editingEventId, { duration: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                    <span className="text-xs text-gray-400">{event.duration.toFixed(2)}s</span>
+                  </div>
+
+                  {/* Background Flash */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.backgroundFlash ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, backgroundFlash: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      ⚪ Background Flash
+                    </label>
+                    {(event.parameters.backgroundFlash ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.backgroundFlash ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, backgroundFlash: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.backgroundFlash ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Camera Shake */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.cameraShake ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      📷 Camera Shake
+                    </label>
+                    {(event.parameters.cameraShake ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.cameraShake ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, cameraShake: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.cameraShake ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vignette Pulse */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.vignettePulse ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, vignettePulse: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🌑 Vignette Pulse
+                    </label>
+                    {(event.parameters.vignettePulse ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.vignettePulse ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, vignettePulse: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.vignettePulse ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Saturation Burst */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.saturationBurst ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, saturationBurst: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🎨 Saturation Burst
+                    </label>
+                    {(event.parameters.saturationBurst ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.saturationBurst ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, saturationBurst: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.saturationBurst ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vignette Strength Pulse */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.vignetteStrengthPulse ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, vignetteStrengthPulse: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🌫️ Vignette Pulse
+                    </label>
+                    {(event.parameters.vignetteStrengthPulse ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.vignetteStrengthPulse ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, vignetteStrengthPulse: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.vignetteStrengthPulse ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Contrast Burst */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.contrastBurst ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, contrastBurst: e.target.checked ? 0.5 : 0 }
+                        })}
+                      />
+                      🔆 Contrast Burst
+                    </label>
+                    {(event.parameters.contrastBurst ?? 0) > 0 && (
+                      <div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={event.parameters.contrastBurst ?? 0}
+                          onChange={(e) => updateParameterEvent(editingEventId, {
+                            parameters: { ...event.parameters, contrastBurst: parseFloat(e.target.value) }
+                          })}
+                          className="w-full"
+                        />
+                        <span className="text-xs text-gray-400">{Math.round((event.parameters.contrastBurst ?? 0) * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Color Tint Flash */}
+                  <div>
+                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={(event.parameters.colorTintFlash?.intensity ?? 0) > 0}
+                        onChange={(e) => updateParameterEvent(editingEventId, {
+                          parameters: { ...event.parameters, colorTintFlash: e.target.checked ? { r: 1, g: 0, b: 0, intensity: 0.5 } : undefined }
+                        })}
+                      />
+                      🌈 Color Tint Flash
+                    </label>
+                    {(event.parameters.colorTintFlash?.intensity ?? 0) > 0 && (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-xs text-red-400 block mb-1">R</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.r ?? 1}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, r: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-green-400 block mb-1">G</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.g ?? 0}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, g: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-blue-400 block mb-1">B</label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              value={event.parameters.colorTintFlash?.b ?? 0}
+                              onChange={(e) => updateParameterEvent(editingEventId, {
+                                parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, b: parseFloat(e.target.value) } }
+                              })}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Intensity</label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={event.parameters.colorTintFlash?.intensity ?? 0.5}
+                            onChange={(e) => updateParameterEvent(editingEventId, {
+                              parameters: { ...event.parameters, colorTintFlash: { ...event.parameters.colorTintFlash!, intensity: parseFloat(e.target.value) } }
+                            })}
+                            className="w-full"
+                          />
+                          <span className="text-xs text-gray-400">{Math.round((event.parameters.colorTintFlash?.intensity ?? 0) * 100)}%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={() => deleteParameterEvent(editingEventId)}
+                    className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center gap-2"
+                  >
+                    <Trash2 size={16} /> Delete Event
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
