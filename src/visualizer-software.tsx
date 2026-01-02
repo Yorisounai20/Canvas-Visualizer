@@ -47,6 +47,7 @@ interface ParameterEvent {
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
+const KEYFRAME_ONLY_ROTATION_SPEED = 0; // Rotation now controlled by keyframes or camera rigs only
 const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
 const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
 const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
@@ -1886,7 +1887,7 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         const r = activeCameraDistance - f.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
         cam.lookAt(0,0,0);
@@ -2120,8 +2121,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
-        const a = rotationSpeed + activeCameraRotation;
+        const a = activeCameraRotation;
         cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
@@ -2203,7 +2203,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
