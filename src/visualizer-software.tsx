@@ -47,7 +47,6 @@ interface ParameterEvent {
 const DEFAULT_CAMERA_DISTANCE = 15;
 const DEFAULT_CAMERA_HEIGHT = 0;
 const DEFAULT_CAMERA_ROTATION = 0;
-const DEFAULT_CAMERA_AUTO_ROTATE = true;
 const WAVEFORM_SAMPLES = 200; // Reduced from 800 for better performance
 const WAVEFORM_THROTTLE_MS = 33; // Throttle waveform rendering to ~30fps (1000ms / 30fps = 33ms)
 const FPS_UPDATE_INTERVAL_MS = 1000; // Update FPS counter every second
@@ -110,7 +109,6 @@ export default function ThreeDVisualizer() {
   const [cameraDistance, setCameraDistance] = useState(DEFAULT_CAMERA_DISTANCE);
   const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
-  const [cameraAutoRotate, setCameraAutoRotate] = useState(DEFAULT_CAMERA_AUTO_ROTATE);
   
   // Camera Rig Visual Hints
   const [showRigHints, setShowRigHints] = useState(false);
@@ -536,7 +534,6 @@ export default function ThreeDVisualizer() {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
     setCameraHeight(DEFAULT_CAMERA_HEIGHT);
     // Rotation is now keyframe-only, don't reset it here
-    setCameraAutoRotate(DEFAULT_CAMERA_AUTO_ROTATE);
   };
 
   // Global keyframe management functions
@@ -1889,7 +1886,7 @@ export default function ThreeDVisualizer() {
       const blend = transitionRef.current;
 
       if (type === 'orbit') {
-        const rotationSpeed = cameraAutoRotate ? el*0.2 : 0;
+        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
         const r = activeCameraDistance - f.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
         cam.lookAt(0,0,0);
@@ -2123,7 +2120,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'spiral') {
-        const rotationSpeed = cameraAutoRotate ? el*0.3 : 0;
+        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
         const a = rotationSpeed + activeCameraRotation;
         cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
@@ -2206,7 +2203,7 @@ export default function ThreeDVisualizer() {
           o.material.color.setStyle(midsColor);
         });
       } else if (type === 'seiryu') {
-        const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
+        const rotationSpeed = 0; // Rotation now controlled by keyframes or camera rigs
         cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
@@ -3251,10 +3248,6 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">📷 Global Camera Controls</h3>
               <p className="text-xs text-gray-400 mb-3">These settings apply when no keyframes are active.</p>
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="autoRotate" checked={cameraAutoRotate} onChange={(e) => setCameraAutoRotate(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">Auto-Rotate Camera</label>
-                </div>
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Zoom Distance: {cameraDistance}</label>
                   <input type="range" id="cameraDistance" name="cameraDistance" min="5" max="50" step="1" value={cameraDistance} onChange={(e) => setCameraDistance(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
@@ -5194,6 +5187,26 @@ export default function ThreeDVisualizer() {
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">G</kbd>
                     </div>
                   </div>
+                </div>
+
+                {/* Mouse Controls */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mouse Controls (When Paused)</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Rotate camera around scene</span>
+                      <span className="text-xs text-gray-500">Left drag</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Pan camera</span>
+                      <span className="text-xs text-gray-500">Right drag</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Zoom in/out</span>
+                      <span className="text-xs text-gray-500">Mouse wheel</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2 italic">Mouse controls disable during playback</p>
                 </div>
               </div>
             </div>
