@@ -182,6 +182,29 @@ export default function ThreeDVisualizer() {
   const lastWaveformRenderRef = useRef<number>(0);
   const waveformAnimationFrameRef = useRef<number | null>(null);
 
+  // PHASE 5: Text Animator state
+  const [textAnimatorKeyframes, setTextAnimatorKeyframes] = useState<any[]>([]);
+  const [selectedTextKeyframeId, setSelectedTextKeyframeId] = useState<string | null>(null);
+  const textCharacterMeshesRef = useRef<Map<string, THREE.Mesh[]>>(new Map()); // keyframeId -> character meshes
+  
+  // PHASE 5: Mask Reveals state
+  const [masks, setMasks] = useState<any[]>([]);
+  const [maskRevealKeyframes, setMaskRevealKeyframes] = useState<any[]>([]);
+  const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
+  const maskMaterialsRef = useRef<Map<string, THREE.Material>>(new Map()); // Store mask materials
+  
+  // PHASE 5: Camera Rig state
+  const [cameraRigs, setCameraRigs] = useState<any[]>([]);
+  const [cameraRigKeyframes, setCameraRigKeyframes] = useState<any[]>([]);
+  const [activeCameraRigId, setActiveCameraRigId] = useState<string | null>(null);
+  const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
+  const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
+  
+  // PHASE 5: UI state for Phase 5 features
+  const [showTextAnimatorPanel, setShowTextAnimatorPanel] = useState(false);
+  const [showMaskPanel, setShowMaskPanel] = useState(false);
+  const [showCameraRigPanel, setShowCameraRigPanel] = useState(false);
+
   // Memoized sorted letterbox keyframes for performance
   const sortedLetterboxKeyframes = useMemo(() => {
     return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
@@ -1076,6 +1099,195 @@ export default function ThreeDVisualizer() {
     highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
   });
 
+  // PHASE 5: Text Animator Functions
+  const createTextAnimatorKeyframe = (time: number, text: string = 'Sample Text') => {
+    const newKeyframe = {
+      id: `text-anim-${Date.now()}`,
+      time,
+      text,
+      visible: true,
+      animation: 'fade' as const,
+      direction: 'up' as const,
+      stagger: 0.05, // 50ms between characters
+      duration: 0.5, // 500ms per character
+      characterOffsets: []
+    };
+    setTextAnimatorKeyframes(prev => [...prev, newKeyframe]);
+    addLog(`Created text animator keyframe at ${formatTime(time)}`, 'success');
+    return newKeyframe;
+  };
+
+  const updateTextAnimatorKeyframe = (id: string, updates: any) => {
+    setTextAnimatorKeyframes(prev => 
+      prev.map(kf => kf.id === id ? { ...kf, ...updates } : kf)
+    );
+  };
+
+  const deleteTextAnimatorKeyframe = (id: string) => {
+    setTextAnimatorKeyframes(prev => prev.filter(kf => kf.id !== id));
+    // Clean up character meshes
+    const meshes = textCharacterMeshesRef.current.get(id);
+    if (meshes && sceneRef.current) {
+      meshes.forEach(mesh => {
+        sceneRef.current!.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+      });
+      textCharacterMeshesRef.current.delete(id);
+    }
+    addLog(`Deleted text animator keyframe`, 'info');
+  };
+
+  // PHASE 5: Mask Functions
+  const createMask = (type: 'circle' | 'rectangle' | 'custom' = 'circle') => {
+    const newMask = {
+      id: `mask-${Date.now()}`,
+      name: `${type.charAt(0).toUpperCase() + type.slice(1)} Mask`,
+      type,
+      enabled: true,
+      inverted: false,
+      blendMode: 'normal' as const,
+      feather: 10,
+      center: type === 'circle' ? { x: 0.5, y: 0.5 } : undefined,
+      radius: type === 'circle' ? 0.3 : undefined,
+      rect: type === 'rectangle' ? { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } : undefined,
+      path: type === 'custom' ? [] : undefined
+    };
+    setMasks(prev => [...prev, newMask]);
+    addLog(`Created ${type} mask`, 'success');
+    return newMask;
+  };
+
+  const updateMask = (id: string, updates: any) => {
+    setMasks(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  const deleteMask = (id: string) => {
+    setMasks(prev => prev.filter(m => m.id !== id));
+    setMaskRevealKeyframes(prev => prev.filter(kf => kf.maskId !== id));
+    addLog(`Deleted mask`, 'info');
+  };
+
+  const createMaskRevealKeyframe = (maskId: string, time: number) => {
+    const mask = masks.find(m => m.id === maskId);
+    if (!mask) return;
+    
+    const newKeyframe = {
+      id: `mask-reveal-${Date.now()}`,
+      time,
+      maskId,
+      animation: 'expand-circle' as const,
+      duration: 1.0,
+      easing: 'easeInOut' as const,
+      targetCenter: mask.center ? { ...mask.center } : { x: 0.5, y: 0.5 },
+      targetRadius: mask.radius || 0.5,
+      targetRect: mask.rect ? { ...mask.rect } : undefined
+    };
+    setMaskRevealKeyframes(prev => [...prev, newKeyframe]);
+    addLog(`Created mask reveal keyframe at ${formatTime(time)}`, 'success');
+    return newKeyframe;
+  };
+
+  const deleteMaskRevealKeyframe = (id: string) => {
+    setMaskRevealKeyframes(prev => prev.filter(kf => kf.id !== id));
+    addLog(`Deleted mask reveal keyframe`, 'info');
+  };
+
+  // PHASE 5: Camera Rig Functions
+  const createCameraRig = (type: 'orbit' | 'dolly' | 'crane' | 'custom' = 'orbit') => {
+    const newRig = {
+      id: `rig-${Date.now()}`,
+      name: `${type.charAt(0).toUpperCase() + type.slice(1)} Rig`,
+      enabled: false,
+      type,
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      trackingTarget: null,
+      trackingOffset: { x: 0, y: 0, z: 0 },
+      trackingSmooth: 0.5,
+      orbitRadius: type === 'orbit' ? 15 : undefined,
+      orbitSpeed: type === 'orbit' ? 0.5 : undefined,
+      orbitAxis: type === 'orbit' ? 'y' as const : undefined,
+      dollySpeed: type === 'dolly' ? 1.0 : undefined,
+      dollyAxis: type === 'dolly' ? 'z' as const : undefined,
+      craneHeight: type === 'crane' ? 10 : undefined,
+      craneTilt: type === 'crane' ? 0 : undefined
+    };
+    setCameraRigs(prev => [...prev, newRig]);
+    
+    // Create null object in scene
+    if (sceneRef.current) {
+      const nullObject = new THREE.Object3D();
+      nullObject.name = newRig.name;
+      sceneRef.current.add(nullObject);
+      cameraRigNullObjectsRef.current.set(newRig.id, nullObject);
+    }
+    
+    addLog(`Created ${type} camera rig`, 'success');
+    return newRig;
+  };
+
+  const updateCameraRig = (id: string, updates: any) => {
+    setCameraRigs(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+    
+    // Update null object
+    const nullObject = cameraRigNullObjectsRef.current.get(id);
+    if (nullObject && updates.position) {
+      nullObject.position.set(updates.position.x, updates.position.y, updates.position.z);
+    }
+    if (nullObject && updates.rotation) {
+      nullObject.rotation.set(updates.rotation.x, updates.rotation.y, updates.rotation.z);
+    }
+  };
+
+  const deleteCameraRig = (id: string) => {
+    setCameraRigs(prev => prev.filter(r => r.id !== id));
+    setCameraRigKeyframes(prev => prev.filter(kf => kf.rigId !== id));
+    
+    // Remove null object
+    const nullObject = cameraRigNullObjectsRef.current.get(id);
+    if (nullObject && sceneRef.current) {
+      sceneRef.current.remove(nullObject);
+      cameraRigNullObjectsRef.current.delete(id);
+    }
+    
+    if (activeCameraRigId === id) {
+      setActiveCameraRigId(null);
+    }
+    
+    addLog(`Deleted camera rig`, 'info');
+  };
+
+  const createCameraRigKeyframe = (rigId: string, time: number) => {
+    const rig = cameraRigs.find(r => r.id === rigId);
+    if (!rig) return;
+    
+    const newKeyframe = {
+      id: `rig-kf-${Date.now()}`,
+      time,
+      rigId,
+      position: { ...rig.position },
+      rotation: { ...rig.rotation },
+      duration: 1.0,
+      easing: 'linear' as const,
+      preset: undefined
+    };
+    setCameraRigKeyframes(prev => [...prev, newKeyframe]);
+    addLog(`Created camera rig keyframe at ${formatTime(time)}`, 'success');
+    return newKeyframe;
+  };
+
+  const deleteCameraRigKeyframe = (id: string) => {
+    setCameraRigKeyframes(prev => prev.filter(kf => kf.id !== id));
+    addLog(`Deleted camera rig keyframe`, 'info');
+  };
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -1866,6 +2078,244 @@ export default function ThreeDVisualizer() {
         });
       }
 
+      // PHASE 5: Text Animator - Animate per-character text
+      textAnimatorKeyframes.forEach(textKf => {
+        if (!fontRef.current) return;
+        
+        // Create character meshes if they don't exist
+        if (!textCharacterMeshesRef.current.has(textKf.id)) {
+          const characterMeshes: THREE.Mesh[] = [];
+          const chars = textKf.text.split('');
+          let xOffset = -(textKf.text.length * 0.6) / 2; // Center text
+          
+          chars.forEach((char, index) => {
+            const textGeometry = new TextGeometry(char, {
+              font: fontRef.current,
+              size: 1,
+              height: 0.2,
+              curveSegments: 12,
+              bevelEnabled: true,
+              bevelThickness: 0.03,
+              bevelSize: 0.02,
+              bevelSegments: 5
+            });
+            
+            const textMaterial = new THREE.MeshBasicMaterial({
+              color: bassColor,
+              transparent: true,
+              opacity: 0
+            });
+            
+            const charMesh = new THREE.Mesh(textGeometry, textMaterial);
+            charMesh.position.set(xOffset, 5, 0);
+            
+            // Apply character-specific offsets if defined
+            const offset = textKf.characterOffsets?.find((o: any) => o.index === index);
+            if (offset) {
+              charMesh.position.add(new THREE.Vector3(offset.position.x, offset.position.y, offset.position.z));
+              charMesh.rotation.set(offset.rotation.x, offset.rotation.y, offset.rotation.z);
+              charMesh.scale.set(offset.scale.x, offset.scale.y, offset.scale.z);
+            } else {
+              charMesh.scale.set(1, 1, 1);
+            }
+            
+            scene.add(charMesh);
+            characterMeshes.push(charMesh);
+            xOffset += 0.6; // Spacing between characters
+          });
+          
+          textCharacterMeshesRef.current.set(textKf.id, characterMeshes);
+        }
+        
+        // Animate characters based on time and animation type
+        const meshes = textCharacterMeshesRef.current.get(textKf.id);
+        if (!meshes) return;
+        
+        const timeSinceKeyframe = t - textKf.time;
+        
+        meshes.forEach((charMesh, index) => {
+          const charStartTime = index * textKf.stagger;
+          const charAnimTime = timeSinceKeyframe - charStartTime;
+          
+          if (charAnimTime < 0) {
+            // Not started yet
+            charMesh.visible = false;
+            return;
+          }
+          
+          if (!textKf.visible) {
+            charMesh.visible = false;
+            return;
+          }
+          
+          charMesh.visible = true;
+          
+          // Calculate animation progress (0 to 1)
+          const progress = Math.min(charAnimTime / textKf.duration, 1);
+          
+          // Apply animation based on type
+          switch (textKf.animation) {
+            case 'fade':
+              (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
+              break;
+            
+            case 'slide': {
+              const distance = 3;
+              let slideOffset = { x: 0, y: 0, z: 0 };
+              switch (textKf.direction) {
+                case 'up': slideOffset.y = -distance; break;
+                case 'down': slideOffset.y = distance; break;
+                case 'left': slideOffset.x = distance; break;
+                case 'right': slideOffset.x = -distance; break;
+              }
+              const baseY = 5;
+              charMesh.position.y = baseY + slideOffset.y * (1 - progress);
+              charMesh.position.x += slideOffset.x * (1 - progress);
+              (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
+              break;
+            }
+            
+            case 'scale': {
+              const scale = progress;
+              charMesh.scale.setScalar(scale);
+              (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
+              break;
+            }
+            
+            case 'bounce': {
+              const bounceHeight = Math.abs(Math.sin(progress * Math.PI)) * 2;
+              charMesh.position.y = 5 + bounceHeight;
+              (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
+              break;
+            }
+            
+            default:
+              (charMesh.material as THREE.MeshBasicMaterial).opacity = textKf.visible ? 1 : 0;
+          }
+          
+          // Update color
+          (charMesh.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        });
+      });
+
+      // PHASE 5: Camera Rig - Apply rig transforms to camera
+      if (activeCameraRigId) {
+        const activeRig = cameraRigs.find(r => r.id === activeCameraRigId && r.enabled);
+        if (activeRig) {
+          const rigNullObject = cameraRigNullObjectsRef.current.get(activeCameraRigId);
+          
+          // Find active rig keyframe or use rig's base position
+          const sortedRigKeyframes = cameraRigKeyframes
+            .filter(kf => kf.rigId === activeCameraRigId)
+            .sort((a, b) => a.time - b.time);
+          
+          let rigPosition = { ...activeRig.position };
+          let rigRotation = { ...activeRig.rotation };
+          
+          // Interpolate between keyframes
+          if (sortedRigKeyframes.length > 0) {
+            const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > t) - 1;
+            if (currentKfIndex >= 0) {
+              const currentKf = sortedRigKeyframes[currentKfIndex];
+              const nextKf = sortedRigKeyframes[currentKfIndex + 1];
+              
+              if (nextKf && t < nextKf.time) {
+                // Interpolate
+                const timeIntoAnim = t - currentKf.time;
+                const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+                
+                // Apply easing
+                let easedProgress = progress;
+                switch (currentKf.easing) {
+                  case 'easeIn':
+                    easedProgress = progress * progress;
+                    break;
+                  case 'easeOut':
+                    easedProgress = 1 - Math.pow(1 - progress, 2);
+                    break;
+                  case 'easeInOut':
+                    easedProgress = progress < 0.5
+                      ? 2 * progress * progress
+                      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    break;
+                }
+                
+                rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
+                rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
+                rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
+                rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
+                rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
+                rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
+              } else {
+                // Use current keyframe values
+                rigPosition = { ...currentKf.position };
+                rigRotation = { ...currentKf.rotation };
+              }
+            }
+          }
+          
+          // Apply rig type-specific motion
+          switch (activeRig.type) {
+            case 'orbit':
+              if (activeRig.orbitRadius && activeRig.orbitSpeed && activeRig.orbitAxis) {
+                const orbitAngle = t * activeRig.orbitSpeed;
+                if (activeRig.orbitAxis === 'y') {
+                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                } else if (activeRig.orbitAxis === 'x') {
+                  rigPosition.y = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                } else if (activeRig.orbitAxis === 'z') {
+                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                  rigPosition.y = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                }
+              }
+              break;
+            
+            case 'dolly':
+              if (activeRig.dollySpeed && activeRig.dollyAxis) {
+                const dollyDistance = t * activeRig.dollySpeed;
+                if (activeRig.dollyAxis === 'z') {
+                  rigPosition.z += dollyDistance;
+                } else if (activeRig.dollyAxis === 'x') {
+                  rigPosition.x += dollyDistance;
+                } else if (activeRig.dollyAxis === 'y') {
+                  rigPosition.y += dollyDistance;
+                }
+              }
+              break;
+            
+            case 'crane':
+              if (activeRig.craneHeight !== undefined) {
+                rigPosition.y = activeRig.craneHeight;
+              }
+              if (activeRig.craneTilt !== undefined) {
+                rigRotation.x = activeRig.craneTilt;
+              }
+              break;
+          }
+          
+          // Update null object position/rotation
+          if (rigNullObject) {
+            rigNullObject.position.set(rigPosition.x, rigPosition.y, rigPosition.z);
+            rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
+            
+            // Parent camera to null object (apply rig offset to camera)
+            const rigCameraOffset = new THREE.Vector3(0, 0, activeCameraDistance);
+            const rigWorldPos = new THREE.Vector3();
+            rigNullObject.getWorldPosition(rigWorldPos);
+            
+            // Apply rig rotation to camera offset
+            rigCameraOffset.applyEuler(rigNullObject.rotation);
+            
+            // Only override camera position if rig is active
+            // (this overrides the preset camera positioning)
+            cam.position.copy(rigWorldPos.add(rigCameraOffset));
+            cam.lookAt(rigWorldPos);
+          }
+        }
+      }
+
       // PHASE 4: Apply background flash effect before rendering
       if (bgFlash > 0) {
         const baseColor = new THREE.Color(backgroundColor);
@@ -1877,6 +2327,16 @@ export default function ThreeDVisualizer() {
         const baseColor = new THREE.Color(backgroundColor);
         scene.background = baseColor;
         rend.setClearColor(baseColor);
+      }
+
+      // PHASE 5: Mask Reveals - Apply masks to renderer (post-render effect)
+      // Note: Full mask implementation would require shader-based rendering or stencil buffer
+      // For now, we'll prepare the mask data and apply basic visibility controls
+      const activeMasks = masks.filter(m => m.enabled);
+      if (activeMasks.length > 0) {
+        // Mask rendering would be implemented here with custom shaders
+        // This is a placeholder for the mask system infrastructure
+        // Future implementation: Use WebGL stencil buffer or shader-based masking
       }
 
       rend.render(scene, cam);
@@ -2170,6 +2630,24 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             ⏱️ Presets
+          </button>
+          <button 
+            onClick={() => setActiveTab('textAnimator')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'textAnimator' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            📝 Text Animator
+          </button>
+          <button 
+            onClick={() => setActiveTab('masks')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'masks' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎭 Masks
+          </button>
+          <button 
+            onClick={() => setActiveTab('cameraRig')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎥 Camera Rig
           </button>
         </div>
 
@@ -3024,6 +3502,646 @@ export default function ThreeDVisualizer() {
                   </select>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* PHASE 5: Text Animator Tab */}
+        {activeTab === 'textAnimator' && (
+          <div>
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-purple-400 mb-2">📝 Text Animator</h3>
+              <p className="text-sm text-gray-400 mb-4">Create per-character animated text with customizable offsets and stagger timing</p>
+              
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => createTextAnimatorKeyframe(currentTime)} 
+                  disabled={!fontLoaded}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg flex items-center gap-2"
+                >
+                  <Plus size={16} /> Add Text Keyframe
+                </button>
+              </div>
+
+              {!fontLoaded && (
+                <div className="bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3 mb-4">
+                  <p className="text-yellow-400 text-sm">⚠️ Font not loaded. Upload a font file to use text animator.</p>
+                </div>
+              )}
+
+              {/* Text Keyframes List */}
+              <div className="space-y-3">
+                {textAnimatorKeyframes.map(kf => (
+                  <div key={kf.id} className="bg-gray-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
+                        <span className="text-white font-semibold">{kf.text}</span>
+                      </div>
+                      <button 
+                        onClick={() => deleteTextAnimatorKeyframe(kf.id)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Text</label>
+                        <input 
+                          type="text" 
+                          value={kf.text}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { text: e.target.value })}
+                          className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Animation</label>
+                        <select 
+                          value={kf.animation}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { animation: e.target.value })}
+                          className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                        >
+                          <option value="fade">Fade In</option>
+                          <option value="slide">Slide In</option>
+                          <option value="scale">Scale In</option>
+                          <option value="bounce">Bounce</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {kf.animation === 'slide' && (
+                      <div className="mb-3">
+                        <label className="text-xs text-gray-400 block mb-1">Direction</label>
+                        <select 
+                          value={kf.direction}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { direction: e.target.value })}
+                          className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                        >
+                          <option value="up">Up</option>
+                          <option value="down">Down</option>
+                          <option value="left">Left</option>
+                          <option value="right">Right</option>
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Stagger (s)</label>
+                        <input 
+                          type="number" 
+                          step="0.01"
+                          min="0"
+                          max="1"
+                          value={kf.stagger}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { stagger: parseFloat(e.target.value) || 0 })}
+                          className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Duration (s)</label>
+                        <input 
+                          type="number" 
+                          step="0.1"
+                          min="0.1"
+                          max="5"
+                          value={kf.duration}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { duration: parseFloat(e.target.value) || 0.5 })}
+                          className="w-full bg-gray-600 text-white text-sm px-3 py-1 rounded"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-300">
+                        <input 
+                          type="checkbox" 
+                          checked={kf.visible}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { visible: e.target.checked })}
+                          className="rounded"
+                        />
+                        Visible
+                      </label>
+                    </div>
+                  </div>
+                ))}
+
+                {textAnimatorKeyframes.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No text keyframes yet. Click "Add Text Keyframe" to create one.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PHASE 5: Masks Tab */}
+        {activeTab === 'masks' && (
+          <div>
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-purple-400 mb-2">🎭 Mask Reveals</h3>
+              <p className="text-sm text-gray-400 mb-4">Create shape-based masks with animated reveals and feathering</p>
+              
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => createMask('circle')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  ⭕ Circle Mask
+                </button>
+                <button 
+                  onClick={() => createMask('rectangle')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  ◻️ Rectangle Mask
+                </button>
+                <button 
+                  onClick={() => createMask('custom')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  ✏️ Custom Path
+                </button>
+              </div>
+
+              {/* Masks List */}
+              <div className="space-y-3 mb-6">
+                {masks.map(mask => (
+                  <div key={mask.id} className="bg-gray-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          checked={mask.enabled}
+                          onChange={(e) => updateMask(mask.id, { enabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <input 
+                          type="text" 
+                          value={mask.name}
+                          onChange={(e) => updateMask(mask.id, { name: e.target.value })}
+                          className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => createMaskRevealKeyframe(mask.id, currentTime)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs"
+                        >
+                          + Keyframe
+                        </button>
+                        <button 
+                          onClick={() => deleteMask(mask.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Blend Mode</label>
+                        <select 
+                          value={mask.blendMode}
+                          onChange={(e) => updateMask(mask.id, { blendMode: e.target.value })}
+                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        >
+                          <option value="normal">Normal</option>
+                          <option value="add">Add</option>
+                          <option value="subtract">Subtract</option>
+                          <option value="multiply">Multiply</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Feather: {mask.feather}</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100"
+                          value={mask.feather}
+                          onChange={(e) => updateMask(mask.id, { feather: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    {mask.type === 'circle' && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Center X</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.center?.x || 0.5}
+                            onChange={(e) => updateMask(mask.id, { center: { ...mask.center, x: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Center Y</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.center?.y || 0.5}
+                            onChange={(e) => updateMask(mask.id, { center: { x: mask.center?.x || 0.5, y: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Radius</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.radius || 0.3}
+                            onChange={(e) => updateMask(mask.id, { radius: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {mask.type === 'rectangle' && mask.rect && (
+                      <div className="grid grid-cols-4 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.rect.x}
+                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, x: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.rect.y}
+                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, y: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Width</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.rect.width}
+                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, width: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Height</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            min="0"
+                            max="1"
+                            value={mask.rect.height}
+                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, height: parseFloat(e.target.value) } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-300">
+                        <input 
+                          type="checkbox" 
+                          checked={mask.inverted}
+                          onChange={(e) => updateMask(mask.id, { inverted: e.target.checked })}
+                          className="rounded"
+                        />
+                        Invert Mask
+                      </label>
+                    </div>
+                  </div>
+                ))}
+
+                {masks.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No masks yet. Click a mask type button to create one.
+                  </div>
+                )}
+              </div>
+
+              {/* Mask Reveal Keyframes */}
+              <div className="mt-6">
+                <h4 className="text-md font-bold text-cyan-400 mb-3">Mask Reveal Keyframes</h4>
+                <div className="space-y-2">
+                  {maskRevealKeyframes.map(kf => {
+                    const mask = masks.find(m => m.id === kf.maskId);
+                    return (
+                      <div key={kf.id} className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
+                          <span className="text-white text-sm">{mask?.name || 'Unknown Mask'}</span>
+                          <span className="text-gray-400 text-xs">({kf.animation})</span>
+                        </div>
+                        <button 
+                          onClick={() => deleteMaskRevealKeyframe(kf.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {maskRevealKeyframes.length === 0 && (
+                    <div className="text-center text-gray-500 py-4 text-sm">
+                      No reveal keyframes. Select a mask and click "+ Keyframe".
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PHASE 5: Camera Rig Tab */}
+        {activeTab === 'cameraRig' && (
+          <div>
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-purple-400 mb-2">🎥 Camera Rig System</h3>
+              <p className="text-sm text-gray-400 mb-4">Create null object rigs for advanced camera movements and tracking</p>
+              
+              <div className="flex gap-2 mb-4">
+                <button 
+                  onClick={() => createCameraRig('orbit')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  🔄 Orbit Rig
+                </button>
+                <button 
+                  onClick={() => createCameraRig('dolly')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  🎬 Dolly Rig
+                </button>
+                <button 
+                  onClick={() => createCameraRig('crane')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  🏗️ Crane Rig
+                </button>
+                <button 
+                  onClick={() => createCameraRig('custom')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                >
+                  ⚙️ Custom Rig
+                </button>
+              </div>
+
+              {/* Camera Rigs List */}
+              <div className="space-y-3 mb-6">
+                {cameraRigs.map(rig => (
+                  <div key={rig.id} className={`bg-gray-700 rounded-lg p-4 ${activeCameraRigId === rig.id ? 'ring-2 ring-purple-500' : ''}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox" 
+                          checked={rig.enabled}
+                          onChange={(e) => {
+                            updateCameraRig(rig.id, { enabled: e.target.checked });
+                            if (e.target.checked) {
+                              setActiveCameraRigId(rig.id);
+                            } else if (activeCameraRigId === rig.id) {
+                              setActiveCameraRigId(null);
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <input 
+                          type="text" 
+                          value={rig.name}
+                          onChange={(e) => updateCameraRig(rig.id, { name: e.target.value })}
+                          className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        />
+                        <span className="text-xs text-gray-400">({rig.type})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => createCameraRigKeyframe(rig.id, currentTime)}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs"
+                        >
+                          + Keyframe
+                        </button>
+                        <button 
+                          onClick={() => deleteCameraRig(rig.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Rig Type-Specific Controls */}
+                    {rig.type === 'orbit' && (
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Radius</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.orbitRadius || 15}
+                            onChange={(e) => updateCameraRig(rig.id, { orbitRadius: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.orbitSpeed || 0.5}
+                            onChange={(e) => updateCameraRig(rig.id, { orbitSpeed: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Axis</label>
+                          <select 
+                            value={rig.orbitAxis || 'y'}
+                            onChange={(e) => updateCameraRig(rig.id, { orbitAxis: e.target.value })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="x">X</option>
+                            <option value="y">Y</option>
+                            <option value="z">Z</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {rig.type === 'dolly' && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.dollySpeed || 1.0}
+                            onChange={(e) => updateCameraRig(rig.id, { dollySpeed: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Axis</label>
+                          <select 
+                            value={rig.dollyAxis || 'z'}
+                            onChange={(e) => updateCameraRig(rig.id, { dollyAxis: e.target.value })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="x">X</option>
+                            <option value="y">Y</option>
+                            <option value="z">Z</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {rig.type === 'crane' && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Height</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.craneHeight || 10}
+                            onChange={(e) => updateCameraRig(rig.id, { craneHeight: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Tilt</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.craneTilt || 0}
+                            onChange={(e) => updateCameraRig(rig.id, { craneTilt: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Base Position/Rotation for all rig types */}
+                    <div className="border-t border-gray-600 pt-3 mt-3">
+                      <div className="text-xs text-gray-400 mb-2">Base Position</div>
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        <input 
+                          type="number" 
+                          placeholder="X"
+                          step="0.5"
+                          value={rig.position.x}
+                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, x: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Y"
+                          step="0.5"
+                          value={rig.position.y}
+                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, y: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Z"
+                          step="0.5"
+                          value={rig.position.z}
+                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, z: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                      </div>
+                      <div className="text-xs text-gray-400 mb-2">Base Rotation</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input 
+                          type="number" 
+                          placeholder="X"
+                          step="0.1"
+                          value={rig.rotation.x}
+                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, x: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Y"
+                          step="0.1"
+                          value={rig.rotation.y}
+                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, y: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                        <input 
+                          type="number" 
+                          placeholder="Z"
+                          step="0.1"
+                          value={rig.rotation.z}
+                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, z: parseFloat(e.target.value) || 0 } })}
+                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {cameraRigs.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No camera rigs yet. Click a rig type button to create one.
+                  </div>
+                )}
+              </div>
+
+              {/* Camera Rig Keyframes */}
+              <div className="mt-6">
+                <h4 className="text-md font-bold text-cyan-400 mb-3">Camera Rig Keyframes</h4>
+                <div className="space-y-2">
+                  {cameraRigKeyframes.map(kf => {
+                    const rig = cameraRigs.find(r => r.id === kf.rigId);
+                    return (
+                      <div key={kf.id} className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
+                          <span className="text-white text-sm">{rig?.name || 'Unknown Rig'}</span>
+                          <span className="text-gray-400 text-xs">({kf.easing})</span>
+                        </div>
+                        <button 
+                          onClick={() => deleteCameraRigKeyframe(kf.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {cameraRigKeyframes.length === 0 && (
+                    <div className="text-center text-gray-500 py-4 text-sm">
+                      No rig keyframes. Select a rig and click "+ Keyframe".
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
