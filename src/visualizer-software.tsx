@@ -78,6 +78,9 @@ export default function ThreeDVisualizer() {
   const [bassColor, setBassColor] = useState('#8a2be2');
   const [midsColor, setMidsColor] = useState('#40e0d0');
   const [highsColor, setHighsColor] = useState('#c8b4ff');
+  const [bassGain, setBassGain] = useState(1.0);
+  const [midsGain, setMidsGain] = useState(1.0);
+  const [highsGain, setHighsGain] = useState(1.0);
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
@@ -1105,9 +1108,9 @@ export default function ThreeDVisualizer() {
   };
 
   const getFreq = (d: Uint8Array) => ({
-    bass: d.slice(0,10).reduce((a,b)=>a+b,0)/10/255,
-    mids: d.slice(10,100).reduce((a,b)=>a+b,0)/90/255,
-    highs: d.slice(100,200).reduce((a,b)=>a+b,0)/100/255
+    bass: (d.slice(0,10).reduce((a,b)=>a+b,0)/10/255) * bassGain,
+    mids: (d.slice(10,100).reduce((a,b)=>a+b,0)/90/255) * midsGain,
+    highs: (d.slice(100,200).reduce((a,b)=>a+b,0)/100/255) * highsGain
   });
 
   // PHASE 5: Text Animator Functions
@@ -2856,25 +2859,69 @@ export default function ThreeDVisualizer() {
         {activeTab === 'controls' && (
           <div>
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
-              <div className="mb-3 pb-3 border-b border-gray-600">
-                <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-                <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
-                <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
-              </div>
-              <div className="flex gap-2 mb-2">
-                <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
-                <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
-              </div>
-              <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
-            </div>
-
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
               <div className="grid grid-cols-3 gap-3">
                 <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
                 <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
                 <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
+              </div>
+            </div>
+            
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Bass Gain</label>
+                    <span className="text-xs text-cyan-300">{bassGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={bassGain} 
+                    onChange={(e) => setBassGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Mids Gain</label>
+                    <span className="text-xs text-cyan-300">{midsGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={midsGain} 
+                    onChange={(e) => setMidsGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400">Highs Gain</label>
+                    <span className="text-xs text-cyan-300">{highsGain.toFixed(2)}x</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="3" 
+                    step="0.1" 
+                    value={highsGain} 
+                    onChange={(e) => setHighsGain(parseFloat(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <button 
+                  onClick={() => { setBassGain(1.0); setMidsGain(1.0); setHighsGain(1.0); }}
+                  className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                >
+                  Reset Frequency Gains
+                </button>
               </div>
             </div>
           </div>
@@ -2911,10 +2958,6 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 HUD Display Options</h3>
               <p className="text-xs text-gray-400 mb-3">Control what information is shown on the visualization canvas.</p>
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showPresetDisplay" checked={showPresetDisplay} onChange={(e) => setShowPresetDisplay(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showPresetDisplay" className="text-sm text-white cursor-pointer">Show Current Preset</label>
-                </div>
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="showFilename" checked={showFilename} onChange={(e) => setShowFilename(e.target.checked)} className="w-4 h-4 cursor-pointer" />
                   <label htmlFor="showFilename" className="text-sm text-white cursor-pointer">Show Audio Filename</label>
@@ -3302,14 +3345,24 @@ export default function ThreeDVisualizer() {
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
           <div>
+            {/* Limitations Notice */}
+            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Post-Processing Effects - Limitations</h3>
+              <p className="text-xs text-yellow-200">
+                The Post-FX controls below require WebGL shader-based post-processing (EffectComposer, passes) which is not yet implemented. 
+                These controls will not affect the visualization until the rendering pipeline is updated to support post-processing effects.
+              </p>
+            </div>
+
             {/* Blend Mode Section */}
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Blend Mode</h3>
-              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually</p>
+              <p className="text-xs text-gray-400 mb-3">Layer blending affects how objects combine visually (not yet implemented)</p>
               <select 
                 value={blendMode} 
                 onChange={(e) => setBlendMode(e.target.value as any)}
                 className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded"
+                disabled
               >
                 <option value="normal">Normal (Standard)</option>
                 <option value="additive">Additive (Brighten)</option>
@@ -3319,8 +3372,8 @@ export default function ThreeDVisualizer() {
             </div>
 
             {/* Vignette Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌫️ Vignette (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Edge darkening effect for cinematic look</p>
               
               <div className="mb-3">
@@ -3336,6 +3389,7 @@ export default function ThreeDVisualizer() {
                   value={vignetteStrength} 
                   onChange={(e) => setVignetteStrength(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3352,20 +3406,22 @@ export default function ThreeDVisualizer() {
                   value={vignetteSoftness} 
                   onChange={(e) => setVignetteSoftness(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setVignetteStrength(0); setVignetteSoftness(0.5); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Vignette
               </button>
             </div>
 
             {/* Color Grading Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Color Grading (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust overall image tone and color</p>
               
               <div className="mb-3">
@@ -3381,6 +3437,7 @@ export default function ThreeDVisualizer() {
                   value={colorSaturation} 
                   onChange={(e) => setColorSaturation(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">0 = grayscale, 1 = normal, 2 = vivid</p>
               </div>
@@ -3398,6 +3455,7 @@ export default function ThreeDVisualizer() {
                   value={colorContrast} 
                   onChange={(e) => setColorContrast(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Lower = flat, higher = punchy</p>
               </div>
@@ -3415,21 +3473,23 @@ export default function ThreeDVisualizer() {
                   value={colorGamma} 
                   onChange={(e) => setColorGamma(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
                 <p className="text-xs text-gray-500 mt-1">Brightness curve adjustment</p>
               </div>
 
               <button 
                 onClick={() => { setColorSaturation(1.0); setColorContrast(1.0); setColorGamma(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full mb-3"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full mb-3 cursor-not-allowed"
+                disabled
               >
                 Reset Color Grading
               </button>
             </div>
 
             {/* Color Tint Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint</h3>
+            <div className="mb-4 bg-gray-700 rounded-lg p-3 opacity-60">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🌈 Color Tint (Not Implemented)</h3>
               <p className="text-xs text-gray-400 mb-3">Apply color cast for mood and atmosphere</p>
               
               <div className="mb-3">
@@ -3445,6 +3505,7 @@ export default function ThreeDVisualizer() {
                   value={colorTintR} 
                   onChange={(e) => setColorTintR(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3461,6 +3522,7 @@ export default function ThreeDVisualizer() {
                   value={colorTintG} 
                   onChange={(e) => setColorTintG(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
@@ -3477,12 +3539,14 @@ export default function ThreeDVisualizer() {
                   value={colorTintB} 
                   onChange={(e) => setColorTintB(parseFloat(e.target.value))}
                   className="w-full"
+                  disabled
                 />
               </div>
 
               <button 
                 onClick={() => { setColorTintR(1.0); setColorTintG(1.0); setColorTintB(1.0); }}
-                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+                className="text-xs bg-gray-600 px-3 py-1 rounded text-white w-full cursor-not-allowed"
+                disabled
               >
                 Reset Color Tint
               </button>
@@ -3520,6 +3584,22 @@ export default function ThreeDVisualizer() {
         {/* PHASE 5: Text Animator Tab */}
         {activeTab === 'textAnimator' && (
           <div>
+            {/* Song Name Overlay Section */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
+              <div className="mb-3 pb-3 border-b border-gray-600">
+                <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
+                <input type="file" accept=".json,.typeface.json" onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" />
+                <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <input type="text" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
+                <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
+              </div>
+              <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
+            </div>
+
+            {/* Text Animator Section */}
             <div className="mb-4">
               <h3 className="text-lg font-bold text-purple-400 mb-2">📝 Text Animator</h3>
               <p className="text-sm text-gray-400 mb-4">Create per-character animated text with customizable offsets and stagger timing</p>
