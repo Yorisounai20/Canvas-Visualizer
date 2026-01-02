@@ -819,16 +819,20 @@ export default function ThreeDVisualizer() {
   };
 
   const playMultiTrackAudio = () => {
-    if (!audioContextRef.current || audioTracks.length === 0) return;
+    if (!audioContextRef.current) return;
+    
+    // Use ref to get current tracks
+    const tracks = audioTracksRef.current;
+    if (tracks.length === 0) return;
     
     const ctx = audioContextRef.current;
     const startOffset = pauseTimeRef.current;
     
     // Start all tracks synchronized
-    audioTracks.forEach(track => {
+    tracks.forEach(track => {
       if (!track.buffer) return;
       
-      // Stop existing source if any
+      // Stop existing source if any to prevent duplicates
       if (track.source) {
         try {
           track.source.stop();
@@ -836,6 +840,7 @@ export default function ThreeDVisualizer() {
         } catch (e) {
           // Ignore errors from already stopped sources
         }
+        track.source = null;
       }
       
       // Create new source
@@ -855,28 +860,24 @@ export default function ThreeDVisualizer() {
       track.source = source;
     });
     
-    // Update ref for internal tracking
-    audioTracksRef.current = audioTracks;
-    
     startTimeRef.current = Date.now() - (startOffset * 1000);
     setIsPlaying(true);
   };
 
   const stopMultiTrackAudio = () => {
-    audioTracks.forEach(track => {
+    // Use ref to get current tracks with their sources
+    const tracks = audioTracksRef.current;
+    tracks.forEach(track => {
       if (track.source) {
         try {
           track.source.stop();
           track.source.disconnect();
         } catch (e) {
-          // Ignore errors
+          // Ignore errors from already stopped sources
         }
         track.source = null;
       }
     });
-    
-    // Update ref for internal tracking
-    audioTracksRef.current = audioTracks;
     
     pauseTimeRef.current = currentTime;
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -884,11 +885,25 @@ export default function ThreeDVisualizer() {
   };
 
   const seekMultiTrack = (t: number) => {
-    const play = isPlaying;
-    if (play) stopMultiTrackAudio();
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop all tracks to prevent duplicates
+    if (wasPlaying) {
+      stopMultiTrackAudio();
+    }
+    
+    // Set new position
     pauseTimeRef.current = t;
     setCurrentTime(t);
-    if (play) playMultiTrackAudio();
+    
+    // Restart if it was playing
+    if (wasPlaying) {
+      // Need to use a microtask to ensure state updates have propagated
+      Promise.resolve().then(() => {
+        playMultiTrackAudio();
+      });
+    }
   };
 
   // PHASE 4: Parameter event functions
@@ -902,7 +917,6 @@ export default function ThreeDVisualizer() {
       threshold: 0.5, // Default threshold for automated mode
       parameters: {
         backgroundFlash: 0.5,
-        cameraShake: 0,
         vignettePulse: 0,
         saturationBurst: 0
       }
@@ -1533,7 +1547,7 @@ export default function ThreeDVisualizer() {
         }
       }
 
-      // Calculate camera shake offset (from existing shake events)
+      // Calculate camera shake offset (from Effects tab shake events only)
       let shakeX = 0, shakeY = 0, shakeZ = 0;
       for (const shake of cameraShakes) {
         const timeSinceShake = t - shake.time;
@@ -1552,7 +1566,6 @@ export default function ThreeDVisualizer() {
       let bgFlash = 0;
       let vignetteFlash = 0;
       let saturationFlash = 0;
-      let eventShakeX = 0, eventShakeY = 0, eventShakeZ = 0;
       
       // Reset Post-FX event accumulation values
       let vignetteStrengthPulse = 0;
@@ -1617,16 +1630,6 @@ export default function ThreeDVisualizer() {
             saturationFlash += event.parameters.saturationBurst * intensity;
           }
           
-          // Camera shake from events
-          if (event.parameters.cameraShake !== undefined) {
-            const decay = intensity;
-            const frequency = 50;
-            const amplitude = event.parameters.cameraShake * decay;
-            eventShakeX += Math.sin(timeSinceEvent * frequency) * amplitude * 0.1;
-            eventShakeY += Math.cos(timeSinceEvent * frequency * 1.3) * amplitude * 0.1;
-            eventShakeZ += Math.sin(timeSinceEvent * frequency * 0.7) * amplitude * 0.05;
-          }
-          
           // Post-FX: Vignette strength pulse
           if (event.parameters.vignetteStrengthPulse !== undefined) {
             vignetteStrengthPulse += event.parameters.vignetteStrengthPulse * intensity;
@@ -1651,11 +1654,6 @@ export default function ThreeDVisualizer() {
       activeVignetteStrengthPulseRef.current = vignetteStrengthPulse;
       activeContrastBurstRef.current = contrastBurst;
       activeColorTintFlashRef.current = colorTintFlash;
-      
-      // Combine event shake with existing camera shake
-      shakeX += eventShakeX;
-      shakeY += eventShakeY;
-      shakeZ += eventShakeZ;
       
       // Store active parameter values in refs (not state to avoid re-renders)
       activeBackgroundFlashRef.current = bgFlash;
@@ -2827,9 +2825,6 @@ export default function ThreeDVisualizer() {
                         <div>Duration: {event.duration}s</div>
                         {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
                           <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
-                        )}
-                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
-                          <div>📷 Shake: {Math.round(event.parameters.cameraShake * 100)}%</div>
                         )}
                         {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
                           <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
@@ -4472,36 +4467,6 @@ export default function ThreeDVisualizer() {
                           className="w-full"
                         />
                         <span className="text-xs text-gray-400">{Math.round((event.parameters.backgroundFlash ?? 0) * 100)}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Camera Shake */}
-                  <div>
-                    <label className="text-sm text-gray-300 block mb-2 flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={(event.parameters.cameraShake ?? 0) > 0}
-                        onChange={(e) => updateParameterEvent(editingEventId, {
-                          parameters: { ...event.parameters, cameraShake: e.target.checked ? 0.5 : 0 }
-                        })}
-                      />
-                      📷 Camera Shake
-                    </label>
-                    {(event.parameters.cameraShake ?? 0) > 0 && (
-                      <div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.05"
-                          value={event.parameters.cameraShake ?? 0}
-                          onChange={(e) => updateParameterEvent(editingEventId, {
-                            parameters: { ...event.parameters, cameraShake: parseFloat(e.target.value) }
-                          })}
-                          className="w-full"
-                        />
-                        <span className="text-xs text-gray-400">{Math.round((event.parameters.cameraShake ?? 0) * 100)}%</span>
                       </div>
                     )}
                   </div>
