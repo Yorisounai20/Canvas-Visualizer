@@ -3748,6 +3748,17 @@ export default function ThreeDVisualizer() {
         {/* PHASE 5: Masks Tab */}
         {activeTab === 'masks' && (
           <div>
+            {/* Implementation Status Notice */}
+            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Masks - Advanced Feature (Not Yet Implemented)</h3>
+              <p className="text-xs text-yellow-200 mb-2">
+                The Masks feature requires WebGL shader-based rendering or stencil buffer implementation, which is not currently available in the rendering pipeline.
+              </p>
+              <p className="text-xs text-yellow-200">
+                UI controls below allow you to configure mask properties, but they won't affect the visualization until the rendering system is updated with WebGL post-processing support.
+              </p>
+            </div>
+
             <div className="mb-4">
               <h3 className="text-lg font-bold text-purple-400 mb-2">🎭 Mask Reveals</h3>
               <p className="text-sm text-gray-400 mb-4">Create shape-based masks with animated reveals and feathering</p>
@@ -3756,18 +3767,21 @@ export default function ThreeDVisualizer() {
                 <button 
                   onClick={() => createMask('circle')} 
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  disabled
                 >
                   ⭕ Circle Mask
                 </button>
                 <button 
                   onClick={() => createMask('rectangle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
+                  disabled
                 >
                   ◻️ Rectangle Mask
                 </button>
                 <button 
                   onClick={() => createMask('custom')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
+                  disabled
                 >
                   ✏️ Custom Path
                 </button>
