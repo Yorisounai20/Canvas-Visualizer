@@ -1619,8 +1619,6 @@ export default function ThreeDVisualizer() {
     if (!isPlaying || !rendererRef.current) return;
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
     const analyser = analyserRef.current;
-    if (!analyser) return;
-    const data = new Uint8Array(analyser.frequencyBinCount);
     const obj = objectsRef.current;
     if (!obj) return;
 
@@ -1645,8 +1643,13 @@ export default function ThreeDVisualizer() {
         fpsLastTime.current = now;
       }
       
-      analyser.getByteFrequencyData(data);
-      const f = getFreq(data);
+      // Get frequency data if analyser exists, otherwise use default values
+      let f = { bass: 0, mids: 0, highs: 0 };
+      if (analyser) {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        f = getFreq(data);
+      }
       const el = (Date.now() - startTimeRef.current) * 0.001;
       const t = el % duration;
       setCurrentTime(t);
