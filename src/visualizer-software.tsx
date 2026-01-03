@@ -2408,8 +2408,7 @@ export default function ThreeDVisualizer() {
       const el = (Date.now() - startTimeRef.current) * 0.001;
       const t = el % duration;
       setCurrentTime(t);
-      const sec = sections.find(s => t >= s.start && t < s.end);
-      const type = sec ? sec.animation : 'orbit';
+      const type = getCurrentPreset(); // Use keyframe-based preset switching
       
       // Interpolate camera settings from global keyframes or use global settings
       let activeCameraDistance, activeCameraHeight, activeCameraRotation;
@@ -5136,11 +5135,15 @@ export default function ThreeDVisualizer() {
           {/* Time Display and Preset Info - No Audio Upload */}
           <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
             <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && getCurrentSection() && (
-              <p className="text-cyan-400 text-xs mt-1">
-                {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
-              </p>
-            )}
+            {showPresetDisplay && (() => {
+              const currentPreset = getCurrentPreset();
+              const animType = animationTypes.find(a => a.value === currentPreset);
+              return animType && (
+                <p className="text-cyan-400 text-xs mt-1">
+                  {animType.icon} {animType.label}
+                </p>
+              );
+            })()}
             
             {/* Play/Stop Button */}
             {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
@@ -6419,27 +6422,115 @@ export default function ThreeDVisualizer() {
         {/* Presets Tab */}
         {activeTab === 'presets' && (
           <div>
-            <div className="mb-4 flex gap-2">
-              <button onClick={addSection} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Preset</button>
+            {/* Timeline Visualization */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-purple-400">🎬 Preset Timeline</h3>
+                <button
+                  onClick={() => setPresetSettingsExpanded(!presetSettingsExpanded)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title={presetSettingsExpanded ? "Collapse settings" : "Expand settings"}
+                >
+                  <ChevronDown 
+                    size={20} 
+                    className={`transition-transform ${presetSettingsExpanded ? '' : '-rotate-90'}`}
+                  />
+                </button>
+              </div>
+              
+              {/* Timeline bar visualization */}
+              <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
+                {/* Timeline markers for each preset keyframe */}
+                {presetKeyframes.map(kf => {
+                  const position = duration > 0 ? (kf.time / duration) * 100 : 0;
+                  const animType = animationTypes.find(a => a.value === kf.preset);
+                  return (
+                    <div
+                      key={kf.id}
+                      className="absolute top-0 bottom-0 w-1 bg-purple-500 hover:bg-purple-400 transition-colors cursor-pointer"
+                      style={{ left: `${position}%` }}
+                      title={`${formatTime(kf.time)}: ${animType?.label || kf.preset}`}
+                    >
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-xs whitespace-nowrap bg-gray-900 px-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                        {animType?.icon} {formatTime(kf.time)}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Current time indicator */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none"
+                  style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              
+              {/* Quick add button */}
+              <button
+                onClick={handleAddPresetKeyframe}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              >
+                <Plus size={14} />
+                Add at {formatTime(currentTime)}
+              </button>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {sections.map((s) => (
-                <div key={s.id} className="bg-gray-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
-                    <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div><label className="text-xs text-gray-400">Start</label><input type="text" id="start" name="start" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                    <div><label className="text-xs text-gray-400">End</label><input type="text" id="text-input-2" name="text-input-2" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                  </div>
-                  <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
-                    {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
+            
+            {/* Collapsible keyframe settings */}
+            {presetSettingsExpanded && (
+              <div className="space-y-3">
+                {presetKeyframes.map((kf, index) => {
+                  const animType = animationTypes.find(a => a.value === kf.preset);
+                  return (
+                    <div key={kf.id} className="bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-purple-400 font-mono text-sm">#{index + 1} - {formatTime(kf.time)}</span>
+                        <button
+                          onClick={() => handleDeletePresetKeyframe(kf.id)}
+                          className="text-red-400 hover:text-red-300 transition-colors"
+                          disabled={presetKeyframes.length <= 1}
+                          title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Time</label>
+                          <input
+                            type="text"
+                            id={`preset-kf-time-${kf.id}`}
+                            name={`preset-kf-time-${kf.id}`}
+                            value={formatTime(kf.time)}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Preset</label>
+                          <select
+                            value={kf.preset}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          >
+                            {animationTypes.map(t => (
+                              <option key={t.value} value={t.value}>
+                                {t.icon} {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      
+                      {/* Preview of current preset */}
+                      <div className="mt-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">
+                        {animType?.icon} {animType?.label || kf.preset}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
