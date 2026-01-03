@@ -2384,9 +2384,18 @@ export default function ThreeDVisualizer() {
         }
         
         // Helper to get current target size
-        const getCurrentSize = () => currentKeyframeIndex >= 0 
-          ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize 
-          : 0;
+        // If we're before the first keyframe, start at 100 (fully closed) if first keyframe will open (targetSize < 100)
+        // Otherwise start at the first keyframe's target
+        const getCurrentSize = () => {
+          if (currentKeyframeIndex >= 0) {
+            return sortedLetterboxKeyframes[currentKeyframeIndex].targetSize;
+          } else if (sortedLetterboxKeyframes.length > 0) {
+            // Before first keyframe - if first keyframe is < 100, start at 100 (closed), else use its value
+            const firstKeyframeTarget = sortedLetterboxKeyframes[0].targetSize;
+            return firstKeyframeTarget < 100 ? 100 : firstKeyframeTarget;
+          }
+          return 0;
+        };
         
         // Check if we should be animating toward the next keyframe
         if (currentKeyframeIndex < sortedLetterboxKeyframes.length - 1) {
@@ -2418,6 +2427,9 @@ export default function ThreeDVisualizer() {
             // Use current keyframe's invert when not animating
             if (currentKeyframeIndex >= 0) {
               setActiveLetterboxInvert(sortedLetterboxKeyframes[currentKeyframeIndex].invert);
+            } else {
+              // Before first keyframe, use first keyframe's invert setting
+              setActiveLetterboxInvert(sortedLetterboxKeyframes[0].invert);
             }
           }
         } else {
