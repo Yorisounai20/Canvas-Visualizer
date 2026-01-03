@@ -202,6 +202,24 @@ export default function ThreeDVisualizer() {
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
+  // NEW: Material controls for shapes
+  const [cubeWireframe, setCubeWireframe] = useState(true);
+  const [cubeOpacity, setCubeOpacity] = useState(0.6);
+  const [cubeColor, setCubeColor] = useState('#8a2be2');
+  const [cubeNeon, setCubeNeon] = useState(false);
+  const [octahedronWireframe, setOctahedronWireframe] = useState(true);
+  const [octahedronOpacity, setOctahedronOpacity] = useState(0.5);
+  const [octahedronColor, setOctahedronColor] = useState('#40e0d0');
+  const [octahedronNeon, setOctahedronNeon] = useState(false);
+  const [tetrahedronWireframe, setTetrahedronWireframe] = useState(false);
+  const [tetrahedronOpacity, setTetrahedronOpacity] = useState(0.7);
+  const [tetrahedronColor, setTetrahedronColor] = useState('#c8b4ff');
+  const [tetrahedronNeon, setTetrahedronNeon] = useState(false);
+  const [sphereWireframe, setSphereWireframe] = useState(true);
+  const [sphereOpacity, setSphereOpacity] = useState(0.4);
+  const [sphereColor, setSphereColor] = useState('#8a2be2');
+  const [sphereNeon, setSphereNeon] = useState(false);
+  
   // NEW: Post-FX controls
   const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
   const [vignetteStrength, setVignetteStrength] = useState(0);
@@ -1368,7 +1386,22 @@ export default function ThreeDVisualizer() {
 
     const cubes: THREE.Mesh[] = [];
     for (let i=0; i<8; i++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.6}));
+      const cubeMaterial = cubeNeon 
+        ? new THREE.MeshStandardMaterial({
+            color: new THREE.Color(cubeColor),
+            emissive: new THREE.Color(cubeColor),
+            emissiveIntensity: 1.5,
+            wireframe: cubeWireframe,
+            transparent: true,
+            opacity: cubeOpacity
+          })
+        : new THREE.MeshBasicMaterial({
+            color: new THREE.Color(cubeColor),
+            wireframe: cubeWireframe,
+            transparent: true,
+            opacity: cubeOpacity
+          });
+      const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), cubeMaterial);
       const a = (i/8)*Math.PI*2;
       c.position.x = Math.cos(a)*8;
       c.position.z = Math.sin(a)*8;
@@ -1379,7 +1412,22 @@ export default function ThreeDVisualizer() {
     const octas: THREE.Mesh[] = [];
     for (let r=0; r<3; r++) {
       for (let i=0; i<6+r*4; i++) {
-        const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshBasicMaterial({color:0x40e0d0,wireframe:true,transparent:true,opacity:0.5}));
+        const octaMaterial = octahedronNeon
+          ? new THREE.MeshStandardMaterial({
+              color: new THREE.Color(octahedronColor),
+              emissive: new THREE.Color(octahedronColor),
+              emissiveIntensity: 1.5,
+              wireframe: octahedronWireframe,
+              transparent: true,
+              opacity: octahedronOpacity
+            })
+          : new THREE.MeshBasicMaterial({
+              color: new THREE.Color(octahedronColor),
+              wireframe: octahedronWireframe,
+              transparent: true,
+              opacity: octahedronOpacity
+            });
+        const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
         const a = (i/(6+r*4))*Math.PI*2;
         const rad = 5+r*2;
         o.position.x = Math.cos(a)*rad;
@@ -1392,13 +1440,43 @@ export default function ThreeDVisualizer() {
 
     const tetras: THREE.Mesh[] = [];
     for (let i=0; i<30; i++) {
-      const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), new THREE.MeshBasicMaterial({color:0xc8b4ff,transparent:true,opacity:0.7}));
+      const tetraMaterial = tetrahedronNeon
+        ? new THREE.MeshStandardMaterial({
+            color: new THREE.Color(tetrahedronColor),
+            emissive: new THREE.Color(tetrahedronColor),
+            emissiveIntensity: 1.5,
+            wireframe: tetrahedronWireframe,
+            transparent: true,
+            opacity: tetrahedronOpacity
+          })
+        : new THREE.MeshBasicMaterial({
+            color: new THREE.Color(tetrahedronColor),
+            wireframe: tetrahedronWireframe,
+            transparent: true,
+            opacity: tetrahedronOpacity
+          });
+      const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), tetraMaterial);
       t.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
       scene.add(t);
       tetras.push(t);
     }
 
-    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.4}));
+    const sphereMaterial = sphereNeon
+      ? new THREE.MeshStandardMaterial({
+          color: new THREE.Color(sphereColor),
+          emissive: new THREE.Color(sphereColor),
+          emissiveIntensity: 1.5,
+          wireframe: sphereWireframe,
+          transparent: true,
+          opacity: sphereOpacity
+        })
+      : new THREE.MeshBasicMaterial({
+          color: new THREE.Color(sphereColor),
+          wireframe: sphereWireframe,
+          transparent: true,
+          opacity: sphereOpacity
+        });
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), sphereMaterial);
     scene.add(sphere);
     
     // Add lighting
@@ -1848,6 +1926,58 @@ export default function ThreeDVisualizer() {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // Update shape materials when material controls change
+  useEffect(() => {
+    if (!objectsRef.current) return;
+    const { cubes, octas, tetras, sphere } = objectsRef.current;
+    
+    // Update cubes
+    cubes.forEach(cube => {
+      const material = cube.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+      material.color.setStyle(cubeColor);
+      material.wireframe = cubeWireframe;
+      material.opacity = cubeOpacity;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.emissive.setStyle(cubeColor);
+        material.emissiveIntensity = cubeNeon ? 1.5 : 0;
+      }
+    });
+    
+    // Update octahedrons
+    octas.forEach(octa => {
+      const material = octa.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+      material.color.setStyle(octahedronColor);
+      material.wireframe = octahedronWireframe;
+      material.opacity = octahedronOpacity;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.emissive.setStyle(octahedronColor);
+        material.emissiveIntensity = octahedronNeon ? 1.5 : 0;
+      }
+    });
+    
+    // Update tetrahedrons
+    tetras.forEach(tetra => {
+      const material = tetra.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+      material.color.setStyle(tetrahedronColor);
+      material.wireframe = tetrahedronWireframe;
+      material.opacity = tetrahedronOpacity;
+      if (material instanceof THREE.MeshStandardMaterial) {
+        material.emissive.setStyle(tetrahedronColor);
+        material.emissiveIntensity = tetrahedronNeon ? 1.5 : 0;
+      }
+    });
+    
+    // Update sphere
+    const sphereMaterial = sphere.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+    sphereMaterial.color.setStyle(sphereColor);
+    sphereMaterial.wireframe = sphereWireframe;
+    sphereMaterial.opacity = sphereOpacity;
+    if (sphereMaterial instanceof THREE.MeshStandardMaterial) {
+      sphereMaterial.emissive.setStyle(sphereColor);
+      sphereMaterial.emissiveIntensity = sphereNeon ? 1.5 : 0;
+    }
+  }, [cubeColor, cubeWireframe, cubeOpacity, cubeNeon, octahedronColor, octahedronWireframe, octahedronOpacity, octahedronNeon, tetrahedronColor, tetrahedronWireframe, tetrahedronOpacity, tetrahedronNeon, sphereColor, sphereWireframe, sphereOpacity, sphereNeon]);
 
   // Enable/disable OrbitControls based on play state
   useEffect(() => {
@@ -4715,6 +4845,115 @@ export default function ThreeDVisualizer() {
                   Reset Frequency Gains
                 </button>
               </div>
+            </div>
+            
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Shape Material Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Customize the appearance of each shape type (cubes, octahedrons, tetrahedrons, sphere)</p>
+              
+              {/* Cubes */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-purple-300 mb-2">Cubes (8 objects)</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={cubeColor} onChange={(e) => setCubeColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="cubeWireframe" checked={cubeWireframe} onChange={(e) => setCubeWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="cubeWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="cubeNeon" checked={cubeNeon} onChange={(e) => setCubeNeon(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="cubeNeon" className="text-xs text-cyan-300 cursor-pointer">✨ Neon Glow</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Octahedrons */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-cyan-300 mb-2">Octahedrons (30 objects)</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={octahedronColor} onChange={(e) => setOctahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="octahedronWireframe" checked={octahedronWireframe} onChange={(e) => setOctahedronWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="octahedronWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="octahedronNeon" checked={octahedronNeon} onChange={(e) => setOctahedronNeon(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="octahedronNeon" className="text-xs text-cyan-300 cursor-pointer">✨ Neon Glow</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Tetrahedrons */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-pink-300 mb-2">Tetrahedrons (30 objects)</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={tetrahedronColor} onChange={(e) => setTetrahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="tetrahedronWireframe" checked={tetrahedronWireframe} onChange={(e) => setTetrahedronWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="tetrahedronWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="tetrahedronNeon" checked={tetrahedronNeon} onChange={(e) => setTetrahedronNeon(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="tetrahedronNeon" className="text-xs text-cyan-300 cursor-pointer">✨ Neon Glow</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Sphere */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-purple-300 mb-2">Sphere (center object)</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={sphereColor} onChange={(e) => setSphereColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="sphereWireframe" checked={sphereWireframe} onChange={(e) => setSphereWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="sphereWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="sphereNeon" checked={sphereNeon} onChange={(e) => setSphereNeon(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="sphereNeon" className="text-xs text-cyan-300 cursor-pointer">✨ Neon Glow</label>
+                  </div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setCubeColor('#8a2be2'); setCubeWireframe(true); setCubeOpacity(0.6); setCubeNeon(false);
+                  setOctahedronColor('#40e0d0'); setOctahedronWireframe(true); setOctahedronOpacity(0.5); setOctahedronNeon(false);
+                  setTetrahedronColor('#c8b4ff'); setTetrahedronWireframe(false); setTetrahedronOpacity(0.7); setTetrahedronNeon(false);
+                  setSphereColor('#8a2be2'); setSphereWireframe(true); setSphereOpacity(0.4); setSphereNeon(false);
+                }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset All Materials to Defaults
+              </button>
             </div>
           </div>
         )}
