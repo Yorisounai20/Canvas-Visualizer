@@ -1342,9 +1342,6 @@ export default function ThreeDVisualizer() {
       rigPathsRef.current.delete(id);
     }
     
-    if (activeCameraRigId === id) {
-      setActiveCameraRigId(null);
-    }
     // Remove from active rigs array
     setActiveCameraRigIds(prev => prev.filter(rigId => rigId !== id));
     
@@ -5464,18 +5461,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={cubeColor} onChange={(e) => setCubeColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="cubeOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
+                    <input type="range" id="cubeOpacity" name="cubeOpacity" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {cubeMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {cubeMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={cubeMetalness} onChange={(e) => setCubeMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="cubeMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {cubeMetalness.toFixed(2)}</label>
+                        <input type="range" id="cubeMetalness" name="cubeMetalness" min="0" max="1" step="0.05" value={cubeMetalness} onChange={(e) => setCubeMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {cubeRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={cubeRoughness} onChange={(e) => setCubeRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="cubeRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {cubeRoughness.toFixed(2)}</label>
+                        <input type="range" id="cubeRoughness" name="cubeRoughness" min="0" max="1" step="0.05" value={cubeRoughness} onChange={(e) => setCubeRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5504,18 +5501,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={octahedronColor} onChange={(e) => setOctahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="octahedronOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
+                    <input type="range" id="octahedronOpacity" name="octahedronOpacity" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {octahedronMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {octahedronMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={octahedronMetalness} onChange={(e) => setOctahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="octahedronMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {octahedronMetalness.toFixed(2)}</label>
+                        <input type="range" id="octahedronMetalness" name="octahedronMetalness" min="0" max="1" step="0.05" value={octahedronMetalness} onChange={(e) => setOctahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {octahedronRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={octahedronRoughness} onChange={(e) => setOctahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="octahedronRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {octahedronRoughness.toFixed(2)}</label>
+                        <input type="range" id="octahedronRoughness" name="octahedronRoughness" min="0" max="1" step="0.05" value={octahedronRoughness} onChange={(e) => setOctahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5544,18 +5541,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={tetrahedronColor} onChange={(e) => setTetrahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="tetrahedronOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
+                    <input type="range" id="tetrahedronOpacity" name="tetrahedronOpacity" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {tetrahedronMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {tetrahedronMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronMetalness} onChange={(e) => setTetrahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="tetrahedronMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {tetrahedronMetalness.toFixed(2)}</label>
+                        <input type="range" id="tetrahedronMetalness" name="tetrahedronMetalness" min="0" max="1" step="0.05" value={tetrahedronMetalness} onChange={(e) => setTetrahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {tetrahedronRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronRoughness} onChange={(e) => setTetrahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="tetrahedronRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {tetrahedronRoughness.toFixed(2)}</label>
+                        <input type="range" id="tetrahedronRoughness" name="tetrahedronRoughness" min="0" max="1" step="0.05" value={tetrahedronRoughness} onChange={(e) => setTetrahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5584,18 +5581,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={sphereColor} onChange={(e) => setSphereColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="sphereOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
+                    <input type="range" id="sphereOpacity" name="sphereOpacity" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {sphereMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {sphereMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={sphereMetalness} onChange={(e) => setSphereMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="sphereMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {sphereMetalness.toFixed(2)}</label>
+                        <input type="range" id="sphereMetalness" name="sphereMetalness" min="0" max="1" step="0.05" value={sphereMetalness} onChange={(e) => setSphereMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {sphereRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={sphereRoughness} onChange={(e) => setSphereRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="sphereRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {sphereRoughness.toFixed(2)}</label>
+                        <input type="range" id="sphereRoughness" name="sphereRoughness" min="0" max="1" step="0.05" value={sphereRoughness} onChange={(e) => setSphereRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
