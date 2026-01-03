@@ -9,8 +9,6 @@ interface RightPanelProps {
   highsColor: string;
   backgroundColor: string;
   borderColor: string;
-  ambientLightIntensity: number;
-  directionalLightIntensity: number;
   cameraDistance: number;
   cameraHeight: number;
   cameraRotation: number;
@@ -30,8 +28,6 @@ interface RightPanelProps {
   onSetHighsColor: (color: string) => void;
   onSetBackgroundColor: (color: string) => void;
   onSetBorderColor: (color: string) => void;
-  onSetAmbientLight: (intensity: number) => void;
-  onSetDirectionalLight: (intensity: number) => void;
   onSetCameraDistance: (distance: number) => void;
   onSetCameraHeight: (height: number) => void;
   onSetCameraRotation: (rotation: number) => void;
@@ -59,8 +55,6 @@ export default function RightPanel({
   highsColor,
   backgroundColor,
   borderColor,
-  ambientLightIntensity,
-  directionalLightIntensity,
   cameraDistance,
   cameraHeight,
   cameraRotation,
@@ -80,8 +74,6 @@ export default function RightPanel({
   onSetHighsColor,
   onSetBackgroundColor,
   onSetBorderColor,
-  onSetAmbientLight,
-  onSetDirectionalLight,
   onSetCameraDistance,
   onSetCameraHeight,
   onSetCameraRotation,
@@ -384,44 +376,6 @@ export default function RightPanel({
                   />
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Lighting */}
-          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
-              Lighting
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Ambient: {(ambientLightIntensity * 100).toFixed(0)}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={ambientLightIntensity}
-                  onChange={(e) => onSetAmbientLight(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Directional: {(directionalLightIntensity * 100).toFixed(0)}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={directionalLightIntensity}
-                  onChange={(e) => onSetDirectionalLight(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
-                />
-              </div>
             </div>
           </div>
 

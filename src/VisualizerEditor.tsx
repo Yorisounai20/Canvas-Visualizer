@@ -2525,8 +2525,6 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               highsColor={highsColor}
               backgroundColor={backgroundColor}
               borderColor={borderColor}
-              ambientLightIntensity={ambientLightIntensity}
-              directionalLightIntensity={directionalLightIntensity}
               cameraDistance={cameraDistance}
               cameraHeight={cameraHeight}
               cameraRotation={cameraRotation}
@@ -2546,8 +2544,6 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               onSetHighsColor={setHighsColor}
               onSetBackgroundColor={setBackgroundColor}
               onSetBorderColor={setBorderColor}
-              onSetAmbientLight={setAmbientLightIntensity}
-              onSetDirectionalLight={setDirectionalLightIntensity}
               onSetCameraDistance={setCameraDistance}
               onSetCameraHeight={setCameraHeight}
               onSetCameraRotation={setCameraRotation}

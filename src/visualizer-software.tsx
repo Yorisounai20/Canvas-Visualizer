@@ -5960,20 +5960,6 @@ export default function ThreeDVisualizer() {
               )}
             </div>
             
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">💡 Lighting Controls</h3>
-              <p className="text-xs text-gray-400 mb-3">Adjust scene lighting intensity.</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Ambient Light: {(ambientLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" id="ambientLightIntensity" name="ambientLightIntensity" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Directional Light: {(directionalLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" id="directionalLightIntensity" name="directionalLightIntensity" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
