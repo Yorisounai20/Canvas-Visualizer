@@ -3132,23 +3132,23 @@ export default function ThreeDVisualizer() {
           // Swimming path - gentle side-to-side motion
           const swayAmount = (1 - progress) * 2 + f.bass * 1.5;
           const x = Math.sin(swimSpeed - i * 0.4) * swayAmount;
-          const y = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
+          const yPos = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
           const z = progress * -20 - 5;
           
           // Hammer T-shape positioning
           if (isHammer) {
             if (i === 0) {
               // Left end of hammer
-              c.position.set(x - 6, y + 0.5, z + 2);
+              c.position.set(x - 6, yPos + 0.5, z + 2);
             } else if (i === 1) {
               // Center of hammer (vertical part of T)
-              c.position.set(x, y, z);
+              c.position.set(x, yPos, z);
             } else {
               // Right end of hammer
-              c.position.set(x + 6, y + 0.5, z + 2);
+              c.position.set(x + 6, yPos + 0.5, z + 2);
             }
           } else {
-            c.position.set(x, y, z);
+            c.position.set(x, yPos, z);
           }
           
           // Scale: MUCH LARGER for prominence
@@ -3180,13 +3180,13 @@ export default function ThreeDVisualizer() {
           const nextProgress = nextI / obj.cubes.length;
           const nextSwayAmount = (1 - nextProgress) * 2 + f.bass * 1.5;
           const nextX = Math.sin(swimSpeed - nextI * 0.4) * nextSwayAmount;
-          const nextY = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
+          const nextYPos = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
           const nextZ = nextProgress * -20 - 5;
           
           if (!isHammer || i === 1) {
             // Only rotate non-hammer cubes (and center of hammer)
             c.rotation.y = Math.atan2(nextX - x, nextZ - z);
-            c.rotation.x = Math.atan2(nextY - y, nextZ - z) * 0.5;
+            c.rotation.x = Math.atan2(nextYPos - yPos, nextZ - z) * 0.5;
             c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
           } else {
             // Hammer ends align with center
