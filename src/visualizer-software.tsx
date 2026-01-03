@@ -11,6 +11,7 @@ import {
   LogEntry, 
   AudioTrack, 
   ParameterEvent,
+  EnvironmentKeyframe,
   DEFAULT_CAMERA_DISTANCE,
   DEFAULT_CAMERA_HEIGHT,
   DEFAULT_CAMERA_ROTATION,
@@ -206,7 +207,7 @@ export default function ThreeDVisualizer() {
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'keyframes', 'effects', 'postfx', 'presets', 'textAnimator', 'masks', 'cameraRig'] as const;
+  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -237,6 +238,11 @@ export default function ThreeDVisualizer() {
   const activeVignetteStrengthPulseRef = useRef(0);
   const activeContrastBurstRef = useRef(0);
   const activeColorTintFlashRef = useRef({ r: 0, g: 0, b: 0 });
+  
+  // Environment system (similar to VisualizerEditor)
+  const [environmentKeyframes, setEnvironmentKeyframes] = useState<EnvironmentKeyframe[]>([]);
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(false);
+  const nextEnvironmentKeyframeId = useRef(1);
   
   // PHASE 4: Track active automated events
   const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
@@ -970,6 +976,31 @@ export default function ThreeDVisualizer() {
       setShowEventModal(false);
       setEditingEventId(null);
     }
+  };
+
+  // Environment keyframe handlers (similar to VisualizerEditor)
+  const handleAddEnvironmentKeyframe = () => {
+    const time = currentTime;
+    const newKeyframe: EnvironmentKeyframe = {
+      id: nextEnvironmentKeyframeId.current++,
+      time,
+      type: 'ocean',
+      intensity: 0.5
+    };
+    setEnvironmentKeyframes([...environmentKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added environment keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const handleDeleteEnvironmentKeyframe = (id: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted environment keyframe', 'info');
+  };
+
+  const handleUpdateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
+    ));
+    addLog('Updated environment keyframe', 'success');
   };
 
   // NEW: Recording functions
@@ -4354,6 +4385,155 @@ export default function ThreeDVisualizer() {
         obj.sphere.material.wireframe = false;
       }
 
+      // ENVIRONMENT RENDERING - Independent from presets (uses octahedrons indices 30-44)
+      // Find active environment keyframe
+      const activeEnvKeyframe = [...environmentKeyframes]
+        .reverse()
+        .find(kf => kf.time <= t);
+      
+      if (activeEnvKeyframe && activeEnvKeyframe.type !== 'none') {
+        const envType = activeEnvKeyframe.type;
+        const envIntensity = activeEnvKeyframe.intensity;
+        const envColor = activeEnvKeyframe.color;
+        
+        // Use octahedrons indices 30-44 (15 objects) for environment
+        const envObjectCount = Math.floor(envIntensity * 15); // 0-15 environment objects based on intensity
+        
+        if (envType === 'ocean') {
+          // Ocean environment: light rays from above + animated particles
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Light rays from surface
+            const rayX = (i % 5 - 2) * 8;
+            const rayZ = -20 + (Math.floor(i / 5)) * 5;
+            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 2;
+            envObj.position.y = 10 - i * 0.3 + Math.sin(el + i) * 0.5;
+            envObj.position.z = rayZ;
+            envObj.rotation.x = Math.PI / 4;
+            envObj.rotation.z = Math.sin(el * 0.3 + i) * 0.2;
+            const raySize = 0.5 + f.highs * 0.3;
+            envObj.scale.set(raySize * 0.3, raySize * 8, raySize * 0.3);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#40e0d0');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.2 + f.highs * 0.2) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+          }
+        } else if (envType === 'forest') {
+          // Forest environment: trees, ground fog
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 3 === 0) {
+              // Trees (tall vertical octas)
+              const treeX = ((i % 5) - 2) * 6;
+              const treeZ = -15 - Math.floor((i - 30) / 5) * 4;
+              envObj.position.set(treeX, -2, treeZ);
+              envObj.rotation.set(0, el * 0.1 + i, 0);
+              const treeHeight = 4 + (i % 3);
+              envObj.scale.set(1, treeHeight, 1);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#2d5016');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + f.mids * 0.2) * envIntensity * blend;
+            } else {
+              // Fog/foliage particles
+              const fogX = Math.sin(i * 3) * 10;
+              const fogY = -3 + Math.sin(el * 0.3 + i) * 2;
+              const fogZ = -10 - (i % 10) * 2;
+              envObj.position.set(fogX, fogY, fogZ);
+              envObj.rotation.y += 0.02;
+              envObj.scale.set(2, 2, 2);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#4a7c59');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + f.bass * 0.1) * envIntensity * blend;
+            }
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'space') {
+          // Space environment: stars, distant planets
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 4 === 0) {
+              // Distant planets
+              const planetDist = 30 + (i % 3) * 10;
+              const planetAngle = (i / 4) * Math.PI * 2 + el * 0.1;
+              envObj.position.x = Math.cos(planetAngle) * planetDist;
+              envObj.position.y = ((i % 7) - 3) * 5;
+              envObj.position.z = Math.sin(planetAngle) * planetDist;
+              envObj.rotation.x += 0.01;
+              envObj.rotation.y += 0.02;
+              const planetSize = 3 + (i % 3);
+              envObj.scale.set(planetSize, planetSize, planetSize);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#8b5cf6');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.4 + f.mids * 0.2) * envIntensity * blend;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+            } else {
+              // Stars (small dots)
+              const starX = (Math.sin(i * 7) * 40);
+              const starY = (Math.cos(i * 5) * 30);
+              const starZ = (Math.sin(i * 3) * 40) - 30;
+              envObj.position.set(starX, starY, starZ);
+              const starTwinkle = 0.2 + Math.sin(el * 2 + i) * 0.1 + f.highs * 0.2;
+              envObj.scale.set(starTwinkle, starTwinkle, starTwinkle);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#ffffff');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + Math.sin(el * 3 + i) * 0.3) * envIntensity * blend;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+            }
+          }
+        } else if (envType === 'city') {
+          // City environment: buildings, lights, grid floor
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Buildings in a grid
+            const gridX = ((i % 5) - 2) * 8;
+            const gridZ = -15 - Math.floor((i - 30) / 5) * 6;
+            const buildingHeight = 3 + ((i * 7) % 5) + f.bass * 2;
+            envObj.position.set(gridX, buildingHeight / 2 - 5, gridZ);
+            envObj.rotation.y = 0;
+            envObj.scale.set(2, buildingHeight, 2);
+            
+            // Window lights (pulsing with music)
+            const lightIntensity = Math.sin(el * 2 + i) * 0.3 + f.mids * 0.5;
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#fbbf24');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + lightIntensity) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'abstract') {
+          // Abstract environment: geometric grid, floating shapes
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Floating geometric shapes in patterns
+            const layerAngle = (i / envObjectCount) * Math.PI * 2 + el * 0.5;
+            const layerRadius = 15 + (i % 3) * 5;
+            envObj.position.x = Math.cos(layerAngle) * layerRadius;
+            envObj.position.y = Math.sin(el + i * 0.5) * 8;
+            envObj.position.z = Math.sin(layerAngle) * layerRadius;
+            envObj.rotation.x += 0.03 * (i % 3 + 1);
+            envObj.rotation.y += 0.02 * (i % 2 + 1);
+            envObj.rotation.z += 0.04;
+            const shapeSize = 1 + f.bass * 0.5 + (i % 3) * 0.5;
+            envObj.scale.set(shapeSize, shapeSize, shapeSize);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#a78bfa');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.5 + f.mids * 0.3) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = (i % 2 === 0);
+          }
+        }
+      } else if (!activeEnvKeyframe || activeEnvKeyframe.type === 'none') {
+        // Hide all environment objects (indices 30-44)
+        for (let i = 30; i < 45; i++) {
+          if (i >= obj.octas.length) break;
+          const envObj = obj.octas[i];
+          envObj.position.set(0, -1000, 0);
+          envObj.scale.set(0.001, 0.001, 0.001);
+          (envObj.material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+      }
+
       if (showSongName && songNameMeshesRef.current.length > 0) {
         songNameMeshesRef.current.forEach((mesh) => {
           const freqIndex = mesh.userData.freqIndex;
@@ -5186,6 +5366,12 @@ export default function ThreeDVisualizer() {
             ✨ Effects
           </button>
           <button 
+            onClick={() => setActiveTab('environments')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'environments' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🌍 Environments
+          </button>
+          <button 
             onClick={() => setActiveTab('postfx')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -5202,12 +5388,6 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'textAnimator' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             📝 Text Animator
-          </button>
-          <button 
-            onClick={() => setActiveTab('masks')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'masks' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            🎭 Masks
           </button>
         </div>
 
@@ -6225,6 +6405,200 @@ export default function ThreeDVisualizer() {
           </div>
         )}
 
+        {/* Environments Tab */}
+        {activeTab === 'environments' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🌍 Environment System</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create audio-reactive background environments with timeline keyframes</p>
+                </div>
+                <button
+                  onClick={handleAddEnvironmentKeyframe}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add at {Math.floor(currentTime)}s
+                </button>
+              </div>
+
+              {environmentKeyframes.length === 0 ? (
+                <div className="bg-gray-800 rounded p-2">
+                  <p className="text-xs text-gray-400 text-center">No environment keyframes yet. Click "Add at {Math.floor(currentTime)}s" to create one</p>
+                </div>
+              ) : (
+                <>
+                  {/* Timeline bar with keyframe markers */}
+                  <div className="relative bg-gray-900 rounded h-12 mb-3">
+                    {/* Current time indicator */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
+                      style={{ left: `${(currentTime / duration) * 100}%` }}
+                    >
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                    </div>
+                    
+                    {/* Keyframe markers */}
+                    {environmentKeyframes.map((kf, idx) => {
+                      const envColors = {
+                        ocean: '#40e0d0',
+                        forest: '#2d5016',
+                        space: '#8b5cf6',
+                        city: '#fbbf24',
+                        abstract: '#a78bfa',
+                        none: '#666666'
+                      };
+                      const markerColor = envColors[kf.type as keyof typeof envColors] || '#999999';
+                      
+                      return (
+                        <div
+                          key={kf.id || idx}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
+                          style={{ left: `${(kf.time / duration) * 100}%` }}
+                          title={`${formatTime(kf.time)} - ${kf.type} (${Math.round(kf.intensity * 100)}%)`}
+                        >
+                          <div 
+                            className="w-3 h-8 hover:scale-110 transition-transform flex items-center justify-center rounded"
+                            style={{ backgroundColor: markerColor }}
+                          >
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                          <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            {formatTime(kf.time)}: {kf.type} ({Math.round(kf.intensity * 100)}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Collapsible Keyframe List */}
+                  <div className="mb-2">
+                    <button
+                      onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)}
+                      className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 text-xs"
+                    >
+                      <ChevronDown 
+                        size={16} 
+                        className={`transition-transform ${showEnvironmentSettings ? '' : '-rotate-90'}`}
+                      />
+                      <span className="font-semibold">Keyframe Settings ({environmentKeyframes.length})</span>
+                    </button>
+                  </div>
+
+                  {showEnvironmentSettings && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {environmentKeyframes.map((keyframe, index) => (
+                        <div key={keyframe.id || index} className="bg-gray-900 rounded p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ 
+                                  backgroundColor: ({
+                                    ocean: '#40e0d0',
+                                    forest: '#2d5016',
+                                    space: '#8b5cf6',
+                                    city: '#fbbf24',
+                                    abstract: '#a78bfa',
+                                    none: '#666666'
+                                  }[keyframe.type as 'ocean' | 'forest' | 'space' | 'city' | 'abstract' | 'none'] || '#999999')
+                                }}
+                              ></div>
+                              <span className="text-white font-semibold text-sm">
+                                {formatTime(keyframe.time)}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteEnvironmentKeyframe(keyframe.id)}
+                              className="text-red-400 hover:text-red-300 text-xs"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Type</label>
+                              <select
+                                value={keyframe.type}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id, 
+                                  e.target.value, 
+                                  keyframe.intensity, 
+                                  keyframe.color
+                                )}
+                                className="w-full bg-gray-800 text-white text-xs px-2 py-1 rounded"
+                              >
+                                <option value="ocean">🌊 Ocean</option>
+                                <option value="forest">🌲 Forest</option>
+                                <option value="space">🌌 Space</option>
+                                <option value="city">🏙️ City</option>
+                                <option value="abstract">🎨 Abstract</option>
+                                <option value="none">❌ None</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">
+                                Intensity: {Math.round(keyframe.intensity * 100)}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={keyframe.intensity}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id,
+                                  keyframe.type,
+                                  parseFloat(e.target.value),
+                                  keyframe.color
+                                )}
+                                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <label className="text-xs text-gray-400 block mb-1">
+                              Color Override (optional)
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={keyframe.color || '#ffffff'}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id,
+                                  keyframe.type,
+                                  keyframe.intensity,
+                                  e.target.value
+                                )}
+                                className="w-12 h-8 rounded cursor-pointer"
+                              />
+                              {keyframe.color && (
+                                <button
+                                  onClick={() => handleUpdateEnvironmentKeyframe(
+                                    keyframe.id,
+                                    keyframe.type,
+                                    keyframe.intensity,
+                                    undefined
+                                  )}
+                                  className="text-xs text-gray-400 hover:text-white"
+                                >
+                                  Reset to Default
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Keyframes Tab */}
 
         {/* Post-FX Tab */}
@@ -6726,259 +7100,6 @@ export default function ThreeDVisualizer() {
                     No text keyframes yet. Click "Add Text Keyframe" to create one.
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* PHASE 5: Masks Tab */}
-        {activeTab === 'masks' && (
-          <div>
-            {/* Implementation Status Notice */}
-            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Masks - Advanced Feature (Not Yet Implemented)</h3>
-              <p className="text-xs text-yellow-200 mb-2">
-                The Masks feature requires WebGL shader-based rendering or stencil buffer implementation, which is not currently available in the rendering pipeline.
-              </p>
-              <p className="text-xs text-yellow-200">
-                UI controls below allow you to configure mask properties, but they won't affect the visualization until the rendering system is updated with WebGL post-processing support.
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-purple-400 mb-2">🎭 Mask Reveals</h3>
-              <p className="text-sm text-gray-400 mb-4">Create shape-based masks with animated reveals and feathering</p>
-              
-              <div className="flex gap-2 mb-4">
-                <button 
-                  onClick={() => createMask('circle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
-                  disabled
-                >
-                  ⭕ Circle Mask
-                </button>
-                <button 
-                  onClick={() => createMask('rectangle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
-                  disabled
-                >
-                  ◻️ Rectangle Mask
-                </button>
-                <button 
-                  onClick={() => createMask('custom')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
-                  disabled
-                >
-                  ✏️ Custom Path
-                </button>
-              </div>
-
-              {/* Masks List */}
-              <div className="space-y-3 mb-6">
-                {masks.map(mask => (
-                  <div key={mask.id} className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="checkbox" id="checkbox-field-4043" name="checkbox-field-4043" 
-                          checked={mask.enabled}
-                          onChange={(e) => updateMask(mask.id, { enabled: e.target.checked })}
-                          className="rounded"
-                        />
-                        <input 
-                          type="text" id="text-field-4049" name="text-field-4049" 
-                          value={mask.name}
-                          onChange={(e) => updateMask(mask.id, { name: e.target.value })}
-                          className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => createMaskRevealKeyframe(mask.id, currentTime)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs"
-                        >
-                          + Keyframe
-                        </button>
-                        <button 
-                          onClick={() => deleteMask(mask.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Blend Mode</label>
-                        <select 
-                          value={mask.blendMode}
-                          onChange={(e) => updateMask(mask.id, { blendMode: e.target.value })}
-                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="add">Add</option>
-                          <option value="subtract">Subtract</option>
-                          <option value="multiply">Multiply</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Feather: {mask.feather}</label>
-                        <input 
-                          type="range" id="feather-mask-feather" name="feather-mask-feather" 
-                          min="0" 
-                          max="100"
-                          value={mask.feather}
-                          onChange={(e) => updateMask(mask.id, { feather: parseInt(e.target.value) })}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-
-                    {mask.type === 'circle' && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Center X</label>
-                          <input 
-                            type="number" id="center-x" name="center-x" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.center?.x || 0.5}
-                            onChange={(e) => updateMask(mask.id, { center: { ...mask.center, x: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Center Y</label>
-                          <input 
-                            type="number" id="center-y" name="center-y" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.center?.y || 0.5}
-                            onChange={(e) => updateMask(mask.id, { center: { x: mask.center?.x || 0.5, y: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Radius</label>
-                          <input 
-                            type="number" id="radius-1" name="radius-1" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.radius || 0.3}
-                            onChange={(e) => updateMask(mask.id, { radius: parseFloat(e.target.value) })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {mask.type === 'rectangle' && mask.rect && (
-                      <div className="grid grid-cols-4 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">X</label>
-                          <input 
-                            type="number" id="x" name="x" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.x}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, x: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Y</label>
-                          <input 
-                            type="number" id="y" name="y" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.y}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, y: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Width</label>
-                          <input 
-                            type="number" id="width" name="width" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.width}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, width: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Height</label>
-                          <input 
-                            type="number" id="height-1" name="height-1" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.height}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, height: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-3">
-                      <label className="flex items-center gap-2 text-sm text-gray-300">
-                        <input 
-                          type="checkbox" id="checkbox-field-4195" name="checkbox-field-4195" 
-                          checked={mask.inverted}
-                          onChange={(e) => updateMask(mask.id, { inverted: e.target.checked })}
-                          className="rounded"
-                        />
-                        Invert Mask
-                      </label>
-                    </div>
-                  </div>
-                ))}
-
-                {masks.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    No masks yet. Click a mask type button to create one.
-                  </div>
-                )}
-              </div>
-
-              {/* Mask Reveal Keyframes */}
-              <div className="mt-6">
-                <h4 className="text-md font-bold text-cyan-400 mb-3">Mask Reveal Keyframes</h4>
-                <div className="space-y-2">
-                  {maskRevealKeyframes.map(kf => {
-                    const mask = masks.find(m => m.id === kf.maskId);
-                    return (
-                      <div key={kf.id} className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
-                          <span className="text-white text-sm">{mask?.name || 'Unknown Mask'}</span>
-                          <span className="text-gray-400 text-xs">({kf.animation})</span>
-                        </div>
-                        <button 
-                          onClick={() => deleteMaskRevealKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {maskRevealKeyframes.length === 0 && (
-                    <div className="text-center text-gray-500 py-4 text-sm">
-                      No reveal keyframes. Select a mask and click "+ Keyframe".
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -8224,7 +8345,7 @@ export default function ThreeDVisualizer() {
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">3</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Keyframes</span>
+                      <span className="text-gray-300">Switch to Camera Rig</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">4</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
@@ -8232,24 +8353,20 @@ export default function ThreeDVisualizer() {
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">5</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Post-FX</span>
+                      <span className="text-gray-300">Switch to Environments</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">6</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Presets</span>
+                      <span className="text-gray-300">Switch to Post-FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">7</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <span className="text-gray-300">Switch to Presets</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">8</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Masks</span>
+                      <span className="text-gray-300">Switch to Text Animator</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">9</kbd>
-                    </div>
-                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Rig</span>
-                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">0</kbd>
                     </div>
                   </div>
                 </div>
