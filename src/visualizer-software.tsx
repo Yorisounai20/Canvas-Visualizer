@@ -1244,7 +1244,7 @@ export default function ThreeDVisualizer() {
       const pathLineGeometry = new THREE.BufferGeometry();
       const pathLine = new THREE.Line(
         pathLineGeometry,
-        new THREE.LineBasicMaterial({ color: pathColor, opacity: 0.8, transparent: true, linewidth: 2 })
+        new THREE.LineBasicMaterial({ color: pathColor, opacity: 0.8, transparent: true })
       );
       pathLine.visible = false;
       sceneRef.current.add(pathLine);
@@ -1434,9 +1434,7 @@ export default function ThreeDVisualizer() {
   const getRigPathColor = (rigType: string): number => {
     switch (rigType) {
       case 'orbit': return 0x00ffff; // cyan
-      case 'rotation': return 0xff8800; // orange
       case 'dolly': return 0x00ff00; // green
-      case 'pan': return 0xffff00; // yellow
       case 'crane': return 0xff00ff; // magenta
       case 'custom': return 0xffffff; // white
       default: return 0x888888; // gray
@@ -1455,8 +1453,8 @@ export default function ThreeDVisualizer() {
     const startTime = 0;
     const endTime = duration > 0 ? duration : (rigKeyframes.length > 0 ? rigKeyframes[rigKeyframes.length - 1].time + 5 : 10);
     
-    // Sample path points (max 60 samples for performance)
-    const sampleCount = Math.min(60, Math.ceil((endTime - startTime) / 0.1));
+    // Sample path points (max 60 samples for performance, min 2 for valid path)
+    const sampleCount = Math.max(2, Math.min(60, Math.ceil((endTime - startTime) / 0.1)));
     const pathPoints: THREE.Vector3[] = [];
     
     for (let i = 0; i <= sampleCount; i++) {
@@ -1467,8 +1465,9 @@ export default function ThreeDVisualizer() {
     
     // Update path line
     if (pathObjects.pathLine && pathPoints.length > 1) {
-      pathObjects.pathLine.geometry.setFromPoints(pathPoints);
-      pathObjects.pathLine.geometry.attributes.position.needsUpdate = true;
+      // Dispose old geometry to prevent memory leaks
+      pathObjects.pathLine.geometry.dispose();
+      pathObjects.pathLine.geometry = new THREE.BufferGeometry().setFromPoints(pathPoints);
     }
     
     // Update keyframe markers
