@@ -298,6 +298,7 @@ export default function ThreeDVisualizer() {
   const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [parameterSettingsExpanded, setParameterSettingsExpanded] = useState(false); // Collapsible settings
   
   // PHASE 4: Active parameter effect values (stored in refs for performance)
   const activeBackgroundFlashRef = useRef(0);
@@ -319,6 +320,20 @@ export default function ThreeDVisualizer() {
     { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
   ]);
   
+  // NEW: Preset switching keyframes (timeline-based)
+  const [presetKeyframes, setPresetKeyframes] = useState<Array<{
+    id: number;
+    time: number;
+    preset: string; // animation type (orbit, explosion, chill, etc.)
+  }>>([
+    { id: 1, time: 0, preset: 'orbit' },
+    { id: 2, time: 20, preset: 'explosion' },
+    { id: 3, time: 40, preset: 'chill' }
+  ]);
+  const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
+  const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
+  
+  // Legacy sections system (kept for backward compatibility with existing code)
   const [sections, setSections] = useState([
     { id: 1, start: 0, end: 20, animation: 'orbit' },
     { id: 2, start: 20, end: 40, animation: 'explosion' },
@@ -551,6 +566,19 @@ export default function ThreeDVisualizer() {
   };
 
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
+  
+  // Get current preset from keyframes (finds the most recent keyframe before current time)
+  const getCurrentPreset = () => {
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    // Find the last keyframe that's at or before current time
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (currentTime >= sorted[i].time) {
+        return sorted[i].preset;
+      }
+    }
+    // If before all keyframes, return first preset or 'orbit' as default
+    return sorted.length > 0 ? sorted[0].preset : 'orbit';
+  };
 
   const addSection = () => {
     const last = sections[sections.length-1];
@@ -566,6 +594,29 @@ export default function ThreeDVisualizer() {
 
   const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
   const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+  
+  // Preset keyframe handlers
+  const handleAddPresetKeyframe = () => {
+    const newKeyframe = {
+      id: nextPresetKeyframeId.current++,
+      time: currentTime,
+      preset: 'orbit' // Default preset
+    };
+    setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeletePresetKeyframe = (id: number) => {
+    // Keep at least one keyframe
+    if (presetKeyframes.length > 1) {
+      setPresetKeyframes(presetKeyframes.filter(kf => kf.id !== id));
+    }
+  };
+  
+  const handleUpdatePresetKeyframe = (id: number, field: string, value: any) => {
+    setPresetKeyframes(presetKeyframes.map(kf => 
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time)); // Re-sort after time update
+  };
 
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
