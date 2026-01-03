@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown } from 'lucide-react';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -194,6 +194,7 @@ export default function ThreeDVisualizer() {
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
+  const [letterboxSettingsExpanded, setLetterboxSettingsExpanded] = useState(false); // Collapsible settings
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
@@ -5824,7 +5825,18 @@ export default function ThreeDVisualizer() {
                 {showLetterbox && letterboxKeyframes.length > 0 && (
                   <div className="mt-4 bg-gray-800 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-300">Timeline</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setLetterboxSettingsExpanded(!letterboxSettingsExpanded)}
+                          className="text-gray-300 hover:text-white transition-colors"
+                        >
+                          <ChevronDown 
+                            size={16} 
+                            className={`transition-transform ${letterboxSettingsExpanded ? '' : '-rotate-90'}`}
+                          />
+                        </button>
+                        <span className="text-xs font-semibold text-gray-300">Timeline</span>
+                      </div>
                       <span className="text-xs text-gray-400">{formatTime(duration)}</span>
                     </div>
                     
@@ -5856,8 +5868,9 @@ export default function ThreeDVisualizer() {
                       ))}
                     </div>
 
-                    {/* Keyframe List */}
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {/* Collapsible Keyframe List */}
+                    {letterboxSettingsExpanded && (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
                       {letterboxKeyframes.map((keyframe, index) => (
                         <div key={keyframe.id || index} className="bg-gray-900 rounded p-3">
                           <div className="flex items-center justify-between mb-2">
@@ -5971,6 +5984,7 @@ export default function ThreeDVisualizer() {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 )}
               </div>
