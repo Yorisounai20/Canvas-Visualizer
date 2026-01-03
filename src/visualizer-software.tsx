@@ -354,6 +354,28 @@ export default function ThreeDVisualizer() {
   const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
   const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
   
+  // Camera Rig Transitions (UI controls only - transition state for future enhancement)
+  const [rigTransitionDuration, setRigTransitionDuration] = useState(1.0); // seconds
+  const [rigTransitionEasing, setRigTransitionEasing] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
+  const [enableRigTransitions, setEnableRigTransitions] = useState(true);
+  
+  // Framing Controls
+  const [lookAtOffsetX, setLookAtOffsetX] = useState(0); // -10 to 10
+  const [lookAtOffsetY, setLookAtOffsetY] = useState(0); // -10 to 10
+  const [enableFramingLock, setEnableFramingLock] = useState(false);
+  const [enableRuleOfThirds, setEnableRuleOfThirds] = useState(false);
+  
+  // Camera FX Layer
+  const [cameraShakeIntensity, setCameraShakeIntensity] = useState(1.0); // multiplier for existing shake
+  const [cameraShakeFrequency, setCameraShakeFrequency] = useState(50); // Hz
+  const [enableHandheldDrift, setEnableHandheldDrift] = useState(false);
+  const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
+  const [enableFovRamping, setEnableFovRamping] = useState(false);
+  const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
+  
+  // Shot Presets
+  const [selectedShotPreset, setSelectedShotPreset] = useState<string | null>(null);
+  
   // PHASE 5: UI state for Phase 5 features
   const [showTextAnimatorPanel, setShowTextAnimatorPanel] = useState(false);
   const [showMaskPanel, setShowMaskPanel] = useState(false);
@@ -1568,6 +1590,105 @@ export default function ThreeDVisualizer() {
     });
   };
 
+  // Shot Presets - predefined camera rig configurations
+  const shotPresets = {
+    'closeup': {
+      name: 'Close-Up',
+      description: 'Tight frame on subject',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        position: { x: 0, y: 0, z: 8 },
+        orbitRadius: rig.type === 'orbit' ? 8 : rig.orbitRadius,
+        rotationDistance: rig.type === 'rotation' ? 8 : rig.rotationDistance,
+        zoomMinDistance: rig.type === 'zoom' ? 5 : rig.zoomMinDistance,
+        zoomMaxDistance: rig.type === 'zoom' ? 12 : rig.zoomMaxDistance,
+      })
+    },
+    'wide': {
+      name: 'Wide Shot',
+      description: 'Establish scene context',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        position: { x: 0, y: 5, z: 30 },
+        orbitRadius: rig.type === 'orbit' ? 30 : rig.orbitRadius,
+        rotationDistance: rig.type === 'rotation' ? 30 : rig.rotationDistance,
+        zoomMinDistance: rig.type === 'zoom' ? 25 : rig.zoomMinDistance,
+        zoomMaxDistance: rig.type === 'zoom' ? 40 : rig.zoomMaxDistance,
+      })
+    },
+    'overhead': {
+      name: 'Overhead',
+      description: 'Bird\'s eye view',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        position: { x: 0, y: 20, z: 0 },
+        rotation: { x: -Math.PI / 2, y: 0, z: 0 },
+        craneHeight: rig.type === 'crane' ? 20 : rig.craneHeight,
+        craneTilt: rig.type === 'crane' ? -Math.PI / 2 : rig.craneTilt,
+      })
+    },
+    'lowAngle': {
+      name: 'Low Angle',
+      description: 'Dramatic upward view',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        position: { x: 0, y: -5, z: 15 },
+        rotation: { x: 0.3, y: 0, z: 0 },
+        craneHeight: rig.type === 'crane' ? -5 : rig.craneHeight,
+        craneTilt: rig.type === 'crane' ? 0.3 : rig.craneTilt,
+      })
+    },
+    'dutch': {
+      name: 'Dutch Angle',
+      description: 'Tilted perspective',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        rotation: { ...rig.rotation, z: 0.3 }, // ~17 degrees tilt
+      })
+    },
+    'tracking': {
+      name: 'Tracking',
+      description: 'Follow subject smoothly',
+      applyToRig: (rig: any) => ({
+        ...rig,
+        dollySpeed: rig.type === 'dolly' ? 1.5 : rig.dollySpeed,
+        rotationSpeed: rig.type === 'rotation' ? 0.5 : rig.rotationSpeed,
+        orbitSpeed: rig.type === 'orbit' ? 0.3 : rig.orbitSpeed,
+      })
+    }
+  };
+
+  const applyShotPreset = (presetKey: string) => {
+    const preset = shotPresets[presetKey as keyof typeof shotPresets];
+    if (!preset) return;
+
+    // Apply preset to all active rigs
+    activeCameraRigIds.forEach(rigId => {
+      const rig = cameraRigs.find(r => r.id === rigId);
+      if (rig) {
+        const updatedRig = preset.applyToRig(rig);
+        updateCameraRig(rigId, updatedRig);
+      }
+    });
+
+    setSelectedShotPreset(presetKey);
+    addLog(`Applied shot preset: ${preset.name}`, 'success');
+  };
+
+  // Handheld drift noise function (simplified Perlin noise using sine waves)
+  const getHandheldNoise = (time: number, axis: number) => {
+    // Use multiple sine waves at different frequencies for organic motion
+    const freq1 = 0.5 + axis * 0.1;
+    const freq2 = 1.2 + axis * 0.15;
+    const freq3 = 2.3 + axis * 0.2;
+    
+    return (
+      Math.sin(time * freq1) * 0.5 +
+      Math.sin(time * freq2) * 0.3 +
+      Math.sin(time * freq3) * 0.2
+    );
+  };
+
   // Scene initialization - runs once on mount
   useEffect(() => {
     if (!containerRef.current) return;
@@ -2346,8 +2467,8 @@ export default function ThreeDVisualizer() {
         if (timeSinceShake >= 0 && timeSinceShake < shake.duration) {
           const progress = timeSinceShake / shake.duration;
           const decay = 1 - progress; // Linear decay
-          const frequency = 50; // Shake frequency
-          const amplitude = shake.intensity * decay;
+          const frequency = cameraShakeFrequency; // Use configurable frequency
+          const amplitude = shake.intensity * decay * cameraShakeIntensity; // Apply intensity multiplier
           shakeX += Math.sin(timeSinceShake * frequency) * amplitude * 0.1;
           shakeY += Math.cos(timeSinceShake * frequency * 1.3) * amplitude * 0.1;
           shakeZ += Math.sin(timeSinceShake * frequency * 0.7) * amplitude * 0.05;
@@ -4335,11 +4456,60 @@ export default function ThreeDVisualizer() {
           // Apply rig rotation to camera offset
           rigCameraOffset.applyEuler(combinedNullObject.rotation);
           
+          // Calculate base camera position from rig
+          let finalCameraPosition = rigWorldPos.clone().add(rigCameraOffset);
+          
+          // Apply Camera FX Layer
+          // 1. Handheld drift using noise
+          if (enableHandheldDrift) {
+            const noiseX = getHandheldNoise(t, 0) * handheldDriftIntensity;
+            const noiseY = getHandheldNoise(t, 1) * handheldDriftIntensity;
+            const noiseZ = getHandheldNoise(t, 2) * handheldDriftIntensity * 0.5; // Reduce Z drift
+            
+            finalCameraPosition.x += noiseX;
+            finalCameraPosition.y += noiseY;
+            finalCameraPosition.z += noiseZ;
+          }
+          
+          // 2. FOV ramping during movement (based on velocity)
+          if (enableFovRamping && cameraRef.current) {
+            // Calculate velocity (simplified - based on distance from default)
+            const distFromDefault = Math.abs(activeCameraDistance - DEFAULT_CAMERA_DISTANCE);
+            const velocityFactor = Math.min(distFromDefault / 20, 1);
+            const fovAdjustment = velocityFactor * fovRampAmount;
+            cameraRef.current.fov = 75 + fovAdjustment;
+            cameraRef.current.updateProjectionMatrix();
+          } else if (cameraRef.current) {
+            // Reset FOV to default
+            if (cameraRef.current.fov !== 75) {
+              cameraRef.current.fov = 75;
+              cameraRef.current.updateProjectionMatrix();
+            }
+          }
+          
           // Only override camera position if rigs are active
           // (this overrides the preset camera positioning)
-          cam.position.copy(rigWorldPos.add(rigCameraOffset));
-          // Camera should always look at scene center, not the rig position
-          cam.lookAt(0, 0, 0);
+          cam.position.copy(finalCameraPosition);
+          
+          // Framing controls - adjust look-at target
+          let lookAtTarget = new THREE.Vector3(0, 0, 0);
+          
+          if (enableFramingLock || lookAtOffsetX !== 0 || lookAtOffsetY !== 0) {
+            // Apply look-at offset
+            lookAtTarget.x += lookAtOffsetX;
+            lookAtTarget.y += lookAtOffsetY;
+            
+            // Rule of thirds bias - shift look-at slightly off-center
+            if (enableRuleOfThirds) {
+              // Offset by 1/3 of viewport for rule of thirds composition
+              const viewportWidth = 20; // Approximate scene width
+              const viewportHeight = 15; // Approximate scene height
+              lookAtTarget.x += (viewportWidth / 6) * Math.sin(t * 0.5); // Subtle oscillation
+              lookAtTarget.y += (viewportHeight / 6) * Math.cos(t * 0.3);
+            }
+          }
+          
+          cam.lookAt(lookAtTarget);
         }
       }
 
@@ -6521,6 +6691,216 @@ export default function ThreeDVisualizer() {
                   Crane=<span className="text-purple-400">Magenta</span>, 
                   Custom=<span className="text-white">White</span>
                 </p>
+              </div>
+
+              {/* Rig Transitions */}
+              <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-semibold text-cyan-400 mb-3">🔄 Rig Transitions</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="enableRigTransitions" 
+                      checked={enableRigTransitions} 
+                      onChange={(e) => setEnableRigTransitions(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="enableRigTransitions" className="text-sm text-white cursor-pointer">
+                      Enable Smooth Transitions
+                    </label>
+                  </div>
+                  {enableRigTransitions && (
+                    <div className="ml-6 space-y-3 border-l-2 border-cyan-500 pl-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Duration: {rigTransitionDuration.toFixed(1)}s</label>
+                        <input 
+                          type="range" 
+                          min="0.1" 
+                          max="5" 
+                          step="0.1" 
+                          value={rigTransitionDuration} 
+                          onChange={(e) => setRigTransitionDuration(parseFloat(e.target.value))} 
+                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Easing</label>
+                        <select 
+                          value={rigTransitionEasing}
+                          onChange={(e) => setRigTransitionEasing(e.target.value as any)}
+                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        >
+                          <option value="linear">Linear</option>
+                          <option value="easeIn">Ease In</option>
+                          <option value="easeOut">Ease Out</option>
+                          <option value="easeInOut">Ease In-Out</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Framing Controls */}
+              <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-semibold text-cyan-400 mb-3">🎯 Framing Controls</h4>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Look-At Offset X: {lookAtOffsetX.toFixed(1)}</label>
+                      <input 
+                        type="range" 
+                        min="-10" 
+                        max="10" 
+                        step="0.5" 
+                        value={lookAtOffsetX} 
+                        onChange={(e) => setLookAtOffsetX(parseFloat(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Look-At Offset Y: {lookAtOffsetY.toFixed(1)}</label>
+                      <input 
+                        type="range" 
+                        min="-10" 
+                        max="10" 
+                        step="0.5" 
+                        value={lookAtOffsetY} 
+                        onChange={(e) => setLookAtOffsetY(parseFloat(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="enableFramingLock" 
+                      checked={enableFramingLock} 
+                      onChange={(e) => setEnableFramingLock(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="enableFramingLock" className="text-sm text-white cursor-pointer">
+                      Framing Lock (keep subject centered)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="enableRuleOfThirds" 
+                      checked={enableRuleOfThirds} 
+                      onChange={(e) => setEnableRuleOfThirds(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="enableRuleOfThirds" className="text-sm text-white cursor-pointer">
+                      Rule of Thirds Bias
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Camera FX Layer */}
+              <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-semibold text-cyan-400 mb-3">✨ Camera FX Layer</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Shake Intensity: {cameraShakeIntensity.toFixed(1)}x</label>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="3" 
+                      step="0.1" 
+                      value={cameraShakeIntensity} 
+                      onChange={(e) => setCameraShakeIntensity(parseFloat(e.target.value))} 
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Shake Frequency: {cameraShakeFrequency}Hz</label>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      step="5" 
+                      value={cameraShakeFrequency} 
+                      onChange={(e) => setCameraShakeFrequency(parseInt(e.target.value))} 
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                    />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="enableHandheldDrift" 
+                      checked={enableHandheldDrift} 
+                      onChange={(e) => setEnableHandheldDrift(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="enableHandheldDrift" className="text-sm text-white cursor-pointer">
+                      Handheld Drift
+                    </label>
+                  </div>
+                  {enableHandheldDrift && (
+                    <div className="ml-6 border-l-2 border-cyan-500 pl-3">
+                      <label className="text-xs text-gray-400 block mb-1">Drift Intensity: {handheldDriftIntensity.toFixed(2)}</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="1" 
+                        step="0.05" 
+                        value={handheldDriftIntensity} 
+                        onChange={(e) => setHandheldDriftIntensity(parseFloat(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="enableFovRamping" 
+                      checked={enableFovRamping} 
+                      onChange={(e) => setEnableFovRamping(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="enableFovRamping" className="text-sm text-white cursor-pointer">
+                      FOV Ramping (motion blur effect)
+                    </label>
+                  </div>
+                  {enableFovRamping && (
+                    <div className="ml-6 border-l-2 border-cyan-500 pl-3">
+                      <label className="text-xs text-gray-400 block mb-1">FOV Ramp Amount: {fovRampAmount}°</label>
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="20" 
+                        step="1" 
+                        value={fovRampAmount} 
+                        onChange={(e) => setFovRampAmount(parseInt(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Shot Presets */}
+              <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-semibold text-cyan-400 mb-3">📷 Shot Presets</h4>
+                <p className="text-xs text-gray-400 mb-3">Apply cinematic presets to active rigs</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(shotPresets).map(([key, preset]) => (
+                    <button
+                      key={key}
+                      onClick={() => applyShotPreset(key)}
+                      className={`text-xs px-3 py-2 rounded transition-colors ${
+                        selectedShotPreset === key 
+                          ? 'bg-purple-600 text-white' 
+                          : 'bg-gray-600 hover:bg-gray-500 text-gray-200'
+                      }`}
+                      title={preset.description}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Camera Rigs List */}
