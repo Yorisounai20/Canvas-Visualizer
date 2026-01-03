@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import VisualizerEditor from './VisualizerEditor';
-import ThreeDVisualizer from './visualizer-software';
+import { useState, lazy, Suspense } from 'react';
 import NewProjectModal from './components/Modals/NewProjectModal';
 import MainDashboard from './components/Dashboard/MainDashboard';
 import { ProjectSettings } from './types';
+
+// Lazy load the large visualizer components for code splitting
+const VisualizerEditor = lazy(() => import('./VisualizerEditor'));
+const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
 
 /**
  * App Component
@@ -46,7 +48,11 @@ function App() {
 
   // Step 2a: Software mode - directly show the simple visualizer
   if (selectedMode === 'software') {
-    return <ThreeDVisualizer />;
+    return (
+      <Suspense fallback={<div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div>}>
+        <ThreeDVisualizer />
+      </Suspense>
+    );
   }
 
   // Step 2b: Editor mode - show project modal first
@@ -56,10 +62,12 @@ function App() {
 
   // Step 3: Show the editor with project settings
   return (
-    <VisualizerEditor 
-      projectSettings={projectSettings}
-      initialAudioFile={initialAudioFile}
-    />
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div>}>
+      <VisualizerEditor 
+        projectSettings={projectSettings}
+        initialAudioFile={initialAudioFile}
+      />
+    </Suspense>
   );
 }
 
