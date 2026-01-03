@@ -3107,11 +3107,9 @@ export default function ThreeDVisualizer() {
         // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
         // Constants for shark anatomy
         const TAIL_SEGMENT_COUNT = 2;
-        const HAMMER_TETRA_COUNT = 8;
-        const HAMMER_BAR_TETRA_COUNT = 6;
-        const FIN_TETRA_START = 8;
-        const FIN_TETRA_END = 12;
-        const BUBBLE_COUNT = 15;
+        const HAMMER_TETRA_COUNT = 3; // Reduced from 8 for simpler, clearer head
+        const DORSAL_FIN_INDEX = 3;
+        const TAIL_FIN_INDEX = 4;
         
         const swimSpeed = elScaled * 0.8;
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
@@ -3124,7 +3122,7 @@ export default function ThreeDVisualizer() {
         );
         cam.lookAt(0, 0, -5);
         
-        // Shark body using cubes - serpentine swimming motion
+        // Shark body using cubes - serpentine swimming motion with LARGER SIZES
         obj.cubes.forEach((c, i) => {
           const progress = i / obj.cubes.length;
           const isHead = i === 0;
@@ -3138,21 +3136,21 @@ export default function ThreeDVisualizer() {
           
           c.position.set(x, y, z);
           
-          // Scale: larger head, medium body, thin tail
+          // Scale: MUCH LARGER for prominence
           let scaleX, scaleY, scaleZ;
           if (isHead) {
-            scaleX = 2 + f.bass * 0.5;
-            scaleY = 1.5 + f.bass * 0.3;
-            scaleZ = 2 + f.bass * 0.5;
+            scaleX = 3.5 + f.bass * 0.8; // Increased from 2
+            scaleY = 2.5 + f.bass * 0.5; // Increased from 1.5
+            scaleZ = 3.5 + f.bass * 0.8; // Increased from 2
           } else if (isTail) {
             const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
-            scaleX = 0.8 - tailProgress * 0.5;
-            scaleY = 0.6 - tailProgress * 0.4;
-            scaleZ = 1.2 + f.bass * 0.3;
+            scaleX = 1.5 - tailProgress * 0.7; // Increased from 0.8
+            scaleY = 1.2 - tailProgress * 0.6; // Increased from 0.6
+            scaleZ = 2 + f.bass * 0.5; // Increased from 1.2
           } else {
-            scaleX = 1.5;
-            scaleY = 1.2;
-            scaleZ = 1.8;
+            scaleX = 2.5; // Increased from 1.5
+            scaleY = 2; // Increased from 1.2
+            scaleZ = 3; // Increased from 1.8
           }
           c.scale.set(scaleX, scaleY, scaleZ);
           
@@ -3169,126 +3167,126 @@ export default function ThreeDVisualizer() {
           c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
           
           c.material.color.setStyle(bassColor);
-          c.material.opacity = (0.85 + f.bass * 0.15) * blend;
+          c.material.opacity = (0.9 + f.bass * 0.1) * blend; // Increased opacity
           c.material.wireframe = false;
         });
         
-        // Hammerhead shape using tetras - distinctive T-shaped head
+        // Simplified hammerhead shape - MUCH MORE PROMINENT
         const head = obj.cubes[0];
         obj.tetras.slice(0, HAMMER_TETRA_COUNT).forEach((hammer, i) => {
-          if (i < HAMMER_BAR_TETRA_COUNT) {
-            // Horizontal hammer bar (6 tetras spread across)
-            const hammerWidth = 7;
-            const hammerPosition = (i / 5 - 0.5) * hammerWidth;
-            hammer.position.x = head.position.x + hammerPosition;
-            hammer.position.y = head.position.y + 0.3;
-            hammer.position.z = head.position.z + 2;
+          if (i === 0) {
+            // Single large horizontal hammer bar - LEFT SIDE
+            hammer.position.x = head.position.x - 5; // Left side of head
+            hammer.position.y = head.position.y + 0.5;
+            hammer.position.z = head.position.z + 3;
             hammer.rotation.x = 0;
             hammer.rotation.y = head.rotation.y;
             hammer.rotation.z = Math.PI / 2;
-            const hammerSize = 0.8 + f.highs * 0.3;
-            hammer.scale.set(hammerSize, hammerSize * 0.4, hammerSize * 1.5);
+            const hammerSize = 3.5 + f.highs * 0.5; // MUCH LARGER
+            hammer.scale.set(hammerSize, hammerSize * 0.6, hammerSize * 2);
             hammer.material.color.setStyle(highsColor);
-            hammer.material.opacity = (0.9 + f.highs * 0.1) * blend;
+            hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
+            hammer.material.wireframe = false;
+          } else if (i === 1) {
+            // Single large horizontal hammer bar - RIGHT SIDE
+            hammer.position.x = head.position.x + 5; // Right side of head
+            hammer.position.y = head.position.y + 0.5;
+            hammer.position.z = head.position.z + 3;
+            hammer.rotation.x = 0;
+            hammer.rotation.y = head.rotation.y;
+            hammer.rotation.z = Math.PI / 2;
+            const hammerSize = 3.5 + f.highs * 0.5; // MUCH LARGER
+            hammer.scale.set(hammerSize, hammerSize * 0.6, hammerSize * 2);
+            hammer.material.color.setStyle(highsColor);
+            hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
             hammer.material.wireframe = false;
           } else {
-            // Eyes on ends of hammer (2 tetras)
-            const side = i === 6 ? 1 : -1;
-            const hammerWidth = 3.5;
-            hammer.position.x = head.position.x + side * hammerWidth;
+            // Center connecting bar
+            hammer.position.x = head.position.x;
             hammer.position.y = head.position.y + 0.5;
-            hammer.position.z = head.position.z + 2.2;
-            hammer.rotation.copy(head.rotation);
-            const eyeSize = 0.5 + f.highs * 0.2;
-            hammer.scale.set(eyeSize, eyeSize, eyeSize * 0.6);
-            hammer.material.color.setStyle('#ffffff');
+            hammer.position.z = head.position.z + 3;
+            hammer.rotation.x = 0;
+            hammer.rotation.y = head.rotation.y;
+            hammer.rotation.z = Math.PI / 2;
+            const hammerSize = 2.5 + f.highs * 0.4;
+            hammer.scale.set(hammerSize, hammerSize * 0.5, hammerSize * 1.5);
+            hammer.material.color.setStyle(highsColor);
             hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
             hammer.material.wireframe = false;
           }
         });
         
-        // Dorsal fin and side fins using remaining tetras
-        obj.tetras.slice(FIN_TETRA_START, FIN_TETRA_END).forEach((fin, i) => {
-          const bodySegment = Math.floor(obj.cubes.length * 0.3); // Fins near front
-          const body = obj.cubes[bodySegment];
-          
-          if (i === 0) {
-            // Dorsal fin (top)
-            fin.position.x = body.position.x;
-            fin.position.y = body.position.y + 2.5 + f.mids * 0.5;
-            fin.position.z = body.position.z;
-            fin.rotation.x = -Math.PI / 6;
-            fin.rotation.y = body.rotation.y;
-            const finSize = 1.8 + f.mids * 0.3;
-            fin.scale.set(finSize * 0.3, finSize, finSize * 0.5);
-          } else {
-            // Pectoral fins (sides)
-            const side = i % 2 === 0 ? 1 : -1;
-            const finAngle = side * Math.PI / 3 + Math.sin(swimSpeed * 2) * 0.3;
-            fin.position.x = body.position.x + Math.cos(finAngle) * 2;
-            fin.position.y = body.position.y - 0.5 + Math.sin(swimSpeed * 2 + i) * 0.3;
-            fin.position.z = body.position.z + 1;
-            fin.rotation.x = -Math.PI / 4;
-            fin.rotation.y = body.rotation.y + finAngle;
-            fin.rotation.z = side * Math.PI / 6 + Math.sin(swimSpeed * 2 + i) * 0.2;
-            const pectSize = 1.2 + f.mids * 0.2;
-            fin.scale.set(pectSize * 0.4, pectSize * 1.2, pectSize * 0.3);
-          }
-          
-          fin.material.color.setStyle(midsColor);
-          fin.material.opacity = (0.8 + f.mids * 0.2) * blend;
-          fin.material.wireframe = false;
+        // Prominent dorsal fin
+        const dorsalFin = obj.tetras[DORSAL_FIN_INDEX];
+        const bodySegment = Math.floor(obj.cubes.length * 0.3);
+        const body = obj.cubes[bodySegment];
+        dorsalFin.position.x = body.position.x;
+        dorsalFin.position.y = body.position.y + 4 + f.mids * 0.8; // MUCH TALLER
+        dorsalFin.position.z = body.position.z;
+        dorsalFin.rotation.x = -Math.PI / 6;
+        dorsalFin.rotation.y = body.rotation.y;
+        dorsalFin.rotation.z = 0;
+        const finSize = 3.5 + f.mids * 0.5; // MUCH LARGER
+        dorsalFin.scale.set(finSize * 0.4, finSize, finSize * 0.6);
+        dorsalFin.material.color.setStyle(midsColor);
+        dorsalFin.material.opacity = (0.9 + f.mids * 0.1) * blend;
+        dorsalFin.material.wireframe = false;
+        
+        // Prominent tail fin
+        const tailFin = obj.tetras[TAIL_FIN_INDEX];
+        const tail = obj.cubes[obj.cubes.length - 1];
+        tailFin.position.x = tail.position.x;
+        tailFin.position.y = tail.position.y;
+        tailFin.position.z = tail.position.z - 2.5;
+        tailFin.rotation.x = Math.PI / 2 + Math.sin(swimSpeed * 3) * 0.3; // Animated tail movement
+        tailFin.rotation.y = tail.rotation.y;
+        tailFin.rotation.z = 0;
+        const tailSize = 3 + f.bass * 0.6; // LARGER
+        tailFin.scale.set(tailSize * 0.5, tailSize, tailSize * 0.4);
+        tailFin.material.color.setStyle(midsColor);
+        tailFin.material.opacity = (0.9 + f.bass * 0.1) * blend;
+        tailFin.material.wireframe = false;
+        
+        // Hide remaining tetras
+        obj.tetras.slice(5).forEach(t => {
+          t.position.set(0, -1000, 0);
+          t.scale.set(0.001, 0.001, 0.001);
+          t.material.opacity = 0;
         });
         
-        // Ocean environment - bubbles and particles using octas
+        // Minimal bubbles for atmosphere - only 5 bubbles total
         obj.octas.forEach((bubble, i) => {
-          if (i < BUBBLE_COUNT) {
-            // Rising bubbles
-            const bubbleSpeed = 0.5 + (i % 3) * 0.2;
-            const riseHeight = (elScaled * bubbleSpeed + i) % 20;
-            const xOffset = Math.sin(i * 2) * 8;
-            const zOffset = -5 - (i % 5) * 3;
+          if (i < 5) {
+            // Sparse rising bubbles
+            const bubbleSpeed = 0.5 + (i % 2) * 0.2;
+            const riseHeight = (elScaled * bubbleSpeed + i * 4) % 25;
+            const xOffset = Math.sin(i * 3) * 10;
+            const zOffset = -8 - i * 4;
             
-            bubble.position.x = xOffset + Math.sin(el + i) * 2;
-            bubble.position.y = riseHeight - 10 + Math.sin(elScaled * 2 + i) * 0.5;
+            bubble.position.x = xOffset;
+            bubble.position.y = riseHeight - 12;
             bubble.position.z = zOffset;
             
-            const bubbleSize = 0.3 + f.highs * 0.2;
+            const bubbleSize = 0.4 + f.highs * 0.2;
             bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
             bubble.rotation.x += 0.05;
             bubble.rotation.y += 0.03;
             
             bubble.material.color.setStyle(highsColor);
-            bubble.material.opacity = (0.4 + f.highs * 0.3) * blend;
+            bubble.material.opacity = (0.3 + f.highs * 0.2) * blend; // More subtle
             bubble.material.wireframe = true;
           } else {
-            // Ocean floor rocks/coral
-            const rockIndex = i - 15;
-            const rockX = (rockIndex % 5 - 2) * 6 + Math.sin(rockIndex) * 2;
-            const rockZ = -Math.floor(rockIndex / 5) * 4 - 10;
-            
-            bubble.position.x = rockX;
-            bubble.position.y = -6 + Math.sin(rockIndex * 3) * 0.5 + f.bass * 0.3;
-            bubble.position.z = rockZ;
-            
-            const rockSize = 1 + (rockIndex % 3) * 0.5 + f.bass * 0.2;
-            bubble.scale.set(rockSize, rockSize * 0.8, rockSize);
-            bubble.rotation.y = rockIndex * 0.8;
-            
-            bubble.material.color.setStyle(midsColor);
-            bubble.material.opacity = (0.5 + f.mids * 0.2) * blend;
-            bubble.material.wireframe = true;
+            // Hide the rest
+            bubble.position.set(0, -1000, 0);
+            bubble.scale.set(0.001, 0.001, 0.001);
+            bubble.material.opacity = 0;
           }
         });
         
-        // Use sphere as distant light source (sun)
-        obj.sphere.position.set(10, 15, -30);
-        const sunSize = 8 + f.bass * 2;
-        obj.sphere.scale.set(sunSize, sunSize, sunSize);
-        obj.sphere.rotation.y += 0.005;
-        obj.sphere.material.color.setStyle('#ffeb99');
-        obj.sphere.material.opacity = (0.3 + f.bass * 0.1) * blend;
-        obj.sphere.material.wireframe = false;
+        // Hide sphere completely - no background distractions
+        obj.sphere.position.set(0, -1000, 0);
+        obj.sphere.scale.set(0.001, 0.001, 0.001);
+        obj.sphere.material.opacity = 0;
       } else if (type === 'kaleidoscope') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
