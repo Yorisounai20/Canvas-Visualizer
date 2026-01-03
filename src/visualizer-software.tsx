@@ -5366,6 +5366,12 @@ export default function ThreeDVisualizer() {
             ✨ Effects
           </button>
           <button 
+            onClick={() => setActiveTab('environments')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'environments' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🌍 Environments
+          </button>
+          <button 
             onClick={() => setActiveTab('postfx')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -6402,8 +6408,13 @@ export default function ThreeDVisualizer() {
               </div>
             </div>
             
-            {/* Environment System Timeline */}
-            <div className="mt-4 bg-gray-700 rounded-lg p-3">
+          </div>
+        )}
+
+        {/* Environments Tab */}
+        {activeTab === 'environments' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-cyan-400">🌍 Environment System</h3>
@@ -6591,7 +6602,6 @@ export default function ThreeDVisualizer() {
                 </>
               )}
             </div>
-            
           </div>
         )}
 
