@@ -1033,7 +1033,7 @@ export default function ThreeDVisualizer() {
   const updateParameterEvent = (eventId: string, updates: Partial<ParameterEvent>) => {
     setParameterEvents(parameterEvents.map(event => 
       event.id === eventId ? { ...event, ...updates } : event
-    ).sort((a, b) => a.time - b.time));
+    ).sort((a, b) => a.startTime - b.startTime));
   };
 
   const deleteParameterEvent = (eventId: string) => {
