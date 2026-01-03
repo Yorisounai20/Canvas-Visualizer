@@ -320,15 +320,17 @@ export default function ThreeDVisualizer() {
     { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
   ]);
   
-  // NEW: Preset switching keyframes (timeline-based)
+  // NEW: Preset switching keyframes (timeline-based) - Enhanced with segments
   const [presetKeyframes, setPresetKeyframes] = useState<Array<{
     id: number;
-    time: number;
+    time: number; // start time
+    endTime: number; // end time (duration of this preset)
     preset: string; // animation type (orbit, explosion, chill, etc.)
+    speed: number; // animation speed multiplier (0.1 to 3.0, default 1.0)
   }>>([
-    { id: 1, time: 0, preset: 'orbit' },
-    { id: 2, time: 20, preset: 'explosion' },
-    { id: 3, time: 40, preset: 'chill' }
+    { id: 1, time: 0, endTime: 20, preset: 'orbit', speed: 1.0 },
+    { id: 2, time: 20, endTime: 40, preset: 'explosion', speed: 1.0 },
+    { id: 3, time: 40, endTime: 60, preset: 'chill', speed: 1.0 }
   ]);
   const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
   const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
@@ -567,18 +569,35 @@ export default function ThreeDVisualizer() {
 
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
   
-  // Get current preset from keyframes (finds the most recent keyframe before current time)
+  // Get current preset from keyframes (finds active preset segment at current time)
   const getCurrentPreset = () => {
     const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
-    // Find the last keyframe that's at or before current time
-    for (let i = sorted.length - 1; i >= 0; i--) {
-      if (currentTime >= sorted[i].time) {
+    // Find the preset segment that contains current time
+    for (let i = 0; i < sorted.length; i++) {
+      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
         return sorted[i].preset;
       }
     }
-    // If before all keyframes, use the first keyframe's preset if it exists,
-    // otherwise return 'orbit' as default
-    return sorted.length > 0 ? sorted[0].preset : 'orbit';
+    // If after all segments or before first, use the first or last preset
+    if (currentTime < sorted[0]?.time) {
+      return sorted[0]?.preset || 'orbit';
+    }
+    // After all segments, use the last preset
+    return sorted[sorted.length - 1]?.preset || 'orbit';
+  };
+  
+  // Get current preset speed multiplier
+  const getCurrentPresetSpeed = () => {
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    for (let i = 0; i < sorted.length; i++) {
+      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
+        return sorted[i].speed || 1.0;
+      }
+    }
+    if (currentTime < sorted[0]?.time) {
+      return sorted[0]?.speed || 1.0;
+    }
+    return sorted[sorted.length - 1]?.speed || 1.0;
   };
 
   const addSection = () => {
@@ -598,10 +617,17 @@ export default function ThreeDVisualizer() {
   
   // Preset keyframe handlers
   const handleAddPresetKeyframe = () => {
+    // Find a good default end time: either 20 seconds from current time, or until next keyframe
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    const nextKeyframe = sorted.find(kf => kf.time > currentTime);
+    const defaultEndTime = nextKeyframe ? nextKeyframe.time : currentTime + 20;
+    
     const newKeyframe = {
       id: nextPresetKeyframeId.current++,
       time: currentTime,
-      preset: 'orbit' // Default preset
+      endTime: Math.max(currentTime + 1, Math.min(defaultEndTime, duration || currentTime + 20)), // At least 1 second duration
+      preset: 'orbit', // Default preset
+      speed: 1.0 // Default speed
     };
     setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
   };
@@ -614,9 +640,20 @@ export default function ThreeDVisualizer() {
   };
   
   const handleUpdatePresetKeyframe = (id: number, field: string, value: any) => {
-    setPresetKeyframes(presetKeyframes.map(kf => 
-      kf.id === id ? { ...kf, [field]: value } : kf
-    ).sort((a, b) => a.time - b.time)); // Re-sort after time update
+    setPresetKeyframes(presetKeyframes.map(kf => {
+      if (kf.id === id) {
+        const updated = { ...kf, [field]: value };
+        // Ensure endTime is always after time
+        if (field === 'time' && updated.endTime <= value) {
+          updated.endTime = value + 1;
+        }
+        if (field === 'endTime' && value <= updated.time) {
+          updated.endTime = updated.time + 1;
+        }
+        return updated;
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
 
   const resetCamera = () => {
@@ -2410,6 +2447,8 @@ export default function ThreeDVisualizer() {
       const t = el % duration;
       setCurrentTime(t);
       const type = getCurrentPreset(); // Use keyframe-based preset switching
+      const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
+      const elScaled = elScaled * presetSpeed; // Apply speed multiplier to animations
       
       // Interpolate camera settings from global keyframes or use global settings
       let activeCameraDistance, activeCameraHeight, activeCameraRotation;
@@ -2654,7 +2693,7 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((planet, i) => {
           const orbitRadius = 5 + i * 1.8;
           const orbitSpeed = 0.8 / (1 + i * 0.3);
-          const angle = el * orbitSpeed + i * 0.5;
+          const angle = elScaled * orbitSpeed + i * 0.5;
           const tilt = Math.sin(i) * 0.3;
           planet.position.x = Math.cos(angle) * orbitRadius;
           planet.position.z = Math.sin(angle) * orbitRadius;
@@ -2675,7 +2714,7 @@ export default function ThreeDVisualizer() {
           const planet = obj.cubes[planetIndex];
           const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
           const moonOrbitSpeed = 3 + (i % 3);
-          const moonAngle = el * moonOrbitSpeed + i;
+          const moonAngle = elScaled * moonOrbitSpeed + i;
           moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
           moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
           moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
@@ -2698,8 +2737,8 @@ export default function ThreeDVisualizer() {
           rogue.position.z = Math.sin(rogueAngle) * rogueDist;
           const rogueSize = 4 + layer * 2 + (i % 3);
           rogue.scale.set(rogueSize, rogueSize, rogueSize);
-          rogue.rotation.x = el * 0.05 + i;
-          rogue.rotation.y = el * 0.03;
+          rogue.rotation.x = elScaled * 0.05 + i;
+          rogue.rotation.y = elScaled * 0.03;
           rogue.rotation.z = 0;
           rogue.material.color.setStyle(midsColor);
           rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
@@ -2708,7 +2747,7 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((asteroid, i) => {
           const beltRadius = 11 + (i % 5) * 0.5;
           const beltSpeed = 0.3;
-          const angle = el * beltSpeed + i * 0.2;
+          const angle = elScaled * beltSpeed + i * 0.2;
           const scatter = Math.sin(i * 10) * 2;
           asteroid.position.x = Math.cos(angle) * (beltRadius + scatter);
           asteroid.position.z = Math.sin(angle) * (beltRadius + scatter);
@@ -2822,11 +2861,11 @@ export default function ThreeDVisualizer() {
         obj.sphere.material.opacity = (0.2+f.bass*0.2) * blend;
         obj.sphere.material.wireframe = false;
       } else if (type === 'wave') {
-        const pathProgress = el * 2;
+        const pathProgress = elScaled * 2;
         cam.position.set(Math.sin(pathProgress * 0.3) * 3 + shakeX, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight + shakeY, activeCameraDistance - 5 + shakeZ);
         cam.lookAt(Math.sin((pathProgress + 2) * 0.3) * 3, Math.cos((pathProgress + 2) * 0.4) * 2, -10);
         obj.octas.slice(0, 30).forEach((segment, i) => {
-          const segmentTime = el * 3 - i * 0.3;
+          const segmentTime = elScaled * 3 - i * 0.3;
           const waveValue = f.bass * Math.sin(segmentTime * 10 + i) + f.mids * Math.cos(segmentTime * 7 + i * 0.5) + f.highs * Math.sin(segmentTime * 15 + i * 2);
           const x = Math.sin(segmentTime * 0.3) * 3;
           const y = waveValue * 3;
@@ -2845,7 +2884,7 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c, i) => {
           const scopeIndex = i % vectorscopePositions.length;
           const scopePos = vectorscopePositions[scopeIndex];
-          const t = el * 5 + i * 0.8;
+          const t = elScaled * 5 + i * 0.8;
           const freqX = 2 + scopeIndex;
           const freqY = 3 + scopeIndex * 0.5;
           const radius = 2 + f.mids * 1.5;
@@ -2867,7 +2906,7 @@ export default function ThreeDVisualizer() {
           const scopeIndex = Math.floor(i / 5) % vectorscopePositions.length;
           const ringIndex = i % 5;
           const scopePos = vectorscopePositions[scopeIndex];
-          const angle = (ringIndex / 5) * Math.PI * 2 + el * 2;
+          const angle = (ringIndex / 5) * Math.PI * 2 + elScaled * 2;
           const haloRadius = 2.5 + f.highs * 1.5;
           halo.position.x = scopePos.x + Math.cos(angle) * haloRadius;
           halo.position.y = scopePos.y + Math.sin(angle) * haloRadius;
@@ -2911,7 +2950,7 @@ export default function ThreeDVisualizer() {
           c.material.color.setStyle(bassColor);
         });
         obj.octas.forEach((o,i) => {
-          const angle = el * 2 + i * 0.3;
+          const angle = elScaled * 2 + i * 0.3;
           const radius = 3 + Math.sin(el + i) * 2 + f.mids * 2;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = i * 0.5 - 5;
@@ -2929,9 +2968,9 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c,i) => {
           const gridX = (i % 4 - 1.5) * 5;
           const gridY = (Math.floor(i / 4) - 1) * 5;
-          c.position.set(gridX, gridY, Math.sin(el * 3 + i) * (2 + f.bass * 5));
+          c.position.set(gridX, gridY, Math.sin(elScaled * 3 + i) * (2 + f.bass * 5));
           c.rotation.x = el + i;
-          c.rotation.y = el * 1.5;
+          c.rotation.y = elScaled * 1.5;
           const s = 1.5 + f.bass * 2.5;
           c.scale.set(s,s,s);
           c.material.opacity = (0.5 + f.bass * 0.5) * blend;
@@ -2941,7 +2980,7 @@ export default function ThreeDVisualizer() {
           const gridPos = i % 16;
           const x = (gridPos % 4 - 1.5) * 4;
           const y = (Math.floor(gridPos / 4) - 1.5) * 4;
-          o.position.set(x, y, Math.cos(el * 2 + i * 0.1) * (1 + f.mids * 3));
+          o.position.set(x, y, Math.cos(elScaled * 2 + i * 0.1) * (1 + f.mids * 3));
           o.rotation.x += 0.02 + f.mids * 0.05;
           o.rotation.y += 0.01 + f.mids * 0.03;
           o.rotation.z += 0.05;
@@ -2954,7 +2993,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
-          const angle = el * 2 + i * 0.8;
+          const angle = elScaled * 2 + i * 0.8;
           const radius = 3 + i * 1.5 + f.bass * 5;
           const height = Math.sin(el + i * 0.5) * 10;
           c.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
@@ -2966,7 +3005,7 @@ export default function ThreeDVisualizer() {
           c.material.color.setStyle(bassColor);
         });
         obj.octas.forEach((o,i) => {
-          const angle = -el * 3 + i * 0.5;
+          const angle = -elScaled * 3 + i * 0.5;
           const radius = 5 + Math.sin(el + i) * 3 + f.mids * 4;
           o.position.set(Math.cos(angle) * radius, (i % 10 - 5) * 2, Math.sin(angle) * radius);
           o.rotation.x += 0.08 + f.mids * 0.05;
@@ -2979,10 +3018,10 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'seiryu') {
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
-        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(elScaled * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
-          const segmentTime = el * 1.5 - i * 0.6;
+          const segmentTime = elScaled * 1.5 - i * 0.6;
           const progress = i / obj.cubes.length;
           const isHead = i === 0;
           const x = Math.sin(segmentTime) * (6 + f.bass * 3);
@@ -2992,7 +3031,7 @@ export default function ThreeDVisualizer() {
           const baseScale = isHead ? 5 : 1.3;
           const scaleSize = baseScale + f.bass * 0.8;
           c.scale.set(scaleSize, scaleSize * 0.8, scaleSize * 1.2);
-          const nextT = el * 1.5 - (i + 1) * 0.6;
+          const nextT = elScaled * 1.5 - (i + 1) * 0.6;
           const lookX = Math.sin(nextT) * 6;
           const lookY = Math.cos(nextT * 0.5) * 4;
           const lookZ = (progress + 0.1) * -15;
@@ -3024,7 +3063,7 @@ export default function ThreeDVisualizer() {
           const mountainZ = -25 - (i % 2) * 5;
           mountain.position.set(mountainX, -5 + mountainHeight, mountainZ);
           mountain.rotation.x = 0;
-          mountain.rotation.y = el * 0.1 + i;
+          mountain.rotation.y = elScaled * 0.1 + i;
           const s = 8 + (i % 3) * 3;
           mountain.scale.set(s, mountainHeight * 2, s);
           mountain.material.color.setStyle(midsColor);
@@ -3033,7 +3072,7 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.slice(10).forEach((o, i) => {
           const bodyIndex = (i % obj.cubes.length);
-          const orbitAngle = (i / 4) * Math.PI * 2 + el * 3;
+          const orbitAngle = (i / 4) * Math.PI * 2 + elScaled * 3;
           const bodyCube = obj.cubes[bodyIndex];
           const orbitRadius = 1.2 + f.mids * 1.5;
           o.position.x = bodyCube.position.x + Math.cos(orbitAngle) * orbitRadius;
@@ -3050,9 +3089,9 @@ export default function ThreeDVisualizer() {
         obj.tetras.slice(2).forEach((cloud, i) => {
           const driftSpeed = 0.2;
           const layer = Math.floor(i / 10);
-          cloud.position.x = ((el * driftSpeed + i * 4) % 50) - 25;
+          cloud.position.x = ((elScaled * driftSpeed + i * 4) % 50) - 25;
           cloud.position.y = 5 + layer * 3 + Math.sin(el + i) * 0.5;
-          cloud.position.z = -10 - layer * 8 + Math.cos(el * 0.3 + i) * 2;
+          cloud.position.z = -10 - layer * 8 + Math.cos(elScaled * 0.3 + i) * 2;
           cloud.rotation.x += 0.01;
           cloud.rotation.y += 0.02;
           const cloudSize = 1.5 + (i % 3) * 0.5;
@@ -3074,7 +3113,7 @@ export default function ThreeDVisualizer() {
         const FIN_TETRA_END = 12;
         const BUBBLE_COUNT = 15;
         
-        const swimSpeed = el * 0.8;
+        const swimSpeed = elScaled * 0.8;
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         
         // Camera follows shark from side/above angle
@@ -3206,12 +3245,12 @@ export default function ThreeDVisualizer() {
           if (i < BUBBLE_COUNT) {
             // Rising bubbles
             const bubbleSpeed = 0.5 + (i % 3) * 0.2;
-            const riseHeight = (el * bubbleSpeed + i) % 20;
+            const riseHeight = (elScaled * bubbleSpeed + i) % 20;
             const xOffset = Math.sin(i * 2) * 8;
             const zOffset = -5 - (i % 5) * 3;
             
             bubble.position.x = xOffset + Math.sin(el + i) * 2;
-            bubble.position.y = riseHeight - 10 + Math.sin(el * 2 + i) * 0.5;
+            bubble.position.y = riseHeight - 10 + Math.sin(elScaled * 2 + i) * 0.5;
             bubble.position.z = zOffset;
             
             const bubbleSize = 0.3 + f.highs * 0.2;
@@ -3258,11 +3297,11 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle + el * (ring % 2 === 0 ? 1 : -1);
+          const angle = segment * segmentAngle + elScaled * (ring % 2 === 0 ? 1 : -1);
           const radius = 5 + ring * 3 + f.bass * 2;
           c.position.x = Math.cos(angle) * radius;
           c.position.y = Math.sin(angle) * radius;
-          c.position.z = Math.sin(el * 2 + i) * 2;
+          c.position.z = Math.sin(elScaled * 2 + i) * 2;
           c.rotation.x = angle;
           c.rotation.y = el + i;
           c.rotation.z = angle * 2;
@@ -3276,13 +3315,13 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle + el * 1.5 * (ring % 2 === 0 ? -1 : 1);
+          const angle = segment * segmentAngle + elScaled * 1.5 * (ring % 2 === 0 ? -1 : 1);
           const radius = 8 + ring * 2 + f.mids * 3;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = Math.sin(angle) * radius;
           o.position.z = Math.cos(el + i) * 1.5;
           o.rotation.x = angle + el;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = -angle;
           const s = 0.9 + f.mids * 0.6;
           o.scale.set(s, s, s);
@@ -3294,13 +3333,13 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle - el * 2;
+          const angle = segment * segmentAngle - elScaled * 2;
           const radius = 3 + ring + f.highs * 2;
           t.position.x = Math.cos(angle) * radius;
           t.position.y = Math.sin(angle) * radius;
           t.position.z = 0;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = angle;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -3311,7 +3350,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, 0, 0);
         const sphereSize = 1 + f.bass * 0.5;
         obj.sphere.scale.set(sphereSize, sphereSize, sphereSize);
-        obj.sphere.rotation.x = el * 0.5;
+        obj.sphere.rotation.x = elScaled * 0.5;
         obj.sphere.rotation.y = el;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
@@ -3322,7 +3361,7 @@ export default function ThreeDVisualizer() {
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const speed = 0.5 + (i % 3) * 0.3;
-          const meteorTime = (el * speed + i * 2) % 10;
+          const meteorTime = (elScaled * speed + i * 2) % 10;
           const startX = ((i % 4) - 1.5) * 20;
           const startY = 15;
           const startZ = ((Math.floor(i / 4)) - 1) * 20;
@@ -3342,7 +3381,7 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.forEach((o, i) => {
           const speed = 0.7 + (i % 4) * 0.2;
-          const meteorTime = (el * speed + i * 1.5) % 8;
+          const meteorTime = (elScaled * speed + i * 1.5) % 8;
           const startX = ((i % 6) - 2.5) * 15;
           const startY = 20;
           const startZ = ((Math.floor(i / 6)) - 2.5) * 15;
@@ -3361,7 +3400,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const speed = 0.3 + (i % 5) * 0.15;
-          const meteorTime = (el * speed + i) % 12;
+          const meteorTime = (elScaled * speed + i) % 12;
           const fallProgress = meteorTime / 12;
           const trail = i % 5;
           t.position.x = ((i % 6) - 2.5) * 10 + Math.sin(meteorTime * 3) * 2;
@@ -3426,13 +3465,13 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.forEach((o, i) => {
           const height = (i - obj.octas.length / 2) * 1.5;
-          const angle = el * 2 + i * 0.3;
+          const angle = elScaled * 2 + i * 0.3;
           const radius = 6 + Math.sin(el + i) * 1 + f.highs * 1.5;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = height;
           o.position.z = Math.sin(angle) * radius;
           o.rotation.x = el + i;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = 0.5 + f.highs * 0.4;
           o.scale.set(s, s, s);
@@ -3451,7 +3490,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 5, 0);
         obj.cubes.forEach((c, i) => {
-          const burstTime = (el * 0.8 + i * 3) % 6;
+          const burstTime = (elScaled * 0.8 + i * 3) % 6;
           const burstProgress = Math.min(burstTime / 2, 1);
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 4) - 1.5) * 10;
@@ -3477,7 +3516,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = burstTime < 2;
         });
         obj.octas.forEach((o, i) => {
-          const burstTime = (el * 0.8 + i * 2.5 + 1) % 6;
+          const burstTime = (elScaled * 0.8 + i * 2.5 + 1) % 6;
           const burstProgress = Math.min(burstTime / 2, 1);
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 6) - 2.5) * 8;
@@ -3503,7 +3542,7 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const burstTime = (el * 0.8 + i * 2 + 0.5) % 6;
+          const burstTime = (elScaled * 0.8 + i * 2 + 0.5) % 6;
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 6) - 2.5) * 7;
           const launchZ = ((Math.floor(i / 6)) - 2.5) * 7;
@@ -3539,10 +3578,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 2 + (column % 3) * 0.5;
-          const fallOffset = (el * fallSpeed + i * 2) % 30;
+          const fallOffset = (elScaled * fallSpeed + i * 2) % 30;
           c.position.x = columnX;
           c.position.y = 15 - fallOffset + Math.sin(el + i) * 0.5;
-          c.position.z = -10 + Math.cos(el * 0.5 + i) * 2;
+          c.position.z = -10 + Math.cos(elScaled * 0.5 + i) * 2;
           c.rotation.x = 0;
           c.rotation.y = 0;
           c.rotation.z = 0;
@@ -3557,10 +3596,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 1.5 + (column % 4) * 0.4;
-          const fallOffset = (el * fallSpeed + i * 1.5) % 35;
+          const fallOffset = (elScaled * fallSpeed + i * 1.5) % 35;
           o.position.x = columnX + Math.sin(el + i) * 0.3;
           o.position.y = 18 - fallOffset;
-          o.position.z = -8 + Math.cos(el * 0.3 + i) * 3;
+          o.position.z = -8 + Math.cos(elScaled * 0.3 + i) * 3;
           o.rotation.x = 0;
           o.rotation.y = 0;
           o.rotation.z = el + i;
@@ -3575,10 +3614,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 2.5 + (column % 5) * 0.3;
-          const fallOffset = (el * fallSpeed + i) % 40;
-          t.position.x = columnX + Math.sin(el * 2 + i) * 0.5;
+          const fallOffset = (elScaled * fallSpeed + i) % 40;
+          t.position.x = columnX + Math.sin(elScaled * 2 + i) * 0.5;
           t.position.y = 20 - fallOffset;
-          t.position.z = -12 + Math.cos(el * 0.4 + i) * 4;
+          t.position.z = -12 + Math.cos(elScaled * 0.4 + i) * 4;
           t.rotation.x = el + i;
           t.rotation.y = 0;
           t.rotation.z = 0;
@@ -3596,7 +3635,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.8) % 20;
           const angle = (i / obj.cubes.length) * Math.PI * 2;
           c.position.x = Math.cos(angle) * rippleRadius;
@@ -3614,7 +3653,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = false;
         });
         obj.octas.forEach((o, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.5 + 2) % 25;
           const angle = (i / obj.octas.length) * Math.PI * 2;
           o.position.x = Math.cos(angle) * rippleRadius;
@@ -3632,14 +3671,14 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.3 + 1) % 22;
           const angle = (i / obj.tetras.length) * Math.PI * 2;
           t.position.x = Math.cos(angle) * rippleRadius;
           t.position.z = Math.sin(angle) * rippleRadius;
           const waveHeight = Math.sin((rippleRadius - rippleTime) * 0.7) * 2;
           t.position.y = waveHeight + f.highs * 1;
-          t.rotation.x = el * 2 + i;
+          t.rotation.x = elScaled * 2 + i;
           t.rotation.y = angle;
           t.rotation.z = el;
           const s = 0.6 + f.highs * 0.5;
@@ -3663,12 +3702,12 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c, i) => {
           const clusterAngle = (i / obj.cubes.length) * Math.PI * 2;
           const clusterRadius = 8 + Math.sin(el + i) * 2;
-          const orbitOffset = Math.cos(el * 0.5 + i * 0.3) * 2;
+          const orbitOffset = Math.cos(elScaled * 0.5 + i * 0.3) * 2;
           c.position.x = Math.cos(clusterAngle) * clusterRadius + orbitOffset;
           c.position.y = Math.sin(i * 2) * 5 + Math.sin(el + i) * 1;
           c.position.z = Math.sin(clusterAngle) * clusterRadius + orbitOffset;
-          c.rotation.x = el * 0.3 + i;
-          c.rotation.y = el * 0.5;
+          c.rotation.x = elScaled * 0.3 + i;
+          c.rotation.y = elScaled * 0.5;
           c.rotation.z = 0;
           const s = 0.8 + f.bass * 1;
           c.scale.set(s, s, s);
@@ -3683,7 +3722,7 @@ export default function ThreeDVisualizer() {
           o.position.x = nearestCube.position.x + (nextCube.position.x - nearestCube.position.x) * t;
           o.position.y = nearestCube.position.y + (nextCube.position.y - nearestCube.position.y) * t;
           o.position.z = nearestCube.position.z + (nextCube.position.z - nearestCube.position.z) * t;
-          const pulse = Math.sin(el * 5 + i) * 0.5 + 0.5;
+          const pulse = Math.sin(elScaled * 5 + i) * 0.5 + 0.5;
           const s = (0.3 + f.mids * 0.4) * (0.5 + pulse * 0.5);
           o.scale.set(s, s * 3, s);
           const dx = nextCube.position.x - nearestCube.position.x;
@@ -3698,7 +3737,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const attachedCube = obj.cubes[i % obj.cubes.length];
-          const orbitAngle = el * 3 + i;
+          const orbitAngle = elScaled * 3 + i;
           const orbitRadius = 1.5 + f.highs * 1;
           t.position.x = attachedCube.position.x + Math.cos(orbitAngle) * orbitRadius;
           t.position.y = attachedCube.position.y + Math.sin(orbitAngle * 0.5) * orbitRadius;
@@ -3725,13 +3764,13 @@ export default function ThreeDVisualizer() {
           const anchorY = 10;
           const anchorZ = (row - 1) * 6;
           const swingSpeed = 1 + col * 0.2;
-          const swingAngle = Math.sin(el * swingSpeed + row) * (Math.PI / 3) + f.bass * 0.3;
+          const swingAngle = Math.sin(elScaled * swingSpeed + row) * (Math.PI / 3) + f.bass * 0.3;
           const pendulumLength = 5 + row;
           c.position.x = anchorX + Math.sin(swingAngle) * pendulumLength;
           c.position.y = anchorY - Math.cos(swingAngle) * pendulumLength;
           c.position.z = anchorZ;
           c.rotation.x = swingAngle;
-          c.rotation.y = el * 0.5;
+          c.rotation.y = elScaled * 0.5;
           c.rotation.z = 0;
           const s = 1 + f.bass * 0.8;
           c.scale.set(s, s, s);
@@ -3763,7 +3802,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const swingSpeed = 1.5 + (i % 3) * 0.3;
-          const swingAngle = Math.sin(el * swingSpeed + i) * (Math.PI / 4) + f.highs * 0.4;
+          const swingAngle = Math.sin(elScaled * swingSpeed + i) * (Math.PI / 4) + f.highs * 0.4;
           const layer = Math.floor(i / 10);
           const posInLayer = i % 10;
           const anchorX = (posInLayer - 4.5) * 3;
@@ -3774,7 +3813,7 @@ export default function ThreeDVisualizer() {
           t.position.y = anchorY - Math.cos(swingAngle) * pendulumLength;
           t.position.z = anchorZ;
           t.rotation.x = swingAngle + el;
-          t.rotation.y = el * 2;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = 0;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -3794,7 +3833,7 @@ export default function ThreeDVisualizer() {
           const posInRing = i % 4;
           const angle = (posInRing / 4) * Math.PI * 2;
           const tunnelRadius = 8 + f.bass * 2;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 5) % 50) - 25;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 5) % 50) - 25;
           c.position.x = Math.cos(angle) * tunnelRadius;
           c.position.y = Math.sin(angle) * tunnelRadius;
           c.position.z = -zProgress;
@@ -3813,7 +3852,7 @@ export default function ThreeDVisualizer() {
           const posInRing = i % 6;
           const angle = (posInRing / 6) * Math.PI * 2;
           const tunnelRadius = 6 + f.mids * 1.5;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 4 + 2) % 45) - 22.5;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 4 + 2) % 45) - 22.5;
           o.position.x = Math.cos(angle) * tunnelRadius;
           o.position.y = Math.sin(angle) * tunnelRadius;
           o.position.z = -zProgress;
@@ -3830,15 +3869,15 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const ringIndex = Math.floor(i / 6);
           const posInRing = i % 6;
-          const angle = (posInRing / 6) * Math.PI * 2 + el * 2;
+          const angle = (posInRing / 6) * Math.PI * 2 + elScaled * 2;
           const tunnelRadius = 4 + Math.sin(el + i) * 1 + f.highs * 1;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 3.5 + 1) % 40) - 20;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 3.5 + 1) % 40) - 20;
           t.position.x = Math.cos(angle) * tunnelRadius;
           t.position.y = Math.sin(angle) * tunnelRadius;
           t.position.z = -zProgress;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = angle;
-          t.rotation.z = el * 2;
+          t.rotation.z = elScaled * 2;
           const s = 0.7 + f.highs * 0.6;
           t.scale.set(s, s, s);
           const depth = Math.abs(zProgress) / 20;
@@ -3855,14 +3894,14 @@ export default function ThreeDVisualizer() {
         const petals = 8;
         obj.cubes.forEach((c, i) => {
           const petalAngle = (i / petals) * Math.PI * 2;
-          const bloomProgress = Math.sin(el * 0.5) * 0.5 + 0.5;
+          const bloomProgress = Math.sin(elScaled * 0.5) * 0.5 + 0.5;
           const petalRadius = 5 + bloomProgress * 5 + f.bass * 2;
           const petalHeight = Math.sin(petalAngle * 2 + el) * 2;
           c.position.x = Math.cos(petalAngle) * petalRadius;
           c.position.y = petalHeight + f.mids * 1;
           c.position.z = Math.sin(petalAngle) * petalRadius;
           c.rotation.x = petalAngle;
-          c.rotation.y = el * 0.3;
+          c.rotation.y = elScaled * 0.3;
           c.rotation.z = Math.sin(el + i) * 0.5;
           const s = 1.5 + bloomProgress + f.bass * 0.8;
           c.scale.set(s * 0.5, s * 2, s);
@@ -3873,7 +3912,7 @@ export default function ThreeDVisualizer() {
         obj.octas.forEach((o, i) => {
           const layer = Math.floor(i / 6);
           const posInLayer = i % 6;
-          const angle = (posInLayer / 6) * Math.PI * 2 + el * 2;
+          const angle = (posInLayer / 6) * Math.PI * 2 + elScaled * 2;
           const radius = 3 + layer + Math.sin(el + i) * 0.5 + f.mids * 1.5;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = -layer * 0.5 + f.mids * 0.5;
@@ -3889,12 +3928,12 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const angle = (i / obj.tetras.length) * Math.PI * 2;
-          const radius = 1 + Math.sin(el * 3 + i) * 0.3;
+          const radius = 1 + Math.sin(elScaled * 3 + i) * 0.3;
           t.position.x = Math.cos(angle) * radius;
-          t.position.y = Math.sin(el * 2 + i) * 0.5 + f.highs * 0.5;
+          t.position.y = Math.sin(elScaled * 2 + i) * 0.5 + f.highs * 0.5;
           t.position.z = Math.sin(angle) * radius;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = 0;
           const s = 0.3 + f.highs * 0.4;
           t.scale.set(s, s, s);
@@ -3917,7 +3956,7 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.cubes.length) * 20 - 10;
           const heightFactor = 1 - Math.abs(height / 10);
           const radius = 2 + heightFactor * 6 + f.bass * 3;
-          const angle = height * 0.5 + el * 2;
+          const angle = height * 0.5 + elScaled * 2;
           c.position.x = Math.cos(angle) * radius;
           c.position.y = height;
           c.position.z = Math.sin(angle) * radius;
@@ -3934,9 +3973,9 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.octas.length) * 25 - 12.5;
           const heightFactor = 1 - Math.abs(height / 12.5);
           const radius = 3 + heightFactor * 8 + f.mids * 4;
-          const angle = height * 0.6 + el * 3;
+          const angle = height * 0.6 + elScaled * 3;
           o.position.x = Math.cos(angle) * radius;
-          o.position.y = height + Math.sin(el * 2 + i) * 0.5;
+          o.position.y = height + Math.sin(elScaled * 2 + i) * 0.5;
           o.position.z = Math.sin(angle) * radius;
           o.rotation.x += 0.1 + f.mids * 0.1;
           o.rotation.y = angle;
@@ -3951,13 +3990,13 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.tetras.length) * 30 - 15;
           const heightFactor = 1 - Math.abs(height / 15);
           const radius = 1 + heightFactor * 10 + f.highs * 5;
-          const angle = height * 0.7 + el * 4 + i * 0.1;
+          const angle = height * 0.7 + elScaled * 4 + i * 0.1;
           t.position.x = Math.cos(angle) * radius;
           t.position.y = height;
           t.position.z = Math.sin(angle) * radius;
-          t.rotation.x = el * 5 + i;
+          t.rotation.x = elScaled * 5 + i;
           t.rotation.y = angle;
-          t.rotation.z = el * 3;
+          t.rotation.z = elScaled * 3;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
           t.material.color.setStyle(highsColor);
@@ -3968,7 +4007,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'cube3d') {
-        cam.position.set(Math.sin(el * 0.2) * 5 + shakeX, Math.cos(el * 0.15) * 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(elScaled * 0.2) * 5 + shakeX, Math.cos(elScaled * 0.15) * 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const dim = 2;
@@ -3981,8 +4020,8 @@ export default function ThreeDVisualizer() {
           c.position.y = y * offset;
           c.position.z = z * offset;
           c.rotation.x = el + i * 0.1;
-          c.rotation.y = el * 1.5 + i * 0.1;
-          c.rotation.z = el * 0.5;
+          c.rotation.y = elScaled * 1.5 + i * 0.1;
+          c.rotation.z = elScaled * 0.5;
           const s = 1.5 + f.bass * 1;
           c.scale.set(s, s, s);
           c.material.color.setStyle(bassColor);
@@ -4011,7 +4050,7 @@ export default function ThreeDVisualizer() {
           o.position.y = (startPos[1] + (endPos[1] - startPos[1]) * t) * scale;
           o.position.z = (startPos[2] + (endPos[2] - startPos[2]) * t) * scale;
           o.rotation.x = el + i;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s, s);
@@ -4025,8 +4064,8 @@ export default function ThreeDVisualizer() {
           t.position.x = Math.cos(orbit + el) * radius;
           t.position.y = Math.sin(orbit * 2 + el) * radius;
           t.position.z = Math.sin(orbit + el) * radius;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = orbit;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -4038,8 +4077,8 @@ export default function ThreeDVisualizer() {
         const coreSize = 3 + f.bass * 2;
         obj.sphere.scale.set(coreSize, coreSize, coreSize);
         obj.sphere.rotation.x = el;
-        obj.sphere.rotation.y = el * 1.5;
-        obj.sphere.rotation.z = el * 0.5;
+        obj.sphere.rotation.y = elScaled * 1.5;
+        obj.sphere.rotation.z = elScaled * 0.5;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
@@ -4054,9 +4093,9 @@ export default function ThreeDVisualizer() {
           const levelHeight = level * 3;
           const spreadFactor = Math.pow(0.7, level);
           const radius = 2 * spreadFactor + f.bass * spreadFactor * 2;
-          c.position.x = Math.cos(angle + el * 0.5) * radius;
+          c.position.x = Math.cos(angle + elScaled * 0.5) * radius;
           c.position.y = levelHeight - 5;
-          c.position.z = Math.sin(angle + el * 0.5) * radius;
+          c.position.z = Math.sin(angle + elScaled * 0.5) * radius;
           c.rotation.x = angle;
           c.rotation.y = el + level;
           c.rotation.z = 0;
@@ -4075,12 +4114,12 @@ export default function ThreeDVisualizer() {
           const levelHeight = level * 3;
           const spreadFactor = Math.pow(0.7, level);
           const radius = (2 + side) * spreadFactor + f.mids * spreadFactor;
-          const sideAngle = angle + (side === 0 ? -0.3 : 0.3) + el * 0.3;
+          const sideAngle = angle + (side === 0 ? -0.3 : 0.3) + elScaled * 0.3;
           o.position.x = Math.cos(sideAngle) * radius;
           o.position.y = levelHeight - 5 + (side === 0 ? 0.5 : -0.5);
           o.position.z = Math.sin(sideAngle) * radius;
           o.rotation.x = sideAngle + el;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = (0.8 - level * 0.1) + f.mids * 0.4;
           o.scale.set(s, s * 0.5, s);
@@ -4091,11 +4130,11 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const swarmAngle = (i / obj.tetras.length) * Math.PI * 2;
           const swarmRadius = 8 + Math.sin(el + i) * 3 + f.highs * 2;
-          const swarmHeight = Math.sin(el * 2 + i * 0.5) * 8;
+          const swarmHeight = Math.sin(elScaled * 2 + i * 0.5) * 8;
           t.position.x = Math.cos(swarmAngle + el) * swarmRadius;
           t.position.y = swarmHeight;
           t.position.z = Math.sin(swarmAngle + el) * swarmRadius;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = swarmAngle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
@@ -4107,7 +4146,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, -7, 0);
         const trunkSize = 1.5 + f.bass * 0.5;
         obj.sphere.scale.set(trunkSize, 3, trunkSize);
-        obj.sphere.rotation.y = el * 0.2;
+        obj.sphere.rotation.y = elScaled * 0.2;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.8 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = false;
@@ -4120,7 +4159,7 @@ export default function ThreeDVisualizer() {
         const star2Z = -star1Z;
         obj.cubes.slice(0, 4).forEach((c, i) => {
           c.position.set(star1X, 0, star1Z);
-          const orbitAngle = el * 3 + (i / 4) * Math.PI * 2;
+          const orbitAngle = elScaled * 3 + (i / 4) * Math.PI * 2;
           const orbitRadius = 2 + f.bass * 1;
           c.position.x += Math.cos(orbitAngle) * orbitRadius;
           c.position.y = Math.sin(orbitAngle * 2) * 0.5;
@@ -4136,7 +4175,7 @@ export default function ThreeDVisualizer() {
         });
         obj.cubes.slice(4).forEach((c, i) => {
           c.position.set(star2X, 0, star2Z);
-          const orbitAngle = -el * 3 + (i / 4) * Math.PI * 2;
+          const orbitAngle = -elScaled * 3 + (i / 4) * Math.PI * 2;
           const orbitRadius = 2 + f.bass * 1;
           c.position.x += Math.cos(orbitAngle) * orbitRadius;
           c.position.y = Math.sin(orbitAngle * 2) * 0.5;
@@ -4151,7 +4190,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = false;
         });
         obj.octas.slice(0, 15).forEach((o, i) => {
-          const angle = el * 5 + i;
+          const angle = elScaled * 5 + i;
           const radius = 6 + Math.sin(el + i) * 2 + f.mids * 3;
           o.position.x = star1X + Math.cos(angle) * radius;
           o.position.y = Math.sin(angle * 1.5) * 2;
@@ -4166,7 +4205,7 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.octas.slice(15).forEach((o, i) => {
-          const angle = -el * 5 + i;
+          const angle = -elScaled * 5 + i;
           const radius = 6 + Math.sin(el + i) * 2 + f.mids * 3;
           o.position.x = star2X + Math.cos(angle) * radius;
           o.position.y = Math.sin(angle * 1.5) * 2;
@@ -4182,7 +4221,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const streamAngle = (i / obj.tetras.length) * Math.PI * 2;
-          const streamProgress = (el * 2 + i) % (Math.PI * 2);
+          const streamProgress = (elScaled * 2 + i) % (Math.PI * 2);
           const t1 = streamProgress / (Math.PI * 2);
           t.position.x = star1X + (star2X - star1X) * t1;
           t.position.y = Math.sin(streamProgress * 3) * 1.5;
@@ -4200,21 +4239,21 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'ribbon') {
-        cam.position.set(Math.sin(el * 0.1) * 8 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(elScaled * 0.1) * 8 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         const ribbonLength = obj.cubes.length;
         obj.cubes.forEach((c, i) => {
           const t = i / ribbonLength;
           const pathAngle = t * Math.PI * 4 + el;
           const radius = 5 + Math.sin(t * Math.PI * 3) * 2;
-          const height = Math.sin(t * Math.PI * 2 + el * 2) * 4;
+          const height = Math.sin(t * Math.PI * 2 + elScaled * 2) * 4;
           c.position.x = Math.cos(pathAngle) * radius;
           c.position.y = height + f.bass * 2;
           c.position.z = Math.sin(pathAngle) * radius;
           const nextT = (i + 1) / ribbonLength;
           const nextAngle = nextT * Math.PI * 4 + el;
           const nextRadius = 5 + Math.sin(nextT * Math.PI * 3) * 2;
-          const nextHeight = Math.sin(nextT * Math.PI * 2 + el * 2) * 4;
+          const nextHeight = Math.sin(nextT * Math.PI * 2 + elScaled * 2) * 4;
           const dx = Math.cos(nextAngle) * nextRadius - c.position.x;
           const dy = nextHeight - c.position.y;
           const dz = Math.sin(nextAngle) * nextRadius - c.position.z;
@@ -4233,11 +4272,11 @@ export default function ThreeDVisualizer() {
           const side = (i % 2) === 0 ? 1 : -1;
           const offset = (1 + f.mids) * side;
           o.position.x = attachedCube.position.x + Math.cos(el + i) * offset;
-          o.position.y = attachedCube.position.y + Math.sin(el * 2 + i) * offset;
+          o.position.y = attachedCube.position.y + Math.sin(elScaled * 2 + i) * offset;
           o.position.z = attachedCube.position.z + Math.sin(el + i) * offset;
-          o.rotation.x = el * 2 + i;
+          o.rotation.x = elScaled * 2 + i;
           o.rotation.y = el;
-          o.rotation.z = el * 3;
+          o.rotation.z = elScaled * 3;
           const s = 0.4 + f.mids * 0.4;
           o.scale.set(s, s, s);
           o.material.color.setStyle(midsColor);
@@ -4245,14 +4284,14 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const orbitAngle = (i / obj.tetras.length) * Math.PI * 2 + el * 3;
+          const orbitAngle = (i / obj.tetras.length) * Math.PI * 2 + elScaled * 3;
           const orbitRadius = 10 + Math.sin(el + i) * 2 + f.highs * 3;
           t.position.x = Math.cos(orbitAngle) * orbitRadius;
           t.position.y = Math.sin(orbitAngle * 2) * 3 + f.highs;
           t.position.z = Math.sin(orbitAngle) * orbitRadius;
-          t.rotation.x = el * 4 + i;
+          t.rotation.x = elScaled * 4 + i;
           t.rotation.y = orbitAngle;
-          t.rotation.z = el * 2;
+          t.rotation.z = elScaled * 2;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
           t.material.color.setStyle(highsColor);
@@ -4284,7 +4323,7 @@ export default function ThreeDVisualizer() {
         });
         const sandCount = obj.tetras.length;
         obj.tetras.forEach((t, i) => {
-          const fallProgress = ((el * 2 + i * 0.1) % 10) / 10;
+          const fallProgress = ((elScaled * 2 + i * 0.1) % 10) / 10;
           const topY = 8;
           const bottomY = -8;
           const neckY = 0;
@@ -4302,7 +4341,7 @@ export default function ThreeDVisualizer() {
           t.position.x = Math.cos(angle) * radius * f.mids;
           t.position.y = y;
           t.position.z = Math.sin(angle) * radius * f.mids;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = angle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.3;
@@ -4315,9 +4354,9 @@ export default function ThreeDVisualizer() {
           const ringAngle = (i / obj.octas.length) * Math.PI * 2;
           const ringY = ((i / obj.octas.length) - 0.5) * 16;
           const ringRadius = 7 + Math.sin(el + i) * 1 + f.mids * 2;
-          o.position.x = Math.cos(ringAngle + el * 0.5) * ringRadius;
+          o.position.x = Math.cos(ringAngle + elScaled * 0.5) * ringRadius;
           o.position.y = ringY;
-          o.position.z = Math.sin(ringAngle + el * 0.5) * ringRadius;
+          o.position.z = Math.sin(ringAngle + elScaled * 0.5) * ringRadius;
           o.rotation.x = ringAngle;
           o.rotation.y = el + i;
           o.rotation.z = 0;
@@ -4343,9 +4382,9 @@ export default function ThreeDVisualizer() {
           const segmentIndex = Math.floor(i / arms);
           const armAngle = (armIndex / arms) * Math.PI * 2;
           const segmentDist = (segmentIndex + 1) * 2;
-          c.position.x = Math.cos(armAngle + el * 0.1) * segmentDist;
-          c.position.y = Math.sin(el * 0.2 + i * 0.1) * 0.5 + f.bass;
-          c.position.z = Math.sin(armAngle + el * 0.1) * segmentDist;
+          c.position.x = Math.cos(armAngle + elScaled * 0.1) * segmentDist;
+          c.position.y = Math.sin(elScaled * 0.2 + i * 0.1) * 0.5 + f.bass;
+          c.position.z = Math.sin(armAngle + elScaled * 0.1) * segmentDist;
           c.rotation.x = 0;
           c.rotation.y = armAngle;
           c.rotation.z = el + i;
@@ -4362,9 +4401,9 @@ export default function ThreeDVisualizer() {
           const mainDist = (branchIndex % 3 + 1) * 2;
           const branchAngle = armAngle + ((branchIndex % 2 === 0) ? 0.5 : -0.5);
           const branchDist = 1.5 + f.mids;
-          o.position.x = Math.cos(armAngle + el * 0.1) * mainDist + Math.cos(branchAngle) * branchDist;
-          o.position.y = Math.sin(el * 0.3 + i * 0.1) * 0.3 + f.mids * 0.5;
-          o.position.z = Math.sin(armAngle + el * 0.1) * mainDist + Math.sin(branchAngle) * branchDist;
+          o.position.x = Math.cos(armAngle + elScaled * 0.1) * mainDist + Math.cos(branchAngle) * branchDist;
+          o.position.y = Math.sin(elScaled * 0.3 + i * 0.1) * 0.3 + f.mids * 0.5;
+          o.position.z = Math.sin(armAngle + elScaled * 0.1) * mainDist + Math.sin(branchAngle) * branchDist;
           o.rotation.x = branchAngle;
           o.rotation.y = el + i;
           o.rotation.z = 0;
@@ -4377,11 +4416,11 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const ringAngle = (i / obj.tetras.length) * Math.PI * 2;
           const ringRadius = 8 + Math.sin(el + i) * 2 + f.highs * 2;
-          const ringFloat = Math.sin(el * 0.5 + i) * 0.5;
-          t.position.x = Math.cos(ringAngle + el * 0.2) * ringRadius;
+          const ringFloat = Math.sin(elScaled * 0.5 + i) * 0.5;
+          t.position.x = Math.cos(ringAngle + elScaled * 0.2) * ringRadius;
           t.position.y = ringFloat + f.highs * 0.5;
-          t.position.z = Math.sin(ringAngle + el * 0.2) * ringRadius;
-          t.rotation.x = el * 2 + i;
+          t.position.z = Math.sin(ringAngle + elScaled * 0.2) * ringRadius;
+          t.rotation.x = elScaled * 2 + i;
           t.rotation.y = ringAngle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
@@ -4393,7 +4432,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, 0, 0);
         const coreSize = 1.5 + Math.sin(el) * 0.3 + f.bass * 0.8;
         obj.sphere.scale.set(coreSize, coreSize * 0.5, coreSize);
-        obj.sphere.rotation.y = el * 0.5;
+        obj.sphere.rotation.y = elScaled * 0.5;
         obj.sphere.material.color.setStyle(highsColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
@@ -6482,21 +6521,39 @@ export default function ThreeDVisualizer() {
                 </button>
               </div>
               
-              {/* Timeline bar visualization */}
+              {/* Timeline bar visualization with segments */}
               <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
-                {/* Timeline markers for each preset keyframe */}
+                {/* Preset segments */}
                 {presetKeyframes.map(kf => {
-                  const position = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                  const startPos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                  const endPos = duration > 0 ? Math.min((kf.endTime / duration) * 100, 100) : 0;
+                  const width = Math.max(endPos - startPos, 0.5); // Minimum visible width
                   const animType = animationTypes.find(a => a.value === kf.preset);
+                  
+                  // Color coding by preset type
+                  const colors: Record<string, string> = {
+                    orbit: 'bg-blue-500',
+                    explosion: 'bg-orange-500',
+                    tunnel: 'bg-green-500',
+                    wave: 'bg-cyan-500',
+                    spiral: 'bg-purple-500',
+                    chill: 'bg-pink-500',
+                    pulse: 'bg-yellow-500',
+                    vortex: 'bg-red-500',
+                    dragon: 'bg-indigo-500',
+                    hammerhead: 'bg-teal-500'
+                  };
+                  const colorClass = colors[kf.preset] || 'bg-gray-500';
+                  
                   return (
                     <div
                       key={kf.id}
-                      className="absolute top-0 bottom-0 w-1 bg-purple-500 hover:bg-purple-400 transition-colors cursor-pointer"
-                      style={{ left: `${position}%` }}
-                      title={`${formatTime(kf.time)}: ${animType?.label || kf.preset}`}
+                      className={`absolute top-0 bottom-0 ${colorClass} opacity-70 hover:opacity-90 transition-opacity cursor-pointer border-r-2 border-white`}
+                      style={{ left: `${startPos}%`, width: `${width}%` }}
+                      title={`${animType?.label || kf.preset}: ${formatTime(kf.time)} - ${formatTime(kf.endTime)} (${kf.speed}x speed)`}
                     >
-                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 text-xs whitespace-nowrap bg-gray-900 px-1 rounded opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
-                        {animType?.icon} {formatTime(kf.time)}
+                      <div className="absolute top-1 left-1 text-xs text-white font-semibold truncate px-1">
+                        {animType?.icon}
                       </div>
                     </div>
                   );
@@ -6504,7 +6561,7 @@ export default function ThreeDVisualizer() {
                 
                 {/* Current time indicator */}
                 <div 
-                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none"
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
                   style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                 />
               </div>
@@ -6524,10 +6581,13 @@ export default function ThreeDVisualizer() {
               <div className="space-y-3">
                 {presetKeyframes.map((kf, index) => {
                   const animType = animationTypes.find(a => a.value === kf.preset);
+                  const duration = kf.endTime - kf.time;
                   return (
                     <div key={kf.id} className="bg-gray-700 rounded-lg p-3">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-purple-400 font-mono text-sm">#{index + 1} - {formatTime(kf.time)}</span>
+                        <span className="text-purple-400 font-mono text-sm">
+                          #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
+                        </span>
                         <button
                           onClick={() => handleDeletePresetKeyframe(kf.id)}
                           className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -6540,9 +6600,9 @@ export default function ThreeDVisualizer() {
                         </button>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-3 gap-3 mb-2">
                         <div>
-                          <label className="text-xs text-gray-400 block mb-1">Time</label>
+                          <label className="text-xs text-gray-400 block mb-1">Start Time</label>
                           <input
                             type="text"
                             id={`preset-kf-time-${kf.id}`}
@@ -6553,24 +6613,50 @@ export default function ThreeDVisualizer() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs text-gray-400 block mb-1">Preset</label>
-                          <select
-                            value={kf.preset}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                          <label className="text-xs text-gray-400 block mb-1">End Time</label>
+                          <input
+                            type="text"
+                            id={`preset-kf-endtime-${kf.id}`}
+                            name={`preset-kf-endtime-${kf.id}`}
+                            value={formatTime(kf.endTime)}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
                             className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          >
-                            {animationTypes.map(t => (
-                              <option key={t.value} value={t.value}>
-                                {t.icon} {t.label}
-                              </option>
-                            ))}
-                          </select>
+                          />
                         </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
+                          <input
+                            type="number"
+                            id={`preset-kf-speed-${kf.id}`}
+                            name={`preset-kf-speed-${kf.id}`}
+                            min="0.1"
+                            max="3.0"
+                            step="0.1"
+                            value={kf.speed}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'speed', parseFloat(e.target.value) || 1.0)}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Preset</label>
+                        <select
+                          value={kf.preset}
+                          onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        >
+                          {animationTypes.map(t => (
+                            <option key={t.value} value={t.value}>
+                              {t.icon} {t.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       
                       {/* Preview of current preset */}
                       <div className="mt-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">
-                        {animType?.icon} {animType?.label || kf.preset}
+                        {animType?.icon} {animType?.label || kf.preset} • {kf.speed}x speed • {duration.toFixed(1)}s duration
                       </div>
                     </div>
                   );
