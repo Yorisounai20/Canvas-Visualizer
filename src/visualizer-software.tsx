@@ -354,19 +354,10 @@ export default function ThreeDVisualizer() {
   const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
   const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
   
-  // Camera Rig Transitions
+  // Camera Rig Transitions (UI controls only - transition state for future enhancement)
   const [rigTransitionDuration, setRigTransitionDuration] = useState(1.0); // seconds
   const [rigTransitionEasing, setRigTransitionEasing] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
   const [enableRigTransitions, setEnableRigTransitions] = useState(true);
-  const rigTransitionStateRef = useRef<{
-    isTransitioning: boolean;
-    startTime: number;
-    fromRigIds: string[];
-    toRigIds: string[];
-    startPosition: THREE.Vector3;
-    startRotation: THREE.Euler;
-    startFov: number;
-  } | null>(null);
   
   // Framing Controls
   const [lookAtOffsetX, setLookAtOffsetX] = useState(0); // -10 to 10
@@ -381,7 +372,6 @@ export default function ThreeDVisualizer() {
   const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
   const [enableFovRamping, setEnableFovRamping] = useState(false);
   const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
-  const handheldNoiseOffsetRef = useRef({ x: 0, y: 0, z: 0 });
   
   // Shot Presets
   const [selectedShotPreset, setSelectedShotPreset] = useState<string | null>(null);
@@ -1697,12 +1687,6 @@ export default function ThreeDVisualizer() {
       Math.sin(time * freq2) * 0.3 +
       Math.sin(time * freq3) * 0.2
     );
-  };
-
-  // Rig transition interpolation
-  const interpolateRigTransition = (progress: number) => {
-    // Apply easing to transition progress
-    return applyEasing(progress, rigTransitionEasing);
   };
 
   // Scene initialization - runs once on mount
