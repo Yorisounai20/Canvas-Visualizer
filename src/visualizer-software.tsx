@@ -4677,59 +4677,71 @@ export default function ThreeDVisualizer() {
 
                     {/* Base Position/Rotation for all rig types */}
                     <div className="border-t border-gray-600 pt-3 mt-3">
-                      <div className="text-xs text-gray-400 mb-2">Base Position</div>
+                      <div className="text-xs text-gray-400 mb-2">Base Position (X, Y, Z)</div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
-                        <input 
-                          type="number" id="number-field-4419" name="number-field-4419" 
-                          placeholder="X"
-                          step="0.5"
-                          value={rig.position.x}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, x: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4427" name="number-field-4427" 
-                          placeholder="Y"
-                          step="0.5"
-                          value={rig.position.y}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, y: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4435" name="number-field-4435" 
-                          placeholder="Z"
-                          step="0.5"
-                          value={rig.position.z}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, z: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.x}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, x: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.y}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, y: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Z</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.z}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, z: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 mb-2">Base Rotation</div>
+                      <div className="text-xs text-gray-400 mb-2">Base Rotation (X, Y, Z in radians)</div>
                       <div className="grid grid-cols-3 gap-2">
-                        <input 
-                          type="number" id="number-field-4446" name="number-field-4446" 
-                          placeholder="X"
-                          step="0.1"
-                          value={rig.rotation.x}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, x: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4454" name="number-field-4454" 
-                          placeholder="Y"
-                          step="0.1"
-                          value={rig.rotation.y}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, y: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4462" name="number-field-4462" 
-                          placeholder="Z"
-                          step="0.1"
-                          value={rig.rotation.z}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, z: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.x}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, x: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.y}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, y: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Z</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.z}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, z: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
