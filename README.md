@@ -32,7 +32,7 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 - ✅ Scrolling and static waveform visualization modes
 
 **Shared Features (Both Modes):**
-- ✅ 9 animation presets with audio-reactive 3D visuals
+- ✅ 25 animation presets with audio-reactive 3D visuals
 - ✅ 3D text overlay with font loading
 - ✅ Waveform visualization
 - ✅ Debug console (toggle with `` ` `` key)
@@ -138,7 +138,7 @@ Features:
 - Smooth transitions between animation styles
 - Real-time audio frequency analysis (bass, mids, highs)
 
-### 🌀 **9 Animation Presets**
+### 🌀 **25 Animation Presets**
 
 1. **Orbital Dance** 🌀 - Solar system simulation with planets orbiting a pulsing sun
 2. **Explosion** 💥 - Objects exploding outward from center with radial motion
@@ -148,7 +148,23 @@ Features:
 6. **Chill Vibes** 🎵 - Gentle floating motion, relaxed animation
 7. **Pulse Grid** ⚡ - Grid of objects pulsing in sync with music
 8. **Vortex Storm** 🌪️ - Swirling vortex with dynamic rotation
-9. **Azure Dragon** 🐉 - Serpentine dragon flying through mountains (most complex)
+9. **Azure Dragon** 🐉 - Serpentine dragon flying through mountains
+10. **Kaleidoscope** 🔮 - Symmetrical patterns radiating from center with mirrored geometry
+11. **Meteor Shower** ☄️ - Objects falling and shooting across the scene with trails
+12. **DNA Helix** 🧬 - Double helix structure rotating with connecting strands
+13. **Fireworks** 🎆 - Explosive particles bursting outward in colorful displays
+14. **Matrix Rain** 💚 - Falling columns of objects inspired by digital rain
+15. **Ripple Wave** 〰️ - Concentric circular waves expanding from center
+16. **Constellation** ✨ - Star-like patterns with connecting lines between points
+17. **Pendulum** ⏱️ - Swinging and oscillating motion patterns
+18. **Blooming Flower** 🌸 - Organic petal structures blooming and pulsing with music
+19. **Tornado** 🌀 - Spiraling vortex ascending with layered debris particles
+20. **Hypercube** 📦 - 4D cube representation with rotating edges and vertices
+21. **Fractal Tree** 🌳 - Branching organic structure with recursive patterns
+22. **Binary Stars** ⭐ - Two orbiting stellar bodies with circling planets and debris
+23. **Ribbon Dance** 🎀 - Flowing curved ribbon path with trailing particles
+24. **Hourglass** ⏳ - Sand-like particles flowing through narrowing passage
+25. **Snowflake** ❄️ - Hexagonal crystalline structure with intricate branching arms
 
 *Available in both Editor and Software modes*
 
