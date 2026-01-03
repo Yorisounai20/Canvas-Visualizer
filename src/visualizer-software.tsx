@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown } from 'lucide-react';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -189,11 +189,13 @@ export default function ThreeDVisualizer() {
   const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
   
   // NEW: Visual effects controls
+  const DEFAULT_MAX_LETTERBOX_HEIGHT = 270; // Default maximum bar height for curtain mode
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
-  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270); // Maximum bar height for curtain mode (affects both top and bottom)
+  const [letterboxSettingsExpanded, setLetterboxSettingsExpanded] = useState(false); // Collapsible settings
+  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   // NEW: Skybox controls
@@ -249,12 +251,14 @@ export default function ThreeDVisualizer() {
   
   // NEW: Letterbox animation keyframes
   const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
+    id?: number;         // Unique ID for each keyframe
     time: number;        // Time in seconds when this keyframe activates
     targetSize: number;  // Target letterbox size (0-100px)
     duration: number;    // Duration of the animation in seconds
     mode: 'instant' | 'smooth'; // Animation mode
     invert: boolean;     // Per-keyframe invert: true = curtain mode (100=closed, 0=open)
   }>>([]);
+  const nextLetterboxKeyframeId = useRef(1); // Counter for generating unique IDs
   // NEW: Camera shake events
   const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
   
@@ -294,6 +298,7 @@ export default function ThreeDVisualizer() {
   const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [parameterSettingsExpanded, setParameterSettingsExpanded] = useState(false); // Collapsible settings
   
   // PHASE 4: Active parameter effect values (stored in refs for performance)
   const activeBackgroundFlashRef = useRef(0);
@@ -315,6 +320,22 @@ export default function ThreeDVisualizer() {
     { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
   ]);
   
+  // NEW: Preset switching keyframes (timeline-based) - Enhanced with segments
+  const [presetKeyframes, setPresetKeyframes] = useState<Array<{
+    id: number;
+    time: number; // start time
+    endTime: number; // end time (duration of this preset)
+    preset: string; // animation type (orbit, explosion, chill, etc.)
+    speed: number; // animation speed multiplier (0.1 to 3.0, default 1.0)
+  }>>([
+    { id: 1, time: 0, endTime: 20, preset: 'orbit', speed: 1.0 },
+    { id: 2, time: 20, endTime: 40, preset: 'explosion', speed: 1.0 },
+    { id: 3, time: 40, endTime: 60, preset: 'chill', speed: 1.0 }
+  ]);
+  const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
+  const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
+  
+  // Legacy sections system (kept for backward compatibility with existing code)
   const [sections, setSections] = useState([
     { id: 1, start: 0, end: 20, animation: 'orbit' },
     { id: 2, start: 20, end: 40, animation: 'explosion' },
@@ -547,6 +568,37 @@ export default function ThreeDVisualizer() {
   };
 
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
+  
+  // Get current preset from keyframes (finds active preset segment at current time)
+  const getCurrentPreset = () => {
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    // Find the preset segment that contains current time
+    for (let i = 0; i < sorted.length; i++) {
+      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
+        return sorted[i].preset;
+      }
+    }
+    // If after all segments or before first, use the first or last preset
+    if (currentTime < sorted[0]?.time) {
+      return sorted[0]?.preset || 'orbit';
+    }
+    // After all segments, use the last preset
+    return sorted[sorted.length - 1]?.preset || 'orbit';
+  };
+  
+  // Get current preset speed multiplier
+  const getCurrentPresetSpeed = () => {
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    for (let i = 0; i < sorted.length; i++) {
+      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
+        return sorted[i].speed || 1.0;
+      }
+    }
+    if (currentTime < sorted[0]?.time) {
+      return sorted[0]?.speed || 1.0;
+    }
+    return sorted[sorted.length - 1]?.speed || 1.0;
+  };
 
   const addSection = () => {
     const last = sections[sections.length-1];
@@ -562,6 +614,47 @@ export default function ThreeDVisualizer() {
 
   const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
   const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+  
+  // Preset keyframe handlers
+  const handleAddPresetKeyframe = () => {
+    // Find a good default end time: either 20 seconds from current time, or until next keyframe
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    const nextKeyframe = sorted.find(kf => kf.time > currentTime);
+    const defaultEndTime = nextKeyframe ? nextKeyframe.time : currentTime + 20;
+    
+    const newKeyframe = {
+      id: nextPresetKeyframeId.current++,
+      time: currentTime,
+      endTime: Math.max(currentTime + 1, Math.min(defaultEndTime, duration || currentTime + 20)), // At least 1 second duration
+      preset: 'orbit', // Default preset
+      speed: 1.0 // Default speed
+    };
+    setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeletePresetKeyframe = (id: number) => {
+    // Keep at least one keyframe
+    if (presetKeyframes.length > 1) {
+      setPresetKeyframes(presetKeyframes.filter(kf => kf.id !== id));
+    }
+  };
+  
+  const handleUpdatePresetKeyframe = (id: number, field: string, value: any) => {
+    setPresetKeyframes(presetKeyframes.map(kf => {
+      if (kf.id === id) {
+        const updated = { ...kf, [field]: value };
+        // Ensure endTime is always after time
+        if (field === 'time' && updated.endTime <= value) {
+          updated.endTime = value + 1;
+        }
+        if (field === 'endTime' && value <= updated.time) {
+          updated.endTime = updated.time + 1;
+        }
+        return updated;
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time)); // Re-sort after time update
+  };
 
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
@@ -616,37 +709,6 @@ export default function ThreeDVisualizer() {
   const updateKeyframe = (keyframeIndex, field, value) => {
     setCameraKeyframes(cameraKeyframes.map((kf, i) => 
       i === keyframeIndex ? { ...kf, [field]: value } : kf
-    ));
-  };
-
-  // Letterbox keyframe management
-  const addLetterboxKeyframe = () => {
-    const newKeyframe = {
-      time: letterboxKeyframes.length > 0 
-        ? Math.max(...letterboxKeyframes.map(k => k.time)) + 5 
-        : 0,
-      targetSize: 50,
-      duration: 1,
-      mode: 'smooth' as 'smooth' | 'instant',
-      invert: false  // Default to non-inverted
-    };
-    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe]);
-    setShowLetterbox(true); // Enable letterbox when adding keyframes
-    setUseLetterboxAnimation(true); // Enable animation mode
-  };
-
-  const deleteLetterboxKeyframe = (index: number) => {
-    const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
-    setLetterboxKeyframes(newKeyframes);
-    // If no keyframes left, disable animation mode
-    if (newKeyframes.length === 0) {
-      setUseLetterboxAnimation(false);
-    }
-  };
-
-  const updateLetterboxKeyframe = (index: number, field: string, value: number | string | boolean) => {
-    setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
-      i === index ? { ...kf, [field]: value } : kf
     ));
   };
 
@@ -1370,9 +1432,6 @@ export default function ThreeDVisualizer() {
       rigPathsRef.current.delete(id);
     }
     
-    if (activeCameraRigId === id) {
-      setActiveCameraRigId(null);
-    }
     // Remove from active rigs array
     setActiveCameraRigIds(prev => prev.filter(rigId => rigId !== id));
     
@@ -2387,8 +2446,9 @@ export default function ThreeDVisualizer() {
       const el = (Date.now() - startTimeRef.current) * 0.001;
       const t = el % duration;
       setCurrentTime(t);
-      const sec = sections.find(s => t >= s.start && t < s.end);
-      const type = sec ? sec.animation : 'orbit';
+      const type = getCurrentPreset(); // Use keyframe-based preset switching
+      const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
+      const elScaled = elScaled * presetSpeed; // Apply speed multiplier to animations
       
       // Interpolate camera settings from global keyframes or use global settings
       let activeCameraDistance, activeCameraHeight, activeCameraRotation;
@@ -2415,9 +2475,18 @@ export default function ThreeDVisualizer() {
         }
         
         // Helper to get current target size
-        const getCurrentSize = () => currentKeyframeIndex >= 0 
-          ? sortedLetterboxKeyframes[currentKeyframeIndex].targetSize 
-          : 0;
+        // If we're before the first keyframe, start at 100 (fully closed) if first keyframe will open (targetSize < 100)
+        // Otherwise start at the first keyframe's target
+        const getCurrentSize = () => {
+          if (currentKeyframeIndex >= 0) {
+            return sortedLetterboxKeyframes[currentKeyframeIndex].targetSize;
+          } else if (sortedLetterboxKeyframes.length > 0) {
+            // Before first keyframe - if first keyframe is < 100, start at 100 (closed), else use its value
+            const firstKeyframeTarget = sortedLetterboxKeyframes[0].targetSize;
+            return firstKeyframeTarget < 100 ? 100 : firstKeyframeTarget;
+          }
+          return 0;
+        };
         
         // Check if we should be animating toward the next keyframe
         if (currentKeyframeIndex < sortedLetterboxKeyframes.length - 1) {
@@ -2449,6 +2518,9 @@ export default function ThreeDVisualizer() {
             // Use current keyframe's invert when not animating
             if (currentKeyframeIndex >= 0) {
               setActiveLetterboxInvert(sortedLetterboxKeyframes[currentKeyframeIndex].invert);
+            } else {
+              // Before first keyframe, use first keyframe's invert setting
+              setActiveLetterboxInvert(sortedLetterboxKeyframes[0].invert);
             }
           }
         } else {
@@ -2621,7 +2693,7 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((planet, i) => {
           const orbitRadius = 5 + i * 1.8;
           const orbitSpeed = 0.8 / (1 + i * 0.3);
-          const angle = el * orbitSpeed + i * 0.5;
+          const angle = elScaled * orbitSpeed + i * 0.5;
           const tilt = Math.sin(i) * 0.3;
           planet.position.x = Math.cos(angle) * orbitRadius;
           planet.position.z = Math.sin(angle) * orbitRadius;
@@ -2642,7 +2714,7 @@ export default function ThreeDVisualizer() {
           const planet = obj.cubes[planetIndex];
           const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
           const moonOrbitSpeed = 3 + (i % 3);
-          const moonAngle = el * moonOrbitSpeed + i;
+          const moonAngle = elScaled * moonOrbitSpeed + i;
           moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
           moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
           moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
@@ -2665,8 +2737,8 @@ export default function ThreeDVisualizer() {
           rogue.position.z = Math.sin(rogueAngle) * rogueDist;
           const rogueSize = 4 + layer * 2 + (i % 3);
           rogue.scale.set(rogueSize, rogueSize, rogueSize);
-          rogue.rotation.x = el * 0.05 + i;
-          rogue.rotation.y = el * 0.03;
+          rogue.rotation.x = elScaled * 0.05 + i;
+          rogue.rotation.y = elScaled * 0.03;
           rogue.rotation.z = 0;
           rogue.material.color.setStyle(midsColor);
           rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
@@ -2675,7 +2747,7 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((asteroid, i) => {
           const beltRadius = 11 + (i % 5) * 0.5;
           const beltSpeed = 0.3;
-          const angle = el * beltSpeed + i * 0.2;
+          const angle = elScaled * beltSpeed + i * 0.2;
           const scatter = Math.sin(i * 10) * 2;
           asteroid.position.x = Math.cos(angle) * (beltRadius + scatter);
           asteroid.position.z = Math.sin(angle) * (beltRadius + scatter);
@@ -2764,12 +2836,36 @@ export default function ThreeDVisualizer() {
           o.material.opacity = (0.3+f.mids*0.3) * blend;
           o.material.color.setStyle(midsColor);
         });
+        obj.tetras.forEach((t,i) => {
+          const ringAngle = (i/obj.tetras.length)*Math.PI*2;
+          const ringRadius = 10+Math.sin(el*0.3+i)*2;
+          t.position.set(
+            Math.cos(ringAngle+el*0.2)*ringRadius,
+            Math.sin(el*0.5+i*0.5)*3,
+            Math.sin(ringAngle+el*0.2)*ringRadius
+          );
+          t.rotation.x += 0.01+f.highs*0.02;
+          t.rotation.y += 0.015+f.highs*0.03;
+          const s = 0.6+f.highs*0.4;
+          t.scale.set(s,s,s);
+          t.material.opacity = (0.25+f.highs*0.35) * blend;
+          t.material.color.setStyle(highsColor);
+          t.material.wireframe = true;
+        });
+        obj.sphere.position.set(0, Math.sin(el*0.4)*2, 0);
+        const sphereSize = 2.5+f.bass*0.5+f.mids*0.3;
+        obj.sphere.scale.set(sphereSize,sphereSize,sphereSize);
+        obj.sphere.rotation.x += 0.003;
+        obj.sphere.rotation.y += 0.005;
+        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.opacity = (0.2+f.bass*0.2) * blend;
+        obj.sphere.material.wireframe = false;
       } else if (type === 'wave') {
-        const pathProgress = el * 2;
+        const pathProgress = elScaled * 2;
         cam.position.set(Math.sin(pathProgress * 0.3) * 3 + shakeX, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight + shakeY, activeCameraDistance - 5 + shakeZ);
         cam.lookAt(Math.sin((pathProgress + 2) * 0.3) * 3, Math.cos((pathProgress + 2) * 0.4) * 2, -10);
         obj.octas.slice(0, 30).forEach((segment, i) => {
-          const segmentTime = el * 3 - i * 0.3;
+          const segmentTime = elScaled * 3 - i * 0.3;
           const waveValue = f.bass * Math.sin(segmentTime * 10 + i) + f.mids * Math.cos(segmentTime * 7 + i * 0.5) + f.highs * Math.sin(segmentTime * 15 + i * 2);
           const x = Math.sin(segmentTime * 0.3) * 3;
           const y = waveValue * 3;
@@ -2788,7 +2884,7 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c, i) => {
           const scopeIndex = i % vectorscopePositions.length;
           const scopePos = vectorscopePositions[scopeIndex];
-          const t = el * 5 + i * 0.8;
+          const t = elScaled * 5 + i * 0.8;
           const freqX = 2 + scopeIndex;
           const freqY = 3 + scopeIndex * 0.5;
           const radius = 2 + f.mids * 1.5;
@@ -2810,7 +2906,7 @@ export default function ThreeDVisualizer() {
           const scopeIndex = Math.floor(i / 5) % vectorscopePositions.length;
           const ringIndex = i % 5;
           const scopePos = vectorscopePositions[scopeIndex];
-          const angle = (ringIndex / 5) * Math.PI * 2 + el * 2;
+          const angle = (ringIndex / 5) * Math.PI * 2 + elScaled * 2;
           const haloRadius = 2.5 + f.highs * 1.5;
           halo.position.x = scopePos.x + Math.cos(angle) * haloRadius;
           halo.position.y = scopePos.y + Math.sin(angle) * haloRadius;
@@ -2854,7 +2950,7 @@ export default function ThreeDVisualizer() {
           c.material.color.setStyle(bassColor);
         });
         obj.octas.forEach((o,i) => {
-          const angle = el * 2 + i * 0.3;
+          const angle = elScaled * 2 + i * 0.3;
           const radius = 3 + Math.sin(el + i) * 2 + f.mids * 2;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = i * 0.5 - 5;
@@ -2872,9 +2968,9 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c,i) => {
           const gridX = (i % 4 - 1.5) * 5;
           const gridY = (Math.floor(i / 4) - 1) * 5;
-          c.position.set(gridX, gridY, Math.sin(el * 3 + i) * (2 + f.bass * 5));
+          c.position.set(gridX, gridY, Math.sin(elScaled * 3 + i) * (2 + f.bass * 5));
           c.rotation.x = el + i;
-          c.rotation.y = el * 1.5;
+          c.rotation.y = elScaled * 1.5;
           const s = 1.5 + f.bass * 2.5;
           c.scale.set(s,s,s);
           c.material.opacity = (0.5 + f.bass * 0.5) * blend;
@@ -2884,7 +2980,7 @@ export default function ThreeDVisualizer() {
           const gridPos = i % 16;
           const x = (gridPos % 4 - 1.5) * 4;
           const y = (Math.floor(gridPos / 4) - 1.5) * 4;
-          o.position.set(x, y, Math.cos(el * 2 + i * 0.1) * (1 + f.mids * 3));
+          o.position.set(x, y, Math.cos(elScaled * 2 + i * 0.1) * (1 + f.mids * 3));
           o.rotation.x += 0.02 + f.mids * 0.05;
           o.rotation.y += 0.01 + f.mids * 0.03;
           o.rotation.z += 0.05;
@@ -2897,7 +2993,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
         obj.cubes.forEach((c,i) => {
-          const angle = el * 2 + i * 0.8;
+          const angle = elScaled * 2 + i * 0.8;
           const radius = 3 + i * 1.5 + f.bass * 5;
           const height = Math.sin(el + i * 0.5) * 10;
           c.position.set(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
@@ -2909,7 +3005,7 @@ export default function ThreeDVisualizer() {
           c.material.color.setStyle(bassColor);
         });
         obj.octas.forEach((o,i) => {
-          const angle = -el * 3 + i * 0.5;
+          const angle = -elScaled * 3 + i * 0.5;
           const radius = 5 + Math.sin(el + i) * 3 + f.mids * 4;
           o.position.set(Math.cos(angle) * radius, (i % 10 - 5) * 2, Math.sin(angle) * radius);
           o.rotation.x += 0.08 + f.mids * 0.05;
@@ -2922,10 +3018,10 @@ export default function ThreeDVisualizer() {
         });
       } else if (type === 'seiryu') {
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
-        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(el * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(rotationSpeed + activeCameraRotation) * 5 + shakeX, 8 + Math.cos(elScaled * 0.2) * 3 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
-          const segmentTime = el * 1.5 - i * 0.6;
+          const segmentTime = elScaled * 1.5 - i * 0.6;
           const progress = i / obj.cubes.length;
           const isHead = i === 0;
           const x = Math.sin(segmentTime) * (6 + f.bass * 3);
@@ -2935,7 +3031,7 @@ export default function ThreeDVisualizer() {
           const baseScale = isHead ? 5 : 1.3;
           const scaleSize = baseScale + f.bass * 0.8;
           c.scale.set(scaleSize, scaleSize * 0.8, scaleSize * 1.2);
-          const nextT = el * 1.5 - (i + 1) * 0.6;
+          const nextT = elScaled * 1.5 - (i + 1) * 0.6;
           const lookX = Math.sin(nextT) * 6;
           const lookY = Math.cos(nextT * 0.5) * 4;
           const lookZ = (progress + 0.1) * -15;
@@ -2967,7 +3063,7 @@ export default function ThreeDVisualizer() {
           const mountainZ = -25 - (i % 2) * 5;
           mountain.position.set(mountainX, -5 + mountainHeight, mountainZ);
           mountain.rotation.x = 0;
-          mountain.rotation.y = el * 0.1 + i;
+          mountain.rotation.y = elScaled * 0.1 + i;
           const s = 8 + (i % 3) * 3;
           mountain.scale.set(s, mountainHeight * 2, s);
           mountain.material.color.setStyle(midsColor);
@@ -2976,7 +3072,7 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.slice(10).forEach((o, i) => {
           const bodyIndex = (i % obj.cubes.length);
-          const orbitAngle = (i / 4) * Math.PI * 2 + el * 3;
+          const orbitAngle = (i / 4) * Math.PI * 2 + elScaled * 3;
           const bodyCube = obj.cubes[bodyIndex];
           const orbitRadius = 1.2 + f.mids * 1.5;
           o.position.x = bodyCube.position.x + Math.cos(orbitAngle) * orbitRadius;
@@ -2993,9 +3089,9 @@ export default function ThreeDVisualizer() {
         obj.tetras.slice(2).forEach((cloud, i) => {
           const driftSpeed = 0.2;
           const layer = Math.floor(i / 10);
-          cloud.position.x = ((el * driftSpeed + i * 4) % 50) - 25;
+          cloud.position.x = ((elScaled * driftSpeed + i * 4) % 50) - 25;
           cloud.position.y = 5 + layer * 3 + Math.sin(el + i) * 0.5;
-          cloud.position.z = -10 - layer * 8 + Math.cos(el * 0.3 + i) * 2;
+          cloud.position.z = -10 - layer * 8 + Math.cos(elScaled * 0.3 + i) * 2;
           cloud.rotation.x += 0.01;
           cloud.rotation.y += 0.02;
           const cloudSize = 1.5 + (i % 3) * 0.5;
@@ -3007,6 +3103,181 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+      } else if (type === 'hammerhead') {
+        // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
+        // Constants for shark anatomy
+        const TAIL_SEGMENT_COUNT = 2;
+        const HAMMER_CUBE_COUNT = 3; // 3 cubes form the T-shaped hammer
+        const DORSAL_FIN_INDEX = 0; // Use first tetrahedron for dorsal fin
+        const TAIL_FIN_INDEX = 1; // Use second tetrahedron for tail fin
+        
+        const swimSpeed = elScaled * 0.8;
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
+        
+        // Camera follows shark from side/above angle
+        cam.position.set(
+          Math.sin(rotationSpeed + activeCameraRotation) * activeCameraDistance * 0.8 + Math.sin(swimSpeed * 0.3) * 2 + shakeX,
+          5 + activeCameraHeight + Math.sin(swimSpeed * 0.5) * 1 + shakeY,
+          activeCameraDistance * 0.8 + shakeZ
+        );
+        cam.lookAt(0, 0, -5);
+        
+        // Shark body using cubes - serpentine swimming motion
+        obj.cubes.forEach((c, i) => {
+          const progress = i / obj.cubes.length;
+          const isHead = i === 0;
+          const isHammer = i < HAMMER_CUBE_COUNT; // First 3 cubes form hammer
+          const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
+          
+          // Swimming path - gentle side-to-side motion
+          const swayAmount = (1 - progress) * 2 + f.bass * 1.5;
+          const x = Math.sin(swimSpeed - i * 0.4) * swayAmount;
+          const yPos = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
+          const z = progress * -20 - 5;
+          
+          // Hammer T-shape positioning
+          if (isHammer) {
+            if (i === 0) {
+              // Left end of hammer
+              c.position.set(x - 6, yPos + 0.5, z + 2);
+            } else if (i === 1) {
+              // Center of hammer (vertical part of T)
+              c.position.set(x, yPos, z);
+            } else {
+              // Right end of hammer
+              c.position.set(x + 6, yPos + 0.5, z + 2);
+            }
+          } else {
+            c.position.set(x, yPos, z);
+          }
+          
+          // Scale: MUCH LARGER for prominence
+          let scaleX, scaleY, scaleZ;
+          if (isHammer && i !== 1) {
+            // Hammer end cubes - stretched horizontally
+            scaleX = 5 + f.highs * 0.5; // Very wide for hammer ends
+            scaleY = 2 + f.highs * 0.3;
+            scaleZ = 2 + f.highs * 0.3;
+          } else if (isHead) {
+            // Center/head cube
+            scaleX = 2.5 + f.bass * 0.5;
+            scaleY = 2.5 + f.bass * 0.5;
+            scaleZ = 4 + f.bass * 0.8; // Longer for head
+          } else if (isTail) {
+            const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
+            scaleX = 1.5 - tailProgress * 0.7;
+            scaleY = 1.2 - tailProgress * 0.6;
+            scaleZ = 2 + f.bass * 0.5;
+          } else {
+            scaleX = 2.5;
+            scaleY = 2;
+            scaleZ = 3;
+          }
+          c.scale.set(scaleX, scaleY, scaleZ);
+          
+          // Rotation to follow swimming path
+          const nextI = Math.min(i + 1, obj.cubes.length - 1);
+          const nextProgress = nextI / obj.cubes.length;
+          const nextSwayAmount = (1 - nextProgress) * 2 + f.bass * 1.5;
+          const nextX = Math.sin(swimSpeed - nextI * 0.4) * nextSwayAmount;
+          const nextYPos = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
+          const nextZ = nextProgress * -20 - 5;
+          
+          if (!isHammer || i === 1) {
+            // Only rotate non-hammer cubes (and center of hammer)
+            c.rotation.y = Math.atan2(nextX - x, nextZ - z);
+            c.rotation.x = Math.atan2(nextYPos - yPos, nextZ - z) * 0.5;
+            c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
+          } else {
+            // Hammer ends align with center
+            const center = obj.cubes[1];
+            c.rotation.y = center.rotation.y;
+            c.rotation.x = 0;
+            c.rotation.z = 0;
+          }
+          
+          // Color hammer differently
+          if (isHammer) {
+            c.material.color.setStyle(highsColor);
+          } else {
+            c.material.color.setStyle(bassColor);
+          }
+          c.material.opacity = (0.9 + f.bass * 0.1) * blend;
+          c.material.wireframe = false;
+        });
+        
+        // PROMINENT DORSAL FIN using tetrahedron (triangle shape)
+        const dorsalFin = obj.tetras[DORSAL_FIN_INDEX];
+        const bodySegment = Math.floor(obj.cubes.length * 0.35);
+        const body = obj.cubes[bodySegment];
+        dorsalFin.position.x = body.position.x;
+        dorsalFin.position.y = body.position.y + 5 + f.mids * 1; // VERY TALL
+        dorsalFin.position.z = body.position.z;
+        dorsalFin.rotation.x = 0; // Point up
+        dorsalFin.rotation.y = body.rotation.y;
+        dorsalFin.rotation.z = Math.PI; // Flip to point upward
+        const dorsalSize = 5 + f.mids * 0.8; // VERY LARGE
+        dorsalFin.scale.set(dorsalSize * 0.5, dorsalSize * 1.2, dorsalSize * 0.4);
+        dorsalFin.material.color.setStyle(midsColor);
+        dorsalFin.material.opacity = (0.9 + f.mids * 0.1) * blend;
+        dorsalFin.material.wireframe = false;
+        
+        // PROMINENT TAIL FIN using tetrahedron (triangle shape)
+        const tailFin = obj.tetras[TAIL_FIN_INDEX];
+        const tail = obj.cubes[obj.cubes.length - 1];
+        tailFin.position.x = tail.position.x;
+        tailFin.position.y = tail.position.y + Math.sin(swimSpeed * 3) * 1; // Animated vertical movement
+        tailFin.position.z = tail.position.z - 3;
+        tailFin.rotation.x = Math.PI / 2; // Vertical orientation
+        tailFin.rotation.y = tail.rotation.y;
+        tailFin.rotation.z = Math.sin(swimSpeed * 3) * 0.4; // Animated wagging
+        const tailSize = 4 + f.bass * 0.8; // VERY LARGE
+        tailFin.scale.set(tailSize * 0.6, tailSize * 1.3, tailSize * 0.3);
+        tailFin.material.color.setStyle(midsColor);
+        tailFin.material.opacity = (0.9 + f.bass * 0.1) * blend;
+        tailFin.material.wireframe = false;
+        
+        // Hide remaining tetras
+        const USED_TETRAS = 2; // Dorsal fin + tail fin
+        obj.tetras.slice(USED_TETRAS).forEach(t => {
+          t.position.set(0, -1000, 0);
+          t.scale.set(0.001, 0.001, 0.001);
+          t.material.opacity = 0;
+        });
+        
+        // Minimal bubbles for atmosphere - only 5 bubbles total
+        obj.octas.forEach((bubble, i) => {
+          if (i < 5) {
+            // Sparse rising bubbles
+            const bubbleSpeed = 0.5 + (i % 2) * 0.2;
+            const riseHeight = (elScaled * bubbleSpeed + i * 4) % 25;
+            const xOffset = Math.sin(i * 3) * 10;
+            const zOffset = -8 - i * 4;
+            
+            bubble.position.x = xOffset;
+            bubble.position.y = riseHeight - 12;
+            bubble.position.z = zOffset;
+            
+            const bubbleSize = 0.4 + f.highs * 0.2;
+            bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
+            bubble.rotation.x += 0.05;
+            bubble.rotation.y += 0.03;
+            
+            bubble.material.color.setStyle(highsColor);
+            bubble.material.opacity = (0.3 + f.highs * 0.2) * blend; // More subtle
+            bubble.material.wireframe = true;
+          } else {
+            // Hide the rest
+            bubble.position.set(0, -1000, 0);
+            bubble.scale.set(0.001, 0.001, 0.001);
+            bubble.material.opacity = 0;
+          }
+        });
+        
+        // Hide sphere completely - no background distractions
+        obj.sphere.position.set(0, -1000, 0);
+        obj.sphere.scale.set(0.001, 0.001, 0.001);
+        obj.sphere.material.opacity = 0;
       } else if (type === 'kaleidoscope') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -3015,11 +3286,11 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle + el * (ring % 2 === 0 ? 1 : -1);
+          const angle = segment * segmentAngle + elScaled * (ring % 2 === 0 ? 1 : -1);
           const radius = 5 + ring * 3 + f.bass * 2;
           c.position.x = Math.cos(angle) * radius;
           c.position.y = Math.sin(angle) * radius;
-          c.position.z = Math.sin(el * 2 + i) * 2;
+          c.position.z = Math.sin(elScaled * 2 + i) * 2;
           c.rotation.x = angle;
           c.rotation.y = el + i;
           c.rotation.z = angle * 2;
@@ -3033,13 +3304,13 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle + el * 1.5 * (ring % 2 === 0 ? -1 : 1);
+          const angle = segment * segmentAngle + elScaled * 1.5 * (ring % 2 === 0 ? -1 : 1);
           const radius = 8 + ring * 2 + f.mids * 3;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = Math.sin(angle) * radius;
           o.position.z = Math.cos(el + i) * 1.5;
           o.rotation.x = angle + el;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = -angle;
           const s = 0.9 + f.mids * 0.6;
           o.scale.set(s, s, s);
@@ -3051,13 +3322,13 @@ export default function ThreeDVisualizer() {
           const segmentAngle = (Math.PI * 2) / segments;
           const segment = i % segments;
           const ring = Math.floor(i / segments);
-          const angle = segment * segmentAngle - el * 2;
+          const angle = segment * segmentAngle - elScaled * 2;
           const radius = 3 + ring + f.highs * 2;
           t.position.x = Math.cos(angle) * radius;
           t.position.y = Math.sin(angle) * radius;
           t.position.z = 0;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = angle;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -3068,7 +3339,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, 0, 0);
         const sphereSize = 1 + f.bass * 0.5;
         obj.sphere.scale.set(sphereSize, sphereSize, sphereSize);
-        obj.sphere.rotation.x = el * 0.5;
+        obj.sphere.rotation.x = elScaled * 0.5;
         obj.sphere.rotation.y = el;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
@@ -3079,7 +3350,7 @@ export default function ThreeDVisualizer() {
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const speed = 0.5 + (i % 3) * 0.3;
-          const meteorTime = (el * speed + i * 2) % 10;
+          const meteorTime = (elScaled * speed + i * 2) % 10;
           const startX = ((i % 4) - 1.5) * 20;
           const startY = 15;
           const startZ = ((Math.floor(i / 4)) - 1) * 20;
@@ -3099,7 +3370,7 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.forEach((o, i) => {
           const speed = 0.7 + (i % 4) * 0.2;
-          const meteorTime = (el * speed + i * 1.5) % 8;
+          const meteorTime = (elScaled * speed + i * 1.5) % 8;
           const startX = ((i % 6) - 2.5) * 15;
           const startY = 20;
           const startZ = ((Math.floor(i / 6)) - 2.5) * 15;
@@ -3118,7 +3389,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const speed = 0.3 + (i % 5) * 0.15;
-          const meteorTime = (el * speed + i) % 12;
+          const meteorTime = (elScaled * speed + i) % 12;
           const fallProgress = meteorTime / 12;
           const trail = i % 5;
           t.position.x = ((i % 6) - 2.5) * 10 + Math.sin(meteorTime * 3) * 2;
@@ -3183,13 +3454,13 @@ export default function ThreeDVisualizer() {
         });
         obj.octas.forEach((o, i) => {
           const height = (i - obj.octas.length / 2) * 1.5;
-          const angle = el * 2 + i * 0.3;
+          const angle = elScaled * 2 + i * 0.3;
           const radius = 6 + Math.sin(el + i) * 1 + f.highs * 1.5;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = height;
           o.position.z = Math.sin(angle) * radius;
           o.rotation.x = el + i;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = 0.5 + f.highs * 0.4;
           o.scale.set(s, s, s);
@@ -3208,7 +3479,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 5, 0);
         obj.cubes.forEach((c, i) => {
-          const burstTime = (el * 0.8 + i * 3) % 6;
+          const burstTime = (elScaled * 0.8 + i * 3) % 6;
           const burstProgress = Math.min(burstTime / 2, 1);
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 4) - 1.5) * 10;
@@ -3234,7 +3505,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = burstTime < 2;
         });
         obj.octas.forEach((o, i) => {
-          const burstTime = (el * 0.8 + i * 2.5 + 1) % 6;
+          const burstTime = (elScaled * 0.8 + i * 2.5 + 1) % 6;
           const burstProgress = Math.min(burstTime / 2, 1);
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 6) - 2.5) * 8;
@@ -3260,7 +3531,7 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const burstTime = (el * 0.8 + i * 2 + 0.5) % 6;
+          const burstTime = (elScaled * 0.8 + i * 2 + 0.5) % 6;
           const fadeProgress = Math.max((burstTime - 2) / 4, 0);
           const launchX = ((i % 6) - 2.5) * 7;
           const launchZ = ((Math.floor(i / 6)) - 2.5) * 7;
@@ -3296,10 +3567,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 2 + (column % 3) * 0.5;
-          const fallOffset = (el * fallSpeed + i * 2) % 30;
+          const fallOffset = (elScaled * fallSpeed + i * 2) % 30;
           c.position.x = columnX;
           c.position.y = 15 - fallOffset + Math.sin(el + i) * 0.5;
-          c.position.z = -10 + Math.cos(el * 0.5 + i) * 2;
+          c.position.z = -10 + Math.cos(elScaled * 0.5 + i) * 2;
           c.rotation.x = 0;
           c.rotation.y = 0;
           c.rotation.z = 0;
@@ -3314,10 +3585,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 1.5 + (column % 4) * 0.4;
-          const fallOffset = (el * fallSpeed + i * 1.5) % 35;
+          const fallOffset = (elScaled * fallSpeed + i * 1.5) % 35;
           o.position.x = columnX + Math.sin(el + i) * 0.3;
           o.position.y = 18 - fallOffset;
-          o.position.z = -8 + Math.cos(el * 0.3 + i) * 3;
+          o.position.z = -8 + Math.cos(elScaled * 0.3 + i) * 3;
           o.rotation.x = 0;
           o.rotation.y = 0;
           o.rotation.z = el + i;
@@ -3332,10 +3603,10 @@ export default function ThreeDVisualizer() {
           const column = i % columns;
           const columnX = (column - columns / 2 + 0.5) * 3;
           const fallSpeed = 2.5 + (column % 5) * 0.3;
-          const fallOffset = (el * fallSpeed + i) % 40;
-          t.position.x = columnX + Math.sin(el * 2 + i) * 0.5;
+          const fallOffset = (elScaled * fallSpeed + i) % 40;
+          t.position.x = columnX + Math.sin(elScaled * 2 + i) * 0.5;
           t.position.y = 20 - fallOffset;
-          t.position.z = -12 + Math.cos(el * 0.4 + i) * 4;
+          t.position.z = -12 + Math.cos(elScaled * 0.4 + i) * 4;
           t.rotation.x = el + i;
           t.rotation.y = 0;
           t.rotation.z = 0;
@@ -3353,7 +3624,7 @@ export default function ThreeDVisualizer() {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.8) % 20;
           const angle = (i / obj.cubes.length) * Math.PI * 2;
           c.position.x = Math.cos(angle) * rippleRadius;
@@ -3371,7 +3642,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = false;
         });
         obj.octas.forEach((o, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.5 + 2) % 25;
           const angle = (i / obj.octas.length) * Math.PI * 2;
           o.position.x = Math.cos(angle) * rippleRadius;
@@ -3389,14 +3660,14 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const rippleTime = el * 2;
+          const rippleTime = elScaled * 2;
           const rippleRadius = (rippleTime + i * 0.3 + 1) % 22;
           const angle = (i / obj.tetras.length) * Math.PI * 2;
           t.position.x = Math.cos(angle) * rippleRadius;
           t.position.z = Math.sin(angle) * rippleRadius;
           const waveHeight = Math.sin((rippleRadius - rippleTime) * 0.7) * 2;
           t.position.y = waveHeight + f.highs * 1;
-          t.rotation.x = el * 2 + i;
+          t.rotation.x = elScaled * 2 + i;
           t.rotation.y = angle;
           t.rotation.z = el;
           const s = 0.6 + f.highs * 0.5;
@@ -3420,12 +3691,12 @@ export default function ThreeDVisualizer() {
         obj.cubes.forEach((c, i) => {
           const clusterAngle = (i / obj.cubes.length) * Math.PI * 2;
           const clusterRadius = 8 + Math.sin(el + i) * 2;
-          const orbitOffset = Math.cos(el * 0.5 + i * 0.3) * 2;
+          const orbitOffset = Math.cos(elScaled * 0.5 + i * 0.3) * 2;
           c.position.x = Math.cos(clusterAngle) * clusterRadius + orbitOffset;
           c.position.y = Math.sin(i * 2) * 5 + Math.sin(el + i) * 1;
           c.position.z = Math.sin(clusterAngle) * clusterRadius + orbitOffset;
-          c.rotation.x = el * 0.3 + i;
-          c.rotation.y = el * 0.5;
+          c.rotation.x = elScaled * 0.3 + i;
+          c.rotation.y = elScaled * 0.5;
           c.rotation.z = 0;
           const s = 0.8 + f.bass * 1;
           c.scale.set(s, s, s);
@@ -3440,7 +3711,7 @@ export default function ThreeDVisualizer() {
           o.position.x = nearestCube.position.x + (nextCube.position.x - nearestCube.position.x) * t;
           o.position.y = nearestCube.position.y + (nextCube.position.y - nearestCube.position.y) * t;
           o.position.z = nearestCube.position.z + (nextCube.position.z - nearestCube.position.z) * t;
-          const pulse = Math.sin(el * 5 + i) * 0.5 + 0.5;
+          const pulse = Math.sin(elScaled * 5 + i) * 0.5 + 0.5;
           const s = (0.3 + f.mids * 0.4) * (0.5 + pulse * 0.5);
           o.scale.set(s, s * 3, s);
           const dx = nextCube.position.x - nearestCube.position.x;
@@ -3455,7 +3726,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const attachedCube = obj.cubes[i % obj.cubes.length];
-          const orbitAngle = el * 3 + i;
+          const orbitAngle = elScaled * 3 + i;
           const orbitRadius = 1.5 + f.highs * 1;
           t.position.x = attachedCube.position.x + Math.cos(orbitAngle) * orbitRadius;
           t.position.y = attachedCube.position.y + Math.sin(orbitAngle * 0.5) * orbitRadius;
@@ -3482,13 +3753,13 @@ export default function ThreeDVisualizer() {
           const anchorY = 10;
           const anchorZ = (row - 1) * 6;
           const swingSpeed = 1 + col * 0.2;
-          const swingAngle = Math.sin(el * swingSpeed + row) * (Math.PI / 3) + f.bass * 0.3;
+          const swingAngle = Math.sin(elScaled * swingSpeed + row) * (Math.PI / 3) + f.bass * 0.3;
           const pendulumLength = 5 + row;
           c.position.x = anchorX + Math.sin(swingAngle) * pendulumLength;
           c.position.y = anchorY - Math.cos(swingAngle) * pendulumLength;
           c.position.z = anchorZ;
           c.rotation.x = swingAngle;
-          c.rotation.y = el * 0.5;
+          c.rotation.y = elScaled * 0.5;
           c.rotation.z = 0;
           const s = 1 + f.bass * 0.8;
           c.scale.set(s, s, s);
@@ -3520,7 +3791,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const swingSpeed = 1.5 + (i % 3) * 0.3;
-          const swingAngle = Math.sin(el * swingSpeed + i) * (Math.PI / 4) + f.highs * 0.4;
+          const swingAngle = Math.sin(elScaled * swingSpeed + i) * (Math.PI / 4) + f.highs * 0.4;
           const layer = Math.floor(i / 10);
           const posInLayer = i % 10;
           const anchorX = (posInLayer - 4.5) * 3;
@@ -3531,7 +3802,7 @@ export default function ThreeDVisualizer() {
           t.position.y = anchorY - Math.cos(swingAngle) * pendulumLength;
           t.position.z = anchorZ;
           t.rotation.x = swingAngle + el;
-          t.rotation.y = el * 2;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = 0;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -3551,7 +3822,7 @@ export default function ThreeDVisualizer() {
           const posInRing = i % 4;
           const angle = (posInRing / 4) * Math.PI * 2;
           const tunnelRadius = 8 + f.bass * 2;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 5) % 50) - 25;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 5) % 50) - 25;
           c.position.x = Math.cos(angle) * tunnelRadius;
           c.position.y = Math.sin(angle) * tunnelRadius;
           c.position.z = -zProgress;
@@ -3570,7 +3841,7 @@ export default function ThreeDVisualizer() {
           const posInRing = i % 6;
           const angle = (posInRing / 6) * Math.PI * 2;
           const tunnelRadius = 6 + f.mids * 1.5;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 4 + 2) % 45) - 22.5;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 4 + 2) % 45) - 22.5;
           o.position.x = Math.cos(angle) * tunnelRadius;
           o.position.y = Math.sin(angle) * tunnelRadius;
           o.position.z = -zProgress;
@@ -3587,15 +3858,15 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const ringIndex = Math.floor(i / 6);
           const posInRing = i % 6;
-          const angle = (posInRing / 6) * Math.PI * 2 + el * 2;
+          const angle = (posInRing / 6) * Math.PI * 2 + elScaled * 2;
           const tunnelRadius = 4 + Math.sin(el + i) * 1 + f.highs * 1;
-          const zProgress = ((el * tunnelSpeed + ringIndex * 3.5 + 1) % 40) - 20;
+          const zProgress = ((elScaled * tunnelSpeed + ringIndex * 3.5 + 1) % 40) - 20;
           t.position.x = Math.cos(angle) * tunnelRadius;
           t.position.y = Math.sin(angle) * tunnelRadius;
           t.position.z = -zProgress;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = angle;
-          t.rotation.z = el * 2;
+          t.rotation.z = elScaled * 2;
           const s = 0.7 + f.highs * 0.6;
           t.scale.set(s, s, s);
           const depth = Math.abs(zProgress) / 20;
@@ -3612,14 +3883,14 @@ export default function ThreeDVisualizer() {
         const petals = 8;
         obj.cubes.forEach((c, i) => {
           const petalAngle = (i / petals) * Math.PI * 2;
-          const bloomProgress = Math.sin(el * 0.5) * 0.5 + 0.5;
+          const bloomProgress = Math.sin(elScaled * 0.5) * 0.5 + 0.5;
           const petalRadius = 5 + bloomProgress * 5 + f.bass * 2;
           const petalHeight = Math.sin(petalAngle * 2 + el) * 2;
           c.position.x = Math.cos(petalAngle) * petalRadius;
           c.position.y = petalHeight + f.mids * 1;
           c.position.z = Math.sin(petalAngle) * petalRadius;
           c.rotation.x = petalAngle;
-          c.rotation.y = el * 0.3;
+          c.rotation.y = elScaled * 0.3;
           c.rotation.z = Math.sin(el + i) * 0.5;
           const s = 1.5 + bloomProgress + f.bass * 0.8;
           c.scale.set(s * 0.5, s * 2, s);
@@ -3630,7 +3901,7 @@ export default function ThreeDVisualizer() {
         obj.octas.forEach((o, i) => {
           const layer = Math.floor(i / 6);
           const posInLayer = i % 6;
-          const angle = (posInLayer / 6) * Math.PI * 2 + el * 2;
+          const angle = (posInLayer / 6) * Math.PI * 2 + elScaled * 2;
           const radius = 3 + layer + Math.sin(el + i) * 0.5 + f.mids * 1.5;
           o.position.x = Math.cos(angle) * radius;
           o.position.y = -layer * 0.5 + f.mids * 0.5;
@@ -3646,12 +3917,12 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const angle = (i / obj.tetras.length) * Math.PI * 2;
-          const radius = 1 + Math.sin(el * 3 + i) * 0.3;
+          const radius = 1 + Math.sin(elScaled * 3 + i) * 0.3;
           t.position.x = Math.cos(angle) * radius;
-          t.position.y = Math.sin(el * 2 + i) * 0.5 + f.highs * 0.5;
+          t.position.y = Math.sin(elScaled * 2 + i) * 0.5 + f.highs * 0.5;
           t.position.z = Math.sin(angle) * radius;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = 0;
           const s = 0.3 + f.highs * 0.4;
           t.scale.set(s, s, s);
@@ -3674,7 +3945,7 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.cubes.length) * 20 - 10;
           const heightFactor = 1 - Math.abs(height / 10);
           const radius = 2 + heightFactor * 6 + f.bass * 3;
-          const angle = height * 0.5 + el * 2;
+          const angle = height * 0.5 + elScaled * 2;
           c.position.x = Math.cos(angle) * radius;
           c.position.y = height;
           c.position.z = Math.sin(angle) * radius;
@@ -3691,9 +3962,9 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.octas.length) * 25 - 12.5;
           const heightFactor = 1 - Math.abs(height / 12.5);
           const radius = 3 + heightFactor * 8 + f.mids * 4;
-          const angle = height * 0.6 + el * 3;
+          const angle = height * 0.6 + elScaled * 3;
           o.position.x = Math.cos(angle) * radius;
-          o.position.y = height + Math.sin(el * 2 + i) * 0.5;
+          o.position.y = height + Math.sin(elScaled * 2 + i) * 0.5;
           o.position.z = Math.sin(angle) * radius;
           o.rotation.x += 0.1 + f.mids * 0.1;
           o.rotation.y = angle;
@@ -3708,13 +3979,13 @@ export default function ThreeDVisualizer() {
           const height = (i / obj.tetras.length) * 30 - 15;
           const heightFactor = 1 - Math.abs(height / 15);
           const radius = 1 + heightFactor * 10 + f.highs * 5;
-          const angle = height * 0.7 + el * 4 + i * 0.1;
+          const angle = height * 0.7 + elScaled * 4 + i * 0.1;
           t.position.x = Math.cos(angle) * radius;
           t.position.y = height;
           t.position.z = Math.sin(angle) * radius;
-          t.rotation.x = el * 5 + i;
+          t.rotation.x = elScaled * 5 + i;
           t.rotation.y = angle;
-          t.rotation.z = el * 3;
+          t.rotation.z = elScaled * 3;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
           t.material.color.setStyle(highsColor);
@@ -3725,7 +3996,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'cube3d') {
-        cam.position.set(Math.sin(el * 0.2) * 5 + shakeX, Math.cos(el * 0.15) * 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(elScaled * 0.2) * 5 + shakeX, Math.cos(elScaled * 0.15) * 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         obj.cubes.forEach((c, i) => {
           const dim = 2;
@@ -3738,8 +4009,8 @@ export default function ThreeDVisualizer() {
           c.position.y = y * offset;
           c.position.z = z * offset;
           c.rotation.x = el + i * 0.1;
-          c.rotation.y = el * 1.5 + i * 0.1;
-          c.rotation.z = el * 0.5;
+          c.rotation.y = elScaled * 1.5 + i * 0.1;
+          c.rotation.z = elScaled * 0.5;
           const s = 1.5 + f.bass * 1;
           c.scale.set(s, s, s);
           c.material.color.setStyle(bassColor);
@@ -3768,7 +4039,7 @@ export default function ThreeDVisualizer() {
           o.position.y = (startPos[1] + (endPos[1] - startPos[1]) * t) * scale;
           o.position.z = (startPos[2] + (endPos[2] - startPos[2]) * t) * scale;
           o.rotation.x = el + i;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s, s);
@@ -3782,8 +4053,8 @@ export default function ThreeDVisualizer() {
           t.position.x = Math.cos(orbit + el) * radius;
           t.position.y = Math.sin(orbit * 2 + el) * radius;
           t.position.z = Math.sin(orbit + el) * radius;
-          t.rotation.x = el * 3 + i;
-          t.rotation.y = el * 2;
+          t.rotation.x = elScaled * 3 + i;
+          t.rotation.y = elScaled * 2;
           t.rotation.z = orbit;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
@@ -3795,8 +4066,8 @@ export default function ThreeDVisualizer() {
         const coreSize = 3 + f.bass * 2;
         obj.sphere.scale.set(coreSize, coreSize, coreSize);
         obj.sphere.rotation.x = el;
-        obj.sphere.rotation.y = el * 1.5;
-        obj.sphere.rotation.z = el * 0.5;
+        obj.sphere.rotation.y = elScaled * 1.5;
+        obj.sphere.rotation.z = elScaled * 0.5;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
@@ -3811,9 +4082,9 @@ export default function ThreeDVisualizer() {
           const levelHeight = level * 3;
           const spreadFactor = Math.pow(0.7, level);
           const radius = 2 * spreadFactor + f.bass * spreadFactor * 2;
-          c.position.x = Math.cos(angle + el * 0.5) * radius;
+          c.position.x = Math.cos(angle + elScaled * 0.5) * radius;
           c.position.y = levelHeight - 5;
-          c.position.z = Math.sin(angle + el * 0.5) * radius;
+          c.position.z = Math.sin(angle + elScaled * 0.5) * radius;
           c.rotation.x = angle;
           c.rotation.y = el + level;
           c.rotation.z = 0;
@@ -3832,12 +4103,12 @@ export default function ThreeDVisualizer() {
           const levelHeight = level * 3;
           const spreadFactor = Math.pow(0.7, level);
           const radius = (2 + side) * spreadFactor + f.mids * spreadFactor;
-          const sideAngle = angle + (side === 0 ? -0.3 : 0.3) + el * 0.3;
+          const sideAngle = angle + (side === 0 ? -0.3 : 0.3) + elScaled * 0.3;
           o.position.x = Math.cos(sideAngle) * radius;
           o.position.y = levelHeight - 5 + (side === 0 ? 0.5 : -0.5);
           o.position.z = Math.sin(sideAngle) * radius;
           o.rotation.x = sideAngle + el;
-          o.rotation.y = el * 2;
+          o.rotation.y = elScaled * 2;
           o.rotation.z = 0;
           const s = (0.8 - level * 0.1) + f.mids * 0.4;
           o.scale.set(s, s * 0.5, s);
@@ -3848,11 +4119,11 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const swarmAngle = (i / obj.tetras.length) * Math.PI * 2;
           const swarmRadius = 8 + Math.sin(el + i) * 3 + f.highs * 2;
-          const swarmHeight = Math.sin(el * 2 + i * 0.5) * 8;
+          const swarmHeight = Math.sin(elScaled * 2 + i * 0.5) * 8;
           t.position.x = Math.cos(swarmAngle + el) * swarmRadius;
           t.position.y = swarmHeight;
           t.position.z = Math.sin(swarmAngle + el) * swarmRadius;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = swarmAngle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
@@ -3864,7 +4135,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, -7, 0);
         const trunkSize = 1.5 + f.bass * 0.5;
         obj.sphere.scale.set(trunkSize, 3, trunkSize);
-        obj.sphere.rotation.y = el * 0.2;
+        obj.sphere.rotation.y = elScaled * 0.2;
         obj.sphere.material.color.setStyle(bassColor);
         obj.sphere.material.opacity = (0.8 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = false;
@@ -3877,7 +4148,7 @@ export default function ThreeDVisualizer() {
         const star2Z = -star1Z;
         obj.cubes.slice(0, 4).forEach((c, i) => {
           c.position.set(star1X, 0, star1Z);
-          const orbitAngle = el * 3 + (i / 4) * Math.PI * 2;
+          const orbitAngle = elScaled * 3 + (i / 4) * Math.PI * 2;
           const orbitRadius = 2 + f.bass * 1;
           c.position.x += Math.cos(orbitAngle) * orbitRadius;
           c.position.y = Math.sin(orbitAngle * 2) * 0.5;
@@ -3893,7 +4164,7 @@ export default function ThreeDVisualizer() {
         });
         obj.cubes.slice(4).forEach((c, i) => {
           c.position.set(star2X, 0, star2Z);
-          const orbitAngle = -el * 3 + (i / 4) * Math.PI * 2;
+          const orbitAngle = -elScaled * 3 + (i / 4) * Math.PI * 2;
           const orbitRadius = 2 + f.bass * 1;
           c.position.x += Math.cos(orbitAngle) * orbitRadius;
           c.position.y = Math.sin(orbitAngle * 2) * 0.5;
@@ -3908,7 +4179,7 @@ export default function ThreeDVisualizer() {
           c.material.wireframe = false;
         });
         obj.octas.slice(0, 15).forEach((o, i) => {
-          const angle = el * 5 + i;
+          const angle = elScaled * 5 + i;
           const radius = 6 + Math.sin(el + i) * 2 + f.mids * 3;
           o.position.x = star1X + Math.cos(angle) * radius;
           o.position.y = Math.sin(angle * 1.5) * 2;
@@ -3923,7 +4194,7 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.octas.slice(15).forEach((o, i) => {
-          const angle = -el * 5 + i;
+          const angle = -elScaled * 5 + i;
           const radius = 6 + Math.sin(el + i) * 2 + f.mids * 3;
           o.position.x = star2X + Math.cos(angle) * radius;
           o.position.y = Math.sin(angle * 1.5) * 2;
@@ -3939,7 +4210,7 @@ export default function ThreeDVisualizer() {
         });
         obj.tetras.forEach((t, i) => {
           const streamAngle = (i / obj.tetras.length) * Math.PI * 2;
-          const streamProgress = (el * 2 + i) % (Math.PI * 2);
+          const streamProgress = (elScaled * 2 + i) % (Math.PI * 2);
           const t1 = streamProgress / (Math.PI * 2);
           t.position.x = star1X + (star2X - star1X) * t1;
           t.position.y = Math.sin(streamProgress * 3) * 1.5;
@@ -3957,21 +4228,21 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'ribbon') {
-        cam.position.set(Math.sin(el * 0.1) * 8 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.position.set(Math.sin(elScaled * 0.1) * 8 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         const ribbonLength = obj.cubes.length;
         obj.cubes.forEach((c, i) => {
           const t = i / ribbonLength;
           const pathAngle = t * Math.PI * 4 + el;
           const radius = 5 + Math.sin(t * Math.PI * 3) * 2;
-          const height = Math.sin(t * Math.PI * 2 + el * 2) * 4;
+          const height = Math.sin(t * Math.PI * 2 + elScaled * 2) * 4;
           c.position.x = Math.cos(pathAngle) * radius;
           c.position.y = height + f.bass * 2;
           c.position.z = Math.sin(pathAngle) * radius;
           const nextT = (i + 1) / ribbonLength;
           const nextAngle = nextT * Math.PI * 4 + el;
           const nextRadius = 5 + Math.sin(nextT * Math.PI * 3) * 2;
-          const nextHeight = Math.sin(nextT * Math.PI * 2 + el * 2) * 4;
+          const nextHeight = Math.sin(nextT * Math.PI * 2 + elScaled * 2) * 4;
           const dx = Math.cos(nextAngle) * nextRadius - c.position.x;
           const dy = nextHeight - c.position.y;
           const dz = Math.sin(nextAngle) * nextRadius - c.position.z;
@@ -3990,11 +4261,11 @@ export default function ThreeDVisualizer() {
           const side = (i % 2) === 0 ? 1 : -1;
           const offset = (1 + f.mids) * side;
           o.position.x = attachedCube.position.x + Math.cos(el + i) * offset;
-          o.position.y = attachedCube.position.y + Math.sin(el * 2 + i) * offset;
+          o.position.y = attachedCube.position.y + Math.sin(elScaled * 2 + i) * offset;
           o.position.z = attachedCube.position.z + Math.sin(el + i) * offset;
-          o.rotation.x = el * 2 + i;
+          o.rotation.x = elScaled * 2 + i;
           o.rotation.y = el;
-          o.rotation.z = el * 3;
+          o.rotation.z = elScaled * 3;
           const s = 0.4 + f.mids * 0.4;
           o.scale.set(s, s, s);
           o.material.color.setStyle(midsColor);
@@ -4002,14 +4273,14 @@ export default function ThreeDVisualizer() {
           o.material.wireframe = true;
         });
         obj.tetras.forEach((t, i) => {
-          const orbitAngle = (i / obj.tetras.length) * Math.PI * 2 + el * 3;
+          const orbitAngle = (i / obj.tetras.length) * Math.PI * 2 + elScaled * 3;
           const orbitRadius = 10 + Math.sin(el + i) * 2 + f.highs * 3;
           t.position.x = Math.cos(orbitAngle) * orbitRadius;
           t.position.y = Math.sin(orbitAngle * 2) * 3 + f.highs;
           t.position.z = Math.sin(orbitAngle) * orbitRadius;
-          t.rotation.x = el * 4 + i;
+          t.rotation.x = elScaled * 4 + i;
           t.rotation.y = orbitAngle;
-          t.rotation.z = el * 2;
+          t.rotation.z = elScaled * 2;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
           t.material.color.setStyle(highsColor);
@@ -4041,7 +4312,7 @@ export default function ThreeDVisualizer() {
         });
         const sandCount = obj.tetras.length;
         obj.tetras.forEach((t, i) => {
-          const fallProgress = ((el * 2 + i * 0.1) % 10) / 10;
+          const fallProgress = ((elScaled * 2 + i * 0.1) % 10) / 10;
           const topY = 8;
           const bottomY = -8;
           const neckY = 0;
@@ -4059,7 +4330,7 @@ export default function ThreeDVisualizer() {
           t.position.x = Math.cos(angle) * radius * f.mids;
           t.position.y = y;
           t.position.z = Math.sin(angle) * radius * f.mids;
-          t.rotation.x = el * 3 + i;
+          t.rotation.x = elScaled * 3 + i;
           t.rotation.y = angle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.3;
@@ -4072,9 +4343,9 @@ export default function ThreeDVisualizer() {
           const ringAngle = (i / obj.octas.length) * Math.PI * 2;
           const ringY = ((i / obj.octas.length) - 0.5) * 16;
           const ringRadius = 7 + Math.sin(el + i) * 1 + f.mids * 2;
-          o.position.x = Math.cos(ringAngle + el * 0.5) * ringRadius;
+          o.position.x = Math.cos(ringAngle + elScaled * 0.5) * ringRadius;
           o.position.y = ringY;
-          o.position.z = Math.sin(ringAngle + el * 0.5) * ringRadius;
+          o.position.z = Math.sin(ringAngle + elScaled * 0.5) * ringRadius;
           o.rotation.x = ringAngle;
           o.rotation.y = el + i;
           o.rotation.z = 0;
@@ -4100,9 +4371,9 @@ export default function ThreeDVisualizer() {
           const segmentIndex = Math.floor(i / arms);
           const armAngle = (armIndex / arms) * Math.PI * 2;
           const segmentDist = (segmentIndex + 1) * 2;
-          c.position.x = Math.cos(armAngle + el * 0.1) * segmentDist;
-          c.position.y = Math.sin(el * 0.2 + i * 0.1) * 0.5 + f.bass;
-          c.position.z = Math.sin(armAngle + el * 0.1) * segmentDist;
+          c.position.x = Math.cos(armAngle + elScaled * 0.1) * segmentDist;
+          c.position.y = Math.sin(elScaled * 0.2 + i * 0.1) * 0.5 + f.bass;
+          c.position.z = Math.sin(armAngle + elScaled * 0.1) * segmentDist;
           c.rotation.x = 0;
           c.rotation.y = armAngle;
           c.rotation.z = el + i;
@@ -4119,9 +4390,9 @@ export default function ThreeDVisualizer() {
           const mainDist = (branchIndex % 3 + 1) * 2;
           const branchAngle = armAngle + ((branchIndex % 2 === 0) ? 0.5 : -0.5);
           const branchDist = 1.5 + f.mids;
-          o.position.x = Math.cos(armAngle + el * 0.1) * mainDist + Math.cos(branchAngle) * branchDist;
-          o.position.y = Math.sin(el * 0.3 + i * 0.1) * 0.3 + f.mids * 0.5;
-          o.position.z = Math.sin(armAngle + el * 0.1) * mainDist + Math.sin(branchAngle) * branchDist;
+          o.position.x = Math.cos(armAngle + elScaled * 0.1) * mainDist + Math.cos(branchAngle) * branchDist;
+          o.position.y = Math.sin(elScaled * 0.3 + i * 0.1) * 0.3 + f.mids * 0.5;
+          o.position.z = Math.sin(armAngle + elScaled * 0.1) * mainDist + Math.sin(branchAngle) * branchDist;
           o.rotation.x = branchAngle;
           o.rotation.y = el + i;
           o.rotation.z = 0;
@@ -4134,11 +4405,11 @@ export default function ThreeDVisualizer() {
         obj.tetras.forEach((t, i) => {
           const ringAngle = (i / obj.tetras.length) * Math.PI * 2;
           const ringRadius = 8 + Math.sin(el + i) * 2 + f.highs * 2;
-          const ringFloat = Math.sin(el * 0.5 + i) * 0.5;
-          t.position.x = Math.cos(ringAngle + el * 0.2) * ringRadius;
+          const ringFloat = Math.sin(elScaled * 0.5 + i) * 0.5;
+          t.position.x = Math.cos(ringAngle + elScaled * 0.2) * ringRadius;
           t.position.y = ringFloat + f.highs * 0.5;
-          t.position.z = Math.sin(ringAngle + el * 0.2) * ringRadius;
-          t.rotation.x = el * 2 + i;
+          t.position.z = Math.sin(ringAngle + elScaled * 0.2) * ringRadius;
+          t.rotation.x = elScaled * 2 + i;
           t.rotation.y = ringAngle;
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
@@ -4150,7 +4421,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.position.set(0, 0, 0);
         const coreSize = 1.5 + Math.sin(el) * 0.3 + f.bass * 0.8;
         obj.sphere.scale.set(coreSize, coreSize * 0.5, coreSize);
-        obj.sphere.rotation.y = el * 0.5;
+        obj.sphere.rotation.y = elScaled * 0.5;
         obj.sphere.material.color.setStyle(highsColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
@@ -4893,11 +5164,15 @@ export default function ThreeDVisualizer() {
           {/* Time Display and Preset Info - No Audio Upload */}
           <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
             <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && getCurrentSection() && (
-              <p className="text-cyan-400 text-xs mt-1">
-                {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.icon} {animationTypes.find(a => a.value === getCurrentSection()?.animation)?.label}
-              </p>
-            )}
+            {showPresetDisplay && (() => {
+              const currentPreset = getCurrentPreset();
+              const animType = animationTypes.find(a => a.value === currentPreset);
+              return animType && (
+                <p className="text-cyan-400 text-xs mt-1">
+                  {animType.icon} {animType.label}
+                </p>
+              );
+            })()}
             
             {/* Play/Stop Button */}
             {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
@@ -5117,91 +5392,134 @@ export default function ThreeDVisualizer() {
                 </div>
               )}
             </div>
-            
-            {/* Parameter Events Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events</h3>
-                <button
-                  onClick={addParameterEvent}
-                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
-                >
-                  <Plus size={14} /> Add Event
-                </button>
-              </div>
-              
-              {parameterEvents.length === 0 ? (
-                <div className="text-center py-4 text-gray-400 text-xs">
-                  No events. Click "Add Event" to create flash effects.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {parameterEvents.map((event) => (
-                    <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <div>
-                          <span className="text-white font-medium">
-                            {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
-                          </span>
-                          {event.mode === 'automated' && event.audioTrackId && (
-                            <span className="text-gray-400 ml-2">
-                              → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingEventId(event.id);
-                              setShowEventModal(true);
-                            }}
-                            className="text-cyan-400 hover:text-cyan-300"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteParameterEvent(event.id)}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-gray-400 space-y-0.5">
-                        <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
-                        {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
-                          <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
-                        )}
-                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
-                          <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
-                        )}
-                        {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
-                          <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
-                        )}
-                        {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
-                          <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
-                        )}
-                        {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
-                          <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
-                        )}
-                        {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
-                          <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
-                        )}
-                        {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
-                          <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
         {/* Controls Tab */}
         {activeTab === 'controls' && (
           <div>
+            {/* Parameter Events Timeline - Moved to top */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events Timeline</h3>
+                <button
+                  onClick={() => setParameterSettingsExpanded(!parameterSettingsExpanded)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title={parameterSettingsExpanded ? "Collapse settings" : "Expand settings"}
+                >
+                  <ChevronDown 
+                    size={20} 
+                    className={`transition-transform ${parameterSettingsExpanded ? '' : '-rotate-90'}`}
+                  />
+                </button>
+              </div>
+              
+              {/* Timeline bar visualization */}
+              <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
+                {/* Timeline markers for each parameter event */}
+                {parameterEvents.map(event => {
+                  if (event.mode === 'manual') {
+                    const startPos = duration > 0 ? Math.min((event.startTime / duration) * 100, 100) : 0;
+                    const endPos = duration > 0 ? Math.min((event.endTime / duration) * 100, 100) : 0;
+                    const width = Math.max(0, endPos - startPos);
+                    return (
+                      <div
+                        key={event.id}
+                        className="absolute top-0 bottom-0 bg-cyan-500 bg-opacity-40 hover:bg-opacity-60 transition-colors cursor-pointer border-l-2 border-r-2 border-cyan-400"
+                        style={{ left: `${startPos}%`, width: `${width}%` }}
+                        title={`${formatTime(event.startTime)} → ${formatTime(event.endTime)}`}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+                
+                {/* Current time indicator */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                  style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              
+              {/* Quick add button */}
+              <button
+                onClick={addParameterEvent}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              >
+                <Plus size={14} />
+                Add at {formatTime(currentTime)}
+              </button>
+              
+              {/* Collapsible event list */}
+              {parameterSettingsExpanded && (
+                parameterEvents.length === 0 ? (
+                  <div className="text-center py-4 text-gray-400 text-xs mt-3">
+                    No events. Click "Add at Xs" to create flash effects.
+                  </div>
+                ) : (
+                  <div className="space-y-2 mt-3">
+                    {parameterEvents.map((event) => (
+                      <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <div>
+                            <span className="text-white font-medium">
+                              {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
+                            </span>
+                            {event.mode === 'automated' && event.audioTrackId && (
+                              <span className="text-gray-400 ml-2">
+                                → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingEventId(event.id);
+                                setShowEventModal(true);
+                              }}
+                              className="text-cyan-400 hover:text-cyan-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteParameterEvent(event.id)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-gray-400 space-y-0.5">
+                          <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
+                          {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
+                            <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
+                          )}
+                          {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
+                            <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
+                          )}
+                          {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
+                            <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
+                          )}
+                          {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
+                            <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
+                          )}
+                          {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
+                            <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
+                          )}
+                          {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
+                            <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
+                          )}
+                          {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
+                            <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+            
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
@@ -5282,18 +5600,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={cubeColor} onChange={(e) => setCubeColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="cubeOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
+                    <input type="range" id="cubeOpacity" name="cubeOpacity" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {cubeMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {cubeMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={cubeMetalness} onChange={(e) => setCubeMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="cubeMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {cubeMetalness.toFixed(2)}</label>
+                        <input type="range" id="cubeMetalness" name="cubeMetalness" min="0" max="1" step="0.05" value={cubeMetalness} onChange={(e) => setCubeMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {cubeRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={cubeRoughness} onChange={(e) => setCubeRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="cubeRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {cubeRoughness.toFixed(2)}</label>
+                        <input type="range" id="cubeRoughness" name="cubeRoughness" min="0" max="1" step="0.05" value={cubeRoughness} onChange={(e) => setCubeRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5322,18 +5640,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={octahedronColor} onChange={(e) => setOctahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="octahedronOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
+                    <input type="range" id="octahedronOpacity" name="octahedronOpacity" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {octahedronMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {octahedronMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={octahedronMetalness} onChange={(e) => setOctahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="octahedronMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {octahedronMetalness.toFixed(2)}</label>
+                        <input type="range" id="octahedronMetalness" name="octahedronMetalness" min="0" max="1" step="0.05" value={octahedronMetalness} onChange={(e) => setOctahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {octahedronRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={octahedronRoughness} onChange={(e) => setOctahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="octahedronRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {octahedronRoughness.toFixed(2)}</label>
+                        <input type="range" id="octahedronRoughness" name="octahedronRoughness" min="0" max="1" step="0.05" value={octahedronRoughness} onChange={(e) => setOctahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5362,18 +5680,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={tetrahedronColor} onChange={(e) => setTetrahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="tetrahedronOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
+                    <input type="range" id="tetrahedronOpacity" name="tetrahedronOpacity" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {tetrahedronMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {tetrahedronMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronMetalness} onChange={(e) => setTetrahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="tetrahedronMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {tetrahedronMetalness.toFixed(2)}</label>
+                        <input type="range" id="tetrahedronMetalness" name="tetrahedronMetalness" min="0" max="1" step="0.05" value={tetrahedronMetalness} onChange={(e) => setTetrahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {tetrahedronRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronRoughness} onChange={(e) => setTetrahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="tetrahedronRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {tetrahedronRoughness.toFixed(2)}</label>
+                        <input type="range" id="tetrahedronRoughness" name="tetrahedronRoughness" min="0" max="1" step="0.05" value={tetrahedronRoughness} onChange={(e) => setTetrahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5402,18 +5720,18 @@ export default function ThreeDVisualizer() {
                     <input type="color" value={sphereColor} onChange={(e) => setSphereColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
-                    <input type="range" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                    <label htmlFor="sphereOpacity" className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
+                    <input type="range" id="sphereOpacity" name="sphereOpacity" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                   </div>
                   {sphereMaterialType === 'standard' && (
                     <>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Metalness: {sphereMetalness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={sphereMetalness} onChange={(e) => setSphereMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="sphereMetalness" className="text-xs text-gray-400 block mb-1">Metalness: {sphereMetalness.toFixed(2)}</label>
+                        <input type="range" id="sphereMetalness" name="sphereMetalness" min="0" max="1" step="0.05" value={sphereMetalness} onChange={(e) => setSphereMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">Roughness: {sphereRoughness.toFixed(2)}</label>
-                        <input type="range" min="0" max="1" step="0.05" value={sphereRoughness} onChange={(e) => setSphereRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                        <label htmlFor="sphereRoughness" className="text-xs text-gray-400 block mb-1">Roughness: {sphereRoughness.toFixed(2)}</label>
+                        <input type="range" id="sphereRoughness" name="sphereRoughness" min="0" max="1" step="0.05" value={sphereRoughness} onChange={(e) => setSphereRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
                       </div>
                     </>
                   )}
@@ -5547,6 +5865,256 @@ export default function ThreeDVisualizer() {
                 </p>
               </div>
             </div>
+            
+            {/* Letterbox Animation with Timeline */}
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Letterbox (Cinematic Bars)</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create dynamic letterbox animations with timeline keyframes</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const time = currentTime;
+                    const newKeyframe = {
+                      id: nextLetterboxKeyframeId.current++,
+                      time,
+                      targetSize: letterboxSize || 50,
+                      duration: 1.0,
+                      mode: 'smooth' as const,
+                      invert: activeLetterboxInvert
+                    };
+                    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+                    setShowLetterbox(true);
+                    setUseLetterboxAnimation(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add at {Math.floor(currentTime)}s
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="showLetterbox" 
+                    checked={showLetterbox} 
+                    onChange={(e) => setShowLetterbox(e.target.checked)} 
+                    className="w-4 h-4 cursor-pointer" 
+                  />
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">
+                    Enable Letterbox
+                  </label>
+                </div>
+
+                {showLetterbox && (
+                  <div className="ml-7 space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Max Curtain Height: {maxLetterboxHeight}px</label>
+                      <input 
+                        type="range"
+                        min="50"
+                        max="500"
+                        step="10"
+                        value={maxLetterboxHeight}
+                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || DEFAULT_MAX_LETTERBOX_HEIGHT)}
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Controls maximum bar height when at 100%</p>
+                    </div>
+
+                    {letterboxKeyframes.length > 0 && (
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          id="useLetterboxAnimation" 
+                          checked={useLetterboxAnimation} 
+                          onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
+                          className="w-4 h-4 cursor-pointer" 
+                        />
+                        <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
+                          Use Timeline Animation ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
+                        </label>
+                      </div>
+                    )}
+
+                    {letterboxKeyframes.length === 0 && (
+                      <div className="bg-gray-800 rounded p-2">
+                        <p className="text-xs text-gray-400 text-center">No keyframes yet. Click "Add at {Math.floor(currentTime)}s" to create one</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Timeline Visualization */}
+                {showLetterbox && letterboxKeyframes.length > 0 && (
+                  <div className="mt-4 bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setLetterboxSettingsExpanded(!letterboxSettingsExpanded)}
+                          className="text-gray-300 hover:text-white transition-colors"
+                        >
+                          <ChevronDown 
+                            size={16} 
+                            className={`transition-transform ${letterboxSettingsExpanded ? '' : '-rotate-90'}`}
+                          />
+                        </button>
+                        <span className="text-xs font-semibold text-gray-300">Timeline</span>
+                      </div>
+                      <span className="text-xs text-gray-400">{formatTime(duration)}</span>
+                    </div>
+                    
+                    {/* Timeline bar with keyframe markers */}
+                    <div className="relative bg-gray-900 rounded h-12 mb-3">
+                      {/* Current time indicator */}
+                      <div 
+                        className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
+                        style={{ left: `${(currentTime / duration) * 100}%` }}
+                      >
+                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                      </div>
+                      
+                      {/* Keyframe markers */}
+                      {letterboxKeyframes.map((kf, idx) => (
+                        <div
+                          key={kf.id || idx}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
+                          style={{ left: `${(kf.time / duration) * 100}%` }}
+                          title={`${formatTime(kf.time)} - ${kf.targetSize}px`}
+                        >
+                          <div className="w-3 h-8 bg-purple-500 hover:bg-purple-400 rounded group-hover:scale-110 transition-transform flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                          <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            {formatTime(kf.time)}: {kf.targetSize}px
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Collapsible Keyframe List */}
+                    {letterboxSettingsExpanded && (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {letterboxKeyframes.map((keyframe, index) => (
+                        <div key={keyframe.id || index} className="bg-gray-900 rounded p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                              <span className="text-white font-semibold text-sm">
+                                {formatTime(keyframe.time)}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
+                                setLetterboxKeyframes(newKeyframes);
+                                if (newKeyframes.length === 0) {
+                                  setUseLetterboxAnimation(false);
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300 text-xs"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max={duration}
+                                step="0.1"
+                                value={keyframe.time}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, time: parseFloat(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes.sort((a, b) => a.time - b.time));
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Size (0-100)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={keyframe.targetSize}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, targetSize: parseInt(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={keyframe.duration}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, duration: parseFloat(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Mode</label>
+                              <select 
+                                value={keyframe.mode}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, mode: e.target.value as 'smooth' | 'instant' };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              >
+                                <option value="smooth">Smooth</option>
+                                <option value="instant">Instant</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="checkbox"
+                                id={`invert-${keyframe.id || index}`}
+                                checked={keyframe.invert}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, invert: e.target.checked };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-4 h-4 cursor-pointer"
+                              />
+                              <label htmlFor={`invert-${keyframe.id || index}`} className="text-xs text-gray-300 cursor-pointer">
+                                Curtain Mode (opens/closes from edges)
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -5554,73 +6122,6 @@ export default function ThreeDVisualizer() {
         {activeTab === 'effects' && (
           <div>
             <div className="bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">📹 Camera Shake Events</h3>
-              <p className="text-xs text-gray-400 mb-3">Add manual shake events at specific timestamps for impact moments.</p>
-              <button 
-                onClick={addCameraShake} 
-                className="mb-3 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
-              >
-                <Plus size={16} /> Add Shake at {formatTime(currentTime)}
-              </button>
-              
-              {cameraShakes.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {cameraShakes.map((shake, index) => (
-                    <div key={index} className="bg-gray-600 rounded p-3 space-y-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white font-semibold text-sm">Shake {index + 1}</span>
-                        <button 
-                          onClick={() => deleteCameraShake(index)} 
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(shake.time)}</label>
-                        <input 
-                          type="text" id="time-formattime-shake-time" name="time-formattime-shake-time" 
-                          value={formatTime(shake.time)} 
-                          onChange={(e) => updateCameraShake(index, 'time', parseTime(e.target.value))} 
-                          className="w-full bg-gray-700 text-white text-sm px-2 py-1.5 rounded" 
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs text-gray-300 block mb-1">Intensity: {shake.intensity.toFixed(1)}</label>
-                        <input 
-                          type="range" id="intensity-shake-intensity-tofixed-1" name="intensity-shake-intensity-tofixed-1" 
-                          min="1" 
-                          max="20" 
-                          step="0.5" 
-                          value={shake.intensity} 
-                          onChange={(e) => updateCameraShake(index, 'intensity', Number(e.target.value))} 
-                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs text-gray-300 block mb-1">Duration: {shake.duration.toFixed(2)}s</label>
-                        <input 
-                          type="range" id="duration-shake-duration-tofixed-2-s" name="duration-shake-duration-tofixed-2-s" 
-                          min="0.05" 
-                          max="1" 
-                          step="0.05" 
-                          value={shake.duration} 
-                          onChange={(e) => updateCameraShake(index, 'duration', Number(e.target.value))} 
-                          className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-700" 
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic text-center py-4">No shake events yet. Click "Add Shake" to create one.</p>
-              )}
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Visual Effects</h3>
               <p className="text-xs text-gray-400 mb-3">Customize the look and feel of the visualization.</p>
               <div className="space-y-3">
@@ -5794,186 +6295,6 @@ export default function ThreeDVisualizer() {
               </div>
             </div>
             
-            {/* Letterbox Animation Section */}
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Animated Letterbox</h3>
-                  <p className="text-xs text-gray-400 mt-1">Create cinematic curtain-like letterbox animations</p>
-                </div>
-                <button 
-                  onClick={addLetterboxKeyframe} 
-                  disabled={!showLetterbox}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus size={14} /> Add
-                </button>
-              </div>
-              
-              <div className="space-y-2 mb-3">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
-                </div>
-                
-                {showLetterbox && (
-                  <div className="ml-7 space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Max Curtain Height (px) - affects both top & bottom bars</label>
-                      <input 
-                        type="number" id="maxLetterboxHeight" name="maxLetterboxHeight" 
-                        min="50" 
-                        max="500" 
-                        step="10" 
-                        value={maxLetterboxHeight} 
-                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || 270)} 
-                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Default: 270px (full coverage). Tip: 270px covers entire 540px canvas when both bars at 100%</p>
-                    </div>
-                  </div>
-                )}
-                
-                {showLetterbox && letterboxKeyframes.length > 0 && (
-                  <div className="flex items-center gap-3 ml-7">
-                    <input 
-                      type="checkbox" 
-                      id="useLetterboxAnimation" 
-                      checked={useLetterboxAnimation} 
-                      onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
-                      className="w-4 h-4 cursor-pointer" 
-                    />
-                    <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
-                      Use Animations ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
-                    </label>
-                  </div>
-                )}
-                
-                {showLetterbox && letterboxKeyframes.length === 0 && (
-                  <p className="text-xs text-gray-400 ml-7">Manual mode - use slider below</p>
-                )}
-              </div>
-              
-              {letterboxKeyframes.length > 0 ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {letterboxKeyframes.map((keyframe, index) => (
-                    <div key={index} className="bg-gray-800 rounded p-3 space-y-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white font-semibold text-sm">Keyframe {index + 1}</span>
-                        <button 
-                          onClick={() => deleteLetterboxKeyframe(index)} 
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
-                          <input 
-                            type="number" id="time-s" name="time-s" 
-                            min="0" 
-                            max={duration}
-                            step="0.1" 
-                            value={keyframe.time} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'time', parseFloat(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
-                          <input 
-                            type="number" id="size-px" name="size-px" 
-                            min="0" 
-                            max="100" 
-                            step="5" 
-                            value={keyframe.targetSize} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'targetSize', parseInt(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
-                          <input 
-                            type="number" id="duration-s-1" name="duration-s-1" 
-                            min="0" 
-                            max="10" 
-                            step="0.1" 
-                            value={keyframe.duration} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'duration', parseFloat(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Mode</label>
-                          <select 
-                            value={keyframe.mode} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'mode', e.target.value)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                          >
-                            <option value="smooth">Smooth</option>
-                            <option value="instant">Instant</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mt-2">
-                        <input 
-                          type="checkbox" 
-                          id={`invert-${index}`}
-                          checked={keyframe.invert} 
-                          onChange={(e) => updateLetterboxKeyframe(index, 'invert', e.target.checked)} 
-                          className="w-4 h-4 cursor-pointer" 
-                        />
-                        <label htmlFor={`invert-${index}`} className="text-xs text-gray-300 cursor-pointer">
-                          Curtain mode (100=closed, 0=open)
-                        </label>
-                      </div>
-                      
-                      <p className="text-xs text-gray-400 italic">
-                        {keyframe.invert
-                          ? (keyframe.mode === 'smooth' 
-                              ? `Animates to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`} over ${keyframe.duration}s`
-                              : `Instantly sets to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`}`)
-                          : (keyframe.mode === 'smooth' 
-                              ? `Animates to ${keyframe.targetSize}px bars over ${keyframe.duration}s`
-                              : `Instantly sets to ${keyframe.targetSize}px bars`)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic text-center py-4">
-                  No letterbox animations yet. Click "Add" to create cinematic curtain effects.
-                </p>
-              )}
-              
-              {showLetterbox && letterboxKeyframes.length === 0 && (
-                <div className="mt-3">
-                  <label className="text-xs text-gray-400 block mb-1">Manual Size: {letterboxSize}px</label>
-                  <input type="range" id="letterboxSize" name="letterboxSize" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">💡 Lighting Controls</h3>
-              <p className="text-xs text-gray-400 mb-3">Adjust scene lighting intensity.</p>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Ambient Light: {(ambientLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" id="ambientLightIntensity" name="ambientLightIntensity" min="0" max="2" step="0.1" value={ambientLightIntensity} onChange={(e) => setAmbientLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Directional Light: {(directionalLightIntensity * 100).toFixed(0)}%</label>
-                  <input type="range" id="directionalLightIntensity" name="directionalLightIntensity" min="0" max="2" step="0.1" value={directionalLightIntensity} onChange={(e) => setDirectionalLightIntensity(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -6173,27 +6494,164 @@ export default function ThreeDVisualizer() {
         {/* Presets Tab */}
         {activeTab === 'presets' && (
           <div>
-            <div className="mb-4 flex gap-2">
-              <button onClick={addSection} className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg flex items-center gap-2"><Plus size={16} /> Add Preset</button>
+            {/* Timeline Visualization */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-purple-400">🎬 Preset Timeline</h3>
+                <button
+                  onClick={() => setPresetSettingsExpanded(!presetSettingsExpanded)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title={presetSettingsExpanded ? "Collapse settings" : "Expand settings"}
+                >
+                  <ChevronDown 
+                    size={20} 
+                    className={`transition-transform ${presetSettingsExpanded ? '' : '-rotate-90'}`}
+                  />
+                </button>
+              </div>
+              
+              {/* Timeline bar visualization with segments */}
+              <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
+                {/* Preset segments */}
+                {presetKeyframes.map(kf => {
+                  const startPos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                  const endPos = duration > 0 ? Math.min((kf.endTime / duration) * 100, 100) : 0;
+                  const width = Math.max(endPos - startPos, 0.5); // Minimum visible width
+                  const animType = animationTypes.find(a => a.value === kf.preset);
+                  
+                  // Color coding by preset type
+                  const colors: Record<string, string> = {
+                    orbit: 'bg-blue-500',
+                    explosion: 'bg-orange-500',
+                    tunnel: 'bg-green-500',
+                    wave: 'bg-cyan-500',
+                    spiral: 'bg-purple-500',
+                    chill: 'bg-pink-500',
+                    pulse: 'bg-yellow-500',
+                    vortex: 'bg-red-500',
+                    dragon: 'bg-indigo-500',
+                    hammerhead: 'bg-teal-500'
+                  };
+                  const colorClass = colors[kf.preset] || 'bg-gray-500';
+                  
+                  return (
+                    <div
+                      key={kf.id}
+                      className={`absolute top-0 bottom-0 ${colorClass} opacity-70 hover:opacity-90 transition-opacity cursor-pointer border-r-2 border-white`}
+                      style={{ left: `${startPos}%`, width: `${width}%` }}
+                      title={`${animType?.label || kf.preset}: ${formatTime(kf.time)} - ${formatTime(kf.endTime)} (${kf.speed}x speed)`}
+                    >
+                      <div className="absolute top-1 left-1 text-xs text-white font-semibold truncate px-1">
+                        {animType?.icon}
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Current time indicator */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                  style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              
+              {/* Quick add button */}
+              <button
+                onClick={handleAddPresetKeyframe}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              >
+                <Plus size={14} />
+                Add at {formatTime(currentTime)}
+              </button>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {sections.map((s) => (
-                <div key={s.id} className="bg-gray-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-white font-semibold text-sm">{animationTypes.find(a => a.value === s.animation)?.icon || '🎵'} {animationTypes.find(a => a.value === s.animation)?.label || s.animation}</span>
-                    <button onClick={() => deleteSection(s.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16} /></button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div><label className="text-xs text-gray-400">Start</label><input type="text" id="start" name="start" value={formatTime(s.start)} onChange={(e) => updateSection(s.id, 'start', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                    <div><label className="text-xs text-gray-400">End</label><input type="text" id="text-input-2" name="text-input-2" value={formatTime(s.end)} onChange={(e) => updateSection(s.id, 'end', parseTime(e.target.value))} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded" /></div>
-                  </div>
-                  <select value={s.animation} onChange={(e) => updateSection(s.id, 'animation', e.target.value)} className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded mb-2">
-                    {animationTypes.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                  </select>
-                </div>
-              ))}
-            </div>
+            
+            {/* Collapsible keyframe settings */}
+            {presetSettingsExpanded && (
+              <div className="space-y-3">
+                {presetKeyframes.map((kf, index) => {
+                  const animType = animationTypes.find(a => a.value === kf.preset);
+                  const duration = kf.endTime - kf.time;
+                  return (
+                    <div key={kf.id} className="bg-gray-700 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-purple-400 font-mono text-sm">
+                          #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
+                        </span>
+                        <button
+                          onClick={() => handleDeletePresetKeyframe(kf.id)}
+                          className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={presetKeyframes.length <= 1}
+                          title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
+                          aria-disabled={presetKeyframes.length <= 1}
+                          aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3 mb-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Start Time</label>
+                          <input
+                            type="text"
+                            id={`preset-kf-time-${kf.id}`}
+                            name={`preset-kf-time-${kf.id}`}
+                            value={formatTime(kf.time)}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">End Time</label>
+                          <input
+                            type="text"
+                            id={`preset-kf-endtime-${kf.id}`}
+                            name={`preset-kf-endtime-${kf.id}`}
+                            value={formatTime(kf.endTime)}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
+                          <input
+                            type="number"
+                            id={`preset-kf-speed-${kf.id}`}
+                            name={`preset-kf-speed-${kf.id}`}
+                            min="0.1"
+                            max="3.0"
+                            step="0.1"
+                            value={kf.speed}
+                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'speed', parseFloat(e.target.value) || 1.0)}
+                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Preset</label>
+                        <select
+                          value={kf.preset}
+                          onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                        >
+                          {animationTypes.map(t => (
+                            <option key={t.value} value={t.value}>
+                              {t.icon} {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {/* Preview of current preset */}
+                      <div className="mt-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">
+                        {animType?.icon} {animType?.label || kf.preset} • {kf.speed}x speed • {duration.toFixed(1)}s duration
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

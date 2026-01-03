@@ -20,6 +20,7 @@ export interface ProjectState {
   sections: Section[];
   presetKeyframes: PresetKeyframe[];
   textKeyframes: TextKeyframe[];
+  environmentKeyframes: EnvironmentKeyframe[];
   // Camera, lighting, and other properties
   cameraDistance: number;
   cameraHeight: number;
@@ -78,6 +79,14 @@ export interface TextKeyframe {
   time: number;
   show: boolean;
   text?: string;
+}
+
+export interface EnvironmentKeyframe {
+  id: number;
+  time: number;
+  type: 'ocean' | 'forest' | 'space' | 'city' | 'abstract' | 'none';
+  intensity: number; // 0-1, controls density/visibility of environment elements
+  color?: string; // Optional color override
 }
 
 export interface LetterboxKeyframe {

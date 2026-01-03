@@ -14,7 +14,7 @@ import DebugConsole from './components/Debug/DebugConsole';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
 import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, EnvironmentKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -26,7 +26,8 @@ const ANIMATION_TYPES: AnimationType[] = [
   { value: 'chill', label: 'Chill Vibes', icon: '🎵' },
   { value: 'pulse', label: 'Pulse Grid', icon: '⚡' },
   { value: 'vortex', label: 'Vortex Storm', icon: '🌪️' },
-  { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' }
+  { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' },
+  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' }
 ];
 
 // PHASE 4: Default preset parameters for each animation type
@@ -39,7 +40,8 @@ const DEFAULT_PRESET_PARAMETERS: Record<string, PresetParameters> = {
   chill: { density: 20, speed: 0.5, intensity: 0.7, spread: 15 },
   pulse: { density: 10, speed: 1.5, intensity: 1.5, spread: 8 },
   vortex: { density: 50, speed: 2.5, intensity: 1.5, spread: 25 },
-  seiryu: { density: 35, speed: 1.2, intensity: 1.0, spread: 18 }
+  seiryu: { density: 35, speed: 1.2, intensity: 1.0, spread: 18 },
+  hammerhead: { density: 30, speed: 1.0, intensity: 1.2, spread: 15 }
 };
 
 // PHASE 4: Helper to get default parameters for a preset
@@ -254,6 +256,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [cameraShakes, setCameraShakes] = useState<CameraShake[]>([]);
   const [presetKeyframes, setPresetKeyframes] = useState<PresetKeyframe[]>([]);
   const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
+  const [environmentKeyframes, setEnvironmentKeyframes] = useState<EnvironmentKeyframe[]>([]);
 
   // PHASE 2: Colors (initialized from project settings)
   const [bassColor, setBassColor] = useState('#8a2be2');
@@ -528,6 +531,30 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       kf.id === id ? { ...kf, show, text } : kf
     ));
     addLog('Updated text keyframe', 'success');
+  };
+
+  // Environment keyframe handlers
+  const addEnvironmentKeyframe = (time: number) => {
+    const newKeyframe: EnvironmentKeyframe = {
+      id: Date.now(),
+      time,
+      type: 'ocean',
+      intensity: 0.5
+    };
+    setEnvironmentKeyframes([...environmentKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added environment keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteEnvironmentKeyframe = (id: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted environment keyframe', 'info');
+  };
+
+  const updateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, type: type as any, intensity, color } : kf
+    ));
+    addLog('Updated environment keyframe', 'success');
   };
 
   const formatTime = (s: number) => 
@@ -1335,6 +1362,32 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           (o.material as THREE.MeshBasicMaterial).opacity = (0.3 + f.mids * 0.3) * blend;
           (o.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         });
+        
+        obj.tetras.forEach((t, i) => {
+          const ringAngle = (i / obj.tetras.length) * Math.PI * 2;
+          const ringRadius = 10 + Math.sin(el * 0.3 + i) * 2;
+          t.position.set(
+            Math.cos(ringAngle + el * 0.2) * ringRadius,
+            Math.sin(el * 0.5 + i * 0.5) * 3,
+            Math.sin(ringAngle + el * 0.2) * ringRadius
+          );
+          t.rotation.x += 0.01 + f.highs * 0.02;
+          t.rotation.y += 0.015 + f.highs * 0.03;
+          const s = 0.6 + f.highs * 0.4;
+          t.scale.set(s, s, s);
+          (t.material as THREE.MeshBasicMaterial).opacity = (0.25 + f.highs * 0.35) * blend;
+          (t.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
+          (t.material as THREE.MeshBasicMaterial).wireframe = true;
+        });
+        
+        obj.sphere.position.set(0, Math.sin(el * 0.4) * 2, 0);
+        const sphereSize = 2.5 + f.bass * 0.5 + f.mids * 0.3;
+        obj.sphere.scale.set(sphereSize, sphereSize, sphereSize);
+        obj.sphere.rotation.x += 0.003;
+        obj.sphere.rotation.y += 0.005;
+        (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.2 + f.bass * 0.2) * blend;
+        (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
 
       } else if (type === 'pulse') {
         // Pulse Grid - Grid that pulses to the beat
@@ -1478,6 +1531,334 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
             (o.material as THREE.MeshBasicMaterial).wireframe = false;
           }
         });
+      } else if (type === 'hammerhead') {
+        // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
+        // Constants for shark anatomy
+        const TAIL_SEGMENT_COUNT = 2; // Last 2 cubes form the tail
+        const HAMMER_TETRA_COUNT = 8; // Total tetras for hammerhead
+        const HAMMER_BAR_TETRA_COUNT = 6; // Tetras forming horizontal bar
+        const FIN_TETRA_START = 8; // Start index for fin tetras
+        const FIN_TETRA_END = 12; // End index for fin tetras
+        const BUBBLE_COUNT = 15; // Number of rising bubbles in ocean
+        
+        const swimSpeed = el * speed * 0.8;
+        const rotationSpeed = cameraAutoRotate ? el * 0.2 : 0;
+        
+        // Camera follows shark from side/above angle
+        cam.position.set(
+          Math.sin(rotationSpeed + activeCameraRotation) * activeCameraDistance * 0.8 + Math.sin(swimSpeed * 0.3) * 2,
+          5 + activeCameraHeight + Math.sin(swimSpeed * 0.5) * 1,
+          activeCameraDistance * 0.8
+        );
+        cam.lookAt(0, 0, -5);
+        
+        // Shark body using cubes - serpentine swimming motion
+        obj.cubes.forEach((c, i) => {
+          const progress = i / obj.cubes.length;
+          const isHead = i === 0;
+          const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
+          
+          // Swimming path - gentle side-to-side motion
+          const swayAmount = (1 - progress) * 2 + reactiveF.bass * 1.5;
+          const x = Math.sin(swimSpeed - i * 0.4) * swayAmount;
+          const y = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
+          const z = progress * -20 - 5;
+          
+          c.position.set(x, y, z);
+          
+          // Scale: larger head, medium body, thin tail
+          let scaleX, scaleY, scaleZ;
+          if (isHead) {
+            scaleX = 2 + reactiveF.bass * 0.5;
+            scaleY = 1.5 + reactiveF.bass * 0.3;
+            scaleZ = 2 + reactiveF.bass * 0.5;
+          } else if (isTail) {
+            const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
+            scaleX = 0.8 - tailProgress * 0.5;
+            scaleY = 0.6 - tailProgress * 0.4;
+            scaleZ = 1.2 + reactiveF.bass * 0.3;
+          } else {
+            scaleX = 1.5;
+            scaleY = 1.2;
+            scaleZ = 1.8;
+          }
+          c.scale.set(scaleX, scaleY, scaleZ);
+          
+          // Rotation to follow swimming path
+          const nextI = Math.min(i + 1, obj.cubes.length - 1);
+          const nextProgress = nextI / obj.cubes.length;
+          const nextSwayAmount = (1 - nextProgress) * 2 + reactiveF.bass * 1.5;
+          const nextX = Math.sin(swimSpeed - nextI * 0.4) * nextSwayAmount;
+          const nextY = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
+          const nextZ = nextProgress * -20 - 5;
+          
+          c.rotation.y = Math.atan2(nextX - x, nextZ - z);
+          c.rotation.x = Math.atan2(nextY - y, nextZ - z) * 0.5;
+          c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
+          
+          (c.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+          (c.material as THREE.MeshBasicMaterial).opacity = (0.85 + reactiveF.bass * 0.15) * blend;
+          (c.material as THREE.MeshBasicMaterial).wireframe = false;
+        });
+        
+        // Hammerhead shape using tetras - distinctive T-shaped head
+        const head = obj.cubes[0];
+        obj.tetras.slice(0, HAMMER_TETRA_COUNT).forEach((hammer, i) => {
+          if (i < HAMMER_BAR_TETRA_COUNT) {
+            // Horizontal hammer bar (6 tetras spread across)
+            const hammerWidth = 7;
+            const hammerPosition = (i / 5 - 0.5) * hammerWidth;
+            hammer.position.x = head.position.x + hammerPosition;
+            hammer.position.y = head.position.y + 0.3;
+            hammer.position.z = head.position.z + 2;
+            hammer.rotation.x = 0;
+            hammer.rotation.y = head.rotation.y;
+            hammer.rotation.z = Math.PI / 2;
+            const hammerSize = 0.8 + reactiveF.highs * 0.3;
+            hammer.scale.set(hammerSize, hammerSize * 0.4, hammerSize * 1.5);
+            (hammer.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
+            (hammer.material as THREE.MeshBasicMaterial).opacity = (0.9 + reactiveF.highs * 0.1) * blend;
+            (hammer.material as THREE.MeshBasicMaterial).wireframe = false;
+          } else {
+            // Eyes on ends of hammer (2 tetras)
+            const side = i === 6 ? 1 : -1;
+            const hammerWidth = 3.5;
+            hammer.position.x = head.position.x + side * hammerWidth;
+            hammer.position.y = head.position.y + 0.5;
+            hammer.position.z = head.position.z + 2.2;
+            hammer.rotation.copy(head.rotation);
+            const eyeSize = 0.5 + reactiveF.highs * 0.2;
+            hammer.scale.set(eyeSize, eyeSize, eyeSize * 0.6);
+            (hammer.material as THREE.MeshBasicMaterial).color.setStyle('#ffffff');
+            (hammer.material as THREE.MeshBasicMaterial).opacity = (0.95 + reactiveF.highs * 0.05) * blend;
+            (hammer.material as THREE.MeshBasicMaterial).wireframe = false;
+          }
+        });
+        
+        // Dorsal fin and side fins using remaining tetras
+        obj.tetras.slice(FIN_TETRA_START, FIN_TETRA_END).forEach((fin, i) => {
+          const bodySegment = Math.floor(obj.cubes.length * 0.3); // Fins near front
+          const body = obj.cubes[bodySegment];
+          
+          if (i === 0) {
+            // Dorsal fin (top)
+            fin.position.x = body.position.x;
+            fin.position.y = body.position.y + 2.5 + reactiveF.mids * 0.5;
+            fin.position.z = body.position.z;
+            fin.rotation.x = -Math.PI / 6;
+            fin.rotation.y = body.rotation.y;
+            const finSize = 1.8 + reactiveF.mids * 0.3;
+            fin.scale.set(finSize * 0.3, finSize, finSize * 0.5);
+          } else {
+            // Pectoral fins (sides)
+            const side = i % 2 === 0 ? 1 : -1;
+            const finAngle = side * Math.PI / 3 + Math.sin(swimSpeed * 2) * 0.3;
+            fin.position.x = body.position.x + Math.cos(finAngle) * 2;
+            fin.position.y = body.position.y - 0.5 + Math.sin(swimSpeed * 2 + i) * 0.3;
+            fin.position.z = body.position.z + 1;
+            fin.rotation.x = -Math.PI / 4;
+            fin.rotation.y = body.rotation.y + finAngle;
+            fin.rotation.z = side * Math.PI / 6 + Math.sin(swimSpeed * 2 + i) * 0.2;
+            const pectSize = 1.2 + reactiveF.mids * 0.2;
+            fin.scale.set(pectSize * 0.4, pectSize * 1.2, pectSize * 0.3);
+          }
+          
+          (fin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+          (fin.material as THREE.MeshBasicMaterial).opacity = (0.8 + reactiveF.mids * 0.2) * blend;
+          (fin.material as THREE.MeshBasicMaterial).wireframe = false;
+        });
+        
+        // Ocean environment - bubbles and particles using octas
+        obj.octas.forEach((bubble, i) => {
+          if (i < BUBBLE_COUNT) {
+            // Rising bubbles
+            const bubbleSpeed = 0.5 + (i % 3) * 0.2;
+            const riseHeight = (el * bubbleSpeed + i) % 20;
+            const xOffset = Math.sin(i * 2) * 8;
+            const zOffset = -5 - (i % 5) * 3;
+            
+            bubble.position.x = xOffset + Math.sin(el + i) * 2;
+            bubble.position.y = riseHeight - 10 + Math.sin(el * 2 + i) * 0.5;
+            bubble.position.z = zOffset;
+            
+            const bubbleSize = 0.3 + reactiveF.highs * 0.2;
+            bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
+            bubble.rotation.x += 0.05;
+            bubble.rotation.y += 0.03;
+            
+            (bubble.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
+            (bubble.material as THREE.MeshBasicMaterial).opacity = (0.4 + reactiveF.highs * 0.3) * blend;
+            (bubble.material as THREE.MeshBasicMaterial).wireframe = true;
+          } else {
+            // Ocean floor rocks/coral
+            const rockIndex = i - 15;
+            const rockX = (rockIndex % 5 - 2) * 6 + Math.sin(rockIndex) * 2;
+            const rockZ = -Math.floor(rockIndex / 5) * 4 - 10;
+            
+            bubble.position.x = rockX;
+            bubble.position.y = -6 + Math.sin(rockIndex * 3) * 0.5 + reactiveF.bass * 0.3;
+            bubble.position.z = rockZ;
+            
+            const rockSize = 1 + (rockIndex % 3) * 0.5 + reactiveF.bass * 0.2;
+            bubble.scale.set(rockSize, rockSize * 0.8, rockSize);
+            bubble.rotation.y = rockIndex * 0.8;
+            
+            (bubble.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+            (bubble.material as THREE.MeshBasicMaterial).opacity = (0.5 + reactiveF.mids * 0.2) * blend;
+            (bubble.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        });
+        
+        // Hide sphere or use as distant light source
+        obj.sphere.position.set(10, 15, -30);
+        const sunSize = 8 + reactiveF.bass * 2;
+        obj.sphere.scale.set(sunSize, sunSize, sunSize);
+        obj.sphere.rotation.y += 0.005;
+        (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle('#ffeb99');
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.bass * 0.1) * blend;
+        (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
+      }
+
+      // ENVIRONMENT RENDERING - Independent from presets
+      // Find active environment keyframe
+      const activeEnvKeyframe = [...environmentKeyframes]
+        .reverse()
+        .find(kf => kf.time <= t);
+      
+      if (activeEnvKeyframe && activeEnvKeyframe.type !== 'none') {
+        const envType = activeEnvKeyframe.type;
+        const envIntensity = activeEnvKeyframe.intensity;
+        const envColor = activeEnvKeyframe.color;
+        
+        // Use a subset of available objects for environment (don't interfere with presets)
+        // We'll use objects that might not be fully utilized by some presets
+        const envObjectCount = Math.floor(envIntensity * 15); // 0-15 environment objects
+        
+        if (envType === 'ocean') {
+          // Ocean environment: water surface, light rays from above
+          // Use remaining octas as light rays and particles
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Light rays from surface
+            const rayX = (i % 5 - 2) * 8;
+            const rayZ = -20 + (Math.floor(i / 5)) * 5;
+            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 2;
+            envObj.position.y = 10 - i * 0.3 + Math.sin(el + i) * 0.5;
+            envObj.position.z = rayZ;
+            envObj.rotation.x = Math.PI / 4;
+            envObj.rotation.z = Math.sin(el * 0.3 + i) * 0.2;
+            const raySize = 0.5 + reactiveF.highs * 0.3;
+            envObj.scale.set(raySize * 0.3, raySize * 8, raySize * 0.3);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#40e0d0');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.2 + reactiveF.highs * 0.2) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+          }
+        } else if (envType === 'forest') {
+          // Forest environment: trees, ground fog
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 3 === 0) {
+              // Trees (tall vertical octas)
+              const treeX = ((i % 5) - 2) * 6;
+              const treeZ = -15 - Math.floor((i - 30) / 5) * 4;
+              envObj.position.set(treeX, -2, treeZ);
+              envObj.rotation.set(0, el * 0.1 + i, 0);
+              const treeHeight = 4 + (i % 3);
+              envObj.scale.set(1, treeHeight, 1);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#2d5016');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + reactiveF.mids * 0.2) * envIntensity;
+            } else {
+              // Fog/foliage particles
+              const fogX = Math.sin(i * 3) * 10;
+              const fogY = -3 + Math.sin(el * 0.3 + i) * 2;
+              const fogZ = -10 - (i % 10) * 2;
+              envObj.position.set(fogX, fogY, fogZ);
+              envObj.rotation.y += 0.02;
+              envObj.scale.set(2, 2, 2);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#4a7c59');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.bass * 0.1) * envIntensity;
+            }
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'space') {
+          // Space environment: stars, distant planets
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 4 === 0) {
+              // Distant planets
+              const planetDist = 30 + (i % 3) * 10;
+              const planetAngle = (i / 4) * Math.PI * 2 + el * 0.1;
+              envObj.position.x = Math.cos(planetAngle) * planetDist;
+              envObj.position.y = ((i % 7) - 3) * 5;
+              envObj.position.z = Math.sin(planetAngle) * planetDist;
+              envObj.rotation.x += 0.01;
+              envObj.rotation.y += 0.02;
+              const planetSize = 3 + (i % 3);
+              envObj.scale.set(planetSize, planetSize, planetSize);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#8b5cf6');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.4 + reactiveF.mids * 0.2) * envIntensity;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+            } else {
+              // Stars (small dots)
+              const starX = (Math.sin(i * 7) * 40);
+              const starY = (Math.cos(i * 5) * 30);
+              const starZ = (Math.sin(i * 3) * 40) - 30;
+              envObj.position.set(starX, starY, starZ);
+              const starTwinkle = 0.2 + Math.sin(el * 2 + i) * 0.1 + reactiveF.highs * 0.2;
+              envObj.scale.set(starTwinkle, starTwinkle, starTwinkle);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#ffffff');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + Math.sin(el * 3 + i) * 0.3) * envIntensity;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+            }
+          }
+        } else if (envType === 'city') {
+          // City environment: buildings, lights, grid floor
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Buildings in a grid
+            const gridX = ((i % 5) - 2) * 8;
+            const gridZ = -15 - Math.floor((i - 30) / 5) * 6;
+            const buildingHeight = 3 + ((i * 7) % 5) + reactiveF.bass * 2;
+            envObj.position.set(gridX, buildingHeight / 2 - 5, gridZ);
+            envObj.rotation.y = 0;
+            envObj.scale.set(2, buildingHeight, 2);
+            
+            // Window lights (pulsing with music)
+            const lightIntensity = Math.sin(el * 2 + i) * 0.3 + reactiveF.mids * 0.5;
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#fbbf24');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + lightIntensity) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'abstract') {
+          // Abstract environment: geometric grid, floating shapes
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Floating geometric shapes in patterns
+            const layerAngle = (i / envObjectCount) * Math.PI * 2 + el * 0.5;
+            const layerRadius = 15 + (i % 3) * 5;
+            envObj.position.x = Math.cos(layerAngle) * layerRadius;
+            envObj.position.y = Math.sin(el + i * 0.5) * 8;
+            envObj.position.z = Math.sin(layerAngle) * layerRadius;
+            envObj.rotation.x += 0.03 * (i % 3 + 1);
+            envObj.rotation.y += 0.02 * (i % 2 + 1);
+            envObj.rotation.z += 0.04;
+            const shapeSize = 1 + reactiveF.bass * 0.5 + (i % 3) * 0.5;
+            envObj.scale.set(shapeSize, shapeSize, shapeSize);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#a78bfa');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.5 + reactiveF.mids * 0.3) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = (i % 2 === 0);
+          }
+        }
       }
 
       // PHASE 3: Update orbit controls if in workspace mode
@@ -2178,8 +2559,6 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               highsColor={highsColor}
               backgroundColor={backgroundColor}
               borderColor={borderColor}
-              ambientLightIntensity={ambientLightIntensity}
-              directionalLightIntensity={directionalLightIntensity}
               cameraDistance={cameraDistance}
               cameraHeight={cameraHeight}
               cameraRotation={cameraRotation}
@@ -2199,8 +2578,6 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               onSetHighsColor={setHighsColor}
               onSetBackgroundColor={setBackgroundColor}
               onSetBorderColor={setBorderColor}
-              onSetAmbientLight={setAmbientLightIntensity}
-              onSetDirectionalLight={setDirectionalLightIntensity}
               onSetCameraDistance={setCameraDistance}
               onSetCameraHeight={setCameraHeight}
               onSetCameraRotation={setCameraRotation}
@@ -2235,6 +2612,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           presetKeyframes={presetKeyframes}
           cameraKeyframes={cameraKeyframes}
           textKeyframes={textKeyframes}
+          environmentKeyframes={environmentKeyframes}
           workspaceObjects={workspaceObjects}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
@@ -2243,12 +2621,15 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           onAddPresetKeyframe={addPresetKeyframe}
           onAddCameraKeyframe={addCameraKeyframe}
           onAddTextKeyframe={addTextKeyframe}
+          onAddEnvironmentKeyframe={addEnvironmentKeyframe}
           onDeletePresetKeyframe={deletePresetKeyframe}
           onDeleteCameraKeyframe={deleteCameraKeyframe}
           onDeleteTextKeyframe={deleteTextKeyframe}
+          onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
           onUpdatePresetKeyframe={updatePresetKeyframe}
           onUpdateCameraKeyframe={updateCameraKeyframe}
           onUpdateTextKeyframe={updateTextKeyframe}
+          onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
         />
       </div>
 
