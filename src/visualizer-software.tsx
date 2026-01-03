@@ -188,6 +188,12 @@ export default function ThreeDVisualizer() {
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  // NEW: Skybox controls
+  const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image'>('color');
+  const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
+  const [skyboxGradientBottom, setSkyboxGradientBottom] = useState('#0a0a14');
+  const [skyboxImageUrl, setSkyboxImageUrl] = useState('');
+  const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
@@ -1618,13 +1624,92 @@ export default function ThreeDVisualizer() {
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
-    if (sceneRef.current && rendererRef.current) {
+    if (!sceneRef.current || !rendererRef.current) return;
+    
+    // Remove existing skybox mesh if it exists
+    if (skyboxMeshRef.current) {
+      sceneRef.current.remove(skyboxMeshRef.current);
+      skyboxMeshRef.current.geometry.dispose();
+      if (skyboxMeshRef.current.material instanceof THREE.Material) {
+        skyboxMeshRef.current.material.dispose();
+      }
+      skyboxMeshRef.current = null;
+    }
+    
+    if (skyboxType === 'color') {
+      // Standard solid color background
       const bgColor = new THREE.Color(backgroundColor);
       sceneRef.current.background = bgColor;
       sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
       rendererRef.current.setClearColor(backgroundColor);
+    } else if (skyboxType === 'gradient') {
+      // Gradient skybox using a large sphere with gradient shader
+      const skyboxGeometry = new THREE.SphereGeometry(500, 32, 32);
+      const skyboxMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          topColor: { value: new THREE.Color(skyboxGradientTop) },
+          bottomColor: { value: new THREE.Color(skyboxGradientBottom) }
+        },
+        vertexShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 bottomColor;
+          varying vec3 vWorldPosition;
+          void main() {
+            float h = normalize(vWorldPosition).y;
+            gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
+          }
+        `,
+        side: THREE.BackSide
+      });
+      const skyboxMesh = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+      sceneRef.current.add(skyboxMesh);
+      skyboxMeshRef.current = skyboxMesh;
+      
+      // Set scene background to null and clear color to black (skybox will be rendered)
+      sceneRef.current.background = null;
+      rendererRef.current.setClearColor(0x000000);
+      sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+    } else if (skyboxType === 'image') {
+      // Image skybox using equirectangular texture
+      if (skyboxImageUrl) {
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+          skyboxImageUrl,
+          (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            if (sceneRef.current) {
+              sceneRef.current.background = texture;
+              sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+            }
+          },
+          undefined,
+          (error) => {
+            console.error('Error loading skybox image:', error);
+            addLog('Failed to load skybox image', 'error');
+            // Fallback to solid color
+            if (sceneRef.current && rendererRef.current) {
+              const bgColor = new THREE.Color(backgroundColor);
+              sceneRef.current.background = bgColor;
+              rendererRef.current.setClearColor(backgroundColor);
+            }
+          }
+        );
+      } else {
+        // No image URL, fallback to solid color
+        const bgColor = new THREE.Color(backgroundColor);
+        sceneRef.current.background = bgColor;
+        rendererRef.current.setClearColor(backgroundColor);
+      }
     }
-  }, [backgroundColor]);
+  }, [backgroundColor, skyboxType, skyboxGradientTop, skyboxGradientBottom, skyboxImageUrl]);
 
   useEffect(() => {
     if (lightsRef.current.ambient) {
@@ -3765,15 +3850,34 @@ export default function ThreeDVisualizer() {
 
       // PHASE 4: Apply background flash effect before rendering
       if (bgFlash > 0) {
-        const baseColor = new THREE.Color(backgroundColor);
-        const flashColor = new THREE.Color(0xffffff);
-        const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
-        scene.background = blendedColor;
-        rend.setClearColor(blendedColor);
+        if (skyboxType === 'color') {
+          // Standard color flash
+          const baseColor = new THREE.Color(backgroundColor);
+          const flashColor = new THREE.Color(0xffffff);
+          const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
+          scene.background = blendedColor;
+          rend.setClearColor(blendedColor);
+        } else if (skyboxType === 'gradient' && skyboxMeshRef.current) {
+          // Flash the gradient skybox by blending towards white
+          const material = skyboxMeshRef.current.material as THREE.ShaderMaterial;
+          const baseTop = new THREE.Color(skyboxGradientTop);
+          const baseBottom = new THREE.Color(skyboxGradientBottom);
+          const flashColor = new THREE.Color(0xffffff);
+          material.uniforms.topColor.value = baseTop.lerp(flashColor, Math.min(bgFlash, 1));
+          material.uniforms.bottomColor.value = baseBottom.lerp(flashColor, Math.min(bgFlash, 1));
+        }
+        // Note: Image skyboxes don't flash (would require shader manipulation)
       } else {
-        const baseColor = new THREE.Color(backgroundColor);
-        scene.background = baseColor;
-        rend.setClearColor(baseColor);
+        if (skyboxType === 'color') {
+          const baseColor = new THREE.Color(backgroundColor);
+          scene.background = baseColor;
+          rend.setClearColor(baseColor);
+        } else if (skyboxType === 'gradient' && skyboxMeshRef.current) {
+          // Reset gradient colors
+          const material = skyboxMeshRef.current.material as THREE.ShaderMaterial;
+          material.uniforms.topColor.value = new THREE.Color(skyboxGradientTop);
+          material.uniforms.bottomColor.value = new THREE.Color(skyboxGradientBottom);
+        }
       }
 
       // Update camera rig visual hints
@@ -4671,10 +4775,74 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Visual Effects</h3>
               <p className="text-xs text-gray-400 mb-3">Customize the look and feel of the visualization.</p>
               <div className="space-y-3">
+                {/* Skybox Type Selection */}
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Background Color</label>
-                  <input type="color" id="backgroundColor" name="backgroundColor" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  <label className="text-xs text-gray-400 block mb-2">Background Type</label>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setSkyboxType('color')}
+                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'color' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Solid Color
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('gradient')}
+                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'gradient' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Gradient
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('image')}
+                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'image' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Image/Skybox
+                    </button>
+                  </div>
                 </div>
+                
+                {/* Color Mode Controls */}
+                {skyboxType === 'color' && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+                    <input type="color" id="backgroundColor" name="backgroundColor" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  </div>
+                )}
+                
+                {/* Gradient Mode Controls */}
+                {skyboxType === 'gradient' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Top Color (Sky)</label>
+                      <input type="color" id="skyboxGradientTop" name="skyboxGradientTop" value={skyboxGradientTop} onChange={(e) => setSkyboxGradientTop(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Bottom Color (Ground)</label>
+                      <input type="color" id="skyboxGradientBottom" name="skyboxGradientBottom" value={skyboxGradientBottom} onChange={(e) => setSkyboxGradientBottom(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Image Mode Controls */}
+                {skyboxType === 'image' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Equirectangular Image URL</label>
+                      <input 
+                        type="text" 
+                        id="skyboxImageUrl" 
+                        name="skyboxImageUrl"
+                        value={skyboxImageUrl} 
+                        onChange={(e) => setSkyboxImageUrl(e.target.value)} 
+                        placeholder="https://example.com/skybox.jpg"
+                        className="w-full bg-gray-600 text-white text-xs px-3 py-2 rounded" 
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Use equirectangular (360°) panoramic images. Try free resources like <a href="https://polyhaven.com/hdris" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Poly Haven</a>.
+                    </p>
+                  </div>
+                )}
+                
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Border Color</label>
                   <input type="color" id="borderColor" name="borderColor" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
