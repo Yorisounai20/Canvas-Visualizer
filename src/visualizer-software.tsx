@@ -189,11 +189,16 @@ export default function ThreeDVisualizer() {
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   // NEW: Skybox controls
-  const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image'>('color');
+  const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
   const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
   const [skyboxGradientBottom, setSkyboxGradientBottom] = useState('#0a0a14');
   const [skyboxImageUrl, setSkyboxImageUrl] = useState('');
   const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
+  const starFieldRef = useRef<THREE.Points | null>(null);
+  const [starCount, setStarCount] = useState(5000);
+  const [galaxyColor, setGalaxyColor] = useState('#8a2be2');
+  const [nebulaColor1, setNebulaColor1] = useState('#ff1493');
+  const [nebulaColor2, setNebulaColor2] = useState('#4169e1');
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
@@ -1636,6 +1641,16 @@ export default function ThreeDVisualizer() {
       skyboxMeshRef.current = null;
     }
     
+    // Remove existing star field if it exists
+    if (starFieldRef.current) {
+      sceneRef.current.remove(starFieldRef.current);
+      starFieldRef.current.geometry.dispose();
+      if (starFieldRef.current.material instanceof THREE.Material) {
+        starFieldRef.current.material.dispose();
+      }
+      starFieldRef.current = null;
+    }
+    
     if (skyboxType === 'color') {
       // Standard solid color background
       const bgColor = new THREE.Color(backgroundColor);
@@ -1708,8 +1723,122 @@ export default function ThreeDVisualizer() {
         sceneRef.current.background = bgColor;
         rendererRef.current.setClearColor(backgroundColor);
       }
+    } else if (skyboxType === 'stars' || skyboxType === 'galaxy' || skyboxType === 'nebula') {
+      // Procedural star field with optional galaxy/nebula effects
+      sceneRef.current.background = new THREE.Color(0x000000);
+      rendererRef.current.setClearColor(0x000000);
+      sceneRef.current.fog = new THREE.Fog(0x000000, 10, 50);
+      
+      // Create star field
+      const starGeometry = new THREE.BufferGeometry();
+      const starPositions = new Float32Array(starCount * 3);
+      const starColors = new Float32Array(starCount * 3);
+      const starSizes = new Float32Array(starCount);
+      
+      for (let i = 0; i < starCount; i++) {
+        // Random position on sphere
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const radius = 400 + Math.random() * 100;
+        
+        starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        starPositions[i * 3 + 2] = radius * Math.cos(phi);
+        
+        // Star color and size based on type
+        if (skyboxType === 'stars') {
+          // Simple white stars with slight color variation
+          const brightness = 0.8 + Math.random() * 0.2;
+          starColors[i * 3] = brightness;
+          starColors[i * 3 + 1] = brightness;
+          starColors[i * 3 + 2] = brightness;
+          starSizes[i] = Math.random() * 2 + 0.5;
+        } else if (skyboxType === 'galaxy') {
+          // Galaxy with purple/blue tint
+          const color = new THREE.Color(galaxyColor);
+          const mix = Math.random();
+          starColors[i * 3] = color.r * (0.5 + mix * 0.5);
+          starColors[i * 3 + 1] = color.g * (0.5 + mix * 0.5);
+          starColors[i * 3 + 2] = color.b * (0.5 + mix * 0.5);
+          starSizes[i] = Math.random() * 3 + 0.5;
+        } else { // nebula
+          // Nebula with pink/blue color variation
+          const color1 = new THREE.Color(nebulaColor1);
+          const color2 = new THREE.Color(nebulaColor2);
+          const mix = Math.random();
+          starColors[i * 3] = color1.r * mix + color2.r * (1 - mix);
+          starColors[i * 3 + 1] = color1.g * mix + color2.g * (1 - mix);
+          starColors[i * 3 + 2] = color1.b * mix + color2.b * (1 - mix);
+          starSizes[i] = Math.random() * 4 + 1;
+        }
+      }
+      
+      starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+      starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+      
+      const starMaterial = new THREE.PointsMaterial({
+        size: 2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending
+      });
+      
+      const starField = new THREE.Points(starGeometry, starMaterial);
+      sceneRef.current.add(starField);
+      starFieldRef.current = starField;
+      
+      // Add nebula clouds for nebula mode
+      if (skyboxType === 'nebula') {
+        const nebulaGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const nebulaMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            color1: { value: new THREE.Color(nebulaColor1) },
+            color2: { value: new THREE.Color(nebulaColor2) },
+            time: { value: 0 }
+          },
+          vertexShader: `
+            varying vec3 vWorldPosition;
+            void main() {
+              vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+              vWorldPosition = worldPosition.xyz;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform float time;
+            varying vec3 vWorldPosition;
+            
+            // Simple noise function
+            float noise(vec3 p) {
+              return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+            }
+            
+            void main() {
+              vec3 pos = normalize(vWorldPosition);
+              float n = noise(pos * 3.0);
+              n += noise(pos * 6.0) * 0.5;
+              n += noise(pos * 12.0) * 0.25;
+              
+              vec3 color = mix(color1, color2, n);
+              float alpha = smoothstep(0.3, 0.7, n) * 0.3;
+              gl_FragColor = vec4(color, alpha);
+            }
+          `,
+          side: THREE.BackSide,
+          transparent: true,
+          blending: THREE.AdditiveBlending
+        });
+        const nebulaMesh = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
+        sceneRef.current.add(nebulaMesh);
+        skyboxMeshRef.current = nebulaMesh;
+      }
     }
-  }, [backgroundColor, skyboxType, skyboxGradientTop, skyboxGradientBottom, skyboxImageUrl]);
+  }, [backgroundColor, skyboxType, skyboxGradientTop, skyboxGradientBottom, skyboxImageUrl, starCount, galaxyColor, nebulaColor1, nebulaColor2]);
 
   useEffect(() => {
     if (lightsRef.current.ambient) {
@@ -4778,24 +4907,44 @@ export default function ThreeDVisualizer() {
                 {/* Skybox Type Selection */}
                 <div>
                   <label className="text-xs text-gray-400 block mb-2">Background Type</label>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2 mb-2">
                     <button 
                       onClick={() => setSkyboxType('color')}
-                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'color' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'color' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
                     >
                       Solid Color
                     </button>
                     <button 
                       onClick={() => setSkyboxType('gradient')}
-                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'gradient' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'gradient' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
                     >
                       Gradient
                     </button>
                     <button 
                       onClick={() => setSkyboxType('image')}
-                      className={`flex-1 px-3 py-2 rounded text-xs ${skyboxType === 'image' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'image' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
                     >
-                      Image/Skybox
+                      Image
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => setSkyboxType('stars')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'stars' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      ✨ Stars
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('galaxy')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'galaxy' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      🌌 Galaxy
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('nebula')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'nebula' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      🌠 Nebula
                     </button>
                   </div>
                 </div>
@@ -4839,6 +4988,81 @@ export default function ThreeDVisualizer() {
                     </div>
                     <p className="text-xs text-gray-500 italic">
                       Use equirectangular (360°) panoramic images. Try free resources like <a href="https://polyhaven.com/hdris" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Poly Haven</a>.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Stars Mode Controls */}
+                {skyboxType === 'stars' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Procedurally generated star field with random distribution.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Galaxy Mode Controls */}
+                {skyboxType === 'galaxy' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Galaxy Color</label>
+                      <input type="color" id="galaxyColor" name="galaxyColor" value={galaxyColor} onChange={(e) => setGalaxyColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Spiral galaxy with colored star clusters.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Nebula Mode Controls */}
+                {skyboxType === 'nebula' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nebula Color 1</label>
+                      <input type="color" id="nebulaColor1" name="nebulaColor1" value={nebulaColor1} onChange={(e) => setNebulaColor1(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nebula Color 2</label>
+                      <input type="color" id="nebulaColor2" name="nebulaColor2" value={nebulaColor2} onChange={(e) => setNebulaColor2(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Colorful nebula with gas clouds and stars.
                     </p>
                   </div>
                 )}
