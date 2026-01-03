@@ -576,7 +576,8 @@ export default function ThreeDVisualizer() {
         return sorted[i].preset;
       }
     }
-    // If before all keyframes, return first preset or 'orbit' as default
+    // If before all keyframes, use the first keyframe's preset if it exists,
+    // otherwise return 'orbit' as default
     return sorted.length > 0 ? sorted[0].preset : 'orbit';
   };
 
@@ -5390,9 +5391,9 @@ export default function ThreeDVisualizer() {
                 {/* Timeline markers for each parameter event */}
                 {parameterEvents.map(event => {
                   if (event.mode === 'manual') {
-                    const startPos = duration > 0 ? (event.startTime / duration) * 100 : 0;
-                    const endPos = duration > 0 ? (event.endTime / duration) * 100 : 0;
-                    const width = endPos - startPos;
+                    const startPos = duration > 0 ? Math.min((event.startTime / duration) * 100, 100) : 0;
+                    const endPos = duration > 0 ? Math.min((event.endTime / duration) * 100, 100) : 0;
+                    const width = Math.max(0, endPos - startPos);
                     return (
                       <div
                         key={event.id}
@@ -6485,7 +6486,7 @@ export default function ThreeDVisualizer() {
               <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
                 {/* Timeline markers for each preset keyframe */}
                 {presetKeyframes.map(kf => {
-                  const position = duration > 0 ? (kf.time / duration) * 100 : 0;
+                  const position = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
                   const animType = animationTypes.find(a => a.value === kf.preset);
                   return (
                     <div
@@ -6529,9 +6530,11 @@ export default function ThreeDVisualizer() {
                         <span className="text-purple-400 font-mono text-sm">#{index + 1} - {formatTime(kf.time)}</span>
                         <button
                           onClick={() => handleDeletePresetKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors"
+                          className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           disabled={presetKeyframes.length <= 1}
                           title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
+                          aria-disabled={presetKeyframes.length <= 1}
+                          aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
                         >
                           <Trash2 size={16} />
                         </button>
