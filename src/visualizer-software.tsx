@@ -207,7 +207,7 @@ export default function ThreeDVisualizer() {
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'keyframes', 'effects', 'postfx', 'presets', 'textAnimator', 'masks', 'cameraRig'] as const;
+  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -5389,12 +5389,6 @@ export default function ThreeDVisualizer() {
           >
             📝 Text Animator
           </button>
-          <button 
-            onClick={() => setActiveTab('masks')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'masks' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            🎭 Masks
-          </button>
         </div>
 
         {/* Waveforms Tab - PHASE 4 */}
@@ -7111,259 +7105,6 @@ export default function ThreeDVisualizer() {
           </div>
         )}
 
-        {/* PHASE 5: Masks Tab */}
-        {activeTab === 'masks' && (
-          <div>
-            {/* Implementation Status Notice */}
-            <div className="mb-4 bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-yellow-400 mb-2">⚠️ Masks - Advanced Feature (Not Yet Implemented)</h3>
-              <p className="text-xs text-yellow-200 mb-2">
-                The Masks feature requires WebGL shader-based rendering or stencil buffer implementation, which is not currently available in the rendering pipeline.
-              </p>
-              <p className="text-xs text-yellow-200">
-                UI controls below allow you to configure mask properties, but they won't affect the visualization until the rendering system is updated with WebGL post-processing support.
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-lg font-bold text-purple-400 mb-2">🎭 Mask Reveals</h3>
-              <p className="text-sm text-gray-400 mb-4">Create shape-based masks with animated reveals and feathering</p>
-              
-              <div className="flex gap-2 mb-4">
-                <button 
-                  onClick={() => createMask('circle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
-                  disabled
-                >
-                  ⭕ Circle Mask
-                </button>
-                <button 
-                  onClick={() => createMask('rectangle')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
-                  disabled
-                >
-                  ◻️ Rectangle Mask
-                </button>
-                <button 
-                  onClick={() => createMask('custom')} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm cursor-not-allowed opacity-60"
-                  disabled
-                >
-                  ✏️ Custom Path
-                </button>
-              </div>
-
-              {/* Masks List */}
-              <div className="space-y-3 mb-6">
-                {masks.map(mask => (
-                  <div key={mask.id} className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="checkbox" id="checkbox-field-4043" name="checkbox-field-4043" 
-                          checked={mask.enabled}
-                          onChange={(e) => updateMask(mask.id, { enabled: e.target.checked })}
-                          className="rounded"
-                        />
-                        <input 
-                          type="text" id="text-field-4049" name="text-field-4049" 
-                          value={mask.name}
-                          onChange={(e) => updateMask(mask.id, { name: e.target.value })}
-                          className="bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => createMaskRevealKeyframe(mask.id, currentTime)}
-                          className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-xs"
-                        >
-                          + Keyframe
-                        </button>
-                        <button 
-                          onClick={() => deleteMask(mask.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-3">
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Blend Mode</label>
-                        <select 
-                          value={mask.blendMode}
-                          onChange={(e) => updateMask(mask.id, { blendMode: e.target.value })}
-                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="add">Add</option>
-                          <option value="subtract">Subtract</option>
-                          <option value="multiply">Multiply</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Feather: {mask.feather}</label>
-                        <input 
-                          type="range" id="feather-mask-feather" name="feather-mask-feather" 
-                          min="0" 
-                          max="100"
-                          value={mask.feather}
-                          onChange={(e) => updateMask(mask.id, { feather: parseInt(e.target.value) })}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-
-                    {mask.type === 'circle' && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Center X</label>
-                          <input 
-                            type="number" id="center-x" name="center-x" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.center?.x || 0.5}
-                            onChange={(e) => updateMask(mask.id, { center: { ...mask.center, x: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Center Y</label>
-                          <input 
-                            type="number" id="center-y" name="center-y" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.center?.y || 0.5}
-                            onChange={(e) => updateMask(mask.id, { center: { x: mask.center?.x || 0.5, y: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Radius</label>
-                          <input 
-                            type="number" id="radius-1" name="radius-1" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.radius || 0.3}
-                            onChange={(e) => updateMask(mask.id, { radius: parseFloat(e.target.value) })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {mask.type === 'rectangle' && mask.rect && (
-                      <div className="grid grid-cols-4 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">X</label>
-                          <input 
-                            type="number" id="x" name="x" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.x}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, x: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Y</label>
-                          <input 
-                            type="number" id="y" name="y" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.y}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, y: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Width</label>
-                          <input 
-                            type="number" id="width" name="width" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.width}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, width: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Height</label>
-                          <input 
-                            type="number" id="height-1" name="height-1" 
-                            step="0.01"
-                            min="0"
-                            max="1"
-                            value={mask.rect.height}
-                            onChange={(e) => updateMask(mask.id, { rect: { ...mask.rect, height: parseFloat(e.target.value) } })}
-                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-3">
-                      <label className="flex items-center gap-2 text-sm text-gray-300">
-                        <input 
-                          type="checkbox" id="checkbox-field-4195" name="checkbox-field-4195" 
-                          checked={mask.inverted}
-                          onChange={(e) => updateMask(mask.id, { inverted: e.target.checked })}
-                          className="rounded"
-                        />
-                        Invert Mask
-                      </label>
-                    </div>
-                  </div>
-                ))}
-
-                {masks.length === 0 && (
-                  <div className="text-center text-gray-500 py-8">
-                    No masks yet. Click a mask type button to create one.
-                  </div>
-                )}
-              </div>
-
-              {/* Mask Reveal Keyframes */}
-              <div className="mt-6">
-                <h4 className="text-md font-bold text-cyan-400 mb-3">Mask Reveal Keyframes</h4>
-                <div className="space-y-2">
-                  {maskRevealKeyframes.map(kf => {
-                    const mask = masks.find(m => m.id === kf.maskId);
-                    return (
-                      <div key={kf.id} className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
-                          <span className="text-white text-sm">{mask?.name || 'Unknown Mask'}</span>
-                          <span className="text-gray-400 text-xs">({kf.animation})</span>
-                        </div>
-                        <button 
-                          onClick={() => deleteMaskRevealKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  {maskRevealKeyframes.length === 0 && (
-                    <div className="text-center text-gray-500 py-4 text-sm">
-                      No reveal keyframes. Select a mask and click "+ Keyframe".
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* PHASE 5: Camera Rig Tab */}
         {activeTab === 'cameraRig' && (
           <div>
@@ -8604,7 +8345,7 @@ export default function ThreeDVisualizer() {
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">3</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Keyframes</span>
+                      <span className="text-gray-300">Switch to Camera Rig</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">4</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
@@ -8612,24 +8353,20 @@ export default function ThreeDVisualizer() {
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">5</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Post-FX</span>
+                      <span className="text-gray-300">Switch to Environments</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">6</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Presets</span>
+                      <span className="text-gray-300">Switch to Post-FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">7</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <span className="text-gray-300">Switch to Presets</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">8</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Masks</span>
+                      <span className="text-gray-300">Switch to Text Animator</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">9</kbd>
-                    </div>
-                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Rig</span>
-                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">0</kbd>
                     </div>
                   </div>
                 </div>
