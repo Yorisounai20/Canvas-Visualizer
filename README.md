@@ -1,7 +1,8 @@
 # 🎵 Canvas Visualizer - 3D Music Video Creator
 
-## **✅ Development Status**
+## **Development Status**
 
+**Version 2.4 - Camera Rig Path Visualization**
 **Version 2.4 - Advanced Skybox & Material System (Software Mode)**
 
 Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls.
@@ -383,6 +384,11 @@ Professional camera control with:
 - **Easing functions** - Linear, Ease In, Ease Out, Ease In-Out
 - **Camera shake** - Impact effects synchronized to audio
 - **Null object hierarchy** - Professional transform composition
+- **3D Path Visualization** - Real-time visual feedback of rig trajectories
+  - Color-coded paths per rig type (Orbit=Cyan, Dolly=Green, Crane=Magenta, Custom=White)
+  - Sphere markers at keyframe positions with size variations based on easing
+  - Toggle visibility for paths and markers independently
+  - Eliminates need to constantly switch between UI and viewport during setup
 
 📚 **[Complete Camera Rig Documentation](CAMERA_RIG_DOCUMENTATION.md)**  
 📖 **[Quick Reference Guide](docs/CAMERA_RIG_QUICK_REFERENCE.md)**
@@ -690,6 +696,17 @@ npm run lint         # Run ESLint
 
 ## **Recent Changes & Improvements**
 
+### **Version 2.4 - Camera Rig Path Visualization (Latest):**
+- ✨ **3D Path Visualization** - Real-time visual feedback of camera rig trajectories in the viewport
+  - Color-coded paths: Orbit (Cyan), Dolly (Green), Crane (Magenta), Custom (White)
+  - Sphere markers at keyframe positions with size variations based on easing type
+  - "Show Paths" and "Show Keyframe Markers" toggles in Camera Rig tab
+  - Paths update in real-time as rig parameters change
+  - Automatic path sampling (2-60 samples per rig for optimal performance)
+  - Proper memory management with geometry disposal on updates
+- 🐛 **Fixed Dolly Rig Behavior** - Camera now correctly looks at scene center instead of following the rig position
+  - Creates proper tracking shots while keeping the scene in view
+  - Dolly rig now useful for forward/backward, lateral, and vertical camera movements
 ### **Version 2.4 - Advanced Skybox & Material System (Latest):**
 - ✨ **6 Skybox/Background Modes (Software Mode)** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
   - **Gradient Skybox** - Vertical color gradients with custom GLSL shaders (top/bottom color control)
@@ -806,6 +823,7 @@ npm run lint         # Run ESLint
 
 ---
 
+**Version:** 2.4 (Camera Rig Path Visualization)  
 **Version:** 2.4 (Advanced Skybox & Material System)  
 **Last Updated:** 01/03/2026  
 **License:** MIT  
@@ -816,6 +834,7 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
+- Version 2.4: Camera Rig Path Visualization, Dolly Rig Fix
 - Version 2.4: Advanced Skybox & Material System (6 skybox modes, 4 material types, PBR support)
 - Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
 - Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
