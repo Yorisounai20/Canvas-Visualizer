@@ -4794,15 +4794,6 @@ export default function ThreeDVisualizer() {
         {activeTab === 'controls' && (
           <div>
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" id="bassColor" name="bassColor" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" id="midsColor" name="midsColor" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" id="highsColor" name="highsColor" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-              </div>
-            </div>
-            
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
               <div className="space-y-3">
