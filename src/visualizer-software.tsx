@@ -3080,7 +3080,9 @@ export default function ThreeDVisualizer() {
           }
           
           // Scale: MUCH LARGER for prominence
-          let scaleX, scaleY, scaleZ;
+          let scaleX = 2.5;
+          let scaleY = 2;
+          let scaleZ = 3;
           if (isHammer && i !== 1) {
             // Hammer end cubes - stretched horizontally
             scaleX = 5 + f.highs * 0.5; // Very wide for hammer ends
@@ -3096,10 +3098,6 @@ export default function ThreeDVisualizer() {
             scaleX = 1.5 - tailProgress * 0.7;
             scaleY = 1.2 - tailProgress * 0.6;
             scaleZ = 2 + f.bass * 0.5;
-          } else {
-            scaleX = 2.5;
-            scaleY = 2;
-            scaleZ = 3;
           }
           c.scale.set(scaleX, scaleY, scaleZ);
           
@@ -4244,7 +4242,8 @@ export default function ThreeDVisualizer() {
           const topY = 8;
           const bottomY = -8;
           const neckY = 0;
-          let y, radius;
+          let y = 0;
+          let radius = 0;
           if (fallProgress < 0.3) {
             const topProgress = fallProgress / 0.3;
             y = topY - topProgress * (topY - neckY);
