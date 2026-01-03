@@ -14,7 +14,7 @@ import DebugConsole from './components/Debug/DebugConsole';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
 import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, EnvironmentKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -256,6 +256,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [cameraShakes, setCameraShakes] = useState<CameraShake[]>([]);
   const [presetKeyframes, setPresetKeyframes] = useState<PresetKeyframe[]>([]);
   const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
+  const [environmentKeyframes, setEnvironmentKeyframes] = useState<EnvironmentKeyframe[]>([]);
 
   // PHASE 2: Colors (initialized from project settings)
   const [bassColor, setBassColor] = useState('#8a2be2');
@@ -530,6 +531,30 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       kf.id === id ? { ...kf, show, text } : kf
     ));
     addLog('Updated text keyframe', 'success');
+  };
+
+  // Environment keyframe handlers
+  const addEnvironmentKeyframe = (time: number) => {
+    const newKeyframe: EnvironmentKeyframe = {
+      id: Date.now(),
+      time,
+      type: 'ocean',
+      intensity: 0.5
+    };
+    setEnvironmentKeyframes([...environmentKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added environment keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const deleteEnvironmentKeyframe = (id: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted environment keyframe', 'info');
+  };
+
+  const updateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, type: type as any, intensity, color } : kf
+    ));
+    addLog('Updated environment keyframe', 'success');
   };
 
   const formatTime = (s: number) => 
@@ -1660,6 +1685,148 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
       }
 
+      // ENVIRONMENT RENDERING - Independent from presets
+      // Find active environment keyframe
+      const activeEnvKeyframe = [...environmentKeyframes]
+        .reverse()
+        .find(kf => kf.time <= t);
+      
+      if (activeEnvKeyframe && activeEnvKeyframe.type !== 'none') {
+        const envType = activeEnvKeyframe.type;
+        const envIntensity = activeEnvKeyframe.intensity;
+        const envColor = activeEnvKeyframe.color;
+        
+        // Use a subset of available objects for environment (don't interfere with presets)
+        // We'll use objects that might not be fully utilized by some presets
+        const envObjectCount = Math.floor(envIntensity * 15); // 0-15 environment objects
+        
+        if (envType === 'ocean') {
+          // Ocean environment: water surface, light rays from above
+          // Use remaining octas as light rays and particles
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Light rays from surface
+            const rayX = (i % 5 - 2) * 8;
+            const rayZ = -20 + (Math.floor(i / 5)) * 5;
+            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 2;
+            envObj.position.y = 10 - i * 0.3 + Math.sin(el + i) * 0.5;
+            envObj.position.z = rayZ;
+            envObj.rotation.x = Math.PI / 4;
+            envObj.rotation.z = Math.sin(el * 0.3 + i) * 0.2;
+            const raySize = 0.5 + reactiveF.highs * 0.3;
+            envObj.scale.set(raySize * 0.3, raySize * 8, raySize * 0.3);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#40e0d0');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.2 + reactiveF.highs * 0.2) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+          }
+        } else if (envType === 'forest') {
+          // Forest environment: trees, ground fog
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 3 === 0) {
+              // Trees (tall vertical octas)
+              const treeX = ((i % 5) - 2) * 6;
+              const treeZ = -15 - Math.floor((i - 30) / 5) * 4;
+              envObj.position.set(treeX, -2, treeZ);
+              envObj.rotation.set(0, el * 0.1 + i, 0);
+              const treeHeight = 4 + (i % 3);
+              envObj.scale.set(1, treeHeight, 1);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#2d5016');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + reactiveF.mids * 0.2) * envIntensity;
+            } else {
+              // Fog/foliage particles
+              const fogX = Math.sin(i * 3) * 10;
+              const fogY = -3 + Math.sin(el * 0.3 + i) * 2;
+              const fogZ = -10 - (i % 10) * 2;
+              envObj.position.set(fogX, fogY, fogZ);
+              envObj.rotation.y += 0.02;
+              envObj.scale.set(2, 2, 2);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#4a7c59');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.bass * 0.1) * envIntensity;
+            }
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'space') {
+          // Space environment: stars, distant planets
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 4 === 0) {
+              // Distant planets
+              const planetDist = 30 + (i % 3) * 10;
+              const planetAngle = (i / 4) * Math.PI * 2 + el * 0.1;
+              envObj.position.x = Math.cos(planetAngle) * planetDist;
+              envObj.position.y = ((i % 7) - 3) * 5;
+              envObj.position.z = Math.sin(planetAngle) * planetDist;
+              envObj.rotation.x += 0.01;
+              envObj.rotation.y += 0.02;
+              const planetSize = 3 + (i % 3);
+              envObj.scale.set(planetSize, planetSize, planetSize);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#8b5cf6');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.4 + reactiveF.mids * 0.2) * envIntensity;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+            } else {
+              // Stars (small dots)
+              const starX = (Math.sin(i * 7) * 40);
+              const starY = (Math.cos(i * 5) * 30);
+              const starZ = (Math.sin(i * 3) * 40) - 30;
+              envObj.position.set(starX, starY, starZ);
+              const starTwinkle = 0.2 + Math.sin(el * 2 + i) * 0.1 + reactiveF.highs * 0.2;
+              envObj.scale.set(starTwinkle, starTwinkle, starTwinkle);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#ffffff');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + Math.sin(el * 3 + i) * 0.3) * envIntensity;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+            }
+          }
+        } else if (envType === 'city') {
+          // City environment: buildings, lights, grid floor
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Buildings in a grid
+            const gridX = ((i % 5) - 2) * 8;
+            const gridZ = -15 - Math.floor((i - 30) / 5) * 6;
+            const buildingHeight = 3 + ((i * 7) % 5) + reactiveF.bass * 2;
+            envObj.position.set(gridX, buildingHeight / 2 - 5, gridZ);
+            envObj.rotation.y = 0;
+            envObj.scale.set(2, buildingHeight, 2);
+            
+            // Window lights (pulsing with music)
+            const lightIntensity = Math.sin(el * 2 + i) * 0.3 + reactiveF.mids * 0.5;
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#fbbf24');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + lightIntensity) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'abstract') {
+          // Abstract environment: geometric grid, floating shapes
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Floating geometric shapes in patterns
+            const layerAngle = (i / envObjectCount) * Math.PI * 2 + el * 0.5;
+            const layerRadius = 15 + (i % 3) * 5;
+            envObj.position.x = Math.cos(layerAngle) * layerRadius;
+            envObj.position.y = Math.sin(el + i * 0.5) * 8;
+            envObj.position.z = Math.sin(layerAngle) * layerRadius;
+            envObj.rotation.x += 0.03 * (i % 3 + 1);
+            envObj.rotation.y += 0.02 * (i % 2 + 1);
+            envObj.rotation.z += 0.04;
+            const shapeSize = 1 + reactiveF.bass * 0.5 + (i % 3) * 0.5;
+            envObj.scale.set(shapeSize, shapeSize, shapeSize);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#a78bfa');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.5 + reactiveF.mids * 0.3) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = (i % 2 === 0);
+          }
+        }
+      }
+
       // PHASE 3: Update orbit controls if in workspace mode
       if (orbitControlsRef.current && workspaceMode) {
         orbitControlsRef.current.update();
@@ -2415,6 +2582,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           presetKeyframes={presetKeyframes}
           cameraKeyframes={cameraKeyframes}
           textKeyframes={textKeyframes}
+          environmentKeyframes={environmentKeyframes}
           workspaceObjects={workspaceObjects}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
@@ -2423,12 +2591,15 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           onAddPresetKeyframe={addPresetKeyframe}
           onAddCameraKeyframe={addCameraKeyframe}
           onAddTextKeyframe={addTextKeyframe}
+          onAddEnvironmentKeyframe={addEnvironmentKeyframe}
           onDeletePresetKeyframe={deletePresetKeyframe}
           onDeleteCameraKeyframe={deleteCameraKeyframe}
           onDeleteTextKeyframe={deleteTextKeyframe}
+          onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
           onUpdatePresetKeyframe={updatePresetKeyframe}
           onUpdateCameraKeyframe={updateCameraKeyframe}
           onUpdateTextKeyframe={updateTextKeyframe}
+          onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
         />
       </div>
 
