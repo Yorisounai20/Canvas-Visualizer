@@ -106,12 +106,13 @@ Features:
 
 | Feature | Editor Mode | Software Mode |
 |---------|-------------|---------------|
-| Interface | Multi-panel, professional | Single-view, simplified |
-| Timeline | Multiple sections, multi-tab | Single timeline |
+| Interface | Multi-panel, professional | Tabbed interface at bottom |
+| Timeline | Multiple sections, multi-tab | Single waveform display |
 | Layers | Full layer management | No layers |
 | Workspace | Blender-like 3D editing | N/A |
-| Keyframes | Preset, Camera, Text | Letterbox, Camera Shake, Events |
+| Keyframes | Preset, Camera, Text | Camera, Letterbox, Camera Shake, Events |
 | Audio Tracks | Single | Multiple with mixing |
+| Camera Rigs | Yes (7 rig types) | Yes (7 rig types) |
 | Learning Curve | Steep | Easy |
 | Best For | Complex projects | Quick visualizations |
 
@@ -177,47 +178,90 @@ Features:
 
 ### ⚡ **Software Mode Interface**
 
-- **Left Panel (Presets & Audio):**
-  - Animation preset selector with icons
-  - Audio file upload
-  - Multiple audio track management
-  - Volume and mute controls per track
-  - Active track selection for visualization
+The Software Mode features a streamlined tabbed interface at the bottom for easy access to all controls:
+
+- **Top Bar:**
+  - Title and tagline
+  - Keyboard shortcuts button (?)
+  - Export button (purple, top-right)
   
 - **Center Canvas:**
   - 960x540 3D visualization preview
-  - Optional border and letterbox effects
-  - Filename overlay (toggleable)
-  - Preset display (toggleable)
+  - Optional border effects (configurable in Settings tab)
+  - Letterbox overlays when enabled (configured in Effects tab)
+  - Filename overlay (toggleable in Settings tab)
+  - Preset display (toggleable in Settings tab)
   
-- **Right Panel (Controls):**
-  - **🎚️ Frequency Gain Controls** - Bass, mids, highs sensitivity multipliers (0-3x)
-  - **🎭 Shape Material Controls** - Per-shape customization:
-    - Material type dropdown (Basic, Standard PBR, Phong, Lambert)
-    - Color picker for each shape (Cubes, Octahedrons, Tetrahedrons, Sphere)
-    - Opacity slider (0.0-1.0)
-    - Wireframe toggle
-    - Metalness & Roughness sliders (Standard PBR only, 0.0-1.0)
-    - Reset all materials to defaults button
-  - **📷 Camera Settings Tab** - Distance, height, rotation, auto-rotate
-  - **📝 Text Animator Tab** - 3D text overlay with custom font loading
-  - **✨ Effects Tab**:
-    - **🌌 Visual Effects** - 6 skybox/background modes:
-      - **Solid Color** - Traditional single-color background
-      - **Gradient** - Sky-to-ground color gradient (customizable top/bottom colors)
-      - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI)
-      - **Stars** - Procedurally generated star field (1,000-10,000 stars, adjustable count)
-      - **Galaxy** - Spiral galaxy with customizable color tint
-      - **Nebula** - Multi-color nebula with shader-based gas clouds (dual-color customization)
-    - **📽️ Animated Letterbox** - Keyframe-based curtain effects
-    - **💥 Camera Shake Events** - Time-triggered shake with intensity control
-    - **⚡ Parameter Events** - Background flash, vignette pulse, saturation burst
-  - **⚙️ Settings Tab** - Border color, lighting controls, waveform mode, HUD toggles
+- **Bottom Section (Tabbed Interface):**
+  - **Waveform Display Area:**
+    - Scrolling or static waveform visualization
+    - Playback controls and time display
+    - Current preset indicator
   
-- **Bottom Timeline:**
-  - Scrolling or static waveform visualization
-  - Playback controls and time display
-  - Export button with resolution options
+  - **Control Tabs:**
+    
+    - **🎵 Waveforms Tab:**
+      - Add/remove audio tracks
+      - Multiple audio track management
+      - Volume and mute controls per track
+      - Active track selection for visualization
+    
+    - **🎨 Controls Tab:**
+      - **🎚️ Frequency Gain Controls** - Bass, mids, highs sensitivity multipliers (0-3x)
+      - **🎭 Shape Material Controls** - Per-shape customization:
+        - Material type dropdown (Basic, Standard PBR, Phong, Lambert)
+        - Color picker for each shape (Cubes, Octahedrons, Tetrahedrons, Sphere)
+        - Opacity slider (0.0-1.0)
+        - Wireframe toggle
+        - Metalness & Roughness sliders (Standard PBR only, 0.0-1.0)
+        - Reset all materials to defaults button
+    
+    - **📷 Camera Settings Tab:**
+      - Distance, height, rotation controls
+      - Auto-rotate toggle
+      - Camera keyframe system
+    
+    - **🎥 Camera Rig Tab:**
+      - Create camera rigs (Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom)
+      - Path visualization controls
+      - Rig transitions (smooth interpolation with easing)
+      - Framing controls (look-at offset, framing lock, rule of thirds)
+      - Camera FX layer (shake, handheld drift, FOV ramping)
+      - Shot presets (Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking)
+      - Camera rig keyframes
+    
+    - **✨ Effects Tab:**
+      - **🌌 Visual Effects** - 6 skybox/background modes:
+        - **Solid Color** - Traditional single-color background
+        - **Gradient** - Sky-to-ground color gradient (customizable top/bottom colors)
+        - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI)
+        - **Stars** - Procedurally generated star field (1,000-10,000 stars, adjustable count)
+        - **Galaxy** - Spiral galaxy with customizable color tint
+        - **Nebula** - Multi-color nebula with shader-based gas clouds (dual-color customization)
+      - **📽️ Animated Letterbox** - Keyframe-based curtain effects
+      - **💥 Camera Shake Events** - Time-triggered shake with intensity control
+      - **⚡ Parameter Events** - Background flash, vignette pulse, saturation burst, color tint flash
+    
+    - **🎭 Post-FX Tab:**
+      - Vignette strength and softness
+      - Saturation adjustment
+      - Contrast control
+      - Gamma correction
+      - Color tint (R, G, B channels)
+    
+    - **⏱️ Presets Tab:**
+      - Animation preset selector with 25 presets
+      - Visual preset icons
+    
+    - **📝 Text Animator Tab:**
+      - 3D text overlay with custom font loading
+      - Text visibility keyframes
+      - Text animation effects
+    
+    - **🎭 Masks Tab:**
+      - Masking system for advanced compositing
+      - Circle and rectangle mask types
+      - Blend modes and feathering
 
 ### 🎬 **Editor Mode: Timeline-Based Animation System**
 - Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
@@ -590,12 +634,22 @@ The Editor interface is divided into 5 main areas, inspired by professional vide
 
 ### **3. Software Mode Overview:**
 
-The Software interface is streamlined with tabbed controls:
+The Software interface is streamlined with tabbed controls at the bottom:
 
-- **Left Panel:** Preset selection and audio track management
-- **Center Canvas:** 960x540 3D preview with optional overlays
-- **Right Panel:** Tabbed controls (Colors, Camera, Text, Effects, Settings)
-- **Bottom:** Waveform visualization and playback controls
+- **Top Section:** Title bar with export button and keyboard shortcuts
+- **Center Canvas:** 960x540 3D preview with optional overlays and border effects
+- **Bottom Section:** 
+  - **Waveform Display** - Scrolling or static waveform visualization with playback controls and time display
+  - **Tabbed Controls** - Access all features through tabs:
+    - **🎵 Waveforms** - Audio track management with volume/mute controls and active track selection
+    - **🎨 Controls** - Frequency gain controls and per-shape material customization
+    - **📷 Camera Settings** - Distance, height, rotation, auto-rotate controls
+    - **🎥 Camera Rig** - Advanced camera rig system with transitions, framing, FX, and shot presets
+    - **✨ Effects** - Skybox modes, letterbox animation, camera shake events, parameter events
+    - **🎭 Post-FX** - Post-processing effects (vignette, saturation, contrast, gamma, color tint)
+    - **⏱️ Presets** - Animation preset selector
+    - **📝 Text Animator** - 3D text overlay with custom font loading
+    - **🎭 Masks** - Masking system for advanced compositing
 
 ### **Development:**
 ```bash
@@ -619,12 +673,13 @@ npm run lint         # Run ESLint
 
 ### **Basic Workflow (Software Mode):**
 1. **Select Mode** - Choose Software Mode from the Main Dashboard
-2. **Upload Audio** - Click to upload your audio file in the left panel
-3. **Choose Preset** - Select an animation preset from the left panel
-4. **Customize** - Adjust colors, camera, and effects in the right panel tabs
-5. **Add Effects** - Set up letterbox, camera shakes, or parameter events as desired
-6. **Preview** - Click Play to watch your visualization in real-time
-7. **Export** - Click Export button to render and download
+2. **Upload Audio** - Navigate to the Waveforms tab and click "Add Track" to upload your audio file
+3. **Choose Preset** - Switch to the Presets tab and select an animation preset
+4. **Customize** - Use the Controls tab to adjust frequency gains and shape materials
+5. **Adjust Camera** - Configure camera position in the Camera Settings tab or set up advanced rigs in the Camera Rig tab
+6. **Add Effects** - Go to the Effects tab to set up skybox, letterbox, camera shakes, or parameter events
+7. **Preview** - Click Play in the waveform section to watch your visualization in real-time
+8. **Export** - Click Export button (top-right) to select resolution and render the final video
 
 ### **Keyboard Shortcuts:**
 
