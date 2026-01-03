@@ -2,6 +2,7 @@
 
 ## **Development Status**
 
+**Version 2.5 - Camera Rig Polish & Enhancements**
 **Version 2.4 - Camera Rig Path Visualization**
 **Version 2.4 - Advanced Skybox & Material System (Software Mode)**
 
@@ -378,17 +379,44 @@ Each preset controls:
 - Smooth blending when switching between presets
 
 ### **Camera Rig System:**
-Professional camera control with:
+Professional camera control with production-ready polish features:
+
+**Core Rig Types:**
+- **Seven rig types** - Orbit, Rotation, Dolly, Pan, Crane, Zoom, and Custom rigs
 - **Keyframe animation** - Smooth interpolation between camera positions
-- **Four rig types** - Orbit, Dolly, Crane, and Custom rigs
 - **Easing functions** - Linear, Ease In, Ease Out, Ease In-Out
-- **Camera shake** - Impact effects synchronized to audio
 - **Null object hierarchy** - Professional transform composition
 - **3D Path Visualization** - Real-time visual feedback of rig trajectories
   - Color-coded paths per rig type (Orbit=Cyan, Dolly=Green, Crane=Magenta, Custom=White)
   - Sphere markers at keyframe positions with size variations based on easing
   - Toggle visibility for paths and markers independently
   - Eliminates need to constantly switch between UI and viewport during setup
+
+**Rig Transitions:**
+- **Smooth interpolation** - Configurable transition duration (0.1-5 seconds)
+- **Four easing curves** - Linear, Ease In, Ease Out, Ease In-Out
+- **Hard cuts toggle** - Enable/disable smooth transitions
+- Position, rotation, and FOV interpolation support
+
+**Framing Controls:**
+- **Look-at offset** - Reframe shots with X/Y offset controls (±10 units)
+- **Framing lock** - Keep subject centered in frame
+- **Rule of thirds bias** - Dynamic composition with subtle oscillation
+
+**Camera FX Layer (Non-Destructive):**
+- **Enhanced camera shake** - Configurable intensity (0-3x) and frequency (10-100Hz)
+- **Handheld drift** - Organic camera movement using multi-frequency noise (0-1 intensity)
+- **FOV ramping** - Dynamic perspective changes during movement (0-20°)
+- All FX applied on top of rig positioning without modifying base system
+
+**Shot Presets:**
+Six cinematic presets that modify existing rig parameters:
+- **Close-Up** - Tight frame on subject (radius: 8)
+- **Wide Shot** - Establish scene context (radius: 30)
+- **Overhead** - Bird's eye view (height: 20, tilt: -90°)
+- **Low Angle** - Dramatic upward view (height: -5, tilt: 0.3 rad)
+- **Dutch Angle** - Tilted perspective (z-rotation: 0.3 rad)
+- **Tracking** - Follow subject smoothly (increased speeds)
 
 📚 **[Complete Camera Rig Documentation](CAMERA_RIG_DOCUMENTATION.md)**  
 📖 **[Quick Reference Guide](docs/CAMERA_RIG_QUICK_REFERENCE.md)**
@@ -696,7 +724,32 @@ npm run lint         # Run ESLint
 
 ## **Recent Changes & Improvements**
 
-### **Version 2.4 - Camera Rig Path Visualization (Latest):**
+### **Version 2.5 - Camera Rig Polish & Enhancements (Latest):**
+- ✨ **Rig Transitions** - Smooth interpolation between camera states with configurable duration and easing
+  - Position, rotation, and FOV interpolation over 0.1-5 second duration
+  - Four easing curves: Linear, Ease In, Ease Out, Ease In-Out
+  - Toggle for hard cuts vs smooth transitions
+  - UI controls for future state tracking implementation
+- ✨ **Framing Controls** - Professional framing and composition tools
+  - Look-at offset X/Y sliders (±10 units) for reframing shots
+  - Framing lock checkbox to keep subject centered
+  - Rule of thirds bias toggle with dynamic composition
+- ✨ **Camera FX Layer** - Non-destructive camera effects applied post-rig transformation
+  - Configurable shake intensity multiplier (0-3x) for existing shake events
+  - Adjustable shake frequency (10-100Hz) for different shake effects
+  - Handheld drift using multi-frequency noise synthesis (0-1 intensity)
+  - FOV ramping based on camera velocity (0-20°) for dynamic perspective
+- ✨ **Shot Presets** - Six cinematic presets that modify existing rig parameters
+  - Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking
+  - Presets adjust radius, position, rotation, and speed without creating new rig instances
+  - Visual selection UI with active state highlighting
+- 🎯 **Focus on Polish** - Enhanced usability without modifying core architecture
+  - All controls integrated into existing Camera Rig tab
+  - No new UI panels added
+  - Performance and stability maintained
+  - Zero security vulnerabilities (CodeQL scan passed)
+
+### **Version 2.4 - Camera Rig Path Visualization:**
 - ✨ **3D Path Visualization** - Real-time visual feedback of camera rig trajectories in the viewport
   - Color-coded paths: Orbit (Cyan), Dolly (Green), Crane (Magenta), Custom (White)
   - Sphere markers at keyframe positions with size variations based on easing type
@@ -707,7 +760,8 @@ npm run lint         # Run ESLint
 - 🐛 **Fixed Dolly Rig Behavior** - Camera now correctly looks at scene center instead of following the rig position
   - Creates proper tracking shots while keeping the scene in view
   - Dolly rig now useful for forward/backward, lateral, and vertical camera movements
-### **Version 2.4 - Advanced Skybox & Material System (Latest):**
+
+### **Version 2.4 - Advanced Skybox & Material System:**
 - ✨ **6 Skybox/Background Modes (Software Mode)** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
   - **Gradient Skybox** - Vertical color gradients with custom GLSL shaders (top/bottom color control)
   - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI from Poly Haven)
@@ -823,6 +877,7 @@ npm run lint         # Run ESLint
 
 ---
 
+**Version:** 2.5 (Camera Rig Polish & Enhancements)  
 **Version:** 2.4 (Camera Rig Path Visualization)  
 **Version:** 2.4 (Advanced Skybox & Material System)  
 **Last Updated:** 01/03/2026  
@@ -834,6 +889,7 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
+- Version 2.5: Camera Rig Polish & Enhancements (Rig Transitions, Framing Controls, Camera FX Layer, Shot Presets)
 - Version 2.4: Camera Rig Path Visualization, Dolly Rig Fix
 - Version 2.4: Advanced Skybox & Material System (6 skybox modes, 4 material types, PBR support)
 - Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
