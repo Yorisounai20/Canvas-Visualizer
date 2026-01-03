@@ -2979,10 +2979,10 @@ export default function ThreeDVisualizer() {
             📷 Camera Settings
           </button>
           <button 
-            onClick={() => setActiveTab('keyframes')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'keyframes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+            onClick={() => setActiveTab('cameraRig')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
-            🎬 Keyframes
+            🎥 Camera Rig
           </button>
           <button 
             onClick={() => setActiveTab('effects')} 
@@ -3013,12 +3013,6 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'masks' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             🎭 Masks
-          </button>
-          <button 
-            onClick={() => setActiveTab('cameraRig')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            🎥 Camera Rig
           </button>
         </div>
 
@@ -3664,107 +3658,6 @@ export default function ThreeDVisualizer() {
         )}
 
         {/* Keyframes Tab */}
-        {activeTab === 'keyframes' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Global Camera Keyframes</h3>
-                <p className="text-xs text-gray-400 mt-1">Independent camera timeline - not tied to animation presets. Auto-rotate is controlled in Camera Settings.</p>
-              </div>
-              <button 
-                onClick={addKeyframe} 
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
-              >
-                <Plus size={16} /> Add Keyframe
-              </button>
-            </div>
-            
-            {cameraKeyframes && cameraKeyframes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cameraKeyframes.map((kf, kfIndex) => (
-                  <div key={kfIndex} className="bg-gray-700 rounded p-3 space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-semibold text-sm">Keyframe {kfIndex + 1}</span>
-                      {cameraKeyframes.length > 1 && (
-                        <button 
-                          onClick={() => deleteKeyframe(kfIndex)} 
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
-                      <input 
-                        type="text" id="time-formattime-kf-time" name="time-formattime-kf-time" 
-                        value={formatTime(kf.time)} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'time', parseTime(e.target.value))} 
-                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Easing</label>
-                      <select 
-                        value={kf.easing || 'linear'} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'easing', e.target.value)}
-                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded"
-                      >
-                        <option value="linear">Linear (No Easing)</option>
-                        <option value="easeIn">Ease In (Slow Start)</option>
-                        <option value="easeOut">Ease Out (Slow End)</option>
-                        <option value="easeInOut">Ease In-Out (Smooth)</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
-                      <input 
-                        type="range" id="distance-kf-distance-tofixed-1" name="distance-kf-distance-tofixed-1" 
-                        min="5" 
-                        max="50" 
-                        step="0.5" 
-                        value={kf.distance} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'distance', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
-                      <input 
-                        type="range" id="height-kf-height-tofixed-1" name="height-kf-height-tofixed-1" 
-                        min="-10" 
-                        max="10" 
-                        step="0.5" 
-                        value={kf.height} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'height', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
-                      <input 
-                        type="range" id="rotation-kf-rotation-180-math-pi-tofixed-0" name="rotation-kf-rotation-180-math-pi-tofixed-0" 
-                        min="0" 
-                        max={Math.PI * 2} 
-                        step="0.05" 
-                        value={kf.rotation} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'rotation', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 italic text-center py-4">No keyframes yet. Click "Add Keyframe" to create one.</p>
-            )}
-          </div>
-        )}
 
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
