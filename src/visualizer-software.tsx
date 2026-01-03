@@ -172,6 +172,14 @@ export default function ThreeDVisualizer() {
   const [showRigPath, setShowRigPath] = useState(true);
   const [showRigGrid, setShowRigGrid] = useState(true);
   
+  // Camera Rig Path Visualization
+  const [showRigPaths, setShowRigPaths] = useState(true);
+  const [showRigKeyframeMarkers, setShowRigKeyframeMarkers] = useState(true);
+  const rigPathsRef = useRef<Map<string, {
+    pathLine: THREE.Line | null;
+    keyframeMarkers: THREE.Mesh[];
+  }>>(new Map());
+  
   // NEW: HUD visibility controls
   const [showPresetDisplay, setShowPresetDisplay] = useState(true);
   const [showFilename, setShowFilename] = useState(true);
@@ -1230,6 +1238,21 @@ export default function ThreeDVisualizer() {
       nullObject.name = newRig.name;
       sceneRef.current.add(nullObject);
       cameraRigNullObjectsRef.current.set(newRig.id, nullObject);
+      
+      // Create path visualization objects
+      const pathColor = getRigPathColor(type);
+      const pathLineGeometry = new THREE.BufferGeometry();
+      const pathLine = new THREE.Line(
+        pathLineGeometry,
+        new THREE.LineBasicMaterial({ color: pathColor, opacity: 0.8, transparent: true, linewidth: 2 })
+      );
+      pathLine.visible = false;
+      sceneRef.current.add(pathLine);
+      
+      rigPathsRef.current.set(newRig.id, {
+        pathLine,
+        keyframeMarkers: []
+      });
     }
     
     addLog(`Created ${type} camera rig`, 'success');
@@ -1258,6 +1281,26 @@ export default function ThreeDVisualizer() {
     if (nullObject && sceneRef.current) {
       sceneRef.current.remove(nullObject);
       cameraRigNullObjectsRef.current.delete(id);
+    }
+    
+    // Remove path visualization objects
+    const pathObjects = rigPathsRef.current.get(id);
+    if (pathObjects && sceneRef.current) {
+      if (pathObjects.pathLine) {
+        sceneRef.current.remove(pathObjects.pathLine);
+        pathObjects.pathLine.geometry.dispose();
+        if (pathObjects.pathLine.material instanceof THREE.Material) {
+          pathObjects.pathLine.material.dispose();
+        }
+      }
+      pathObjects.keyframeMarkers.forEach(marker => {
+        sceneRef.current?.remove(marker);
+        marker.geometry.dispose();
+        if (marker.material instanceof THREE.Material) {
+          marker.material.dispose();
+        }
+      });
+      rigPathsRef.current.delete(id);
     }
     
     if (activeCameraRigId === id) {
@@ -1289,6 +1332,183 @@ export default function ThreeDVisualizer() {
   const deleteCameraRigKeyframe = (id: string) => {
     setCameraRigKeyframes(prev => prev.filter(kf => kf.id !== id));
     addLog(`Deleted camera rig keyframe`, 'info');
+  };
+
+  // Helper function to calculate rig position at a given time
+  const calculateRigPositionAtTime = (rig: any, time: number) => {
+    // Get keyframes for this rig
+    const sortedRigKeyframes = cameraRigKeyframes
+      .filter(kf => kf.rigId === rig.id)
+      .sort((a, b) => a.time - b.time);
+    
+    let rigPosition = { ...rig.position };
+    let rigRotation = { ...rig.rotation };
+    
+    // Interpolate between keyframes if they exist
+    if (sortedRigKeyframes.length > 0) {
+      const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > time) - 1;
+      if (currentKfIndex >= 0) {
+        const currentKf = sortedRigKeyframes[currentKfIndex];
+        const nextKf = sortedRigKeyframes[currentKfIndex + 1];
+        
+        if (nextKf && time < nextKf.time) {
+          // Interpolate
+          const timeIntoAnim = time - currentKf.time;
+          const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+          
+          // Apply easing
+          let easedProgress = progress;
+          switch (currentKf.easing) {
+            case 'easeIn':
+              easedProgress = progress * progress * progress;
+              break;
+            case 'easeOut':
+              easedProgress = 1 - Math.pow(1 - progress, 3);
+              break;
+            case 'easeInOut':
+              easedProgress = progress < 0.5
+                ? 4 * progress * progress * progress
+                : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+              break;
+          }
+          
+          rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
+          rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
+          rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
+          rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
+          rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
+          rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
+        } else {
+          // Use current keyframe values
+          rigPosition = { ...currentKf.position };
+          rigRotation = { ...currentKf.rotation };
+        }
+      }
+    }
+    
+    // Apply rig type-specific motion
+    switch (rig.type) {
+      case 'orbit':
+        if (rig.orbitRadius && rig.orbitSpeed && rig.orbitAxis) {
+          const orbitAngle = time * rig.orbitSpeed;
+          if (rig.orbitAxis === 'y') {
+            rigPosition.x = Math.cos(orbitAngle) * rig.orbitRadius;
+            rigPosition.z = Math.sin(orbitAngle) * rig.orbitRadius;
+          } else if (rig.orbitAxis === 'x') {
+            rigPosition.y = Math.cos(orbitAngle) * rig.orbitRadius;
+            rigPosition.z = Math.sin(orbitAngle) * rig.orbitRadius;
+          } else if (rig.orbitAxis === 'z') {
+            rigPosition.x = Math.cos(orbitAngle) * rig.orbitRadius;
+            rigPosition.y = Math.sin(orbitAngle) * rig.orbitRadius;
+          }
+        }
+        break;
+      
+      case 'dolly':
+        if (rig.dollySpeed && rig.dollyAxis) {
+          const dollyDistance = time * rig.dollySpeed;
+          if (rig.dollyAxis === 'z') {
+            rigPosition.z += dollyDistance;
+          } else if (rig.dollyAxis === 'x') {
+            rigPosition.x += dollyDistance;
+          } else if (rig.dollyAxis === 'y') {
+            rigPosition.y += dollyDistance;
+          }
+        }
+        break;
+      
+      case 'crane':
+        if (rig.craneHeight !== undefined) {
+          rigPosition.y = rig.craneHeight;
+        }
+        if (rig.craneTilt !== undefined) {
+          rigRotation.x = rig.craneTilt;
+        }
+        break;
+    }
+    
+    return { position: rigPosition, rotation: rigRotation };
+  };
+
+  // Helper function to get color for rig type
+  const getRigPathColor = (rigType: string): number => {
+    switch (rigType) {
+      case 'orbit': return 0x00ffff; // cyan
+      case 'rotation': return 0xff8800; // orange
+      case 'dolly': return 0x00ff00; // green
+      case 'pan': return 0xffff00; // yellow
+      case 'crane': return 0xff00ff; // magenta
+      case 'custom': return 0xffffff; // white
+      default: return 0x888888; // gray
+    }
+  };
+
+  // Update path visualization for a rig
+  const updateRigPathVisualization = (rig: any) => {
+    if (!sceneRef.current || !rig) return;
+    
+    const pathObjects = rigPathsRef.current.get(rig.id);
+    if (!pathObjects) return;
+    
+    // Determine time range for path sampling
+    const rigKeyframes = cameraRigKeyframes.filter(kf => kf.rigId === rig.id).sort((a, b) => a.time - b.time);
+    const startTime = 0;
+    const endTime = duration > 0 ? duration : (rigKeyframes.length > 0 ? rigKeyframes[rigKeyframes.length - 1].time + 5 : 10);
+    
+    // Sample path points (max 60 samples for performance)
+    const sampleCount = Math.min(60, Math.ceil((endTime - startTime) / 0.1));
+    const pathPoints: THREE.Vector3[] = [];
+    
+    for (let i = 0; i <= sampleCount; i++) {
+      const t = startTime + (endTime - startTime) * (i / sampleCount);
+      const { position } = calculateRigPositionAtTime(rig, t);
+      pathPoints.push(new THREE.Vector3(position.x, position.y, position.z));
+    }
+    
+    // Update path line
+    if (pathObjects.pathLine && pathPoints.length > 1) {
+      pathObjects.pathLine.geometry.setFromPoints(pathPoints);
+      pathObjects.pathLine.geometry.attributes.position.needsUpdate = true;
+    }
+    
+    // Update keyframe markers
+    // Remove old markers
+    pathObjects.keyframeMarkers.forEach(marker => {
+      sceneRef.current?.remove(marker);
+      marker.geometry.dispose();
+      if (marker.material instanceof THREE.Material) {
+        marker.material.dispose();
+      }
+    });
+    pathObjects.keyframeMarkers = [];
+    
+    // Create new markers at keyframe positions
+    rigKeyframes.forEach(kf => {
+      const { position } = calculateRigPositionAtTime(rig, kf.time);
+      
+      // Determine marker size based on easing type
+      let markerSize = 0.3;
+      switch (kf.easing) {
+        case 'easeIn': markerSize = 0.25; break;
+        case 'easeOut': markerSize = 0.35; break;
+        case 'easeInOut': markerSize = 0.4; break;
+        default: markerSize = 0.3; break;
+      }
+      
+      const markerGeometry = new THREE.SphereGeometry(markerSize, 8, 8);
+      const markerColor = getRigPathColor(rig.type);
+      const markerMaterial = new THREE.MeshBasicMaterial({ 
+        color: markerColor, 
+        opacity: 0.9, 
+        transparent: true 
+      });
+      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+      marker.position.set(position.x, position.y, position.z);
+      marker.visible = false; // Will be shown based on showRigKeyframeMarkers state
+      
+      sceneRef.current?.add(marker);
+      pathObjects.keyframeMarkers.push(marker);
+    });
   };
 
   // Scene initialization - runs once on mount
@@ -1623,6 +1843,13 @@ export default function ThreeDVisualizer() {
       orbitControlsRef.current.enabled = !isPlaying;
     }
   }, [isPlaying]);
+
+  // Update camera rig path visualizations when rigs or keyframes change
+  useEffect(() => {
+    cameraRigs.forEach(rig => {
+      updateRigPathVisualization(rig);
+    });
+  }, [cameraRigs, cameraRigKeyframes, duration]);
 
   useEffect(() => {
     if (!isPlaying || !rendererRef.current) return;
@@ -3780,6 +4007,22 @@ export default function ThreeDVisualizer() {
         if (rigHintsRef.current.pathLine) rigHintsRef.current.pathLine.visible = false;
       }
 
+      // Update camera rig path visualizations
+      cameraRigs.forEach(rig => {
+        const pathObjects = rigPathsRef.current.get(rig.id);
+        if (pathObjects) {
+          // Show/hide path line based on enabled state and showRigPaths setting
+          if (pathObjects.pathLine) {
+            pathObjects.pathLine.visible = rig.enabled && showRigPaths;
+          }
+          
+          // Show/hide keyframe markers
+          pathObjects.keyframeMarkers.forEach(marker => {
+            marker.visible = rig.enabled && showRigPaths && showRigKeyframeMarkers;
+          });
+        }
+      });
+
       // PHASE 5: Mask Reveals - Apply masks to renderer (post-render effect)
       // Note: Full mask implementation would require shader-based rendering or stencil buffer
       // For now, we'll prepare the mask data and apply basic visibility controls
@@ -5547,6 +5790,45 @@ export default function ThreeDVisualizer() {
                 >
                   ⚙️ Custom Rig
                 </button>
+              </div>
+
+              {/* Path Visualization Controls */}
+              <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                <h4 className="text-sm font-semibold text-cyan-400 mb-3">📍 Path Visualization</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="checkbox" 
+                      id="showRigPaths" 
+                      checked={showRigPaths} 
+                      onChange={(e) => setShowRigPaths(e.target.checked)} 
+                      className="w-4 h-4 cursor-pointer" 
+                    />
+                    <label htmlFor="showRigPaths" className="text-sm text-white cursor-pointer">
+                      Show Paths
+                    </label>
+                  </div>
+                  {showRigPaths && (
+                    <div className="ml-6 flex items-center gap-3 border-l-2 border-cyan-500 pl-3">
+                      <input 
+                        type="checkbox" 
+                        id="showRigKeyframeMarkers" 
+                        checked={showRigKeyframeMarkers} 
+                        onChange={(e) => setShowRigKeyframeMarkers(e.target.checked)} 
+                        className="w-4 h-4 cursor-pointer" 
+                      />
+                      <label htmlFor="showRigKeyframeMarkers" className="text-xs text-gray-300 cursor-pointer">
+                        Show Keyframe Markers
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  <strong>Path Colors:</strong> Orbit=<span className="text-cyan-400">Cyan</span>, 
+                  Dolly=<span className="text-green-400">Green</span>, 
+                  Crane=<span className="text-purple-400">Magenta</span>, 
+                  Custom=<span className="text-white">White</span>
+                </p>
               </div>
 
               {/* Camera Rigs List */}
