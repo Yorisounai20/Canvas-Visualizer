@@ -107,6 +107,8 @@ Features:
 | Feature | Editor Mode | Software Mode |
 |---------|-------------|---------------|
 | Interface | Multi-panel, professional | Tabbed interface at bottom |
+| Project Setup | New Project Modal with presets | Direct start, no setup |
+| Resolution | Set at project creation (720p-4K+) | Fixed 960x540 canvas, export at 960p-1080p |
 | Timeline | Multiple sections, multi-tab | Single waveform display |
 | Layers | Full layer management | No layers |
 | Workspace | Blender-like 3D editing | N/A |
@@ -374,15 +376,32 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
 - Adjustable intensity
 - Impact effects synchronized to audio
 
-### 🎥 **Video Export System (Both Modes)**
-- Export modal with format and resolution selection
-- Supports WebM format (VP9 video + Opus audio)
-- MP4 support (if browser supports it)
-- **Selectable export resolution:**
+### 🎥 **Video Export System**
+
+**Editor Mode:**
+- Project resolution configured at creation via New Project Modal
+- Resolution presets include:
+  - 720p (1280×720)
+  - 1080p (1920×1080)
+  - 1440p (2560×1440)
+  - 4K (3840×2160)
+  - Instagram Square (1080×1080)
+  - Instagram Story/YouTube Shorts (1080×1920)
+- Export format selection: WebM (VP9 + Opus) or MP4 (if supported)
+- Canvas displays at project resolution for WYSIWYG editing
+
+**Software Mode:**
+- Export resolution selected at export time via Export Modal
+- Resolution options:
   - 960x540 (SD) - compact file size
   - 1280x720 (HD 720p) - good quality
   - 1920x1080 (Full HD 1080p) - highest quality
-- Canvas displays at 960x540 for optimal performance
+- Export format selection: WebM (VP9 + Opus) or MP4 (if supported)
+- Canvas always displays at 960x540 for optimal performance
+
+**Both Modes:**
+- Support WebM and MP4 formats
+- MediaRecorder API for video recording
 - ⚠️ *Note: Full export functionality requires animation playback to be completed*
 
 ---
@@ -581,12 +600,19 @@ src/
 When you first launch Canvas Visualizer, you'll see the **Main Dashboard** with two options:
 
 - **🎬 Editor Mode** - Click to launch the professional interface
-  - You'll then see the **New Project Modal** to configure your project settings (resolution, FPS, etc.)
+  - You'll then see the **New Project Modal** to configure your project settings:
+    - Choose resolution preset (720p, 1080p, 1440p, 4K, Instagram Square, Instagram Story/YouTube Shorts)
+    - Set FPS (frames per second)
+    - Optionally upload audio file
+    - Set background color and project name
   - After configuration, the full Editor interface loads with panels and timeline
+  - Canvas displays at your chosen project resolution for WYSIWYG editing
   
 - **⚡ Software Mode** - Click to launch the simplified visualizer
   - Loads directly into the visualization interface
   - No project configuration needed - just start creating
+  - Canvas always displays at 960x540 for optimal performance
+  - Export resolution selected at export time (960x540, 1280x720, 1920x1080)
 
 ### **2. Editor Mode Overview:**
 
@@ -663,13 +689,13 @@ npm run lint         # Run ESLint
 
 ### **Basic Workflow (Editor Mode):**
 1. **Select Mode** - Choose Editor Mode from the Main Dashboard
-2. **Configure Project** - Set resolution and FPS in the New Project Modal
-3. **Upload Audio** - Click "Choose File" to load an audio file
+2. **Configure Project** - In the New Project Modal, select resolution preset (720p, 1080p, 4K, Instagram formats, etc.) and set FPS
+3. **Upload Audio** - Click "Choose File" to load an audio file (optional during project creation)
 4. **Select Layer** - Click on a layer in the left panel to edit its properties
 5. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
 6. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
 7. **Preview** - Click Play button in top bar to preview your composition
-8. **Export** - Click Export button to render and download the final video
+8. **Export** - Click Export button to select format and render the final video at project resolution
 
 ### **Basic Workflow (Software Mode):**
 1. **Select Mode** - Choose Software Mode from the Main Dashboard
