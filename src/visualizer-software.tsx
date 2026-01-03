@@ -189,11 +189,12 @@ export default function ThreeDVisualizer() {
   const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
   
   // NEW: Visual effects controls
+  const DEFAULT_MAX_LETTERBOX_HEIGHT = 270; // Default maximum bar height for curtain mode
   const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
   const [showLetterbox, setShowLetterbox] = useState(false);
   const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
   const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
-  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270); // Maximum bar height for curtain mode (affects both top and bottom)
+  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
   // NEW: Skybox controls
@@ -249,12 +250,14 @@ export default function ThreeDVisualizer() {
   
   // NEW: Letterbox animation keyframes
   const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
+    id?: number;         // Unique ID for each keyframe
     time: number;        // Time in seconds when this keyframe activates
     targetSize: number;  // Target letterbox size (0-100px)
     duration: number;    // Duration of the animation in seconds
     mode: 'instant' | 'smooth'; // Animation mode
     invert: boolean;     // Per-keyframe invert: true = curtain mode (100=closed, 0=open)
   }>>([]);
+  const nextLetterboxKeyframeId = useRef(1); // Counter for generating unique IDs
   // NEW: Camera shake events
   const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
   
@@ -5528,7 +5531,7 @@ export default function ThreeDVisualizer() {
                   onClick={() => {
                     const time = currentTime;
                     const newKeyframe = {
-                      id: Date.now(),
+                      id: nextLetterboxKeyframeId.current++,
                       time,
                       targetSize: letterboxSize || 50,
                       duration: 1.0,
@@ -5569,7 +5572,7 @@ export default function ThreeDVisualizer() {
                         max="500"
                         step="10"
                         value={maxLetterboxHeight}
-                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || 270)}
+                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || DEFAULT_MAX_LETTERBOX_HEIGHT)}
                         className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
                       />
                       <p className="text-xs text-gray-400 mt-1">Controls maximum bar height when at 100%</p>
