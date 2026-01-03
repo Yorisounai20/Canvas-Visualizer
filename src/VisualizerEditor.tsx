@@ -1362,6 +1362,32 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           (o.material as THREE.MeshBasicMaterial).opacity = (0.3 + f.mids * 0.3) * blend;
           (o.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         });
+        
+        obj.tetras.forEach((t, i) => {
+          const ringAngle = (i / obj.tetras.length) * Math.PI * 2;
+          const ringRadius = 10 + Math.sin(el * 0.3 + i) * 2;
+          t.position.set(
+            Math.cos(ringAngle + el * 0.2) * ringRadius,
+            Math.sin(el * 0.5 + i * 0.5) * 3,
+            Math.sin(ringAngle + el * 0.2) * ringRadius
+          );
+          t.rotation.x += 0.01 + f.highs * 0.02;
+          t.rotation.y += 0.015 + f.highs * 0.03;
+          const s = 0.6 + f.highs * 0.4;
+          t.scale.set(s, s, s);
+          (t.material as THREE.MeshBasicMaterial).opacity = (0.25 + f.highs * 0.35) * blend;
+          (t.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
+          (t.material as THREE.MeshBasicMaterial).wireframe = true;
+        });
+        
+        obj.sphere.position.set(0, Math.sin(el * 0.4) * 2, 0);
+        const sphereSize = 2.5 + f.bass * 0.5 + f.mids * 0.3;
+        obj.sphere.scale.set(sphereSize, sphereSize, sphereSize);
+        obj.sphere.rotation.x += 0.003;
+        obj.sphere.rotation.y += 0.005;
+        (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.2 + f.bass * 0.2) * blend;
+        (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
 
       } else if (type === 'pulse') {
         // Pulse Grid - Grid that pulses to the beat
