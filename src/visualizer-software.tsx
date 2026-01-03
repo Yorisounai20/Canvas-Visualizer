@@ -3107,9 +3107,9 @@ export default function ThreeDVisualizer() {
         // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
         // Constants for shark anatomy
         const TAIL_SEGMENT_COUNT = 2;
-        const HAMMER_TETRA_COUNT = 3; // Reduced from 8 for simpler, clearer head
-        const DORSAL_FIN_INDEX = HAMMER_TETRA_COUNT; // Next available tetra after hammer
-        const TAIL_FIN_INDEX = HAMMER_TETRA_COUNT + 1; // Following tetra for tail fin
+        const HAMMER_CUBE_COUNT = 3; // 3 cubes form the T-shaped hammer
+        const DORSAL_FIN_INDEX = 0; // Use first tetrahedron for dorsal fin
+        const TAIL_FIN_INDEX = 1; // Use second tetrahedron for tail fin
         
         const swimSpeed = elScaled * 0.8;
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
@@ -3122,10 +3122,11 @@ export default function ThreeDVisualizer() {
         );
         cam.lookAt(0, 0, -5);
         
-        // Shark body using cubes - serpentine swimming motion with LARGER SIZES
+        // Shark body using cubes - serpentine swimming motion
         obj.cubes.forEach((c, i) => {
           const progress = i / obj.cubes.length;
           const isHead = i === 0;
+          const isHammer = i < HAMMER_CUBE_COUNT; // First 3 cubes form hammer
           const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
           
           // Swimming path - gentle side-to-side motion
@@ -3134,23 +3135,43 @@ export default function ThreeDVisualizer() {
           const y = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
           const z = progress * -20 - 5;
           
-          c.position.set(x, y, z);
+          // Hammer T-shape positioning
+          if (isHammer) {
+            if (i === 0) {
+              // Left end of hammer
+              c.position.set(x - 6, y + 0.5, z + 2);
+            } else if (i === 1) {
+              // Center of hammer (vertical part of T)
+              c.position.set(x, y, z);
+            } else {
+              // Right end of hammer
+              c.position.set(x + 6, y + 0.5, z + 2);
+            }
+          } else {
+            c.position.set(x, y, z);
+          }
           
           // Scale: MUCH LARGER for prominence
           let scaleX, scaleY, scaleZ;
-          if (isHead) {
-            scaleX = 3.5 + f.bass * 0.8; // Increased from 2
-            scaleY = 2.5 + f.bass * 0.5; // Increased from 1.5
-            scaleZ = 3.5 + f.bass * 0.8; // Increased from 2
+          if (isHammer && i !== 1) {
+            // Hammer end cubes - stretched horizontally
+            scaleX = 5 + f.highs * 0.5; // Very wide for hammer ends
+            scaleY = 2 + f.highs * 0.3;
+            scaleZ = 2 + f.highs * 0.3;
+          } else if (isHead) {
+            // Center/head cube
+            scaleX = 2.5 + f.bass * 0.5;
+            scaleY = 2.5 + f.bass * 0.5;
+            scaleZ = 4 + f.bass * 0.8; // Longer for head
           } else if (isTail) {
             const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
-            scaleX = 1.5 - tailProgress * 0.7; // Increased from 0.8
-            scaleY = 1.2 - tailProgress * 0.6; // Increased from 0.6
-            scaleZ = 2 + f.bass * 0.5; // Increased from 1.2
+            scaleX = 1.5 - tailProgress * 0.7;
+            scaleY = 1.2 - tailProgress * 0.6;
+            scaleZ = 2 + f.bass * 0.5;
           } else {
-            scaleX = 2.5; // Increased from 1.5
-            scaleY = 2; // Increased from 1.2
-            scaleZ = 3; // Increased from 1.8
+            scaleX = 2.5;
+            scaleY = 2;
+            scaleZ = 3;
           }
           c.scale.set(scaleX, scaleY, scaleZ);
           
@@ -3162,93 +3183,62 @@ export default function ThreeDVisualizer() {
           const nextY = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
           const nextZ = nextProgress * -20 - 5;
           
-          c.rotation.y = Math.atan2(nextX - x, nextZ - z);
-          c.rotation.x = Math.atan2(nextY - y, nextZ - z) * 0.5;
-          c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
+          if (!isHammer || i === 1) {
+            // Only rotate non-hammer cubes (and center of hammer)
+            c.rotation.y = Math.atan2(nextX - x, nextZ - z);
+            c.rotation.x = Math.atan2(nextY - y, nextZ - z) * 0.5;
+            c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
+          } else {
+            // Hammer ends align with center
+            const center = obj.cubes[1];
+            c.rotation.y = center.rotation.y;
+            c.rotation.x = 0;
+            c.rotation.z = 0;
+          }
           
-          c.material.color.setStyle(bassColor);
-          c.material.opacity = (0.9 + f.bass * 0.1) * blend; // Increased opacity
+          // Color hammer differently
+          if (isHammer) {
+            c.material.color.setStyle(highsColor);
+          } else {
+            c.material.color.setStyle(bassColor);
+          }
+          c.material.opacity = (0.9 + f.bass * 0.1) * blend;
           c.material.wireframe = false;
         });
         
-        // Simplified hammerhead shape - MUCH MORE PROMINENT
-        const head = obj.cubes[0];
-        obj.tetras.slice(0, HAMMER_TETRA_COUNT).forEach((hammer, i) => {
-          if (i === 0) {
-            // Single large horizontal hammer bar - LEFT SIDE
-            hammer.position.x = head.position.x - 5; // Left side of head
-            hammer.position.y = head.position.y + 0.5;
-            hammer.position.z = head.position.z + 3;
-            hammer.rotation.x = 0;
-            hammer.rotation.y = head.rotation.y;
-            hammer.rotation.z = Math.PI / 2;
-            const hammerSize = 3.5 + f.highs * 0.5; // MUCH LARGER
-            hammer.scale.set(hammerSize, hammerSize * 0.6, hammerSize * 2);
-            hammer.material.color.setStyle(highsColor);
-            hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
-            hammer.material.wireframe = false;
-          } else if (i === 1) {
-            // Single large horizontal hammer bar - RIGHT SIDE
-            hammer.position.x = head.position.x + 5; // Right side of head
-            hammer.position.y = head.position.y + 0.5;
-            hammer.position.z = head.position.z + 3;
-            hammer.rotation.x = 0;
-            hammer.rotation.y = head.rotation.y;
-            hammer.rotation.z = Math.PI / 2;
-            const hammerSize = 3.5 + f.highs * 0.5; // MUCH LARGER
-            hammer.scale.set(hammerSize, hammerSize * 0.6, hammerSize * 2);
-            hammer.material.color.setStyle(highsColor);
-            hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
-            hammer.material.wireframe = false;
-          } else {
-            // Center connecting bar
-            hammer.position.x = head.position.x;
-            hammer.position.y = head.position.y + 0.5;
-            hammer.position.z = head.position.z + 3;
-            hammer.rotation.x = 0;
-            hammer.rotation.y = head.rotation.y;
-            hammer.rotation.z = Math.PI / 2;
-            const hammerSize = 2.5 + f.highs * 0.4;
-            hammer.scale.set(hammerSize, hammerSize * 0.5, hammerSize * 1.5);
-            hammer.material.color.setStyle(highsColor);
-            hammer.material.opacity = (0.95 + f.highs * 0.05) * blend;
-            hammer.material.wireframe = false;
-          }
-        });
-        
-        // Prominent dorsal fin
+        // PROMINENT DORSAL FIN using tetrahedron (triangle shape)
         const dorsalFin = obj.tetras[DORSAL_FIN_INDEX];
-        const bodySegment = Math.floor(obj.cubes.length * 0.3);
+        const bodySegment = Math.floor(obj.cubes.length * 0.35);
         const body = obj.cubes[bodySegment];
         dorsalFin.position.x = body.position.x;
-        dorsalFin.position.y = body.position.y + 4 + f.mids * 0.8; // MUCH TALLER
+        dorsalFin.position.y = body.position.y + 5 + f.mids * 1; // VERY TALL
         dorsalFin.position.z = body.position.z;
-        dorsalFin.rotation.x = -Math.PI / 6;
+        dorsalFin.rotation.x = 0; // Point up
         dorsalFin.rotation.y = body.rotation.y;
-        dorsalFin.rotation.z = 0;
-        const finSize = 3.5 + f.mids * 0.5; // MUCH LARGER
-        dorsalFin.scale.set(finSize * 0.4, finSize, finSize * 0.6);
+        dorsalFin.rotation.z = Math.PI; // Flip to point upward
+        const dorsalSize = 5 + f.mids * 0.8; // VERY LARGE
+        dorsalFin.scale.set(dorsalSize * 0.5, dorsalSize * 1.2, dorsalSize * 0.4);
         dorsalFin.material.color.setStyle(midsColor);
         dorsalFin.material.opacity = (0.9 + f.mids * 0.1) * blend;
         dorsalFin.material.wireframe = false;
         
-        // Prominent tail fin
+        // PROMINENT TAIL FIN using tetrahedron (triangle shape)
         const tailFin = obj.tetras[TAIL_FIN_INDEX];
         const tail = obj.cubes[obj.cubes.length - 1];
         tailFin.position.x = tail.position.x;
-        tailFin.position.y = tail.position.y;
-        tailFin.position.z = tail.position.z - 2.5;
-        tailFin.rotation.x = Math.PI / 2 + Math.sin(swimSpeed * 3) * 0.3; // Animated tail movement
+        tailFin.position.y = tail.position.y + Math.sin(swimSpeed * 3) * 1; // Animated vertical movement
+        tailFin.position.z = tail.position.z - 3;
+        tailFin.rotation.x = Math.PI / 2; // Vertical orientation
         tailFin.rotation.y = tail.rotation.y;
-        tailFin.rotation.z = 0;
-        const tailSize = 3 + f.bass * 0.6; // LARGER
-        tailFin.scale.set(tailSize * 0.5, tailSize, tailSize * 0.4);
+        tailFin.rotation.z = Math.sin(swimSpeed * 3) * 0.4; // Animated wagging
+        const tailSize = 4 + f.bass * 0.8; // VERY LARGE
+        tailFin.scale.set(tailSize * 0.6, tailSize * 1.3, tailSize * 0.3);
         tailFin.material.color.setStyle(midsColor);
         tailFin.material.opacity = (0.9 + f.bass * 0.1) * blend;
         tailFin.material.wireframe = false;
         
         // Hide remaining tetras
-        const USED_TETRAS = HAMMER_TETRA_COUNT + 2; // Hammer + dorsal fin + tail fin
+        const USED_TETRAS = 2; // Dorsal fin + tail fin
         obj.tetras.slice(USED_TETRAS).forEach(t => {
           t.position.set(0, -1000, 0);
           t.scale.set(0.001, 0.001, 0.001);
