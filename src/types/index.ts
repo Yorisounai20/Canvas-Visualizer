@@ -170,6 +170,8 @@ export interface CameraRig {
   trackingTarget?: string; // ID of object to follow
   trackingOffset: { x: number; y: number; z: number };
   trackingSmooth: number; // Smoothing factor (0-1)
+  // Direction control
+  invertDirection: boolean; // Reverse the direction of movement
   // Orbit parameters
   orbitRadius?: number;
   orbitSpeed?: number;

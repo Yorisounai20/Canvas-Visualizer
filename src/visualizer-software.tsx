@@ -290,7 +290,7 @@ export default function ThreeDVisualizer() {
   // PHASE 5: Camera Rig state
   const [cameraRigs, setCameraRigs] = useState<any[]>([]);
   const [cameraRigKeyframes, setCameraRigKeyframes] = useState<any[]>([]);
-  const [activeCameraRigId, setActiveCameraRigId] = useState<string | null>(null);
+  const [activeCameraRigIds, setActiveCameraRigIds] = useState<string[]>([]);
   const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
   const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
   
@@ -1199,6 +1199,7 @@ export default function ThreeDVisualizer() {
       trackingTarget: null,
       trackingOffset: { x: 0, y: 0, z: 0 },
       trackingSmooth: 0.5,
+      invertDirection: false,
       orbitRadius: type === 'orbit' ? 15 : undefined,
       orbitSpeed: type === 'orbit' ? 0.5 : undefined,
       orbitAxis: type === 'orbit' ? 'y' as const : undefined,
@@ -1252,9 +1253,8 @@ export default function ThreeDVisualizer() {
       cameraRigNullObjectsRef.current.delete(id);
     }
     
-    if (activeCameraRigId === id) {
-      setActiveCameraRigId(null);
-    }
+    // Remove from active rigs array
+    setActiveCameraRigIds(prev => prev.filter(rigId => rigId !== id));
     
     addLog(`Deleted camera rig`, 'info');
   };
@@ -2391,148 +2391,181 @@ export default function ThreeDVisualizer() {
       });
 
       // PHASE 5: Camera Rig - Apply rig transforms to camera
-      if (activeCameraRigId) {
-        const activeRig = cameraRigs.find(r => r.id === activeCameraRigId && r.enabled);
-        if (activeRig) {
-          const rigNullObject = cameraRigNullObjectsRef.current.get(activeCameraRigId);
+      // Support for multiple simultaneous rigs
+      if (activeCameraRigIds.length > 0) {
+        // Get all enabled rigs
+        const activeRigs = cameraRigs.filter(r => activeCameraRigIds.includes(r.id) && r.enabled);
+        
+        if (activeRigs.length > 0) {
+          // Initialize combined position and rotation
+          let combinedPosition = { x: 0, y: 0, z: 0 };
+          let combinedRotation = { x: 0, y: 0, z: 0 };
           
-          // Find active rig keyframe or use rig's base position
-          const sortedRigKeyframes = cameraRigKeyframes
-            .filter(kf => kf.rigId === activeCameraRigId)
-            .sort((a, b) => a.time - b.time);
-          
-          let rigPosition = { ...activeRig.position };
-          let rigRotation = { ...activeRig.rotation };
-          
-          // Interpolate between keyframes
-          if (sortedRigKeyframes.length > 0) {
-            const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > t) - 1;
-            if (currentKfIndex >= 0) {
-              const currentKf = sortedRigKeyframes[currentKfIndex];
-              const nextKf = sortedRigKeyframes[currentKfIndex + 1];
-              
-              if (nextKf && t < nextKf.time) {
-                // Interpolate
-                const timeIntoAnim = t - currentKf.time;
-                const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+          // Process each active rig
+          activeRigs.forEach(activeRig => {
+            const rigNullObject = cameraRigNullObjectsRef.current.get(activeRig.id);
+            
+            // Find active rig keyframe or use rig's base position
+            const sortedRigKeyframes = cameraRigKeyframes
+              .filter(kf => kf.rigId === activeRig.id)
+              .sort((a, b) => a.time - b.time);
+            
+            let rigPosition = { ...activeRig.position };
+            let rigRotation = { ...activeRig.rotation };
+            
+            // Interpolate between keyframes
+            if (sortedRigKeyframes.length > 0) {
+              const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > t) - 1;
+              if (currentKfIndex >= 0) {
+                const currentKf = sortedRigKeyframes[currentKfIndex];
+                const nextKf = sortedRigKeyframes[currentKfIndex + 1];
                 
-                // Apply easing
-                let easedProgress = progress;
-                switch (currentKf.easing) {
-                  case 'easeIn':
-                    easedProgress = progress * progress;
-                    break;
-                  case 'easeOut':
-                    easedProgress = 1 - Math.pow(1 - progress, 2);
-                    break;
-                  case 'easeInOut':
-                    easedProgress = progress < 0.5
-                      ? 2 * progress * progress
-                      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                    break;
+                if (nextKf && t < nextKf.time) {
+                  // Interpolate
+                  const timeIntoAnim = t - currentKf.time;
+                  const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+                  
+                  // Apply easing
+                  let easedProgress = progress;
+                  switch (currentKf.easing) {
+                    case 'easeIn':
+                      easedProgress = progress * progress;
+                      break;
+                    case 'easeOut':
+                      easedProgress = 1 - Math.pow(1 - progress, 2);
+                      break;
+                    case 'easeInOut':
+                      easedProgress = progress < 0.5
+                        ? 2 * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                      break;
+                  }
+                  
+                  rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
+                  rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
+                  rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
+                  rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
+                  rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
+                  rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
+                } else {
+                  // Use current keyframe values
+                  rigPosition = { ...currentKf.position };
+                  rigRotation = { ...currentKf.rotation };
                 }
-                
-                rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
-                rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
-                rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
-                rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
-                rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
-                rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
-              } else {
-                // Use current keyframe values
-                rigPosition = { ...currentKf.position };
-                rigRotation = { ...currentKf.rotation };
               }
             }
-          }
-          
-          // Apply rig type-specific motion
-          switch (activeRig.type) {
-            case 'orbit':
-              if (activeRig.orbitRadius && activeRig.orbitSpeed && activeRig.orbitAxis) {
-                const orbitAngle = t * activeRig.orbitSpeed;
-                if (activeRig.orbitAxis === 'y') {
-                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
-                } else if (activeRig.orbitAxis === 'x') {
-                  rigPosition.y = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
-                } else if (activeRig.orbitAxis === 'z') {
-                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.y = Math.sin(orbitAngle) * activeRig.orbitRadius;
+            
+            // Apply direction multiplier
+            const directionMultiplier = activeRig.invertDirection ? -1 : 1;
+            
+            // Apply rig type-specific motion
+            switch (activeRig.type) {
+              case 'orbit':
+                if (activeRig.orbitRadius && activeRig.orbitSpeed && activeRig.orbitAxis) {
+                  const orbitAngle = t * activeRig.orbitSpeed * directionMultiplier;
+                  if (activeRig.orbitAxis === 'y') {
+                    rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  } else if (activeRig.orbitAxis === 'x') {
+                    rigPosition.y = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  } else if (activeRig.orbitAxis === 'z') {
+                    rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.y = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  }
                 }
-              }
-              break;
-            
-            case 'dolly':
-              if (activeRig.dollySpeed && activeRig.dollyAxis) {
-                const dollyDistance = t * activeRig.dollySpeed;
-                if (activeRig.dollyAxis === 'z') {
-                  rigPosition.z += dollyDistance;
-                } else if (activeRig.dollyAxis === 'x') {
-                  rigPosition.x += dollyDistance;
-                } else if (activeRig.dollyAxis === 'y') {
-                  rigPosition.y += dollyDistance;
+                break;
+              
+              case 'dolly':
+                if (activeRig.dollySpeed && activeRig.dollyAxis) {
+                  const dollyDistance = t * activeRig.dollySpeed * directionMultiplier;
+                  if (activeRig.dollyAxis === 'z') {
+                    rigPosition.z += dollyDistance;
+                  } else if (activeRig.dollyAxis === 'x') {
+                    rigPosition.x += dollyDistance;
+                  } else if (activeRig.dollyAxis === 'y') {
+                    rigPosition.y += dollyDistance;
+                  }
                 }
-              }
-              break;
+                break;
+              
+              case 'crane':
+                if (activeRig.craneHeight !== undefined) {
+                  rigPosition.y = activeRig.craneHeight;
+                }
+                if (activeRig.craneTilt !== undefined) {
+                  rigRotation.x = activeRig.craneTilt * directionMultiplier;
+                }
+                break;
+              
+              case 'rotation':
+                // Camera continuously faces the center while maintaining distance
+                if (activeRig.rotationDistance && activeRig.rotationSpeed) {
+                  const rotationAngle = t * activeRig.rotationSpeed * directionMultiplier;
+                  rigPosition.x = Math.cos(rotationAngle) * activeRig.rotationDistance;
+                  rigPosition.z = Math.sin(rotationAngle) * activeRig.rotationDistance;
+                  // Calculate rotation to face center
+                  rigRotation.y = rotationAngle + Math.PI;
+                }
+                break;
+              
+              case 'pan':
+                // Horizontal sweeping movement
+                if (activeRig.panSpeed && activeRig.panRange) {
+                  const panAngle = Math.sin(t * activeRig.panSpeed) * (activeRig.panRange * Math.PI / 180 / 2) * directionMultiplier;
+                  rigRotation.y += panAngle; // Add to existing rotation for combination
+                }
+                break;
+              
+              case 'zoom':
+                // Smooth zoom in/out movement
+                if (activeRig.zoomSpeed && activeRig.zoomMinDistance !== undefined && activeRig.zoomMaxDistance !== undefined) {
+                  const zoomProgress = (Math.sin(t * activeRig.zoomSpeed * directionMultiplier) + 1) / 2; // 0 to 1
+                  const zoomDistance = activeRig.zoomMinDistance + (activeRig.zoomMaxDistance - activeRig.zoomMinDistance) * zoomProgress;
+                  rigPosition.z += zoomDistance; // Add to existing z position for combination
+                }
+                break;
+            }
             
-            case 'crane':
-              if (activeRig.craneHeight !== undefined) {
-                rigPosition.y = activeRig.craneHeight;
-              }
-              if (activeRig.craneTilt !== undefined) {
-                rigRotation.x = activeRig.craneTilt;
-              }
-              break;
+            // Update null object position/rotation
+            if (rigNullObject) {
+              rigNullObject.position.set(rigPosition.x, rigPosition.y, rigPosition.z);
+              rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
+            }
             
-            case 'rotation':
-              // Camera continuously faces the center while maintaining distance
-              if (activeRig.rotationDistance && activeRig.rotationSpeed) {
-                const rotationAngle = t * activeRig.rotationSpeed;
-                rigPosition.x = Math.cos(rotationAngle) * activeRig.rotationDistance;
-                rigPosition.z = Math.sin(rotationAngle) * activeRig.rotationDistance;
-                // Calculate rotation to face center
-                rigRotation.y = rotationAngle + Math.PI;
-              }
-              break;
-            
-            case 'pan':
-              // Horizontal sweeping movement
-              if (activeRig.panSpeed && activeRig.panRange) {
-                const panAngle = Math.sin(t * activeRig.panSpeed) * (activeRig.panRange * Math.PI / 180 / 2);
-                rigRotation.y = panAngle;
-              }
-              break;
-            
-            case 'zoom':
-              // Smooth zoom in/out movement
-              if (activeRig.zoomSpeed && activeRig.zoomMinDistance !== undefined && activeRig.zoomMaxDistance !== undefined) {
-                const zoomProgress = (Math.sin(t * activeRig.zoomSpeed) + 1) / 2; // 0 to 1
-                const zoomDistance = activeRig.zoomMinDistance + (activeRig.zoomMaxDistance - activeRig.zoomMinDistance) * zoomProgress;
-                rigPosition.z = zoomDistance;
-              }
-              break;
-          }
+            // Accumulate transformations from all rigs
+            combinedPosition.x += rigPosition.x;
+            combinedPosition.y += rigPosition.y;
+            combinedPosition.z += rigPosition.z;
+            combinedRotation.x += rigRotation.x;
+            combinedRotation.y += rigRotation.y;
+            combinedRotation.z += rigRotation.z;
+          });
           
-          // Update null object position/rotation
-          if (rigNullObject) {
-            rigNullObject.position.set(rigPosition.x, rigPosition.y, rigPosition.z);
-            rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
-            
-            // Parent camera to null object (apply rig offset to camera)
-            const rigCameraOffset = new THREE.Vector3(0, 0, activeCameraDistance);
-            const rigWorldPos = new THREE.Vector3();
-            rigNullObject.getWorldPosition(rigWorldPos);
-            
-            // Apply rig rotation to camera offset
-            rigCameraOffset.applyEuler(rigNullObject.rotation);
-            
-            // Only override camera position if rig is active
-            // (this overrides the preset camera positioning)
-            cam.position.copy(rigWorldPos.add(rigCameraOffset));
-            cam.lookAt(rigWorldPos);
-          }
+          // Apply combined transformations to camera
+          // Average the position to prevent extreme offsets
+          const rigCount = activeRigs.length;
+          combinedPosition.x /= rigCount;
+          combinedPosition.y /= rigCount;
+          combinedPosition.z /= rigCount;
+          
+          // Create a virtual null object for the combined transform
+          const combinedNullObject = new THREE.Object3D();
+          combinedNullObject.position.set(combinedPosition.x, combinedPosition.y, combinedPosition.z);
+          combinedNullObject.rotation.set(combinedRotation.x, combinedRotation.y, combinedRotation.z);
+          
+          // Parent camera to combined transform
+          const rigCameraOffset = new THREE.Vector3(0, 0, activeCameraDistance);
+          const rigWorldPos = new THREE.Vector3();
+          combinedNullObject.getWorldPosition(rigWorldPos);
+          
+          // Apply rig rotation to camera offset
+          rigCameraOffset.applyEuler(combinedNullObject.rotation);
+          
+          // Only override camera position if rigs are active
+          // (this overrides the preset camera positioning)
+          cam.position.copy(rigWorldPos.add(rigCameraOffset));
+          cam.lookAt(rigWorldPos);
         }
       }
 
@@ -4411,7 +4444,7 @@ export default function ThreeDVisualizer() {
               {/* Camera Rigs List */}
               <div className="space-y-3 mb-6">
                 {cameraRigs.map(rig => (
-                  <div key={rig.id} className={`bg-gray-700 rounded-lg p-4 ${activeCameraRigId === rig.id ? 'ring-2 ring-purple-500' : ''}`}>
+                  <div key={rig.id} className={`bg-gray-700 rounded-lg p-4 ${activeCameraRigIds.includes(rig.id) ? 'ring-2 ring-purple-500' : ''}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
@@ -4420,9 +4453,9 @@ export default function ThreeDVisualizer() {
                           onChange={(e) => {
                             updateCameraRig(rig.id, { enabled: e.target.checked });
                             if (e.target.checked) {
-                              setActiveCameraRigId(rig.id);
-                            } else if (activeCameraRigId === rig.id) {
-                              setActiveCameraRigId(null);
+                              setActiveCameraRigIds(prev => [...prev, rig.id]);
+                            } else {
+                              setActiveCameraRigIds(prev => prev.filter(id => id !== rig.id));
                             }
                           }}
                           className="rounded"
@@ -4623,6 +4656,22 @@ export default function ThreeDVisualizer() {
                             className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {/* Invert Direction Control - for all animated rig types */}
+                    {(rig.type === 'orbit' || rig.type === 'rotation' || rig.type === 'dolly' || rig.type === 'pan' || rig.type === 'zoom' || rig.type === 'crane') && (
+                      <div className="mb-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={rig.invertDirection || false}
+                            onChange={(e) => updateCameraRig(rig.id, { invertDirection: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span>↔️ Invert Direction</span>
+                          <span className="text-gray-500">(Reverse movement)</span>
+                        </label>
                       </div>
                     )}
 
