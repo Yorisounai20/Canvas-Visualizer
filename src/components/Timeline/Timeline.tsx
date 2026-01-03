@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, WorkspaceObject } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 
@@ -15,6 +15,7 @@ interface TimelineProps {
   presetKeyframes: PresetKeyframe[];
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
+  environmentKeyframes: EnvironmentKeyframe[];
   workspaceObjects?: WorkspaceObject[]; // For camera selection in camera keyframes
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
@@ -23,20 +24,23 @@ interface TimelineProps {
   onAddPresetKeyframe?: (time: number) => void;
   onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
+  onAddEnvironmentKeyframe?: (time: number) => void;
   onDeletePresetKeyframe?: (id: number) => void;
   onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
+  onDeleteEnvironmentKeyframe?: (id: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
+  onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
 }
 
-type TimelineTab = 'sections' | 'presets' | 'camera' | 'text';
+type TimelineTab = 'sections' | 'presets' | 'camera' | 'text' | 'environment';
 
 /**
  * Timeline Component - After Effects-style timeline with tabs
  * Shows sections as bars that can be moved, trimmed, and resized
- * Includes tabs for Sections, Presets, Camera, and Text organization
+ * Includes tabs for Sections, Presets, Camera, Text, and Environment organization
  */
 export default function Timeline({
   sections,
@@ -49,6 +53,7 @@ export default function Timeline({
   presetKeyframes,
   cameraKeyframes,
   textKeyframes,
+  environmentKeyframes,
   workspaceObjects = [],
   onSelectSection,
   onUpdateSection,
@@ -57,12 +62,15 @@ export default function Timeline({
   onAddPresetKeyframe,
   onAddCameraKeyframe,
   onAddTextKeyframe,
+  onAddEnvironmentKeyframe,
   onDeletePresetKeyframe,
   onDeleteCameraKeyframe,
   onDeleteTextKeyframe,
+  onDeleteEnvironmentKeyframe,
   onUpdatePresetKeyframe,
   onUpdateCameraKeyframe,
-  onUpdateTextKeyframe
+  onUpdateTextKeyframe,
+  onUpdateEnvironmentKeyframe
 }: TimelineProps) {
   const [activeTab, setActiveTab] = useState<TimelineTab>('sections');
   const [dragState, setDragState] = useState<{
@@ -78,14 +86,14 @@ export default function Timeline({
     isOpen: boolean;
     x: number;
     y: number;
-    type: 'preset' | 'camera' | 'text' | null;
+    type: 'preset' | 'camera' | 'text' | 'environment' | null;
     keyframeId?: number;
     keyframeTime?: number;
   }>({ isOpen: false, x: 0, y: 0, type: null });
 
   // Edit modal state for keyframes
   const [editingKeyframe, setEditingKeyframe] = useState<{
-    type: 'preset' | 'camera' | 'text' | null;
+    type: 'preset' | 'camera' | 'text' | 'environment' | null;
     data: any;
   }>({ type: null, data: null });
 
@@ -178,6 +186,20 @@ export default function Timeline({
           label: 'Delete Keyframe',
           icon: <Trash2 size={14} />,
           onClick: () => onDeleteTextKeyframe?.(contextMenu.keyframeId!)
+        });
+      }
+    } else if (contextMenu.type === 'environment' && contextMenu.keyframeId !== undefined) {
+      const keyframe = environmentKeyframes.find(kf => kf.id === contextMenu.keyframeId);
+      if (keyframe) {
+        items.push({
+          label: 'Edit Environment',
+          icon: <Edit2 size={14} />,
+          onClick: () => setEditingKeyframe({ type: 'environment', data: keyframe })
+        });
+        items.push({
+          label: 'Delete Keyframe',
+          icon: <Trash2 size={14} />,
+          onClick: () => onDeleteEnvironmentKeyframe?.(contextMenu.keyframeId!)
         });
       }
     }
@@ -338,7 +360,8 @@ export default function Timeline({
             { id: 'sections' as TimelineTab, label: 'Sections', icon: '📋' },
             { id: 'presets' as TimelineTab, label: 'Presets', icon: '🎨' },
             { id: 'camera' as TimelineTab, label: 'Camera', icon: '📷' },
-            { id: 'text' as TimelineTab, label: 'Text', icon: '📝' }
+            { id: 'text' as TimelineTab, label: 'Text', icon: '📝' },
+            { id: 'environment' as TimelineTab, label: 'Environment', icon: '🌍' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -719,6 +742,93 @@ export default function Timeline({
             </div>
           </>
         )}
+
+        {/* Environment Tab */}
+        {activeTab === 'environment' && (
+          <>
+            {/* Add Environment Keyframe Button */}
+            <div className="mb-3 flex items-center justify-between">
+              {onAddEnvironmentKeyframe && (
+                <button
+                  onClick={() => onAddEnvironmentKeyframe(currentTime)}
+                  className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 transition-colors text-sm flex items-center gap-1"
+                  title="Add environment keyframe at current time"
+                >
+                  <Plus size={14} />
+                  <span>Add Environment</span>
+                </button>
+              )}
+            </div>
+
+            {/* Timeline area for environment keyframes */}
+            <div 
+              className="relative bg-gray-750 rounded h-24 cursor-crosshair border border-gray-600"
+              style={{ minHeight: '96px' }}
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const clickedTime = (x / rect.width) * (duration || 60);
+                if (onAddEnvironmentKeyframe) {
+                  onAddEnvironmentKeyframe(clickedTime);
+                }
+              }}
+            >
+              {/* Current time indicator */}
+              <div
+                className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                style={{ left: `${(currentTime / (duration || 60)) * 100}%` }}
+              />
+
+              {/* Environment Keyframe Markers */}
+              {environmentKeyframes.map(kf => (
+                <div
+                  key={kf.id}
+                  className="absolute top-1 w-4 h-4 bg-green-500 rounded-full cursor-pointer hover:scale-125 transition-transform flex items-center justify-center group"
+                  style={{ left: `calc(${(kf.time / (duration || 60)) * 100}% - 8px)` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingKeyframe({ type: 'environment', data: kf });
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({
+                      isOpen: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      type: 'environment',
+                      keyframeId: kf.id,
+                      keyframeTime: kf.time
+                    });
+                  }}
+                  title={`Environment: ${kf.type} (${formatTime(kf.time)})`}
+                >
+                  <span className="text-[8px]">🌍</span>
+                  <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                    {formatTime(kf.time)} - {kf.type.charAt(0).toUpperCase() + kf.type.slice(1)} ({Math.round(kf.intensity * 100)}%)
+                    {onDeleteEnvironmentKeyframe && (
+                      <button
+                        className="ml-2 text-red-400 hover:text-red-300"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteEnvironmentKeyframe(kf.id);
+                        }}
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {environmentKeyframes.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                  Click timeline to add environment keyframes
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
 
@@ -952,6 +1062,101 @@ export default function Timeline({
         </div>
       </div>
     )}
+
+      {/* Edit Environment Keyframe Modal */}
+      {editingKeyframe.type === 'environment' && editingKeyframe.data && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[200]">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full border border-gray-600">
+            <h3 className="text-lg font-semibold text-white mb-4">Edit Environment Keyframe</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Environment Type</label>
+                <select
+                  value={editingKeyframe.data.type}
+                  onChange={(e) => setEditingKeyframe({ 
+                    ...editingKeyframe, 
+                    data: { ...editingKeyframe.data, type: e.target.value }
+                  })}
+                  className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+                >
+                  <option value="none">⚫ None</option>
+                  <option value="ocean">🌊 Ocean</option>
+                  <option value="forest">🌲 Forest</option>
+                  <option value="space">🌌 Space</option>
+                  <option value="city">🏙️ City</option>
+                  <option value="abstract">🔷 Abstract</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">
+                  Intensity: {Math.round((editingKeyframe.data.intensity || 0.5) * 100)}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={editingKeyframe.data.intensity || 0.5}
+                  onChange={(e) => setEditingKeyframe({ 
+                    ...editingKeyframe, 
+                    data: { ...editingKeyframe.data, intensity: parseFloat(e.target.value) }
+                  })}
+                  className="w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">Controls density and visibility of environment elements</p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 block mb-2">Color Override (Optional)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={editingKeyframe.data.color || '#ffffff'}
+                    onChange={(e) => setEditingKeyframe({ 
+                      ...editingKeyframe, 
+                      data: { ...editingKeyframe.data, color: e.target.value }
+                    })}
+                    className="w-12 h-10 bg-gray-700 rounded border border-gray-600 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={editingKeyframe.data.color || ''}
+                    onChange={(e) => setEditingKeyframe({ 
+                      ...editingKeyframe, 
+                      data: { ...editingKeyframe.data, color: e.target.value }
+                    })}
+                    placeholder="#ffffff (leave empty for default)"
+                    className="flex-1 bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setEditingKeyframe({ type: null, data: null })}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (onUpdateEnvironmentKeyframe) {
+                      onUpdateEnvironmentKeyframe(
+                        editingKeyframe.data.id, 
+                        editingKeyframe.data.type, 
+                        editingKeyframe.data.intensity,
+                        editingKeyframe.data.color
+                      );
+                    }
+                    setEditingKeyframe({ type: null, data: null });
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

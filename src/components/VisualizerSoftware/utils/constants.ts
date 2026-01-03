@@ -26,3 +26,12 @@ export const animationTypes = [
   { value: 'snowflake', label: 'Snowflake', icon: '❄️' },
   { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' }
 ];
+
+export const environmentTypes = [
+  { value: 'none', label: 'None', icon: '⚫' },
+  { value: 'ocean', label: 'Ocean', icon: '🌊' },
+  { value: 'forest', label: 'Forest', icon: '🌲' },
+  { value: 'space', label: 'Space', icon: '🌌' },
+  { value: 'city', label: 'City', icon: '🏙️' },
+  { value: 'abstract', label: 'Abstract', icon: '🔷' }
+];
