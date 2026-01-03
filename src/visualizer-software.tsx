@@ -3905,7 +3905,8 @@ export default function ThreeDVisualizer() {
             // Only override camera position if rig is active
             // (this overrides the preset camera positioning)
             cam.position.copy(rigWorldPos.add(rigCameraOffset));
-            cam.lookAt(rigWorldPos);
+            // Camera should always look at scene center, not the rig position
+            cam.lookAt(0, 0, 0);
           }
         }
       }
