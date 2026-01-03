@@ -2,9 +2,9 @@
 
 ## **✅ Development Status**
 
-**Version 2.2 - Dual-Mode Architecture (Editor + Software Modes)**
+**Version 2.4 - Advanced Skybox & Material System (Software Mode)**
 
-Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations.
+Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls.
 
 **Dual-Mode Architecture:**
 - 🎬 **Editor Mode** - Professional interface with layers, timeline, workspace, and advanced controls
@@ -30,13 +30,16 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 - ✅ Parameter events (background flash, vignette pulse, saturation burst)
 - ✅ Multiple audio track support with mixing
 - ✅ Scrolling and static waveform visualization modes
+- ✅ **6 skybox/background modes**: Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
+- ✅ **Professional material system**: 4 material types (Basic, Standard PBR, Phong, Lambert) with per-shape controls
+- ✅ **PBR rendering**: Metalness and roughness controls for physically-based materials
 
 **Shared Features (Both Modes):**
 - ✅ 25 animation presets with audio-reactive 3D visuals
 - ✅ 3D text overlay with font loading
 - ✅ Waveform visualization
 - ✅ Debug console (toggle with `` ` `` key)
-- ✅ Color pickers and camera controls
+- ✅ Per-shape color pickers and camera controls
 - ✅ Export modal with resolution selection
 - ✅ Manual control mode for non-audio-reactive animations
 
@@ -94,6 +97,8 @@ Features:
 - Parameter events (flashes, pulses)
 - Multiple audio track mixing
 - Waveform mode selection
+- **6 skybox/background modes** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
+- **Professional material system** - 4 material types with per-shape controls and PBR support
 
 ### **Comparison**
 
@@ -184,11 +189,28 @@ Features:
   - Preset display (toggleable)
   
 - **Right Panel (Controls):**
-  - **Colors Tab:** Bass, mids, highs color pickers
-  - **Camera Tab:** Distance, height, rotation, auto-rotate
-  - **Text Tab:** 3D text overlay with custom font loading
-  - **Effects Tab:** Letterbox keyframes, camera shake events, parameter events
-  - **Settings Tab:** Background, border, lighting, waveform mode, HUD toggles
+  - **🎚️ Frequency Gain Controls** - Bass, mids, highs sensitivity multipliers (0-3x)
+  - **🎭 Shape Material Controls** - Per-shape customization:
+    - Material type dropdown (Basic, Standard PBR, Phong, Lambert)
+    - Color picker for each shape (Cubes, Octahedrons, Tetrahedrons, Sphere)
+    - Opacity slider (0.0-1.0)
+    - Wireframe toggle
+    - Metalness & Roughness sliders (Standard PBR only, 0.0-1.0)
+    - Reset all materials to defaults button
+  - **📷 Camera Settings Tab** - Distance, height, rotation, auto-rotate
+  - **📝 Text Animator Tab** - 3D text overlay with custom font loading
+  - **✨ Effects Tab**:
+    - **🌌 Visual Effects** - 6 skybox/background modes:
+      - **Solid Color** - Traditional single-color background
+      - **Gradient** - Sky-to-ground color gradient (customizable top/bottom colors)
+      - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI)
+      - **Stars** - Procedurally generated star field (1,000-10,000 stars, adjustable count)
+      - **Galaxy** - Spiral galaxy with customizable color tint
+      - **Nebula** - Multi-color nebula with shader-based gas clouds (dual-color customization)
+    - **📽️ Animated Letterbox** - Keyframe-based curtain effects
+    - **💥 Camera Shake Events** - Time-triggered shake with intensity control
+    - **⚡ Parameter Events** - Background flash, vignette pulse, saturation burst
+  - **⚙️ Settings Tab** - Border color, lighting controls, waveform mode, HUD toggles
   
 - **Bottom Timeline:**
   - Scrolling or static waveform visualization
@@ -203,10 +225,24 @@ Features:
 
 ### 🎨 **Customization Options (Both Modes)**
 
-**Colors:**
-- Bass frequency color (low sounds)
-- Mids frequency color (vocals, melody)
-- Highs frequency color (cymbals, hi-hats)
+**Shape Materials (Software Mode):**
+- Individual material controls for each shape type (Cubes, Octahedrons, Tetrahedrons, Sphere)
+- **Material Types:**
+  - **Basic (Unlit)** - Simple flat material, no lighting required, always visible
+  - **Standard (PBR)** - Physically-based rendering with metalness (0.0-1.0) and roughness (0.0-1.0) controls
+  - **Phong (Shiny)** - Classic shiny material with specular highlights (fixed shininess: 30)
+  - **Lambert (Matte)** - Diffuse matte material for soft appearance
+- Color picker per shape (independent from frequency colors)
+- Opacity slider per shape (0.0-1.0)
+- Wireframe toggle per shape
+- PBR controls (metalness/roughness) visible only when Standard material selected
+- Reset all materials to defaults button
+
+**Frequency Gain (Software Mode):**
+- Bass gain multiplier (0-3x) - Controls sensitivity of bass frequency band
+- Mids gain multiplier (0-3x) - Controls sensitivity of mids frequency band
+- Highs gain multiplier (0-3x) - Controls sensitivity of highs frequency band
+- Reset frequency gains button
 
 **Camera Controls:**
 - Zoom distance (5-50 units)
@@ -215,9 +251,15 @@ Features:
 - Auto-rotate toggle (orbits around scene automatically)
 
 **Visual Effects:**
-- Background color customization
+- **Skybox/Background (Software Mode):**
+  - **Solid Color** - Single-color background (hex color picker)
+  - **Gradient** - Vertical gradient with top and bottom colors
+  - **Image/Skybox** - Equirectangular panoramic images (enter URL, supports CORS-enabled resources, try [Poly Haven](https://polyhaven.com/hdris))
+  - **Stars** - Procedural star field with adjustable star count (1,000-10,000)
+  - **Galaxy** - Procedural spiral galaxy with customizable color tint
+  - **Nebula** - Procedural nebula with dual-color gas clouds and shader-based fog effects
 - Border color customization
-- Letterbox toggle (basic on/off)
+- Letterbox toggle (basic on/off in Editor mode, keyframe animation in Software mode)
 - Ambient and directional lighting controls
 
 ### ✨ **Advanced Features (Editor Mode)**
@@ -313,8 +355,18 @@ Features:
 - Built with Three.js (WebGL)
 - 960x540 canvas (16:9 aspect ratio)
 - Fog effect for depth
-- Wireframe + solid rendering modes
+- **Material system (Software Mode):**
+  - **Basic (MeshBasicMaterial)** - Unlit, flat shading, always visible
+  - **Standard (MeshStandardMaterial)** - PBR with metalness and roughness, responds to lighting
+  - **Phong (MeshPhongMaterial)** - Specular highlights, classic shiny materials
+  - **Lambert (MeshLambertMaterial)** - Diffuse matte shading, soft appearance
+- Wireframe rendering mode (per-shape toggle)
 - Geometric primitives: Cubes, Octahedrons, Tetrahedrons, Spheres
+- **Skybox rendering (Software Mode):**
+  - Solid color backgrounds
+  - Gradient backgrounds with GLSL shaders
+  - Equirectangular image mapping for 360° panoramas
+  - Procedural star fields, galaxies, and nebulae using THREE.Points and custom shaders
 
 ### **Animation System:**
 Each preset controls:
@@ -638,7 +690,22 @@ npm run lint         # Run ESLint
 
 ## **Recent Changes & Improvements**
 
-### **Version 2.3 - UI/UX Enhancements & Keyframe Architecture (Latest):**
+### **Version 2.4 - Advanced Skybox & Material System (Latest):**
+- ✨ **6 Skybox/Background Modes (Software Mode)** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
+  - **Gradient Skybox** - Vertical color gradients with custom GLSL shaders (top/bottom color control)
+  - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI from Poly Haven)
+  - **Procedural Stars** - 1,000-10,000 randomly distributed stars with adjustable count
+  - **Procedural Galaxy** - Spiral galaxy visualization with customizable color tint
+  - **Procedural Nebula** - Multi-color gas clouds with dual-color customization and shader-based fog effects
+- ✨ **Professional Material System (Software Mode)** - Per-shape material controls
+  - **4 Material Types** - Basic (Unlit), Standard (PBR), Phong (Shiny), Lambert (Matte)
+  - **PBR Support** - Metalness and roughness sliders for Standard materials (0.0-1.0 range)
+  - **Per-Shape Controls** - Independent material, color, opacity, and wireframe settings for Cubes, Octahedrons, Tetrahedrons, and Sphere
+  - **Reset Functionality** - One-click reset to default material values
+- 🔧 **Removed Redundant UI** - Removed "🎨 Colors" section from Software Mode (replaced by per-shape material controls)
+- 🎨 **Enhanced Visual Fidelity** - Physically-based rendering for realistic material appearance with scene lighting
+
+### **Version 2.3 - UI/UX Enhancements & Keyframe Architecture:**
 - ✨ **Keyboard Shortcuts Modal** - Software Mode now has ? button to show available shortcuts
 - ✨ **Camera Rig Visual Hints** - Toggleable position markers, target indicators, path preview, reference grid
 - ✨ **Keyframe-Based Camera Rotation** - Removed global rotation slider, now exclusively keyframe-controlled
@@ -739,8 +806,8 @@ npm run lint         # Run ESLint
 
 ---
 
-**Version:** 2.3 (UI/UX Enhancements & Keyframe Architecture)  
-**Last Updated:** 01/02/2026  
+**Version:** 2.4 (Advanced Skybox & Material System)  
+**Last Updated:** 01/03/2026  
 **License:** MIT  
 **Author:** Yorisounai20
 
@@ -749,6 +816,7 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
+- Version 2.4: Advanced Skybox & Material System (6 skybox modes, 4 material types, PBR support)
 - Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
 - Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
 - Version 2.1: Scene Explorer, extended object types, camera/light support
