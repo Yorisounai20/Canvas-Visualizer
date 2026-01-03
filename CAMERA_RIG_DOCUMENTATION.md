@@ -179,7 +179,7 @@ const interpolateCameraKeyframes = (keyframes, currentTime) => {
 
 ## Camera Rig Types
 
-The system supports four types of camera rigs, each with unique movement patterns:
+The system supports seven types of camera rigs, each with unique movement patterns:
 
 ### 1. Orbit Rig
 
@@ -204,7 +204,29 @@ if (orbitAxis === 'y') {
 - Revealing 3D objects from all angles
 - Creating dynamic, rotating perspectives
 
-### 2. Dolly Rig
+### 2. Rotation Rig
+
+Camera continuously faces the animation center while rotating around it.
+
+**Parameters:**
+- `rotationDistance`: Distance from center (default: 20)
+- `rotationSpeed`: Rotation speed (default: 0.3)
+
+**Calculation:**
+```javascript
+const rotationAngle = time * rotationSpeed;
+position.x = Math.cos(rotationAngle) * rotationDistance;
+position.z = Math.sin(rotationAngle) * rotationDistance;
+// Camera always faces center
+rotation.y = rotationAngle + Math.PI;
+```
+
+**Use Cases:**
+- Tracking shots that maintain focus on the center
+- Showcase animations from all angles while keeping subject centered
+- Professional rotating camera movements
+
+### 3. Dolly Rig
 
 Moves the camera along a straight axis over time.
 
@@ -225,7 +247,26 @@ if (dollyAxis === 'z') {
 - Lateral tracking shots (X-axis)
 - Vertical rises or descents (Y-axis)
 
-### 3. Crane Rig
+### 4. Pan Rig
+
+Horizontal sweeping camera movement (left to right).
+
+**Parameters:**
+- `panSpeed`: Pan speed (default: 0.5)
+- `panRange`: Range of horizontal movement in degrees (default: 90)
+
+**Calculation:**
+```javascript
+const panAngle = Math.sin(time * panSpeed) * (panRange * Math.PI / 180 / 2);
+rotation.y = panAngle;
+```
+
+**Use Cases:**
+- Sweeping panoramic shots
+- Side-to-side scanning movements
+- Dramatic scene reveals
+
+### 5. Crane Rig
 
 Simulates a crane camera with height and tilt control.
 
@@ -244,7 +285,28 @@ rotation.x = craneTilt;
 - Dramatic sweeping movements
 - Establishing shots from above
 
-### 4. Custom Rig
+### 6. Zoom Rig
+
+Smooth zoom in/out movement along the Z-axis.
+
+**Parameters:**
+- `zoomSpeed`: Zoom speed (default: 0.5)
+- `zoomMinDistance`: Minimum camera distance (default: 10)
+- `zoomMaxDistance`: Maximum camera distance (default: 40)
+
+**Calculation:**
+```javascript
+const zoomProgress = (Math.sin(time * zoomSpeed) + 1) / 2; // 0 to 1
+const zoomDistance = zoomMinDistance + (zoomMaxDistance - zoomMinDistance) * zoomProgress;
+position.z = zoomDistance;
+```
+
+**Use Cases:**
+- Breathing/pulsing camera effects
+- Smooth push in/pull out movements
+- Dynamic distance variations
+
+### 7. Custom Rig
 
 User-defined rig with manual position/rotation control.
 
@@ -309,20 +371,32 @@ This creates a hierarchical transform system where:
 
 ### Rig Keyframe Structure
 
-Camera rigs can have their own keyframes that animate the rig itself:
+Camera rigs can have their own keyframes that animate the rig itself. **All keyframe properties are now fully editable** through the UI:
 
 ```typescript
 {
   id: string,              // Unique keyframe ID
-  time: number,            // Time in seconds
+  time: number,            // Time in seconds (editable)
   rigId: string,           // Which rig this keyframe belongs to
-  position: {x, y, z},     // Rig position at this time
-  rotation: {x, y, z},     // Rig rotation at this time
-  duration: number,        // Time to transition to next keyframe (default: 1.0)
-  easing: string,          // Interpolation easing ('linear', 'easeIn', 'easeOut', 'easeInOut')
+  position: {x, y, z},     // Rig position at this time (editable)
+  rotation: {x, y, z},     // Rig rotation at this time (editable)
+  duration: number,        // Time to transition to next keyframe (editable, default: 1.0)
+  easing: string,          // Interpolation easing (editable: 'linear', 'easeIn', 'easeOut', 'easeInOut')
   preset: string           // Optional: trigger preset change at this keyframe
 }
 ```
+
+### Editing Keyframes
+
+Users can edit all keyframe properties directly in the UI:
+
+1. **Time**: Change when the keyframe occurs (format: MM:SS)
+2. **Duration**: Adjust transition time to the next keyframe (in seconds)
+3. **Easing**: Select interpolation curve (Linear, Ease In, Ease Out, Ease In-Out)
+4. **Position**: Set X, Y, Z coordinates for the rig position
+5. **Rotation**: Set X, Y, Z rotation values (in radians)
+
+This allows for precise control over camera movement without needing to delete and recreate keyframes.
 
 ### Rig Keyframe Interpolation
 
@@ -352,7 +426,7 @@ rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x
 The final rig transform is:
 1. **Base position/rotation** from rig settings
 2. **+Keyframe animation** (if keyframes exist)
-3. **+Automated rig motion** (orbit/dolly/crane pattern)
+3. **+Automated rig motion** (orbit/dolly/crane/rotation/pan/zoom pattern)
 
 Example for orbit rig with keyframes:
 ```javascript
@@ -697,19 +771,20 @@ useEffect(() => {
 
 The camera rig system provides:
 
-✅ **Keyframe-based animation** with smooth interpolation  
-✅ **Four rig types** (orbit, dolly, crane, custom)  
+✅ **Keyframe-based animation** with smooth interpolation and **fully editable keyframes**  
+✅ **Seven rig types** (orbit, rotation, dolly, pan, crane, zoom, custom)  
 ✅ **Easing functions** for natural motion  
 ✅ **Camera shake** for impact effects  
 ✅ **Null object hierarchy** for transform composition  
 ✅ **Audio-reactive movement** integrated with presets  
 ✅ **Professional camera control** for music videos  
+✅ **Comprehensive UI labels** for intuitive control  
 
 The system combines automated patterns, keyframe animation, and procedural effects to create dynamic, professional-quality camera movements synchronized to audio.
 
 ---
 
-**Version:** 2.2  
+**Version:** 2.3  
 **Last Updated:** January 2, 2026  
 **Related Files:**
 - `src/visualizer-software.tsx` - Main implementation

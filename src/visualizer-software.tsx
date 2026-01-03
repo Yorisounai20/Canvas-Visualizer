@@ -313,7 +313,7 @@ export default function ThreeDVisualizer() {
   // PHASE 5: Camera Rig state
   const [cameraRigs, setCameraRigs] = useState<any[]>([]);
   const [cameraRigKeyframes, setCameraRigKeyframes] = useState<any[]>([]);
-  const [activeCameraRigId, setActiveCameraRigId] = useState<string | null>(null);
+  const [activeCameraRigIds, setActiveCameraRigIds] = useState<string[]>([]);
   const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
   const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
   
@@ -1211,7 +1211,7 @@ export default function ThreeDVisualizer() {
   };
 
   // PHASE 5: Camera Rig Functions
-  const createCameraRig = (type: 'orbit' | 'dolly' | 'crane' | 'custom' = 'orbit') => {
+  const createCameraRig = (type: 'orbit' | 'dolly' | 'crane' | 'custom' | 'rotation' | 'pan' | 'zoom' = 'orbit') => {
     const newRig = {
       id: `rig-${Date.now()}`,
       name: `${type.charAt(0).toUpperCase() + type.slice(1)} Rig`,
@@ -1222,13 +1222,21 @@ export default function ThreeDVisualizer() {
       trackingTarget: null,
       trackingOffset: { x: 0, y: 0, z: 0 },
       trackingSmooth: 0.5,
+      invertDirection: false,
       orbitRadius: type === 'orbit' ? 15 : undefined,
       orbitSpeed: type === 'orbit' ? 0.5 : undefined,
       orbitAxis: type === 'orbit' ? 'y' as const : undefined,
       dollySpeed: type === 'dolly' ? 1.0 : undefined,
       dollyAxis: type === 'dolly' ? 'z' as const : undefined,
       craneHeight: type === 'crane' ? 10 : undefined,
-      craneTilt: type === 'crane' ? 0 : undefined
+      craneTilt: type === 'crane' ? 0 : undefined,
+      rotationDistance: type === 'rotation' ? 20 : undefined,
+      rotationSpeed: type === 'rotation' ? 0.3 : undefined,
+      panSpeed: type === 'pan' ? 0.5 : undefined,
+      panRange: type === 'pan' ? 90 : undefined,
+      zoomSpeed: type === 'zoom' ? 0.5 : undefined,
+      zoomMinDistance: type === 'zoom' ? 10 : undefined,
+      zoomMaxDistance: type === 'zoom' ? 40 : undefined
     };
     setCameraRigs(prev => [...prev, newRig]);
     
@@ -1306,6 +1314,8 @@ export default function ThreeDVisualizer() {
     if (activeCameraRigId === id) {
       setActiveCameraRigId(null);
     }
+    // Remove from active rigs array
+    setActiveCameraRigIds(prev => prev.filter(rigId => rigId !== id));
     
     addLog(`Deleted camera rig`, 'info');
   };
@@ -1328,6 +1338,17 @@ export default function ThreeDVisualizer() {
     addLog(`Created camera rig keyframe at ${formatTime(time)}`, 'success');
     return newKeyframe;
   };
+
+  const updateCameraRigKeyframe = (id: string, updates: Partial<{
+    time: number;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    duration: number;
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  }>) => {
+    setCameraRigKeyframes(prev => prev.map(kf => kf.id === id ? { ...kf, ...updates } : kf));
+  };
+
 
   const deleteCameraRigKeyframe = (id: string) => {
     setCameraRigKeyframes(prev => prev.filter(kf => kf.id !== id));
@@ -3793,114 +3814,147 @@ export default function ThreeDVisualizer() {
       });
 
       // PHASE 5: Camera Rig - Apply rig transforms to camera
-      if (activeCameraRigId) {
-        const activeRig = cameraRigs.find(r => r.id === activeCameraRigId && r.enabled);
-        if (activeRig) {
-          const rigNullObject = cameraRigNullObjectsRef.current.get(activeCameraRigId);
+      // Support for multiple simultaneous rigs
+      if (activeCameraRigIds.length > 0) {
+        // Get all enabled rigs
+        const activeRigs = cameraRigs.filter(r => activeCameraRigIds.includes(r.id) && r.enabled);
+        
+        if (activeRigs.length > 0) {
+          // Initialize combined position and rotation
+          let combinedPosition = { x: 0, y: 0, z: 0 };
+          let combinedRotation = { x: 0, y: 0, z: 0 };
           
-          // Find active rig keyframe or use rig's base position
-          const sortedRigKeyframes = cameraRigKeyframes
-            .filter(kf => kf.rigId === activeCameraRigId)
-            .sort((a, b) => a.time - b.time);
-          
-          let rigPosition = { ...activeRig.position };
-          let rigRotation = { ...activeRig.rotation };
-          
-          // Interpolate between keyframes
-          if (sortedRigKeyframes.length > 0) {
-            const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > t) - 1;
-            if (currentKfIndex >= 0) {
-              const currentKf = sortedRigKeyframes[currentKfIndex];
-              const nextKf = sortedRigKeyframes[currentKfIndex + 1];
-              
-              if (nextKf && t < nextKf.time) {
-                // Interpolate
-                const timeIntoAnim = t - currentKf.time;
-                const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+          // Process each active rig
+          activeRigs.forEach(activeRig => {
+            const rigNullObject = cameraRigNullObjectsRef.current.get(activeRig.id);
+            
+            // Find active rig keyframe or use rig's base position
+            const sortedRigKeyframes = cameraRigKeyframes
+              .filter(kf => kf.rigId === activeRig.id)
+              .sort((a, b) => a.time - b.time);
+            
+            let rigPosition = { ...activeRig.position };
+            let rigRotation = { ...activeRig.rotation };
+            
+            // Interpolate between keyframes
+            if (sortedRigKeyframes.length > 0) {
+              const currentKfIndex = sortedRigKeyframes.findIndex(kf => kf.time > t) - 1;
+              if (currentKfIndex >= 0) {
+                const currentKf = sortedRigKeyframes[currentKfIndex];
+                const nextKf = sortedRigKeyframes[currentKfIndex + 1];
                 
-                // Apply easing
-                let easedProgress = progress;
-                switch (currentKf.easing) {
-                  case 'easeIn':
-                    easedProgress = progress * progress;
-                    break;
-                  case 'easeOut':
-                    easedProgress = 1 - Math.pow(1 - progress, 2);
-                    break;
-                  case 'easeInOut':
-                    easedProgress = progress < 0.5
-                      ? 2 * progress * progress
-                      : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-                    break;
+                if (nextKf && t < nextKf.time) {
+                  // Interpolate
+                  const timeIntoAnim = t - currentKf.time;
+                  const progress = Math.min(timeIntoAnim / currentKf.duration, 1);
+                  
+                  // Apply easing
+                  let easedProgress = progress;
+                  switch (currentKf.easing) {
+                    case 'easeIn':
+                      easedProgress = progress * progress;
+                      break;
+                    case 'easeOut':
+                      easedProgress = 1 - Math.pow(1 - progress, 2);
+                      break;
+                    case 'easeInOut':
+                      easedProgress = progress < 0.5
+                        ? 2 * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                      break;
+                  }
+                  
+                  rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
+                  rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
+                  rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
+                  rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
+                  rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
+                  rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
+                } else {
+                  // Use current keyframe values
+                  rigPosition = { ...currentKf.position };
+                  rigRotation = { ...currentKf.rotation };
                 }
-                
-                rigPosition.x = currentKf.position.x + (nextKf.position.x - currentKf.position.x) * easedProgress;
-                rigPosition.y = currentKf.position.y + (nextKf.position.y - currentKf.position.y) * easedProgress;
-                rigPosition.z = currentKf.position.z + (nextKf.position.z - currentKf.position.z) * easedProgress;
-                rigRotation.x = currentKf.rotation.x + (nextKf.rotation.x - currentKf.rotation.x) * easedProgress;
-                rigRotation.y = currentKf.rotation.y + (nextKf.rotation.y - currentKf.rotation.y) * easedProgress;
-                rigRotation.z = currentKf.rotation.z + (nextKf.rotation.z - currentKf.rotation.z) * easedProgress;
-              } else {
-                // Use current keyframe values
-                rigPosition = { ...currentKf.position };
-                rigRotation = { ...currentKf.rotation };
               }
             }
-          }
-          
-          // Apply rig type-specific motion
-          switch (activeRig.type) {
-            case 'orbit':
-              if (activeRig.orbitRadius && activeRig.orbitSpeed && activeRig.orbitAxis) {
-                const orbitAngle = t * activeRig.orbitSpeed;
-                if (activeRig.orbitAxis === 'y') {
-                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
-                } else if (activeRig.orbitAxis === 'x') {
-                  rigPosition.y = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
-                } else if (activeRig.orbitAxis === 'z') {
-                  rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
-                  rigPosition.y = Math.sin(orbitAngle) * activeRig.orbitRadius;
+            
+            // Apply direction multiplier
+            const directionMultiplier = activeRig.invertDirection ? -1 : 1;
+            
+            // Apply rig type-specific motion
+            switch (activeRig.type) {
+              case 'orbit':
+                if (activeRig.orbitRadius && activeRig.orbitSpeed && activeRig.orbitAxis) {
+                  const orbitAngle = t * activeRig.orbitSpeed * directionMultiplier;
+                  if (activeRig.orbitAxis === 'y') {
+                    rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  } else if (activeRig.orbitAxis === 'x') {
+                    rigPosition.y = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.z = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  } else if (activeRig.orbitAxis === 'z') {
+                    rigPosition.x = Math.cos(orbitAngle) * activeRig.orbitRadius;
+                    rigPosition.y = Math.sin(orbitAngle) * activeRig.orbitRadius;
+                  }
                 }
-              }
-              break;
-            
-            case 'dolly':
-              if (activeRig.dollySpeed && activeRig.dollyAxis) {
-                const dollyDistance = t * activeRig.dollySpeed;
-                if (activeRig.dollyAxis === 'z') {
-                  rigPosition.z += dollyDistance;
-                } else if (activeRig.dollyAxis === 'x') {
-                  rigPosition.x += dollyDistance;
-                } else if (activeRig.dollyAxis === 'y') {
-                  rigPosition.y += dollyDistance;
+                break;
+              
+              case 'dolly':
+                if (activeRig.dollySpeed && activeRig.dollyAxis) {
+                  const dollyDistance = t * activeRig.dollySpeed * directionMultiplier;
+                  if (activeRig.dollyAxis === 'z') {
+                    rigPosition.z += dollyDistance;
+                  } else if (activeRig.dollyAxis === 'x') {
+                    rigPosition.x += dollyDistance;
+                  } else if (activeRig.dollyAxis === 'y') {
+                    rigPosition.y += dollyDistance;
+                  }
                 }
-              }
-              break;
+                break;
+              
+              case 'crane':
+                if (activeRig.craneHeight !== undefined) {
+                  rigPosition.y = activeRig.craneHeight;
+                }
+                if (activeRig.craneTilt !== undefined) {
+                  rigRotation.x = activeRig.craneTilt * directionMultiplier;
+                }
+                break;
+              
+              case 'rotation':
+                // Camera continuously faces the center while maintaining distance
+                if (activeRig.rotationDistance && activeRig.rotationSpeed) {
+                  const rotationAngle = t * activeRig.rotationSpeed * directionMultiplier;
+                  rigPosition.x = Math.cos(rotationAngle) * activeRig.rotationDistance;
+                  rigPosition.z = Math.sin(rotationAngle) * activeRig.rotationDistance;
+                  // Calculate rotation to face center
+                  rigRotation.y = rotationAngle + Math.PI;
+                }
+                break;
+              
+              case 'pan':
+                // Horizontal sweeping movement
+                if (activeRig.panSpeed && activeRig.panRange) {
+                  const panAngle = Math.sin(t * activeRig.panSpeed) * (activeRig.panRange * Math.PI / 180 / 2) * directionMultiplier;
+                  rigRotation.y += panAngle; // Add to existing rotation for combination
+                }
+                break;
+              
+              case 'zoom':
+                // Smooth zoom in/out movement
+                if (activeRig.zoomSpeed && activeRig.zoomMinDistance !== undefined && activeRig.zoomMaxDistance !== undefined) {
+                  const zoomProgress = (Math.sin(t * activeRig.zoomSpeed * directionMultiplier) + 1) / 2; // 0 to 1
+                  const zoomDistance = activeRig.zoomMinDistance + (activeRig.zoomMaxDistance - activeRig.zoomMinDistance) * zoomProgress;
+                  rigPosition.z += zoomDistance; // Add to existing z position for combination
+                }
+                break;
+            }
             
-            case 'crane':
-              if (activeRig.craneHeight !== undefined) {
-                rigPosition.y = activeRig.craneHeight;
-              }
-              if (activeRig.craneTilt !== undefined) {
-                rigRotation.x = activeRig.craneTilt;
-              }
-              break;
-          }
-          
-          // Update null object position/rotation
-          if (rigNullObject) {
-            rigNullObject.position.set(rigPosition.x, rigPosition.y, rigPosition.z);
-            rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
-            
-            // Parent camera to null object (apply rig offset to camera)
-            const rigCameraOffset = new THREE.Vector3(0, 0, activeCameraDistance);
-            const rigWorldPos = new THREE.Vector3();
-            rigNullObject.getWorldPosition(rigWorldPos);
-            
-            // Apply rig rotation to camera offset
-            rigCameraOffset.applyEuler(rigNullObject.rotation);
+            // Update null object position/rotation
+            if (rigNullObject) {
+              rigNullObject.position.set(rigPosition.x, rigPosition.y, rigPosition.z);
+              rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
+            }
             
             // Only override camera position if rig is active
             // (this overrides the preset camera positioning)
@@ -3908,6 +3962,39 @@ export default function ThreeDVisualizer() {
             // Camera should always look at scene center, not the rig position
             cam.lookAt(0, 0, 0);
           }
+            // Accumulate transformations from all rigs
+            combinedPosition.x += rigPosition.x;
+            combinedPosition.y += rigPosition.y;
+            combinedPosition.z += rigPosition.z;
+            combinedRotation.x += rigRotation.x;
+            combinedRotation.y += rigRotation.y;
+            combinedRotation.z += rigRotation.z;
+          });
+          
+          // Apply combined transformations to camera
+          // Average the position to prevent extreme offsets
+          const rigCount = activeRigs.length;
+          combinedPosition.x /= rigCount;
+          combinedPosition.y /= rigCount;
+          combinedPosition.z /= rigCount;
+          
+          // Create a virtual null object for the combined transform
+          const combinedNullObject = new THREE.Object3D();
+          combinedNullObject.position.set(combinedPosition.x, combinedPosition.y, combinedPosition.z);
+          combinedNullObject.rotation.set(combinedRotation.x, combinedRotation.y, combinedRotation.z);
+          
+          // Parent camera to combined transform
+          const rigCameraOffset = new THREE.Vector3(0, 0, activeCameraDistance);
+          const rigWorldPos = new THREE.Vector3();
+          combinedNullObject.getWorldPosition(rigWorldPos);
+          
+          // Apply rig rotation to camera offset
+          rigCameraOffset.applyEuler(combinedNullObject.rotation);
+          
+          // Only override camera position if rigs are active
+          // (this overrides the preset camera positioning)
+          cam.position.copy(rigWorldPos.add(rigCameraOffset));
+          cam.lookAt(rigWorldPos);
         }
       }
 
@@ -4351,10 +4438,10 @@ export default function ThreeDVisualizer() {
             📷 Camera Settings
           </button>
           <button 
-            onClick={() => setActiveTab('keyframes')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'keyframes' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+            onClick={() => setActiveTab('cameraRig')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
-            🎬 Keyframes
+            🎥 Camera Rig
           </button>
           <button 
             onClick={() => setActiveTab('effects')} 
@@ -4385,12 +4472,6 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'masks' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             🎭 Masks
-          </button>
-          <button 
-            onClick={() => setActiveTab('cameraRig')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            🎥 Camera Rig
           </button>
         </div>
 
@@ -5036,107 +5117,6 @@ export default function ThreeDVisualizer() {
         )}
 
         {/* Keyframes Tab */}
-        {activeTab === 'keyframes' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white">Global Camera Keyframes</h3>
-                <p className="text-xs text-gray-400 mt-1">Independent camera timeline - not tied to animation presets. Auto-rotate is controlled in Camera Settings.</p>
-              </div>
-              <button 
-                onClick={addKeyframe} 
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2"
-              >
-                <Plus size={16} /> Add Keyframe
-              </button>
-            </div>
-            
-            {cameraKeyframes && cameraKeyframes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {cameraKeyframes.map((kf, kfIndex) => (
-                  <div key={kfIndex} className="bg-gray-700 rounded p-3 space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-semibold text-sm">Keyframe {kfIndex + 1}</span>
-                      {cameraKeyframes.length > 1 && (
-                        <button 
-                          onClick={() => deleteKeyframe(kfIndex)} 
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Time: {formatTime(kf.time)}</label>
-                      <input 
-                        type="text" id="time-formattime-kf-time" name="time-formattime-kf-time" 
-                        value={formatTime(kf.time)} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'time', parseTime(e.target.value))} 
-                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Easing</label>
-                      <select 
-                        value={kf.easing || 'linear'} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'easing', e.target.value)}
-                        className="w-full bg-gray-600 text-white text-sm px-2 py-1.5 rounded"
-                      >
-                        <option value="linear">Linear (No Easing)</option>
-                        <option value="easeIn">Ease In (Slow Start)</option>
-                        <option value="easeOut">Ease Out (Slow End)</option>
-                        <option value="easeInOut">Ease In-Out (Smooth)</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Distance: {kf.distance.toFixed(1)}</label>
-                      <input 
-                        type="range" id="distance-kf-distance-tofixed-1" name="distance-kf-distance-tofixed-1" 
-                        min="5" 
-                        max="50" 
-                        step="0.5" 
-                        value={kf.distance} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'distance', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Height: {kf.height.toFixed(1)}</label>
-                      <input 
-                        type="range" id="height-kf-height-tofixed-1" name="height-kf-height-tofixed-1" 
-                        min="-10" 
-                        max="10" 
-                        step="0.5" 
-                        value={kf.height} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'height', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Rotation: {(kf.rotation * 180 / Math.PI).toFixed(0)}°</label>
-                      <input 
-                        type="range" id="rotation-kf-rotation-180-math-pi-tofixed-0" name="rotation-kf-rotation-180-math-pi-tofixed-0" 
-                        min="0" 
-                        max={Math.PI * 2} 
-                        step="0.05" 
-                        value={kf.rotation} 
-                        onChange={(e) => updateKeyframe(kfIndex, 'rotation', Number(e.target.value))} 
-                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 italic text-center py-4">No keyframes yet. Click "Add Keyframe" to create one.</p>
-            )}
-          </div>
-        )}
 
         {/* Post-FX Tab */}
         {activeTab === 'postfx' && (
@@ -5765,12 +5745,19 @@ export default function ThreeDVisualizer() {
               <h3 className="text-lg font-bold text-purple-400 mb-2">🎥 Camera Rig System</h3>
               <p className="text-sm text-gray-400 mb-4">Create null object rigs for advanced camera movements and tracking</p>
               
-              <div className="flex gap-2 mb-4">
+              <div className="flex gap-2 mb-4 flex-wrap">
                 <button 
                   onClick={() => createCameraRig('orbit')} 
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
                 >
                   🔄 Orbit Rig
+                </button>
+                <button 
+                  onClick={() => createCameraRig('rotation')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  title="Camera that continuously faces the animation center"
+                >
+                  🎯 Rotation Rig
                 </button>
                 <button 
                   onClick={() => createCameraRig('dolly')} 
@@ -5779,10 +5766,24 @@ export default function ThreeDVisualizer() {
                   🎬 Dolly Rig
                 </button>
                 <button 
+                  onClick={() => createCameraRig('pan')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  title="Horizontal sweeping camera movement"
+                >
+                  📹 Pan Rig
+                </button>
+                <button 
                   onClick={() => createCameraRig('crane')} 
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
                 >
                   🏗️ Crane Rig
+                </button>
+                <button 
+                  onClick={() => createCameraRig('zoom')} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm"
+                  title="Smooth zoom in/out movement"
+                >
+                  🔍 Zoom Rig
                 </button>
                 <button 
                   onClick={() => createCameraRig('custom')} 
@@ -5834,7 +5835,7 @@ export default function ThreeDVisualizer() {
               {/* Camera Rigs List */}
               <div className="space-y-3 mb-6">
                 {cameraRigs.map(rig => (
-                  <div key={rig.id} className={`bg-gray-700 rounded-lg p-4 ${activeCameraRigId === rig.id ? 'ring-2 ring-purple-500' : ''}`}>
+                  <div key={rig.id} className={`bg-gray-700 rounded-lg p-4 ${activeCameraRigIds.includes(rig.id) ? 'ring-2 ring-purple-500' : ''}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <input 
@@ -5843,9 +5844,9 @@ export default function ThreeDVisualizer() {
                           onChange={(e) => {
                             updateCameraRig(rig.id, { enabled: e.target.checked });
                             if (e.target.checked) {
-                              setActiveCameraRigId(rig.id);
-                            } else if (activeCameraRigId === rig.id) {
-                              setActiveCameraRigId(null);
+                              setActiveCameraRigIds(prev => [...prev, rig.id]);
+                            } else {
+                              setActiveCameraRigIds(prev => prev.filter(id => id !== rig.id));
                             }
                           }}
                           className="rounded"
@@ -5964,61 +5965,174 @@ export default function ThreeDVisualizer() {
                       </div>
                     )}
 
+                    {rig.type === 'rotation' && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Distance from Center</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.rotationDistance || 20}
+                            onChange={(e) => updateCameraRig(rig.id, { rotationDistance: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Rotation Speed</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotationSpeed || 0.3}
+                            onChange={(e) => updateCameraRig(rig.id, { rotationSpeed: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {rig.type === 'pan' && (
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Pan Speed</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.panSpeed || 0.5}
+                            onChange={(e) => updateCameraRig(rig.id, { panSpeed: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Pan Range (degrees)</label>
+                          <input 
+                            type="number" 
+                            step="5"
+                            value={rig.panRange || 90}
+                            onChange={(e) => updateCameraRig(rig.id, { panRange: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {rig.type === 'zoom' && (
+                      <div className="grid grid-cols-3 gap-2 mb-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Zoom Speed</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.zoomSpeed || 0.5}
+                            onChange={(e) => updateCameraRig(rig.id, { zoomSpeed: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Min Distance</label>
+                          <input 
+                            type="number" 
+                            step="1"
+                            value={rig.zoomMinDistance || 10}
+                            onChange={(e) => updateCameraRig(rig.id, { zoomMinDistance: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Max Distance</label>
+                          <input 
+                            type="number" 
+                            step="1"
+                            value={rig.zoomMaxDistance || 40}
+                            onChange={(e) => updateCameraRig(rig.id, { zoomMaxDistance: parseFloat(e.target.value) })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Invert Direction Control - for all animated rig types */}
+                    {(rig.type === 'orbit' || rig.type === 'rotation' || rig.type === 'dolly' || rig.type === 'pan' || rig.type === 'zoom' || rig.type === 'crane') && (
+                      <div className="mb-3">
+                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                          <input 
+                            type="checkbox"
+                            checked={rig.invertDirection || false}
+                            onChange={(e) => updateCameraRig(rig.id, { invertDirection: e.target.checked })}
+                            className="rounded"
+                          />
+                          <span>↔️ Invert Direction</span>
+                          <span className="text-gray-500">(Reverse movement)</span>
+                        </label>
+                      </div>
+                    )}
+
                     {/* Base Position/Rotation for all rig types */}
                     <div className="border-t border-gray-600 pt-3 mt-3">
-                      <div className="text-xs text-gray-400 mb-2">Base Position</div>
+                      <div className="text-xs text-gray-400 mb-2">Base Position (X, Y, Z)</div>
                       <div className="grid grid-cols-3 gap-2 mb-2">
-                        <input 
-                          type="number" id="number-field-4419" name="number-field-4419" 
-                          placeholder="X"
-                          step="0.5"
-                          value={rig.position.x}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, x: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4427" name="number-field-4427" 
-                          placeholder="Y"
-                          step="0.5"
-                          value={rig.position.y}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, y: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4435" name="number-field-4435" 
-                          placeholder="Z"
-                          step="0.5"
-                          value={rig.position.z}
-                          onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, z: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.x}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, x: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.y}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, y: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Z</label>
+                          <input 
+                            type="number" 
+                            step="0.5"
+                            value={rig.position.z}
+                            onChange={(e) => updateCameraRig(rig.id, { position: { ...rig.position, z: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 mb-2">Base Rotation</div>
+                      <div className="text-xs text-gray-400 mb-2">Base Rotation (X, Y, Z in radians)</div>
                       <div className="grid grid-cols-3 gap-2">
-                        <input 
-                          type="number" id="number-field-4446" name="number-field-4446" 
-                          placeholder="X"
-                          step="0.1"
-                          value={rig.rotation.x}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, x: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4454" name="number-field-4454" 
-                          placeholder="Y"
-                          step="0.1"
-                          value={rig.rotation.y}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, y: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
-                        <input 
-                          type="number" id="number-field-4462" name="number-field-4462" 
-                          placeholder="Z"
-                          step="0.1"
-                          value={rig.rotation.z}
-                          onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, z: parseFloat(e.target.value) || 0 } })}
-                          className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
-                        />
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.x}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, x: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.y}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, y: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Z</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={rig.rotation.z}
+                            onChange={(e) => updateCameraRig(rig.id, { rotation: { ...rig.rotation, z: parseFloat(e.target.value) || 0 } })}
+                            className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -6034,22 +6148,122 @@ export default function ThreeDVisualizer() {
               {/* Camera Rig Keyframes */}
               <div className="mt-6">
                 <h4 className="text-md font-bold text-cyan-400 mb-3">Camera Rig Keyframes</h4>
-                <div className="space-y-2">
+                <p className="text-xs text-gray-400 mb-3">Edit keyframe timing, position, rotation, and animation settings.</p>
+                <div className="space-y-3">
                   {cameraRigKeyframes.map(kf => {
                     const rig = cameraRigs.find(r => r.id === kf.rigId);
                     return (
-                      <div key={kf.id} className="bg-gray-700 rounded-lg p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="text-cyan-400 font-mono text-sm">{formatTime(kf.time)}</span>
-                          <span className="text-white text-sm">{rig?.name || 'Unknown Rig'}</span>
-                          <span className="text-gray-400 text-xs">({kf.easing})</span>
+                      <div key={kf.id} className="bg-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-cyan-400 font-semibold text-sm">{rig?.name || 'Unknown Rig'}</span>
+                          </div>
+                          <button 
+                            onClick={() => deleteCameraRigKeyframe(kf.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => deleteCameraRigKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300"
-                        >
-                          <X size={16} />
-                        </button>
+
+                        {/* Time and Animation Controls */}
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Time</label>
+                            <input 
+                              type="text" 
+                              value={formatTime(kf.time)} 
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { time: parseTime(e.target.value) })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Duration (sec)</label>
+                            <input 
+                              type="number" 
+                              step="0.1"
+                              min="0.1"
+                              value={kf.duration}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { duration: parseFloat(e.target.value) || 1.0 })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Easing</label>
+                            <select 
+                              value={kf.easing}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { easing: e.target.value })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            >
+                              <option value="linear">Linear</option>
+                              <option value="easeIn">Ease In</option>
+                              <option value="easeOut">Ease Out</option>
+                              <option value="easeInOut">Ease In-Out</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Position Controls */}
+                        <div className="mb-2">
+                          <label className="text-xs text-gray-400 block mb-1">Position (X, Y, Z)</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input 
+                              type="number" 
+                              placeholder="X"
+                              step="0.5"
+                              value={kf.position.x}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { position: { ...kf.position, x: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                            <input 
+                              type="number" 
+                              placeholder="Y"
+                              step="0.5"
+                              value={kf.position.y}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { position: { ...kf.position, y: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                            <input 
+                              type="number" 
+                              placeholder="Z"
+                              step="0.5"
+                              value={kf.position.z}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { position: { ...kf.position, z: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Rotation Controls */}
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Rotation (X, Y, Z in radians)</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input 
+                              type="number" 
+                              placeholder="X"
+                              step="0.1"
+                              value={kf.rotation.x}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { rotation: { ...kf.rotation, x: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                            <input 
+                              type="number" 
+                              placeholder="Y"
+                              step="0.1"
+                              value={kf.rotation.y}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { rotation: { ...kf.rotation, y: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                            <input 
+                              type="number" 
+                              placeholder="Z"
+                              step="0.1"
+                              value={kf.rotation.z}
+                              onChange={(e) => updateCameraRigKeyframe(kf.id, { rotation: { ...kf.rotation, z: parseFloat(e.target.value) || 0 } })}
+                              className="w-full bg-gray-600 text-white text-xs px-2 py-1 rounded"
+                            />
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
