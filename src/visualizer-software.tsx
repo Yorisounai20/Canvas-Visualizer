@@ -3956,12 +3956,6 @@ export default function ThreeDVisualizer() {
               rigNullObject.rotation.set(rigRotation.x, rigRotation.y, rigRotation.z);
             }
             
-            // Only override camera position if rig is active
-            // (this overrides the preset camera positioning)
-            cam.position.copy(rigWorldPos.add(rigCameraOffset));
-            // Camera should always look at scene center, not the rig position
-            cam.lookAt(0, 0, 0);
-          }
             // Accumulate transformations from all rigs
             combinedPosition.x += rigPosition.x;
             combinedPosition.y += rigPosition.y;
@@ -3970,13 +3964,6 @@ export default function ThreeDVisualizer() {
             combinedRotation.y += rigRotation.y;
             combinedRotation.z += rigRotation.z;
           });
-          
-          // Apply combined transformations to camera
-          // Average the position to prevent extreme offsets
-          const rigCount = activeRigs.length;
-          combinedPosition.x /= rigCount;
-          combinedPosition.y /= rigCount;
-          combinedPosition.z /= rigCount;
           
           // Create a virtual null object for the combined transform
           const combinedNullObject = new THREE.Object3D();
@@ -3994,7 +3981,8 @@ export default function ThreeDVisualizer() {
           // Only override camera position if rigs are active
           // (this overrides the preset camera positioning)
           cam.position.copy(rigWorldPos.add(rigCameraOffset));
-          cam.lookAt(rigWorldPos);
+          // Camera should always look at scene center, not the rig position
+          cam.lookAt(0, 0, 0);
         }
       }
 
