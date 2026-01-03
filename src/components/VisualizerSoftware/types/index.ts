@@ -37,6 +37,14 @@ export interface ParameterEvent {
   };
 }
 
+export interface EnvironmentKeyframe {
+  id: number;
+  time: number;
+  type: 'ocean' | 'forest' | 'space' | 'city' | 'abstract' | 'none';
+  intensity: number; // 0-1, controls density/visibility of environment elements
+  color?: string; // Optional color override
+}
+
 // Default camera settings constants
 export const DEFAULT_CAMERA_DISTANCE = 15;
 export const DEFAULT_CAMERA_HEIGHT = 0;

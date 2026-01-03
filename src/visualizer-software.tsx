@@ -11,6 +11,7 @@ import {
   LogEntry, 
   AudioTrack, 
   ParameterEvent,
+  EnvironmentKeyframe,
   DEFAULT_CAMERA_DISTANCE,
   DEFAULT_CAMERA_HEIGHT,
   DEFAULT_CAMERA_ROTATION,
@@ -237,6 +238,11 @@ export default function ThreeDVisualizer() {
   const activeVignetteStrengthPulseRef = useRef(0);
   const activeContrastBurstRef = useRef(0);
   const activeColorTintFlashRef = useRef({ r: 0, g: 0, b: 0 });
+  
+  // Environment system (similar to VisualizerEditor)
+  const [environmentKeyframes, setEnvironmentKeyframes] = useState<EnvironmentKeyframe[]>([]);
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(false);
+  const nextEnvironmentKeyframeId = useRef(1);
   
   // PHASE 4: Track active automated events
   const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
@@ -970,6 +976,31 @@ export default function ThreeDVisualizer() {
       setShowEventModal(false);
       setEditingEventId(null);
     }
+  };
+
+  // Environment keyframe handlers (similar to VisualizerEditor)
+  const handleAddEnvironmentKeyframe = () => {
+    const time = currentTime;
+    const newKeyframe: EnvironmentKeyframe = {
+      id: nextEnvironmentKeyframeId.current++,
+      time,
+      type: 'ocean',
+      intensity: 0.5
+    };
+    setEnvironmentKeyframes([...environmentKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added environment keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const handleDeleteEnvironmentKeyframe = (id: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted environment keyframe', 'info');
+  };
+
+  const handleUpdateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
+    ));
+    addLog('Updated environment keyframe', 'success');
   };
 
   // NEW: Recording functions
@@ -4354,6 +4385,155 @@ export default function ThreeDVisualizer() {
         obj.sphere.material.wireframe = false;
       }
 
+      // ENVIRONMENT RENDERING - Independent from presets (uses octahedrons indices 30-44)
+      // Find active environment keyframe
+      const activeEnvKeyframe = [...environmentKeyframes]
+        .reverse()
+        .find(kf => kf.time <= t);
+      
+      if (activeEnvKeyframe && activeEnvKeyframe.type !== 'none') {
+        const envType = activeEnvKeyframe.type;
+        const envIntensity = activeEnvKeyframe.intensity;
+        const envColor = activeEnvKeyframe.color;
+        
+        // Use octahedrons indices 30-44 (15 objects) for environment
+        const envObjectCount = Math.floor(envIntensity * 15); // 0-15 environment objects based on intensity
+        
+        if (envType === 'ocean') {
+          // Ocean environment: light rays from above + animated particles
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Light rays from surface
+            const rayX = (i % 5 - 2) * 8;
+            const rayZ = -20 + (Math.floor(i / 5)) * 5;
+            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 2;
+            envObj.position.y = 10 - i * 0.3 + Math.sin(el + i) * 0.5;
+            envObj.position.z = rayZ;
+            envObj.rotation.x = Math.PI / 4;
+            envObj.rotation.z = Math.sin(el * 0.3 + i) * 0.2;
+            const raySize = 0.5 + f.highs * 0.3;
+            envObj.scale.set(raySize * 0.3, raySize * 8, raySize * 0.3);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#40e0d0');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.2 + f.highs * 0.2) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+          }
+        } else if (envType === 'forest') {
+          // Forest environment: trees, ground fog
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 3 === 0) {
+              // Trees (tall vertical octas)
+              const treeX = ((i % 5) - 2) * 6;
+              const treeZ = -15 - Math.floor((i - 30) / 5) * 4;
+              envObj.position.set(treeX, -2, treeZ);
+              envObj.rotation.set(0, el * 0.1 + i, 0);
+              const treeHeight = 4 + (i % 3);
+              envObj.scale.set(1, treeHeight, 1);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#2d5016');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + f.mids * 0.2) * envIntensity * blend;
+            } else {
+              // Fog/foliage particles
+              const fogX = Math.sin(i * 3) * 10;
+              const fogY = -3 + Math.sin(el * 0.3 + i) * 2;
+              const fogZ = -10 - (i % 10) * 2;
+              envObj.position.set(fogX, fogY, fogZ);
+              envObj.rotation.y += 0.02;
+              envObj.scale.set(2, 2, 2);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#4a7c59');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + f.bass * 0.1) * envIntensity * blend;
+            }
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'space') {
+          // Space environment: stars, distant planets
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            if (i % 4 === 0) {
+              // Distant planets
+              const planetDist = 30 + (i % 3) * 10;
+              const planetAngle = (i / 4) * Math.PI * 2 + el * 0.1;
+              envObj.position.x = Math.cos(planetAngle) * planetDist;
+              envObj.position.y = ((i % 7) - 3) * 5;
+              envObj.position.z = Math.sin(planetAngle) * planetDist;
+              envObj.rotation.x += 0.01;
+              envObj.rotation.y += 0.02;
+              const planetSize = 3 + (i % 3);
+              envObj.scale.set(planetSize, planetSize, planetSize);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#8b5cf6');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.4 + f.mids * 0.2) * envIntensity * blend;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+            } else {
+              // Stars (small dots)
+              const starX = (Math.sin(i * 7) * 40);
+              const starY = (Math.cos(i * 5) * 30);
+              const starZ = (Math.sin(i * 3) * 40) - 30;
+              envObj.position.set(starX, starY, starZ);
+              const starTwinkle = 0.2 + Math.sin(el * 2 + i) * 0.1 + f.highs * 0.2;
+              envObj.scale.set(starTwinkle, starTwinkle, starTwinkle);
+              (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#ffffff');
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + Math.sin(el * 3 + i) * 0.3) * envIntensity * blend;
+              (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
+            }
+          }
+        } else if (envType === 'city') {
+          // City environment: buildings, lights, grid floor
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Buildings in a grid
+            const gridX = ((i % 5) - 2) * 8;
+            const gridZ = -15 - Math.floor((i - 30) / 5) * 6;
+            const buildingHeight = 3 + ((i * 7) % 5) + f.bass * 2;
+            envObj.position.set(gridX, buildingHeight / 2 - 5, gridZ);
+            envObj.rotation.y = 0;
+            envObj.scale.set(2, buildingHeight, 2);
+            
+            // Window lights (pulsing with music)
+            const lightIntensity = Math.sin(el * 2 + i) * 0.3 + f.mids * 0.5;
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#fbbf24');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + lightIntensity) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
+          }
+        } else if (envType === 'abstract') {
+          // Abstract environment: geometric grid, floating shapes
+          for (let i = 30; i < 30 + envObjectCount; i++) {
+            if (i >= obj.octas.length) break;
+            const envObj = obj.octas[i];
+            
+            // Floating geometric shapes in patterns
+            const layerAngle = (i / envObjectCount) * Math.PI * 2 + el * 0.5;
+            const layerRadius = 15 + (i % 3) * 5;
+            envObj.position.x = Math.cos(layerAngle) * layerRadius;
+            envObj.position.y = Math.sin(el + i * 0.5) * 8;
+            envObj.position.z = Math.sin(layerAngle) * layerRadius;
+            envObj.rotation.x += 0.03 * (i % 3 + 1);
+            envObj.rotation.y += 0.02 * (i % 2 + 1);
+            envObj.rotation.z += 0.04;
+            const shapeSize = 1 + f.bass * 0.5 + (i % 3) * 0.5;
+            envObj.scale.set(shapeSize, shapeSize, shapeSize);
+            (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#a78bfa');
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.5 + f.mids * 0.3) * envIntensity * blend;
+            (envObj.material as THREE.MeshBasicMaterial).wireframe = (i % 2 === 0);
+          }
+        }
+      } else if (!activeEnvKeyframe || activeEnvKeyframe.type === 'none') {
+        // Hide all environment objects (indices 30-44)
+        for (let i = 30; i < 45; i++) {
+          if (i >= obj.octas.length) break;
+          const envObj = obj.octas[i];
+          envObj.position.set(0, -1000, 0);
+          envObj.scale.set(0.001, 0.001, 0.001);
+          (envObj.material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+      }
+
       if (showSongName && songNameMeshesRef.current.length > 0) {
         songNameMeshesRef.current.forEach((mesh) => {
           const freqIndex = mesh.userData.freqIndex;
@@ -6220,6 +6400,196 @@ export default function ThreeDVisualizer() {
                   <input type="color" id="borderColor" name="borderColor" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
               </div>
+            </div>
+            
+            {/* Environment System Timeline */}
+            <div className="mt-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🌍 Environment System</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create audio-reactive background environments with timeline keyframes</p>
+                </div>
+                <button
+                  onClick={handleAddEnvironmentKeyframe}
+                  className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add at {Math.floor(currentTime)}s
+                </button>
+              </div>
+
+              {environmentKeyframes.length === 0 ? (
+                <div className="bg-gray-800 rounded p-2">
+                  <p className="text-xs text-gray-400 text-center">No environment keyframes yet. Click "Add at {Math.floor(currentTime)}s" to create one</p>
+                </div>
+              ) : (
+                <>
+                  {/* Timeline bar with keyframe markers */}
+                  <div className="relative bg-gray-900 rounded h-12 mb-3">
+                    {/* Current time indicator */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
+                      style={{ left: `${(currentTime / duration) * 100}%` }}
+                    >
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                    </div>
+                    
+                    {/* Keyframe markers */}
+                    {environmentKeyframes.map((kf, idx) => {
+                      const envColors = {
+                        ocean: '#40e0d0',
+                        forest: '#2d5016',
+                        space: '#8b5cf6',
+                        city: '#fbbf24',
+                        abstract: '#a78bfa',
+                        none: '#666666'
+                      };
+                      const markerColor = envColors[kf.type as keyof typeof envColors] || '#999999';
+                      
+                      return (
+                        <div
+                          key={kf.id || idx}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
+                          style={{ left: `${(kf.time / duration) * 100}%` }}
+                          title={`${formatTime(kf.time)} - ${kf.type} (${Math.round(kf.intensity * 100)}%)`}
+                        >
+                          <div 
+                            className="w-3 h-8 hover:scale-110 transition-transform flex items-center justify-center rounded"
+                            style={{ backgroundColor: markerColor }}
+                          >
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                          <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            {formatTime(kf.time)}: {kf.type} ({Math.round(kf.intensity * 100)}%)
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Collapsible Keyframe List */}
+                  <div className="mb-2">
+                    <button
+                      onClick={() => setShowEnvironmentSettings(!showEnvironmentSettings)}
+                      className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 text-xs"
+                    >
+                      <ChevronDown 
+                        size={16} 
+                        className={`transition-transform ${showEnvironmentSettings ? '' : '-rotate-90'}`}
+                      />
+                      <span className="font-semibold">Keyframe Settings ({environmentKeyframes.length})</span>
+                    </button>
+                  </div>
+
+                  {showEnvironmentSettings && (
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {environmentKeyframes.map((keyframe, index) => (
+                        <div key={keyframe.id || index} className="bg-gray-900 rounded p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ 
+                                  backgroundColor: ({
+                                    ocean: '#40e0d0',
+                                    forest: '#2d5016',
+                                    space: '#8b5cf6',
+                                    city: '#fbbf24',
+                                    abstract: '#a78bfa',
+                                    none: '#666666'
+                                  }[keyframe.type as 'ocean' | 'forest' | 'space' | 'city' | 'abstract' | 'none'] || '#999999')
+                                }}
+                              ></div>
+                              <span className="text-white font-semibold text-sm">
+                                {formatTime(keyframe.time)}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteEnvironmentKeyframe(keyframe.id)}
+                              className="text-red-400 hover:text-red-300 text-xs"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Type</label>
+                              <select
+                                value={keyframe.type}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id, 
+                                  e.target.value, 
+                                  keyframe.intensity, 
+                                  keyframe.color
+                                )}
+                                className="w-full bg-gray-800 text-white text-xs px-2 py-1 rounded"
+                              >
+                                <option value="ocean">🌊 Ocean</option>
+                                <option value="forest">🌲 Forest</option>
+                                <option value="space">🌌 Space</option>
+                                <option value="city">🏙️ City</option>
+                                <option value="abstract">🎨 Abstract</option>
+                                <option value="none">❌ None</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">
+                                Intensity: {Math.round(keyframe.intensity * 100)}%
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={keyframe.intensity}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id,
+                                  keyframe.type,
+                                  parseFloat(e.target.value),
+                                  keyframe.color
+                                )}
+                                className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <label className="text-xs text-gray-400 block mb-1">
+                              Color Override (optional)
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={keyframe.color || '#ffffff'}
+                                onChange={(e) => handleUpdateEnvironmentKeyframe(
+                                  keyframe.id,
+                                  keyframe.type,
+                                  keyframe.intensity,
+                                  e.target.value
+                                )}
+                                className="w-12 h-8 rounded cursor-pointer"
+                              />
+                              {keyframe.color && (
+                                <button
+                                  onClick={() => handleUpdateEnvironmentKeyframe(
+                                    keyframe.id,
+                                    keyframe.type,
+                                    keyframe.intensity,
+                                    undefined
+                                  )}
+                                  className="text-xs text-gray-400 hover:text-white"
+                                >
+                                  Reset to Default
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             
           </div>
