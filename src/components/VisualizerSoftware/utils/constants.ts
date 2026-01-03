@@ -23,5 +23,6 @@ export const animationTypes = [
   { value: 'orbit2', label: 'Binary Stars', icon: '⭐' },
   { value: 'ribbon', label: 'Ribbon Dance', icon: '🎀' },
   { value: 'hourglass', label: 'Hourglass', icon: '⏳' },
-  { value: 'snowflake', label: 'Snowflake', icon: '❄️' }
+  { value: 'snowflake', label: 'Snowflake', icon: '❄️' },
+  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' }
 ];
