@@ -3108,8 +3108,8 @@ export default function ThreeDVisualizer() {
         // Constants for shark anatomy
         const TAIL_SEGMENT_COUNT = 2;
         const HAMMER_TETRA_COUNT = 3; // Reduced from 8 for simpler, clearer head
-        const DORSAL_FIN_INDEX = 3;
-        const TAIL_FIN_INDEX = 4;
+        const DORSAL_FIN_INDEX = HAMMER_TETRA_COUNT; // Next available tetra after hammer
+        const TAIL_FIN_INDEX = HAMMER_TETRA_COUNT + 1; // Following tetra for tail fin
         
         const swimSpeed = elScaled * 0.8;
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
@@ -3248,7 +3248,8 @@ export default function ThreeDVisualizer() {
         tailFin.material.wireframe = false;
         
         // Hide remaining tetras
-        obj.tetras.slice(5).forEach(t => {
+        const USED_TETRAS = HAMMER_TETRA_COUNT + 2; // Hammer + dorsal fin + tail fin
+        obj.tetras.slice(USED_TETRAS).forEach(t => {
           t.position.set(0, -1000, 0);
           t.scale.set(0.001, 0.001, 0.001);
           t.material.opacity = 0;
