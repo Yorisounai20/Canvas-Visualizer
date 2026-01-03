@@ -188,8 +188,45 @@ export default function ThreeDVisualizer() {
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(270); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  // NEW: Skybox controls
+  const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
+  const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
+  const [skyboxGradientBottom, setSkyboxGradientBottom] = useState('#0a0a14');
+  const [skyboxImageUrl, setSkyboxImageUrl] = useState('');
+  const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
+  const starFieldRef = useRef<THREE.Points | null>(null);
+  const [starCount, setStarCount] = useState(5000);
+  const [galaxyColor, setGalaxyColor] = useState('#8a2be2');
+  const [nebulaColor1, setNebulaColor1] = useState('#ff1493');
+  const [nebulaColor2, setNebulaColor2] = useState('#4169e1');
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
+  
+  // NEW: Material controls for shapes
+  const [cubeWireframe, setCubeWireframe] = useState(true);
+  const [cubeOpacity, setCubeOpacity] = useState(0.6);
+  const [cubeColor, setCubeColor] = useState('#8a2be2');
+  const [cubeMaterialType, setCubeMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [cubeMetalness, setCubeMetalness] = useState(0.5);
+  const [cubeRoughness, setCubeRoughness] = useState(0.5);
+  const [octahedronWireframe, setOctahedronWireframe] = useState(true);
+  const [octahedronOpacity, setOctahedronOpacity] = useState(0.5);
+  const [octahedronColor, setOctahedronColor] = useState('#40e0d0');
+  const [octahedronMaterialType, setOctahedronMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [octahedronMetalness, setOctahedronMetalness] = useState(0.5);
+  const [octahedronRoughness, setOctahedronRoughness] = useState(0.5);
+  const [tetrahedronWireframe, setTetrahedronWireframe] = useState(false);
+  const [tetrahedronOpacity, setTetrahedronOpacity] = useState(0.7);
+  const [tetrahedronColor, setTetrahedronColor] = useState('#c8b4ff');
+  const [tetrahedronMaterialType, setTetrahedronMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [tetrahedronMetalness, setTetrahedronMetalness] = useState(0.5);
+  const [tetrahedronRoughness, setTetrahedronRoughness] = useState(0.5);
+  const [sphereWireframe, setSphereWireframe] = useState(true);
+  const [sphereOpacity, setSphereOpacity] = useState(0.4);
+  const [sphereColor, setSphereColor] = useState('#8a2be2');
+  const [sphereMaterialType, setSphereMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [sphereMetalness, setSphereMetalness] = useState(0.5);
+  const [sphereRoughness, setSphereRoughness] = useState(0.5);
   
   // NEW: Post-FX controls
   const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
@@ -1355,9 +1392,54 @@ export default function ThreeDVisualizer() {
       return;
     }
 
+    // Helper function to create materials
+    const createMaterial = (
+      type: 'basic' | 'standard' | 'phong' | 'lambert',
+      color: string,
+      wireframe: boolean,
+      opacity: number,
+      metalness: number = 0.5,
+      roughness: number = 0.5
+    ): THREE.Material => {
+      const baseColor = new THREE.Color(color);
+      const commonProps = {
+        color: baseColor,
+        wireframe,
+        transparent: true,
+        opacity
+      };
+
+      switch (type) {
+        case 'standard':
+          return new THREE.MeshStandardMaterial({
+            ...commonProps,
+            metalness,
+            roughness
+          });
+        case 'phong':
+          return new THREE.MeshPhongMaterial({
+            ...commonProps,
+            shininess: 30
+          });
+        case 'lambert':
+          return new THREE.MeshLambertMaterial(commonProps);
+        case 'basic':
+        default:
+          return new THREE.MeshBasicMaterial(commonProps);
+      }
+    };
+
     const cubes: THREE.Mesh[] = [];
     for (let i=0; i<8; i++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.6}));
+      const cubeMaterial = createMaterial(
+        cubeMaterialType,
+        cubeColor,
+        cubeWireframe,
+        cubeOpacity,
+        cubeMetalness,
+        cubeRoughness
+      );
+      const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), cubeMaterial);
       const a = (i/8)*Math.PI*2;
       c.position.x = Math.cos(a)*8;
       c.position.z = Math.sin(a)*8;
@@ -1368,7 +1450,15 @@ export default function ThreeDVisualizer() {
     const octas: THREE.Mesh[] = [];
     for (let r=0; r<3; r++) {
       for (let i=0; i<6+r*4; i++) {
-        const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), new THREE.MeshBasicMaterial({color:0x40e0d0,wireframe:true,transparent:true,opacity:0.5}));
+        const octaMaterial = createMaterial(
+          octahedronMaterialType,
+          octahedronColor,
+          octahedronWireframe,
+          octahedronOpacity,
+          octahedronMetalness,
+          octahedronRoughness
+        );
+        const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
         const a = (i/(6+r*4))*Math.PI*2;
         const rad = 5+r*2;
         o.position.x = Math.cos(a)*rad;
@@ -1381,13 +1471,29 @@ export default function ThreeDVisualizer() {
 
     const tetras: THREE.Mesh[] = [];
     for (let i=0; i<30; i++) {
-      const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), new THREE.MeshBasicMaterial({color:0xc8b4ff,transparent:true,opacity:0.7}));
+      const tetraMaterial = createMaterial(
+        tetrahedronMaterialType,
+        tetrahedronColor,
+        tetrahedronWireframe,
+        tetrahedronOpacity,
+        tetrahedronMetalness,
+        tetrahedronRoughness
+      );
+      const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), tetraMaterial);
       t.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
       scene.add(t);
       tetras.push(t);
     }
 
-    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), new THREE.MeshBasicMaterial({color:0x8a2be2,wireframe:true,transparent:true,opacity:0.4}));
+    const sphereMaterial = createMaterial(
+      sphereMaterialType,
+      sphereColor,
+      sphereWireframe,
+      sphereOpacity,
+      sphereMetalness,
+      sphereRoughness
+    );
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(1.5,16,16), sphereMaterial);
     scene.add(sphere);
     
     // Add lighting
@@ -1618,13 +1724,216 @@ export default function ThreeDVisualizer() {
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
-    if (sceneRef.current && rendererRef.current) {
+    if (!sceneRef.current || !rendererRef.current) return;
+    
+    // Remove existing skybox mesh if it exists
+    if (skyboxMeshRef.current) {
+      sceneRef.current.remove(skyboxMeshRef.current);
+      skyboxMeshRef.current.geometry.dispose();
+      if (skyboxMeshRef.current.material instanceof THREE.Material) {
+        skyboxMeshRef.current.material.dispose();
+      }
+      skyboxMeshRef.current = null;
+    }
+    
+    // Remove existing star field if it exists
+    if (starFieldRef.current) {
+      sceneRef.current.remove(starFieldRef.current);
+      starFieldRef.current.geometry.dispose();
+      if (starFieldRef.current.material instanceof THREE.Material) {
+        starFieldRef.current.material.dispose();
+      }
+      starFieldRef.current = null;
+    }
+    
+    if (skyboxType === 'color') {
+      // Standard solid color background
       const bgColor = new THREE.Color(backgroundColor);
       sceneRef.current.background = bgColor;
       sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
       rendererRef.current.setClearColor(backgroundColor);
+    } else if (skyboxType === 'gradient') {
+      // Gradient skybox using a large sphere with gradient shader
+      const skyboxGeometry = new THREE.SphereGeometry(500, 32, 32);
+      const skyboxMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+          topColor: { value: new THREE.Color(skyboxGradientTop) },
+          bottomColor: { value: new THREE.Color(skyboxGradientBottom) }
+        },
+        vertexShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 bottomColor;
+          varying vec3 vWorldPosition;
+          void main() {
+            float h = normalize(vWorldPosition).y;
+            gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
+          }
+        `,
+        side: THREE.BackSide
+      });
+      const skyboxMesh = new THREE.Mesh(skyboxGeometry, skyboxMaterial);
+      sceneRef.current.add(skyboxMesh);
+      skyboxMeshRef.current = skyboxMesh;
+      
+      // Set scene background to null and clear color to black (skybox will be rendered)
+      sceneRef.current.background = null;
+      rendererRef.current.setClearColor(0x000000);
+      sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+    } else if (skyboxType === 'image') {
+      // Image skybox using equirectangular texture
+      if (skyboxImageUrl) {
+        const textureLoader = new THREE.TextureLoader();
+        textureLoader.load(
+          skyboxImageUrl,
+          (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            if (sceneRef.current) {
+              sceneRef.current.background = texture;
+              sceneRef.current.fog = new THREE.Fog(backgroundColor, 10, 50);
+            }
+          },
+          undefined,
+          (error) => {
+            console.error('Error loading skybox image:', error);
+            addLog('Failed to load skybox image', 'error');
+            // Fallback to solid color
+            if (sceneRef.current && rendererRef.current) {
+              const bgColor = new THREE.Color(backgroundColor);
+              sceneRef.current.background = bgColor;
+              rendererRef.current.setClearColor(backgroundColor);
+            }
+          }
+        );
+      } else {
+        // No image URL, fallback to solid color
+        const bgColor = new THREE.Color(backgroundColor);
+        sceneRef.current.background = bgColor;
+        rendererRef.current.setClearColor(backgroundColor);
+      }
+    } else if (skyboxType === 'stars' || skyboxType === 'galaxy' || skyboxType === 'nebula') {
+      // Procedural star field with optional galaxy/nebula effects
+      sceneRef.current.background = new THREE.Color(0x000000);
+      rendererRef.current.setClearColor(0x000000);
+      sceneRef.current.fog = new THREE.Fog(0x000000, 10, 50);
+      
+      // Create star field
+      const starGeometry = new THREE.BufferGeometry();
+      const starPositions = new Float32Array(starCount * 3);
+      const starColors = new Float32Array(starCount * 3);
+      const starSizes = new Float32Array(starCount);
+      
+      for (let i = 0; i < starCount; i++) {
+        // Random position on sphere
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const radius = 400 + Math.random() * 100;
+        
+        starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+        starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        starPositions[i * 3 + 2] = radius * Math.cos(phi);
+        
+        // Star color and size based on type
+        if (skyboxType === 'stars') {
+          // Simple white stars with slight color variation
+          const brightness = 0.8 + Math.random() * 0.2;
+          starColors[i * 3] = brightness;
+          starColors[i * 3 + 1] = brightness;
+          starColors[i * 3 + 2] = brightness;
+          starSizes[i] = Math.random() * 2 + 0.5;
+        } else if (skyboxType === 'galaxy') {
+          // Galaxy with purple/blue tint
+          const color = new THREE.Color(galaxyColor);
+          const mix = Math.random();
+          starColors[i * 3] = color.r * (0.5 + mix * 0.5);
+          starColors[i * 3 + 1] = color.g * (0.5 + mix * 0.5);
+          starColors[i * 3 + 2] = color.b * (0.5 + mix * 0.5);
+          starSizes[i] = Math.random() * 3 + 0.5;
+        } else { // nebula
+          // Nebula with pink/blue color variation
+          const color1 = new THREE.Color(nebulaColor1);
+          const color2 = new THREE.Color(nebulaColor2);
+          const mix = Math.random();
+          starColors[i * 3] = color1.r * mix + color2.r * (1 - mix);
+          starColors[i * 3 + 1] = color1.g * mix + color2.g * (1 - mix);
+          starColors[i * 3 + 2] = color1.b * mix + color2.b * (1 - mix);
+          starSizes[i] = Math.random() * 4 + 1;
+        }
+      }
+      
+      starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+      starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+      
+      const starMaterial = new THREE.PointsMaterial({
+        size: 2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.8,
+        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending
+      });
+      
+      const starField = new THREE.Points(starGeometry, starMaterial);
+      sceneRef.current.add(starField);
+      starFieldRef.current = starField;
+      
+      // Add nebula clouds for nebula mode
+      if (skyboxType === 'nebula') {
+        const nebulaGeometry = new THREE.SphereGeometry(500, 32, 32);
+        const nebulaMaterial = new THREE.ShaderMaterial({
+          uniforms: {
+            color1: { value: new THREE.Color(nebulaColor1) },
+            color2: { value: new THREE.Color(nebulaColor2) },
+            time: { value: 0 }
+          },
+          vertexShader: `
+            varying vec3 vWorldPosition;
+            void main() {
+              vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+              vWorldPosition = worldPosition.xyz;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 color1;
+            uniform vec3 color2;
+            uniform float time;
+            varying vec3 vWorldPosition;
+            
+            // Simple noise function
+            float noise(vec3 p) {
+              return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+            }
+            
+            void main() {
+              vec3 pos = normalize(vWorldPosition);
+              float n = noise(pos * 3.0);
+              n += noise(pos * 6.0) * 0.5;
+              n += noise(pos * 12.0) * 0.25;
+              
+              vec3 color = mix(color1, color2, n);
+              float alpha = smoothstep(0.3, 0.7, n) * 0.3;
+              gl_FragColor = vec4(color, alpha);
+            }
+          `,
+          side: THREE.BackSide,
+          transparent: true,
+          blending: THREE.AdditiveBlending
+        });
+        const nebulaMesh = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
+        sceneRef.current.add(nebulaMesh);
+        skyboxMeshRef.current = nebulaMesh;
+      }
     }
-  }, [backgroundColor]);
+  }, [backgroundColor, skyboxType, skyboxGradientTop, skyboxGradientBottom, skyboxImageUrl, starCount, galaxyColor, nebulaColor1, nebulaColor2]);
 
   useEffect(() => {
     if (lightsRef.current.ambient) {
@@ -1634,6 +1943,54 @@ export default function ThreeDVisualizer() {
       lightsRef.current.directional.intensity = directionalLightIntensity;
     }
   }, [ambientLightIntensity, directionalLightIntensity]);
+
+  // Update shape materials when material controls change
+  useEffect(() => {
+    if (!objectsRef.current) return;
+    const { cubes, octas, tetras, sphere } = objectsRef.current;
+    
+    // Helper to update material properties
+    const updateMaterial = (
+      material: THREE.Material,
+      color: string,
+      wireframe: boolean,
+      opacity: number,
+      metalness?: number,
+      roughness?: number
+    ) => {
+      if ('color' in material) {
+        (material as any).color.setStyle(color);
+      }
+      if ('wireframe' in material) {
+        (material as any).wireframe = wireframe;
+      }
+      if ('opacity' in material) {
+        (material as any).opacity = opacity;
+      }
+      if (material instanceof THREE.MeshStandardMaterial && metalness !== undefined && roughness !== undefined) {
+        material.metalness = metalness;
+        material.roughness = roughness;
+      }
+    };
+    
+    // Update cubes
+    cubes.forEach(cube => {
+      updateMaterial(cube.material, cubeColor, cubeWireframe, cubeOpacity, cubeMetalness, cubeRoughness);
+    });
+    
+    // Update octahedrons
+    octas.forEach(octa => {
+      updateMaterial(octa.material, octahedronColor, octahedronWireframe, octahedronOpacity, octahedronMetalness, octahedronRoughness);
+    });
+    
+    // Update tetrahedrons
+    tetras.forEach(tetra => {
+      updateMaterial(tetra.material, tetrahedronColor, tetrahedronWireframe, tetrahedronOpacity, tetrahedronMetalness, tetrahedronRoughness);
+    });
+    
+    // Update sphere
+    updateMaterial(sphere.material, sphereColor, sphereWireframe, sphereOpacity, sphereMetalness, sphereRoughness);
+  }, [cubeColor, cubeWireframe, cubeOpacity, cubeMetalness, cubeRoughness, octahedronColor, octahedronWireframe, octahedronOpacity, octahedronMetalness, octahedronRoughness, tetrahedronColor, tetrahedronWireframe, tetrahedronOpacity, tetrahedronMetalness, tetrahedronRoughness, sphereColor, sphereWireframe, sphereOpacity, sphereMetalness, sphereRoughness]);
 
   // Enable/disable OrbitControls based on play state
   useEffect(() => {
@@ -3765,15 +4122,34 @@ export default function ThreeDVisualizer() {
 
       // PHASE 4: Apply background flash effect before rendering
       if (bgFlash > 0) {
-        const baseColor = new THREE.Color(backgroundColor);
-        const flashColor = new THREE.Color(0xffffff);
-        const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
-        scene.background = blendedColor;
-        rend.setClearColor(blendedColor);
+        if (skyboxType === 'color') {
+          // Standard color flash
+          const baseColor = new THREE.Color(backgroundColor);
+          const flashColor = new THREE.Color(0xffffff);
+          const blendedColor = baseColor.lerp(flashColor, Math.min(bgFlash, 1));
+          scene.background = blendedColor;
+          rend.setClearColor(blendedColor);
+        } else if (skyboxType === 'gradient' && skyboxMeshRef.current) {
+          // Flash the gradient skybox by blending towards white
+          const material = skyboxMeshRef.current.material as THREE.ShaderMaterial;
+          const baseTop = new THREE.Color(skyboxGradientTop);
+          const baseBottom = new THREE.Color(skyboxGradientBottom);
+          const flashColor = new THREE.Color(0xffffff);
+          material.uniforms.topColor.value = baseTop.lerp(flashColor, Math.min(bgFlash, 1));
+          material.uniforms.bottomColor.value = baseBottom.lerp(flashColor, Math.min(bgFlash, 1));
+        }
+        // Note: Image skyboxes don't flash (would require shader manipulation)
       } else {
-        const baseColor = new THREE.Color(backgroundColor);
-        scene.background = baseColor;
-        rend.setClearColor(baseColor);
+        if (skyboxType === 'color') {
+          const baseColor = new THREE.Color(backgroundColor);
+          scene.background = baseColor;
+          rend.setClearColor(baseColor);
+        } else if (skyboxType === 'gradient' && skyboxMeshRef.current) {
+          // Reset gradient colors
+          const material = skyboxMeshRef.current.material as THREE.ShaderMaterial;
+          material.uniforms.topColor.value = new THREE.Color(skyboxGradientTop);
+          material.uniforms.bottomColor.value = new THREE.Color(skyboxGradientBottom);
+        }
       }
 
       // Update camera rig visual hints
@@ -4418,15 +4794,6 @@ export default function ThreeDVisualizer() {
         {activeTab === 'controls' && (
           <div>
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Colors</h3>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-xs text-gray-400 block mb-1">Bass</label><input type="color" id="bassColor" name="bassColor" value={bassColor} onChange={(e) => setBassColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Mids</label><input type="color" id="midsColor" name="midsColor" value={midsColor} onChange={(e) => setMidsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-                <div><label className="text-xs text-gray-400 block mb-1">Highs</label><input type="color" id="highsColor" name="highsColor" value={highsColor} onChange={(e) => setHighsColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" /></div>
-              </div>
-            </div>
-            
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
               <div className="space-y-3">
@@ -4482,6 +4849,183 @@ export default function ThreeDVisualizer() {
                   Reset Frequency Gains
                 </button>
               </div>
+            </div>
+            
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎭 Shape Material Controls</h3>
+              <p className="text-xs text-gray-400 mb-3">Customize the appearance of each shape type (cubes, octahedrons, tetrahedrons, sphere)</p>
+              
+              {/* Cubes */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-purple-300 mb-2">Cubes</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Material Type</label>
+                    <select value={cubeMaterialType} onChange={(e) => setCubeMaterialType(e.target.value as any)} className="w-full bg-gray-700 text-white text-xs px-2 py-1.5 rounded cursor-pointer">
+                      <option value="basic">Basic (Unlit)</option>
+                      <option value="standard">Standard (PBR)</option>
+                      <option value="phong">Phong (Shiny)</option>
+                      <option value="lambert">Lambert (Matte)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={cubeColor} onChange={(e) => setCubeColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {cubeOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={cubeOpacity} onChange={(e) => setCubeOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  {cubeMaterialType === 'standard' && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Metalness: {cubeMetalness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={cubeMetalness} onChange={(e) => setCubeMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Roughness: {cubeRoughness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={cubeRoughness} onChange={(e) => setCubeRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="cubeWireframe" checked={cubeWireframe} onChange={(e) => setCubeWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="cubeWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Octahedrons */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-cyan-300 mb-2">Octahedrons</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Material Type</label>
+                    <select value={octahedronMaterialType} onChange={(e) => setOctahedronMaterialType(e.target.value as any)} className="w-full bg-gray-700 text-white text-xs px-2 py-1.5 rounded cursor-pointer">
+                      <option value="basic">Basic (Unlit)</option>
+                      <option value="standard">Standard (PBR)</option>
+                      <option value="phong">Phong (Shiny)</option>
+                      <option value="lambert">Lambert (Matte)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={octahedronColor} onChange={(e) => setOctahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {octahedronOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={octahedronOpacity} onChange={(e) => setOctahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  {octahedronMaterialType === 'standard' && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Metalness: {octahedronMetalness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={octahedronMetalness} onChange={(e) => setOctahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Roughness: {octahedronRoughness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={octahedronRoughness} onChange={(e) => setOctahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="octahedronWireframe" checked={octahedronWireframe} onChange={(e) => setOctahedronWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="octahedronWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Tetrahedrons */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-pink-300 mb-2">Tetrahedrons</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Material Type</label>
+                    <select value={tetrahedronMaterialType} onChange={(e) => setTetrahedronMaterialType(e.target.value as any)} className="w-full bg-gray-700 text-white text-xs px-2 py-1.5 rounded cursor-pointer">
+                      <option value="basic">Basic (Unlit)</option>
+                      <option value="standard">Standard (PBR)</option>
+                      <option value="phong">Phong (Shiny)</option>
+                      <option value="lambert">Lambert (Matte)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={tetrahedronColor} onChange={(e) => setTetrahedronColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {tetrahedronOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={tetrahedronOpacity} onChange={(e) => setTetrahedronOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  {tetrahedronMaterialType === 'standard' && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Metalness: {tetrahedronMetalness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronMetalness} onChange={(e) => setTetrahedronMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Roughness: {tetrahedronRoughness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={tetrahedronRoughness} onChange={(e) => setTetrahedronRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="tetrahedronWireframe" checked={tetrahedronWireframe} onChange={(e) => setTetrahedronWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="tetrahedronWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Sphere */}
+              <div className="bg-gray-800 rounded p-3 mb-3">
+                <h4 className="text-xs font-semibold text-purple-300 mb-2">Sphere</h4>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Material Type</label>
+                    <select value={sphereMaterialType} onChange={(e) => setSphereMaterialType(e.target.value as any)} className="w-full bg-gray-700 text-white text-xs px-2 py-1.5 rounded cursor-pointer">
+                      <option value="basic">Basic (Unlit)</option>
+                      <option value="standard">Standard (PBR)</option>
+                      <option value="phong">Phong (Shiny)</option>
+                      <option value="lambert">Lambert (Matte)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Color</label>
+                    <input type="color" value={sphereColor} onChange={(e) => setSphereColor(e.target.value)} className="w-full h-8 rounded cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Opacity: {sphereOpacity.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={sphereOpacity} onChange={(e) => setSphereOpacity(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                  </div>
+                  {sphereMaterialType === 'standard' && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Metalness: {sphereMetalness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={sphereMetalness} onChange={(e) => setSphereMetalness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Roughness: {sphereRoughness.toFixed(2)}</label>
+                        <input type="range" min="0" max="1" step="0.05" value={sphereRoughness} onChange={(e) => setSphereRoughness(parseFloat(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
+                      </div>
+                    </>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id="sphereWireframe" checked={sphereWireframe} onChange={(e) => setSphereWireframe(e.target.checked)} className="w-4 h-4 cursor-pointer" />
+                    <label htmlFor="sphereWireframe" className="text-xs text-white cursor-pointer">Wireframe</label>
+                  </div>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setCubeColor('#8a2be2'); setCubeWireframe(true); setCubeOpacity(0.6); setCubeMaterialType('basic'); setCubeMetalness(0.5); setCubeRoughness(0.5);
+                  setOctahedronColor('#40e0d0'); setOctahedronWireframe(true); setOctahedronOpacity(0.5); setOctahedronMaterialType('basic'); setOctahedronMetalness(0.5); setOctahedronRoughness(0.5);
+                  setTetrahedronColor('#c8b4ff'); setTetrahedronWireframe(false); setTetrahedronOpacity(0.7); setTetrahedronMaterialType('basic'); setTetrahedronMetalness(0.5); setTetrahedronRoughness(0.5);
+                  setSphereColor('#8a2be2'); setSphereWireframe(true); setSphereOpacity(0.4); setSphereMaterialType('basic'); setSphereMetalness(0.5); setSphereRoughness(0.5);
+                }}
+                className="text-xs bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded text-white w-full"
+              >
+                Reset All Materials to Defaults
+              </button>
             </div>
           </div>
         )}
@@ -4671,10 +5215,169 @@ export default function ThreeDVisualizer() {
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎨 Visual Effects</h3>
               <p className="text-xs text-gray-400 mb-3">Customize the look and feel of the visualization.</p>
               <div className="space-y-3">
+                {/* Skybox Type Selection */}
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">Background Color</label>
-                  <input type="color" id="backgroundColor" name="backgroundColor" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  <label className="text-xs text-gray-400 block mb-2">Background Type</label>
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <button 
+                      onClick={() => setSkyboxType('color')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'color' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Solid Color
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('gradient')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'gradient' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Gradient
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('image')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'image' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      Image
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button 
+                      onClick={() => setSkyboxType('stars')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'stars' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      ✨ Stars
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('galaxy')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'galaxy' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      🌌 Galaxy
+                    </button>
+                    <button 
+                      onClick={() => setSkyboxType('nebula')}
+                      className={`px-2 py-2 rounded text-xs ${skyboxType === 'nebula' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+                    >
+                      🌠 Nebula
+                    </button>
+                  </div>
                 </div>
+                
+                {/* Color Mode Controls */}
+                {skyboxType === 'color' && (
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+                    <input type="color" id="backgroundColor" name="backgroundColor" value={backgroundColor} onChange={(e) => setBackgroundColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                  </div>
+                )}
+                
+                {/* Gradient Mode Controls */}
+                {skyboxType === 'gradient' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Top Color (Sky)</label>
+                      <input type="color" id="skyboxGradientTop" name="skyboxGradientTop" value={skyboxGradientTop} onChange={(e) => setSkyboxGradientTop(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Bottom Color (Ground)</label>
+                      <input type="color" id="skyboxGradientBottom" name="skyboxGradientBottom" value={skyboxGradientBottom} onChange={(e) => setSkyboxGradientBottom(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                  </div>
+                )}
+                
+                {/* Image Mode Controls */}
+                {skyboxType === 'image' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Equirectangular Image URL</label>
+                      <input 
+                        type="text" 
+                        id="skyboxImageUrl" 
+                        name="skyboxImageUrl"
+                        value={skyboxImageUrl} 
+                        onChange={(e) => setSkyboxImageUrl(e.target.value)} 
+                        placeholder="https://example.com/skybox.jpg"
+                        className="w-full bg-gray-600 text-white text-xs px-3 py-2 rounded" 
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Use equirectangular (360°) panoramic images. Try free resources like <a href="https://polyhaven.com/hdris" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Poly Haven</a>.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Stars Mode Controls */}
+                {skyboxType === 'stars' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Procedurally generated star field with random distribution.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Galaxy Mode Controls */}
+                {skyboxType === 'galaxy' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Galaxy Color</label>
+                      <input type="color" id="galaxyColor" name="galaxyColor" value={galaxyColor} onChange={(e) => setGalaxyColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Spiral galaxy with colored star clusters.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Nebula Mode Controls */}
+                {skyboxType === 'nebula' && (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Star Count: {starCount}</label>
+                      <input 
+                        type="range" 
+                        min="1000" 
+                        max="10000" 
+                        step="500" 
+                        value={starCount} 
+                        onChange={(e) => setStarCount(Number(e.target.value))} 
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nebula Color 1</label>
+                      <input type="color" id="nebulaColor1" name="nebulaColor1" value={nebulaColor1} onChange={(e) => setNebulaColor1(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Nebula Color 2</label>
+                      <input type="color" id="nebulaColor2" name="nebulaColor2" value={nebulaColor2} onChange={(e) => setNebulaColor2(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
+                    </div>
+                    <p className="text-xs text-gray-500 italic">
+                      Colorful nebula with gas clouds and stars.
+                    </p>
+                  </div>
+                )}
+                
                 <div>
                   <label className="text-xs text-gray-400 block mb-1">Border Color</label>
                   <input type="color" id="borderColor" name="borderColor" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
