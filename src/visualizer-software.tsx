@@ -2376,7 +2376,7 @@ export default function ThreeDVisualizer() {
       setCurrentTime(t);
       const type = getCurrentPreset(); // Use keyframe-based preset switching
       const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
-      const elScaled = elScaled * presetSpeed; // Apply speed multiplier to animations
+      const elScaled = el * presetSpeed; // Apply speed multiplier to animations
       
       // Interpolate camera settings from global keyframes or use global settings
       let activeCameraDistance, activeCameraHeight, activeCameraRotation;
