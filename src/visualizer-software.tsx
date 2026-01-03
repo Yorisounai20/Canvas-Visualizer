@@ -1278,7 +1278,13 @@ export default function ThreeDVisualizer() {
     return newKeyframe;
   };
 
-  const updateCameraRigKeyframe = (id: string, updates: any) => {
+  const updateCameraRigKeyframe = (id: string, updates: Partial<{
+    time: number;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    duration: number;
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  }>) => {
     setCameraRigKeyframes(prev => prev.map(kf => kf.id === id ? { ...kf, ...updates } : kf));
   };
 
