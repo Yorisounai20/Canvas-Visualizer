@@ -5363,91 +5363,134 @@ export default function ThreeDVisualizer() {
                 </div>
               )}
             </div>
-            
-            {/* Parameter Events Section */}
-            <div className="mb-4 bg-gray-700 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events</h3>
-                <button
-                  onClick={addParameterEvent}
-                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded flex items-center gap-1"
-                >
-                  <Plus size={14} /> Add Event
-                </button>
-              </div>
-              
-              {parameterEvents.length === 0 ? (
-                <div className="text-center py-4 text-gray-400 text-xs">
-                  No events. Click "Add Event" to create flash effects.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {parameterEvents.map((event) => (
-                    <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <div>
-                          <span className="text-white font-medium">
-                            {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
-                          </span>
-                          {event.mode === 'automated' && event.audioTrackId && (
-                            <span className="text-gray-400 ml-2">
-                              → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingEventId(event.id);
-                              setShowEventModal(true);
-                            }}
-                            className="text-cyan-400 hover:text-cyan-300"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteParameterEvent(event.id)}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="text-gray-400 space-y-0.5">
-                        <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
-                        {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
-                          <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
-                        )}
-                        {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
-                          <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
-                        )}
-                        {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
-                          <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
-                        )}
-                        {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
-                          <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
-                        )}
-                        {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
-                          <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
-                        )}
-                        {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
-                          <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
-                        )}
-                        {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
-                          <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
         {/* Controls Tab */}
         {activeTab === 'controls' && (
           <div>
+            {/* Parameter Events Timeline - Moved to top */}
+            <div className="mb-4 bg-gray-700 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">⚡ Parameter Events Timeline</h3>
+                <button
+                  onClick={() => setParameterSettingsExpanded(!parameterSettingsExpanded)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                  title={parameterSettingsExpanded ? "Collapse settings" : "Expand settings"}
+                >
+                  <ChevronDown 
+                    size={20} 
+                    className={`transition-transform ${parameterSettingsExpanded ? '' : '-rotate-90'}`}
+                  />
+                </button>
+              </div>
+              
+              {/* Timeline bar visualization */}
+              <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
+                {/* Timeline markers for each parameter event */}
+                {parameterEvents.map(event => {
+                  if (event.mode === 'manual') {
+                    const startPos = duration > 0 ? (event.startTime / duration) * 100 : 0;
+                    const endPos = duration > 0 ? (event.endTime / duration) * 100 : 0;
+                    const width = endPos - startPos;
+                    return (
+                      <div
+                        key={event.id}
+                        className="absolute top-0 bottom-0 bg-cyan-500 bg-opacity-40 hover:bg-opacity-60 transition-colors cursor-pointer border-l-2 border-r-2 border-cyan-400"
+                        style={{ left: `${startPos}%`, width: `${width}%` }}
+                        title={`${formatTime(event.startTime)} → ${formatTime(event.endTime)}`}
+                      />
+                    );
+                  }
+                  return null;
+                })}
+                
+                {/* Current time indicator */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                  style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              
+              {/* Quick add button */}
+              <button
+                onClick={addParameterEvent}
+                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+              >
+                <Plus size={14} />
+                Add at {formatTime(currentTime)}
+              </button>
+              
+              {/* Collapsible event list */}
+              {parameterSettingsExpanded && (
+                parameterEvents.length === 0 ? (
+                  <div className="text-center py-4 text-gray-400 text-xs mt-3">
+                    No events. Click "Add at Xs" to create flash effects.
+                  </div>
+                ) : (
+                  <div className="space-y-2 mt-3">
+                    {parameterEvents.map((event) => (
+                      <div key={event.id} className="bg-gray-800 rounded p-2 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <div>
+                            <span className="text-white font-medium">
+                              {event.mode === 'manual' ? `${formatTimeInput(event.startTime)} → ${formatTimeInput(event.endTime)}` : '🤖 Automated'}
+                            </span>
+                            {event.mode === 'automated' && event.audioTrackId && (
+                              <span className="text-gray-400 ml-2">
+                                → {audioTracks.find(t => t.id === event.audioTrackId)?.name || 'Unknown track'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingEventId(event.id);
+                                setShowEventModal(true);
+                              }}
+                              className="text-cyan-400 hover:text-cyan-300"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => deleteParameterEvent(event.id)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="text-gray-400 space-y-0.5">
+                          <div>Duration: {(event.endTime - event.startTime).toFixed(2)}s</div>
+                          {event.parameters.backgroundFlash !== undefined && event.parameters.backgroundFlash > 0 && (
+                            <div>⚪ BG Flash: {Math.round(event.parameters.backgroundFlash * 100)}%</div>
+                          )}
+                          {event.parameters.cameraShake !== undefined && event.parameters.cameraShake > 0 && (
+                            <div>📷 Shake (Auto): {Math.round(event.parameters.cameraShake * 100)}%</div>
+                          )}
+                          {event.parameters.vignettePulse !== undefined && event.parameters.vignettePulse > 0 && (
+                            <div>🌑 Vignette: {Math.round(event.parameters.vignettePulse * 100)}%</div>
+                          )}
+                          {event.parameters.saturationBurst !== undefined && event.parameters.saturationBurst > 0 && (
+                            <div>🎨 Saturation: {Math.round(event.parameters.saturationBurst * 100)}%</div>
+                          )}
+                          {event.parameters.vignetteStrengthPulse !== undefined && event.parameters.vignetteStrengthPulse > 0 && (
+                            <div>🌫️ Vig. Pulse: {Math.round(event.parameters.vignetteStrengthPulse * 100)}%</div>
+                          )}
+                          {event.parameters.contrastBurst !== undefined && event.parameters.contrastBurst > 0 && (
+                            <div>🔆 Contrast: {Math.round(event.parameters.contrastBurst * 100)}%</div>
+                          )}
+                          {event.parameters.colorTintFlash !== undefined && event.parameters.colorTintFlash.intensity > 0 && (
+                            <div>🌈 Tint: R{event.parameters.colorTintFlash.r.toFixed(1)} G{event.parameters.colorTintFlash.g.toFixed(1)} B{event.parameters.colorTintFlash.b.toFixed(1)} ({Math.round(event.parameters.colorTintFlash.intensity * 100)}%)</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+            
             <div className="mb-4 bg-gray-700 rounded-lg p-3">
               <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎚️ Frequency Gain Controls</h3>
               <p className="text-xs text-gray-400 mb-3">Adjust the sensitivity of each frequency band to the music</p>
