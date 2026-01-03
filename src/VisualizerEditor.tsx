@@ -1507,6 +1507,14 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         });
       } else if (type === 'hammerhead') {
         // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
+        // Constants for shark anatomy
+        const TAIL_SEGMENT_COUNT = 2; // Last 2 cubes form the tail
+        const HAMMER_TETRA_COUNT = 8; // Total tetras for hammerhead
+        const HAMMER_BAR_TETRA_COUNT = 6; // Tetras forming horizontal bar
+        const FIN_TETRA_START = 8; // Start index for fin tetras
+        const FIN_TETRA_END = 12; // End index for fin tetras
+        const BUBBLE_COUNT = 15; // Number of rising bubbles in ocean
+        
         const swimSpeed = el * speed * 0.8;
         const rotationSpeed = cameraAutoRotate ? el * 0.2 : 0;
         
@@ -1522,7 +1530,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         obj.cubes.forEach((c, i) => {
           const progress = i / obj.cubes.length;
           const isHead = i === 0;
-          const isTail = i >= obj.cubes.length - 2;
+          const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
           
           // Swimming path - gentle side-to-side motion
           const swayAmount = (1 - progress) * 2 + reactiveF.bass * 1.5;
@@ -1539,7 +1547,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
             scaleY = 1.5 + reactiveF.bass * 0.3;
             scaleZ = 2 + reactiveF.bass * 0.5;
           } else if (isTail) {
-            const tailProgress = (i - (obj.cubes.length - 2)) / 2;
+            const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
             scaleX = 0.8 - tailProgress * 0.5;
             scaleY = 0.6 - tailProgress * 0.4;
             scaleZ = 1.2 + reactiveF.bass * 0.3;
@@ -1569,8 +1577,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         
         // Hammerhead shape using tetras - distinctive T-shaped head
         const head = obj.cubes[0];
-        obj.tetras.slice(0, 8).forEach((hammer, i) => {
-          if (i < 6) {
+        obj.tetras.slice(0, HAMMER_TETRA_COUNT).forEach((hammer, i) => {
+          if (i < HAMMER_BAR_TETRA_COUNT) {
             // Horizontal hammer bar (6 tetras spread across)
             const hammerWidth = 7;
             const hammerPosition = (i / 5 - 0.5) * hammerWidth;
@@ -1602,7 +1610,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         });
         
         // Dorsal fin and side fins using remaining tetras
-        obj.tetras.slice(8, 12).forEach((fin, i) => {
+        obj.tetras.slice(FIN_TETRA_START, FIN_TETRA_END).forEach((fin, i) => {
           const bodySegment = Math.floor(obj.cubes.length * 0.3); // Fins near front
           const body = obj.cubes[bodySegment];
           
@@ -1636,7 +1644,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         
         // Ocean environment - bubbles and particles using octas
         obj.octas.forEach((bubble, i) => {
-          if (i < 15) {
+          if (i < BUBBLE_COUNT) {
             // Rising bubbles
             const bubbleSpeed = 0.5 + (i % 3) * 0.2;
             const riseHeight = (el * bubbleSpeed + i) % 20;
