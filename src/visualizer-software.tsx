@@ -619,37 +619,6 @@ export default function ThreeDVisualizer() {
     ));
   };
 
-  // Letterbox keyframe management
-  const addLetterboxKeyframe = () => {
-    const newKeyframe = {
-      time: letterboxKeyframes.length > 0 
-        ? Math.max(...letterboxKeyframes.map(k => k.time)) + 5 
-        : 0,
-      targetSize: 50,
-      duration: 1,
-      mode: 'smooth' as 'smooth' | 'instant',
-      invert: false  // Default to non-inverted
-    };
-    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe]);
-    setShowLetterbox(true); // Enable letterbox when adding keyframes
-    setUseLetterboxAnimation(true); // Enable animation mode
-  };
-
-  const deleteLetterboxKeyframe = (index: number) => {
-    const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
-    setLetterboxKeyframes(newKeyframes);
-    // If no keyframes left, disable animation mode
-    if (newKeyframes.length === 0) {
-      setUseLetterboxAnimation(false);
-    }
-  };
-
-  const updateLetterboxKeyframe = (index: number, field: string, value: number | string | boolean) => {
-    setLetterboxKeyframes(letterboxKeyframes.map((kf, i) => 
-      i === index ? { ...kf, [field]: value } : kf
-    ));
-  };
-
   // Camera shake event management
   const addCameraShake = () => {
     const newTime = currentTime > 0 ? currentTime : 0;
@@ -5547,6 +5516,243 @@ export default function ThreeDVisualizer() {
                 </p>
               </div>
             </div>
+            
+            {/* Letterbox Animation with Timeline */}
+            <div className="bg-gray-700 rounded-lg p-3 mt-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Letterbox (Cinematic Bars)</h3>
+                  <p className="text-xs text-gray-400 mt-1">Create dynamic letterbox animations with timeline keyframes</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const time = currentTime;
+                    const newKeyframe = {
+                      id: Date.now(),
+                      time,
+                      targetSize: letterboxSize || 50,
+                      duration: 1.0,
+                      mode: 'smooth' as const,
+                      invert: activeLetterboxInvert
+                    };
+                    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+                    setShowLetterbox(true);
+                    setUseLetterboxAnimation(true);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1"
+                >
+                  <Plus size={14} /> Add at {Math.floor(currentTime)}s
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="showLetterbox" 
+                    checked={showLetterbox} 
+                    onChange={(e) => setShowLetterbox(e.target.checked)} 
+                    className="w-4 h-4 cursor-pointer" 
+                  />
+                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">
+                    Enable Letterbox
+                  </label>
+                </div>
+
+                {showLetterbox && (
+                  <div className="ml-7 space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-300 block mb-1">Max Curtain Height: {maxLetterboxHeight}px</label>
+                      <input 
+                        type="range"
+                        min="50"
+                        max="500"
+                        step="10"
+                        value={maxLetterboxHeight}
+                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || 270)}
+                        className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Controls maximum bar height when at 100%</p>
+                    </div>
+
+                    {letterboxKeyframes.length > 0 && (
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          id="useLetterboxAnimation" 
+                          checked={useLetterboxAnimation} 
+                          onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
+                          className="w-4 h-4 cursor-pointer" 
+                        />
+                        <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
+                          Use Timeline Animation ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
+                        </label>
+                      </div>
+                    )}
+
+                    {letterboxKeyframes.length === 0 && (
+                      <div className="bg-gray-800 rounded p-2">
+                        <p className="text-xs text-gray-400 text-center">No keyframes yet. Click "Add at {Math.floor(currentTime)}s" to create one</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Timeline Visualization */}
+                {showLetterbox && letterboxKeyframes.length > 0 && (
+                  <div className="mt-4 bg-gray-800 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-300">Timeline</span>
+                      <span className="text-xs text-gray-400">{formatTime(duration)}</span>
+                    </div>
+                    
+                    {/* Timeline bar with keyframe markers */}
+                    <div className="relative bg-gray-900 rounded h-12 mb-3">
+                      {/* Current time indicator */}
+                      <div 
+                        className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
+                        style={{ left: `${(currentTime / duration) * 100}%` }}
+                      >
+                        <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                      </div>
+                      
+                      {/* Keyframe markers */}
+                      {letterboxKeyframes.map((kf, idx) => (
+                        <div
+                          key={kf.id || idx}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
+                          style={{ left: `${(kf.time / duration) * 100}%` }}
+                          title={`${formatTime(kf.time)} - ${kf.targetSize}px`}
+                        >
+                          <div className="w-3 h-8 bg-purple-500 hover:bg-purple-400 rounded group-hover:scale-110 transition-transform flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                          <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            {formatTime(kf.time)}: {kf.targetSize}px
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Keyframe List */}
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {letterboxKeyframes.map((keyframe, index) => (
+                        <div key={keyframe.id || index} className="bg-gray-900 rounded p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                              <span className="text-white font-semibold text-sm">
+                                {formatTime(keyframe.time)}
+                              </span>
+                            </div>
+                            <button 
+                              onClick={() => {
+                                const newKeyframes = letterboxKeyframes.filter((_, i) => i !== index);
+                                setLetterboxKeyframes(newKeyframes);
+                                if (newKeyframes.length === 0) {
+                                  setUseLetterboxAnimation(false);
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300 text-xs"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max={duration}
+                                step="0.1"
+                                value={keyframe.time}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, time: parseFloat(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes.sort((a, b) => a.time - b.time));
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Size (0-100)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={keyframe.targetSize}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, targetSize: parseInt(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
+                              <input 
+                                type="number"
+                                min="0"
+                                max="10"
+                                step="0.1"
+                                value={keyframe.duration}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, duration: parseFloat(e.target.value) || 0 };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-300 block mb-1">Mode</label>
+                              <select 
+                                value={keyframe.mode}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, mode: e.target.value as 'smooth' | 'instant' };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                              >
+                                <option value="smooth">Smooth</option>
+                                <option value="instant">Instant</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="checkbox"
+                                id={`invert-${keyframe.id || index}`}
+                                checked={keyframe.invert}
+                                onChange={(e) => {
+                                  const newKeyframes = [...letterboxKeyframes];
+                                  newKeyframes[index] = { ...keyframe, invert: e.target.checked };
+                                  setLetterboxKeyframes(newKeyframes);
+                                }}
+                                className="w-4 h-4 cursor-pointer"
+                              />
+                              <label htmlFor={`invert-${keyframe.id || index}`} className="text-xs text-gray-300 cursor-pointer">
+                                Curtain Mode (opens/closes from edges)
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -5792,172 +5998,6 @@ export default function ThreeDVisualizer() {
                   <input type="color" id="borderColor" name="borderColor" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-10 rounded cursor-pointer" />
                 </div>
               </div>
-            </div>
-            
-            {/* Letterbox Animation Section */}
-            <div className="bg-gray-700 rounded-lg p-3 mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-cyan-400">🎬 Animated Letterbox</h3>
-                  <p className="text-xs text-gray-400 mt-1">Create cinematic curtain-like letterbox animations</p>
-                </div>
-                <button 
-                  onClick={addLetterboxKeyframe} 
-                  disabled={!showLetterbox}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus size={14} /> Add
-                </button>
-              </div>
-              
-              <div className="space-y-2 mb-3">
-                <div className="flex items-center gap-3">
-                  <input type="checkbox" id="showLetterbox" checked={showLetterbox} onChange={(e) => setShowLetterbox(e.target.checked)} className="w-4 h-4 cursor-pointer" />
-                  <label htmlFor="showLetterbox" className="text-sm text-white cursor-pointer font-semibold">Enable Letterbox</label>
-                </div>
-                
-                {showLetterbox && (
-                  <div className="ml-7 space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-300 block mb-1">Max Curtain Height (px) - affects both top & bottom bars</label>
-                      <input 
-                        type="number" id="maxLetterboxHeight" name="maxLetterboxHeight" 
-                        min="50" 
-                        max="500" 
-                        step="10" 
-                        value={maxLetterboxHeight} 
-                        onChange={(e) => setMaxLetterboxHeight(parseInt(e.target.value) || 270)} 
-                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                      />
-                      <p className="text-xs text-gray-400 mt-1">Default: 270px (full coverage). Tip: 270px covers entire 540px canvas when both bars at 100%</p>
-                    </div>
-                  </div>
-                )}
-                
-                {showLetterbox && letterboxKeyframes.length > 0 && (
-                  <div className="flex items-center gap-3 ml-7">
-                    <input 
-                      type="checkbox" 
-                      id="useLetterboxAnimation" 
-                      checked={useLetterboxAnimation} 
-                      onChange={(e) => setUseLetterboxAnimation(e.target.checked)} 
-                      className="w-4 h-4 cursor-pointer" 
-                    />
-                    <label htmlFor="useLetterboxAnimation" className="text-sm text-white cursor-pointer">
-                      Use Animations ({letterboxKeyframes.length} keyframe{letterboxKeyframes.length !== 1 ? 's' : ''})
-                    </label>
-                  </div>
-                )}
-                
-                {showLetterbox && letterboxKeyframes.length === 0 && (
-                  <p className="text-xs text-gray-400 ml-7">Manual mode - use slider below</p>
-                )}
-              </div>
-              
-              {letterboxKeyframes.length > 0 ? (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {letterboxKeyframes.map((keyframe, index) => (
-                    <div key={index} className="bg-gray-800 rounded p-3 space-y-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white font-semibold text-sm">Keyframe {index + 1}</span>
-                        <button 
-                          onClick={() => deleteLetterboxKeyframe(index)} 
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Time (s)</label>
-                          <input 
-                            type="number" id="time-s" name="time-s" 
-                            min="0" 
-                            max={duration}
-                            step="0.1" 
-                            value={keyframe.time} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'time', parseFloat(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Size (px)</label>
-                          <input 
-                            type="number" id="size-px" name="size-px" 
-                            min="0" 
-                            max="100" 
-                            step="5" 
-                            value={keyframe.targetSize} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'targetSize', parseInt(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Duration (s)</label>
-                          <input 
-                            type="number" id="duration-s-1" name="duration-s-1" 
-                            min="0" 
-                            max="10" 
-                            step="0.1" 
-                            value={keyframe.duration} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'duration', parseFloat(e.target.value) || 0)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded" 
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-300 block mb-1">Mode</label>
-                          <select 
-                            value={keyframe.mode} 
-                            onChange={(e) => updateLetterboxKeyframe(index, 'mode', e.target.value)} 
-                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
-                          >
-                            <option value="smooth">Smooth</option>
-                            <option value="instant">Instant</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mt-2">
-                        <input 
-                          type="checkbox" 
-                          id={`invert-${index}`}
-                          checked={keyframe.invert} 
-                          onChange={(e) => updateLetterboxKeyframe(index, 'invert', e.target.checked)} 
-                          className="w-4 h-4 cursor-pointer" 
-                        />
-                        <label htmlFor={`invert-${index}`} className="text-xs text-gray-300 cursor-pointer">
-                          Curtain mode (100=closed, 0=open)
-                        </label>
-                      </div>
-                      
-                      <p className="text-xs text-gray-400 italic">
-                        {keyframe.invert
-                          ? (keyframe.mode === 'smooth' 
-                              ? `Animates to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`} over ${keyframe.duration}s`
-                              : `Instantly sets to ${keyframe.targetSize === 100 ? 'fully closed' : keyframe.targetSize === 0 ? 'fully open' : `${keyframe.targetSize}% ${keyframe.targetSize > 50 ? 'closed' : 'open'}`}`)
-                          : (keyframe.mode === 'smooth' 
-                              ? `Animates to ${keyframe.targetSize}px bars over ${keyframe.duration}s`
-                              : `Instantly sets to ${keyframe.targetSize}px bars`)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic text-center py-4">
-                  No letterbox animations yet. Click "Add" to create cinematic curtain effects.
-                </p>
-              )}
-              
-              {showLetterbox && letterboxKeyframes.length === 0 && (
-                <div className="mt-3">
-                  <label className="text-xs text-gray-400 block mb-1">Manual Size: {letterboxSize}px</label>
-                  <input type="range" id="letterboxSize" name="letterboxSize" min="0" max="100" step="5" value={letterboxSize} onChange={(e) => setLetterboxSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600" />
-                </div>
-              )}
             </div>
             
           </div>
