@@ -1,4 +1,5 @@
 export const animationTypes = [
+  { value: 'empty', label: 'Empty (No Shapes)', icon: '⬛' },
   { value: 'orbit', label: 'Orbital Dance', icon: '🌀' },
   { value: 'explosion', label: 'Explosion', icon: '💥' },
   { value: 'tunnel', label: 'Tunnel Rush', icon: '🚀' },

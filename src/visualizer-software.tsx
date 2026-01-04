@@ -2650,7 +2650,37 @@ export default function ThreeDVisualizer() {
       }
       const blend = transitionRef.current;
 
-      if (type === 'orbit') {
+      if (type === 'empty') {
+        // Empty preset - hide all shapes, only show camera position
+        cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+        cam.lookAt(0, 0, 0);
+        
+        // Hide sphere
+        obj.sphere.position.set(0, -1000, 0);
+        obj.sphere.scale.set(0.001, 0.001, 0.001);
+        obj.sphere.material.opacity = 0;
+        
+        // Hide all cubes
+        obj.cubes.forEach((c) => {
+          c.position.set(0, -1000, 0);
+          c.scale.set(0.001, 0.001, 0.001);
+          c.material.opacity = 0;
+        });
+        
+        // Hide all octahedrons (except environment ones at indices 30-44)
+        obj.octas.slice(0, 30).forEach((o) => {
+          o.position.set(0, -1000, 0);
+          o.scale.set(0.001, 0.001, 0.001);
+          o.material.opacity = 0;
+        });
+        
+        // Hide all tetrahedrons
+        obj.tetras.forEach((t) => {
+          t.position.set(0, -1000, 0);
+          t.scale.set(0.001, 0.001, 0.001);
+          t.material.opacity = 0;
+        });
+      } else if (type === 'orbit') {
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         const r = activeCameraDistance - f.bass * 5;
         cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
