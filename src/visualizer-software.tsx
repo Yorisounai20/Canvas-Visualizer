@@ -3137,171 +3137,236 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
       } else if (type === 'hammerhead') {
-        // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
-        // Constants for shark anatomy
-        const TAIL_SEGMENT_COUNT = 2;
-        const HAMMER_CUBE_COUNT = 3; // 3 cubes form the T-shaped hammer
-        const DORSAL_FIN_INDEX = 0; // Use first tetrahedron for dorsal fin
-        const TAIL_FIN_INDEX = 1; // Use second tetrahedron for tail fin
+        // Hammerhead Shark - Distinctive T-shaped head with smooth predatory swimming
+        // GEOMETRY ALLOCATION:
+        // Cubes 0-2: Hammer head (center core + left wing + right wing)
+        // Cubes 3-6: Tapered body segments
+        // Cube 7: Tail segment
+        // Tetras 0: Dorsal fin (tall, sharp)
+        // Tetras 1-2: Pectoral fins (left and right)
+        // Tetras 3: Tail fin (asymmetric, vertical)
         
-        const swimSpeed = elScaled * 0.8;
+        const swimTime = elScaled * 0.6; // Slower, more gliding motion
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         
-        // Camera follows shark from side/above angle
+        // Camera positioned for 3/4 view to show hammer shape clearly
+        const camAngle = rotationSpeed + activeCameraRotation;
         cam.position.set(
-          Math.sin(rotationSpeed + activeCameraRotation) * activeCameraDistance * 0.8 + Math.sin(swimSpeed * 0.3) * 2 + shakeX,
-          5 + activeCameraHeight + Math.sin(swimSpeed * 0.5) * 1 + shakeY,
-          activeCameraDistance * 0.8 + shakeZ
+          Math.sin(camAngle) * activeCameraDistance * 0.9 + shakeX,
+          4 + activeCameraHeight + Math.sin(swimTime * 0.3) * 0.5 + shakeY,
+          Math.cos(camAngle) * activeCameraDistance * 0.6 + shakeZ
         );
-        cam.lookAt(0, 0, -5);
+        cam.lookAt(0, 0, -8);
         
-        // Shark body using cubes - serpentine swimming motion
-        obj.cubes.forEach((c, i) => {
-          const progress = i / obj.cubes.length;
-          const isHead = i === 0;
-          const isHammer = i < HAMMER_CUBE_COUNT; // First 3 cubes form hammer
-          const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
-          
-          // Swimming path - gentle side-to-side motion
-          const swayAmount = (1 - progress) * 2 + f.bass * 1.5;
-          const x = Math.sin(swimSpeed - i * 0.4) * swayAmount;
-          const yPos = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
-          const z = progress * -20 - 5;
-          
-          // Hammer T-shape positioning
-          if (isHammer) {
-            if (i === 0) {
-              // Left end of hammer
-              c.position.set(x - 6, yPos + 0.5, z + 2);
-            } else if (i === 1) {
-              // Center of hammer (vertical part of T)
-              c.position.set(x, yPos, z);
-            } else {
-              // Right end of hammer
-              c.position.set(x + 6, yPos + 0.5, z + 2);
-            }
-          } else {
-            c.position.set(x, yPos, z);
-          }
-          
-          // Scale: MUCH LARGER for prominence
-          let scaleX = 2.5;
-          let scaleY = 2;
-          let scaleZ = 3;
-          if (isHammer && i !== 1) {
-            // Hammer end cubes - stretched horizontally
-            scaleX = 5 + f.highs * 0.5; // Very wide for hammer ends
-            scaleY = 2 + f.highs * 0.3;
-            scaleZ = 2 + f.highs * 0.3;
-          } else if (isHead) {
-            // Center/head cube
-            scaleX = 2.5 + f.bass * 0.5;
-            scaleY = 2.5 + f.bass * 0.5;
-            scaleZ = 4 + f.bass * 0.8; // Longer for head
-          } else if (isTail) {
-            const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
-            scaleX = 1.5 - tailProgress * 0.7;
-            scaleY = 1.2 - tailProgress * 0.6;
-            scaleZ = 2 + f.bass * 0.5;
-          }
-          c.scale.set(scaleX, scaleY, scaleZ);
-          
-          // Rotation to follow swimming path
-          const nextI = Math.min(i + 1, obj.cubes.length - 1);
-          const nextProgress = nextI / obj.cubes.length;
-          const nextSwayAmount = (1 - nextProgress) * 2 + f.bass * 1.5;
-          const nextX = Math.sin(swimSpeed - nextI * 0.4) * nextSwayAmount;
-          const nextYPos = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
-          const nextZ = nextProgress * -20 - 5;
-          
-          if (!isHammer || i === 1) {
-            // Only rotate non-hammer cubes (and center of hammer)
-            c.rotation.y = Math.atan2(nextX - x, nextZ - z);
-            c.rotation.x = Math.atan2(nextYPos - yPos, nextZ - z) * 0.5;
-            c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
-          } else {
-            // Hammer ends align with center
-            const center = obj.cubes[1];
-            c.rotation.y = center.rotation.y;
-            c.rotation.x = 0;
-            c.rotation.z = 0;
-          }
-          
-          // Color hammer differently
-          c.material.color.setStyle(cubeColor);
-          c.material.opacity = (0.9 + f.bass * 0.1) * blend;
-          c.material.wireframe = false;
-        });
+        // === SWIMMING ANIMATION ===
+        // Smooth gliding motion - low amplitude, calm and predatory
+        const headSway = Math.sin(swimTime) * 0.3; // Subtle head movement
+        const bodyWaveAmp = 0.4; // Low amplitude body wave
+        const tailPhaseDelay = 1.2; // Tail lags behind body
+        const BODY_SEGMENT_COUNT = 8; // Total body segments (head to tail)
+        const SEGMENT_SPACING = 1 / (BODY_SEGMENT_COUNT - 1); // Progress increment per segment
         
-        // PROMINENT DORSAL FIN using tetrahedron (triangle shape)
-        const dorsalFin = obj.tetras[DORSAL_FIN_INDEX];
-        const bodySegment = Math.floor(obj.cubes.length * 0.35);
-        const body = obj.cubes[bodySegment];
-        dorsalFin.position.x = body.position.x;
-        dorsalFin.position.y = body.position.y + 5 + f.mids * 1; // VERY TALL
-        dorsalFin.position.z = body.position.z;
-        dorsalFin.rotation.x = 0; // Point up
-        dorsalFin.rotation.y = body.rotation.y;
-        dorsalFin.rotation.z = Math.PI; // Flip to point upward
-        const dorsalSize = 5 + f.mids * 0.8; // VERY LARGE
-        dorsalFin.scale.set(dorsalSize * 0.5, dorsalSize * 1.2, dorsalSize * 0.4);
+        // Calculate body center line positions for each segment
+        const bodyPositions: { x: number; y: number; z: number; yaw: number }[] = [];
+        for (let i = 0; i < BODY_SEGMENT_COUNT; i++) {
+          const progress = i / (BODY_SEGMENT_COUNT - 1); // 0 to 1 from head to tail
+          // Body wave increases toward tail
+          const wavePhase = swimTime - progress * tailPhaseDelay;
+          const waveAmp = bodyWaveAmp * progress * progress; // Amplitude increases quadratically toward tail
+          const x = Math.sin(wavePhase) * waveAmp * (3 + f.bass * 0.5);
+          const y = Math.sin(swimTime * 0.4 - progress * 0.3) * 0.3;
+          const z = -progress * 18; // Shark length ~18 units
+          
+          // Calculate yaw (y-rotation) based on swimming direction
+          const nextProgress = Math.min(1, progress + SEGMENT_SPACING);
+          const nextWavePhase = swimTime - nextProgress * tailPhaseDelay;
+          const nextWaveAmp = bodyWaveAmp * nextProgress * nextProgress;
+          const nextX = Math.sin(nextWavePhase) * nextWaveAmp * (3 + f.bass * 0.5);
+          const nextZ = -nextProgress * 18;
+          const yaw = Math.atan2(nextX - x, nextZ - z);
+          
+          bodyPositions.push({ x, y, z, yaw });
+        }
+        
+        // === HEAD (3 CUBES FORMING |-------| SHAPE FROM TOP) ===
+        // The hammerhead should look like: |-------| from above
+        // Cube 0: The long horizontal hammer bar (the -------) - thinner bridge
+        const hammerBar = obj.cubes[0];
+        const headPos = bodyPositions[0];
+        const hammerTotalWidth = 12; // Wide hammer bar but thinner
+        hammerBar.position.set(headPos.x + headSway, headPos.y, headPos.z + 2); // Forward position
+        hammerBar.scale.set(hammerTotalWidth, 1.0 + f.bass * 0.1, 1.2 + f.bass * 0.1); // Thinner bridge (reduced z from 2.0 to 1.2)
+        hammerBar.rotation.set(0, headPos.yaw, 0);
+        hammerBar.material.color.setStyle(cubeColor);
+        hammerBar.material.opacity = 0.95 * blend;
+        hammerBar.material.wireframe = false;
+        
+        // Cube 1: Left eye wing (the left |) - longer eye stalks
+        const leftEyeWing = obj.cubes[1];
+        leftEyeWing.position.set(
+          headPos.x + headSway - hammerTotalWidth / 2,
+          headPos.y,
+          headPos.z + 2.5 // Forward of the bar
+        );
+        leftEyeWing.scale.set(1.5, 1.3 + f.highs * 0.1, 1.5); // Longer eye wings
+        leftEyeWing.rotation.set(0, headPos.yaw, 0);
+        leftEyeWing.material.color.setStyle(cubeColor);
+        leftEyeWing.material.opacity = 0.95 * blend;
+        leftEyeWing.material.wireframe = false;
+        
+        // Cube 2: Right eye wing (the right |) - longer eye stalks
+        const rightEyeWing = obj.cubes[2];
+        rightEyeWing.position.set(
+          headPos.x + headSway + hammerTotalWidth / 2,
+          headPos.y,
+          headPos.z + 2.5 // Forward of the bar
+        );
+        rightEyeWing.scale.set(1.5, 1.3 + f.highs * 0.1, 1.5); // Longer eye wings
+        rightEyeWing.rotation.set(0, headPos.yaw, 0);
+        rightEyeWing.material.color.setStyle(cubeColor);
+        rightEyeWing.material.opacity = 0.95 * blend;
+        rightEyeWing.material.wireframe = false;
+        
+        // === TAPERED BODY (CUBES 3-6) ===
+        // Body segments taper aggressively from head toward tail
+        // Increased z-lengths significantly to eliminate gaps between segments
+        const bodyTaperX = [2.5, 2.0, 1.6, 1.2]; // Width taper (slightly wider)
+        const bodyTaperY = [1.8, 1.5, 1.2, 0.9]; // Height taper (slightly taller)
+        const bodyTaperZ = [5.0, 4.5, 4.0, 3.5]; // Much longer lengths to close gaps
+        
+        for (let i = 0; i < 4; i++) {
+          const cube = obj.cubes[3 + i];
+          // Adjust positions to connect segments without gaps
+          const segmentIndex = 1 + i; // Start from position 1 (just behind head)
+          const pos = bodyPositions[segmentIndex];
+          // Offset z more forward to overlap with previous segment
+          cube.position.set(pos.x, pos.y, pos.z + 1.5);
+          cube.scale.set(
+            bodyTaperX[i] + f.bass * 0.1,
+            bodyTaperY[i] + f.bass * 0.05,
+            bodyTaperZ[i]
+          );
+          cube.rotation.set(0, pos.yaw, Math.sin(swimTime - (1 + i) * 0.3) * 0.05);
+          cube.material.color.setStyle(cubeColor);
+          cube.material.opacity = 0.9 * blend;
+          cube.material.wireframe = false;
+        }
+        
+        // === TAIL SEGMENT (CUBE 7) ===
+        const tailCube = obj.cubes[7];
+        const tailPos = bodyPositions[5]; // Position closer to body
+        // Tail has strongest oscillation with phase delay
+        const tailSwing = Math.sin(swimTime - tailPhaseDelay * 1.5) * 1.5;
+        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z); // Adjusted to connect to body
+        tailCube.scale.set(0.8, 0.6, 4.0); // Longer and thicker tail segment
+        tailCube.rotation.set(0, tailPos.yaw + tailSwing * 0.15, 0);
+        tailCube.material.color.setStyle(cubeColor);
+        tailCube.material.opacity = 0.85 * blend;
+        tailCube.material.wireframe = false;
+        
+        // === DORSAL FIN (TETRA 0) - Tall, sharp, positioned behind head ===
+        const dorsalFin = obj.tetras[0];
+        const dorsalPos = bodyPositions[2]; // Behind head, on first body segment
+        dorsalFin.position.set(
+          dorsalPos.x,
+          dorsalPos.y + 2.5 + f.mids * 0.5, // Closer to body - reduced from 5.5 to 2.5
+          dorsalPos.z
+        );
+        dorsalFin.rotation.set(0, dorsalPos.yaw, Math.PI); // Point upward
+        dorsalFin.scale.set(3, 8 + f.mids * 0.8, 5); // MUCH taller and sharper
         dorsalFin.material.color.setStyle(tetrahedronColor);
-        dorsalFin.material.opacity = (0.9 + f.mids * 0.1) * blend;
+        dorsalFin.material.opacity = 0.9 * blend;
         dorsalFin.material.wireframe = false;
         
-        // PROMINENT TAIL FIN using tetrahedron (triangle shape)
-        const tailFin = obj.tetras[TAIL_FIN_INDEX];
-        const tail = obj.cubes[obj.cubes.length - 1];
-        tailFin.position.x = tail.position.x;
-        tailFin.position.y = tail.position.y + Math.sin(swimSpeed * 3) * 1; // Animated vertical movement
-        tailFin.position.z = tail.position.z - 3;
-        tailFin.rotation.x = Math.PI / 2; // Vertical orientation
-        tailFin.rotation.y = tail.rotation.y;
-        tailFin.rotation.z = Math.sin(swimSpeed * 3) * 0.4; // Animated wagging
-        const tailSize = 4 + f.bass * 0.8; // VERY LARGE
-        tailFin.scale.set(tailSize * 0.6, tailSize * 1.3, tailSize * 0.3);
+        // === PECTORAL FINS (TETRAS 1-2) - Much longer and bigger, flat triangular ===
+        const pectoralPos = bodyPositions[1]; // Just behind head
+        
+        // Left pectoral fin - MUCH longer and bigger
+        const leftPectoral = obj.tetras[1];
+        leftPectoral.position.set(
+          pectoralPos.x - 3, // Out from body (same position)
+          pectoralPos.y - 1.0, // Below body (same position)
+          pectoralPos.z + 1 // Same position
+        );
+        leftPectoral.rotation.set(
+          -0.3, // Slight backward angle
+          pectoralPos.yaw - 0.8, // Angled outward
+          -0.4 + Math.sin(swimTime * 1.5) * 0.1 // Slight downward angle with gentle movement
+        );
+        leftPectoral.scale.set(10, 1.2, 12); // MUCH longer and bigger (was 5, 0.6, 6)
+        leftPectoral.material.color.setStyle(tetrahedronColor);
+        leftPectoral.material.opacity = 0.85 * blend;
+        leftPectoral.material.wireframe = false;
+        
+        // Right pectoral fin (mirror) - MUCH longer and bigger
+        const rightPectoral = obj.tetras[2];
+        rightPectoral.position.set(
+          pectoralPos.x + 3, // Out from body (same position)
+          pectoralPos.y - 1.0, // Same position
+          pectoralPos.z + 1 // Same position
+        );
+        rightPectoral.rotation.set(
+          -0.3,
+          pectoralPos.yaw + 0.8,
+          0.4 - Math.sin(swimTime * 1.5) * 0.1
+        );
+        rightPectoral.scale.set(10, 1.2, 12); // MUCH longer and bigger (was 5, 0.6, 6)
+        rightPectoral.material.color.setStyle(tetrahedronColor);
+        rightPectoral.material.opacity = 0.85 * blend;
+        rightPectoral.material.wireframe = false;
+        
+        // === TAIL FIN (TETRA 3) - Asymmetric, vertical, top lobe larger ===
+        const tailFin = obj.tetras[3];
+        const tailFinSwing = Math.sin(swimTime - tailPhaseDelay * 2) * 0.6; // Most delayed, strongest swing
+        tailFin.position.set(
+          tailPos.x + tailSwing * 0.5,
+          tailPos.y + 1.5, // Offset up more for asymmetry (top lobe larger)
+          tailPos.z - 4 // Further behind tail segment
+        );
+        tailFin.rotation.set(
+          Math.PI / 2 + 0.2, // Vertical orientation, slight upward bias
+          tailPos.yaw + tailFinSwing,
+          0
+        );
+        tailFin.scale.set(1.6, 8 + f.bass * 1.0, 6); // MUCH taller tail fin
         tailFin.material.color.setStyle(tetrahedronColor);
-        tailFin.material.opacity = (0.9 + f.bass * 0.1) * blend;
+        tailFin.material.opacity = 0.9 * blend;
         tailFin.material.wireframe = false;
         
-        // Hide remaining tetras
-        const USED_TETRAS = 2; // Dorsal fin + tail fin
-        obj.tetras.slice(USED_TETRAS).forEach(t => {
-          t.position.set(0, -1000, 0);
-          t.scale.set(0.001, 0.001, 0.001);
-          t.material.opacity = 0;
-        });
+        // Hide remaining tetras (4-29)
+        for (let i = 4; i < obj.tetras.length; i++) {
+          obj.tetras[i].position.set(0, -1000, 0);
+          obj.tetras[i].scale.set(0.001, 0.001, 0.001);
+          obj.tetras[i].material.opacity = 0;
+        }
         
-        // Minimal bubbles for atmosphere - only 5 bubbles total
-        obj.octas.forEach((bubble, i) => {
-          if (i < 5) {
-            // Sparse rising bubbles
-            const bubbleSpeed = 0.5 + (i % 2) * 0.2;
-            const riseHeight = (elScaled * bubbleSpeed + i * 4) % 25;
-            const xOffset = Math.sin(i * 3) * 10;
-            const zOffset = -8 - i * 4;
-            
-            bubble.position.x = xOffset;
-            bubble.position.y = riseHeight - 12;
-            bubble.position.z = zOffset;
-            
-            const bubbleSize = 0.4 + f.highs * 0.2;
-            bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
-            bubble.rotation.x += 0.05;
-            bubble.rotation.y += 0.03;
-            
-            bubble.material.color.setStyle(octahedronColor);
-            bubble.material.opacity = (0.3 + f.highs * 0.2) * blend; // More subtle
-            bubble.material.wireframe = true;
-          } else {
-            // Hide the rest
-            bubble.position.set(0, -1000, 0);
-            bubble.scale.set(0.001, 0.001, 0.001);
-            bubble.material.opacity = 0;
-          }
-        });
+        // === AMBIENT BUBBLES (OCTAS 0-4) - Sparse atmosphere ===
+        for (let i = 0; i < 5; i++) {
+          const bubble = obj.octas[i];
+          const bubbleSpeed = 0.4 + (i % 3) * 0.15;
+          const riseHeight = (elScaled * bubbleSpeed + i * 5) % 30;
+          bubble.position.set(
+            Math.sin(i * 2.5) * 12,
+            riseHeight - 15,
+            -10 - i * 3
+          );
+          const bubbleSize = 0.35 + f.highs * 0.15;
+          bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
+          bubble.rotation.x += 0.03;
+          bubble.rotation.y += 0.02;
+          bubble.material.color.setStyle(octahedronColor);
+          bubble.material.opacity = (0.25 + f.highs * 0.15) * blend;
+          bubble.material.wireframe = true;
+        }
         
-        // Hide sphere completely - no background distractions
+        // Hide remaining octahedrons (5+)
+        for (let i = 5; i < obj.octas.length; i++) {
+          obj.octas[i].position.set(0, -1000, 0);
+          obj.octas[i].scale.set(0.001, 0.001, 0.001);
+          obj.octas[i].material.opacity = 0;
+        }
+        
+        // Hide sphere completely
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
