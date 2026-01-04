@@ -1558,11 +1558,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const headSway = Math.sin(swimTime) * 0.3; // Subtle head movement
         const bodyWaveAmp = 0.4; // Low amplitude body wave
         const tailPhaseDelay = 1.2; // Tail lags behind body
+        const BODY_SEGMENT_COUNT = 8; // Total body segments (head to tail)
+        const SEGMENT_SPACING = 1 / (BODY_SEGMENT_COUNT - 1); // Progress increment per segment
         
         // Calculate body center line positions for each segment
         const bodyPositions: { x: number; y: number; z: number; yaw: number }[] = [];
-        for (let i = 0; i < 8; i++) {
-          const progress = i / 7; // 0 to 1 from head to tail
+        for (let i = 0; i < BODY_SEGMENT_COUNT; i++) {
+          const progress = i / (BODY_SEGMENT_COUNT - 1); // 0 to 1 from head to tail
           // Body wave increases toward tail
           const wavePhase = swimTime - progress * tailPhaseDelay;
           const waveAmp = bodyWaveAmp * progress * progress; // Amplitude increases quadratically toward tail
@@ -1571,7 +1573,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           const z = -progress * 18; // Shark length ~18 units
           
           // Calculate yaw (y-rotation) based on swimming direction
-          const nextProgress = Math.min(1, progress + 0.14);
+          const nextProgress = Math.min(1, progress + SEGMENT_SPACING);
           const nextWavePhase = swimTime - nextProgress * tailPhaseDelay;
           const nextWaveAmp = bodyWaveAmp * nextProgress * nextProgress;
           const nextX = Math.sin(nextWavePhase) * nextWaveAmp * (3 + reactiveF.bass * 0.5);
