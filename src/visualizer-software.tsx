@@ -3190,38 +3190,38 @@ export default function ThreeDVisualizer() {
         
         // === HEAD (3 CUBES FORMING |-------| SHAPE FROM TOP) ===
         // The hammerhead should look like: |-------| from above
-        // Cube 0: The long horizontal hammer bar (the -------)
+        // Cube 0: The long horizontal hammer bar (the -------) - thinner bridge
         const hammerBar = obj.cubes[0];
         const headPos = bodyPositions[0];
-        const hammerTotalWidth = 14; // Wide hammer bar
+        const hammerTotalWidth = 12; // Wide hammer bar but thinner
         hammerBar.position.set(headPos.x + headSway, headPos.y, headPos.z + 2); // Forward position
-        hammerBar.scale.set(hammerTotalWidth, 1.2 + f.bass * 0.1, 2.0 + f.bass * 0.2); // Wide and flat
+        hammerBar.scale.set(hammerTotalWidth, 1.0 + f.bass * 0.1, 1.2 + f.bass * 0.1); // Thinner bridge (reduced z from 2.0 to 1.2)
         hammerBar.rotation.set(0, headPos.yaw, 0);
         hammerBar.material.color.setStyle(cubeColor);
         hammerBar.material.opacity = 0.95 * blend;
         hammerBar.material.wireframe = false;
         
-        // Cube 1: Left eye wing (the left |) - short stubby projection where eyes are
+        // Cube 1: Left eye wing (the left |) - longer eye stalks
         const leftEyeWing = obj.cubes[1];
         leftEyeWing.position.set(
           headPos.x + headSway - hammerTotalWidth / 2,
           headPos.y,
-          headPos.z + 3 // Slightly forward of the bar
+          headPos.z + 2.5 // Forward of the bar
         );
-        leftEyeWing.scale.set(1.2, 1.2 + f.highs * 0.1, 0.8); // Short and stubby (small z)
+        leftEyeWing.scale.set(1.5, 1.3 + f.highs * 0.1, 1.5); // Longer eye wings
         leftEyeWing.rotation.set(0, headPos.yaw, 0);
         leftEyeWing.material.color.setStyle(cubeColor);
         leftEyeWing.material.opacity = 0.95 * blend;
         leftEyeWing.material.wireframe = false;
         
-        // Cube 2: Right eye wing (the right |) - short stubby projection where eyes are
+        // Cube 2: Right eye wing (the right |) - longer eye stalks
         const rightEyeWing = obj.cubes[2];
         rightEyeWing.position.set(
           headPos.x + headSway + hammerTotalWidth / 2,
           headPos.y,
-          headPos.z + 3 // Slightly forward of the bar
+          headPos.z + 2.5 // Forward of the bar
         );
-        rightEyeWing.scale.set(1.2, 1.2 + f.highs * 0.1, 0.8); // Short and stubby (small z)
+        rightEyeWing.scale.set(1.5, 1.3 + f.highs * 0.1, 1.5); // Longer eye wings
         rightEyeWing.rotation.set(0, headPos.yaw, 0);
         rightEyeWing.material.color.setStyle(cubeColor);
         rightEyeWing.material.opacity = 0.95 * blend;
@@ -3229,18 +3229,18 @@ export default function ThreeDVisualizer() {
         
         // === TAPERED BODY (CUBES 3-6) ===
         // Body segments taper aggressively from head toward tail
-        // Increased z-lengths to eliminate gaps between segments
-        const bodyTaperX = [2.2, 1.8, 1.4, 1.0]; // Width taper
-        const bodyTaperY = [1.6, 1.3, 1.0, 0.7]; // Height taper
-        const bodyTaperZ = [4.0, 3.8, 3.5, 3.2]; // Longer lengths to close gaps
+        // Increased z-lengths significantly to eliminate gaps between segments
+        const bodyTaperX = [2.5, 2.0, 1.6, 1.2]; // Width taper (slightly wider)
+        const bodyTaperY = [1.8, 1.5, 1.2, 0.9]; // Height taper (slightly taller)
+        const bodyTaperZ = [5.0, 4.5, 4.0, 3.5]; // Much longer lengths to close gaps
         
         for (let i = 0; i < 4; i++) {
           const cube = obj.cubes[3 + i];
           // Adjust positions to connect segments without gaps
           const segmentIndex = 1 + i; // Start from position 1 (just behind head)
           const pos = bodyPositions[segmentIndex];
-          // Offset z slightly forward to overlap with previous segment
-          cube.position.set(pos.x, pos.y, pos.z + 0.5);
+          // Offset z more forward to overlap with previous segment
+          cube.position.set(pos.x, pos.y, pos.z + 1.5);
           cube.scale.set(
             bodyTaperX[i] + f.bass * 0.1,
             bodyTaperY[i] + f.bass * 0.05,
@@ -3254,11 +3254,11 @@ export default function ThreeDVisualizer() {
         
         // === TAIL SEGMENT (CUBE 7) ===
         const tailCube = obj.cubes[7];
-        const tailPos = bodyPositions[6]; // Position closer to body
+        const tailPos = bodyPositions[5]; // Position closer to body
         // Tail has strongest oscillation with phase delay
         const tailSwing = Math.sin(swimTime - tailPhaseDelay * 1.5) * 1.5;
-        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z - 1); // Adjusted to connect to body
-        tailCube.scale.set(0.6, 0.5, 3.0); // Longer tail segment
+        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z); // Adjusted to connect to body
+        tailCube.scale.set(0.8, 0.6, 4.0); // Longer and thicker tail segment
         tailCube.rotation.set(0, tailPos.yaw + tailSwing * 0.15, 0);
         tailCube.material.color.setStyle(cubeColor);
         tailCube.material.opacity = 0.85 * blend;
@@ -3278,39 +3278,39 @@ export default function ThreeDVisualizer() {
         dorsalFin.material.opacity = 0.9 * blend;
         dorsalFin.material.wireframe = false;
         
-        // === PECTORAL FINS (TETRAS 1-2) - Flat triangular, slight downward angle ===
+        // === PECTORAL FINS (TETRAS 1-2) - Much longer and bigger, flat triangular ===
         const pectoralPos = bodyPositions[1]; // Just behind head
         
-        // Left pectoral fin
+        // Left pectoral fin - MUCH longer and bigger
         const leftPectoral = obj.tetras[1];
         leftPectoral.position.set(
-          pectoralPos.x - 3, // Out from body
-          pectoralPos.y - 1.0, // Below body
-          pectoralPos.z + 1
+          pectoralPos.x - 3, // Out from body (same position)
+          pectoralPos.y - 1.0, // Below body (same position)
+          pectoralPos.z + 1 // Same position
         );
         leftPectoral.rotation.set(
           -0.3, // Slight backward angle
           pectoralPos.yaw - 0.8, // Angled outward
           -0.4 + Math.sin(swimTime * 1.5) * 0.1 // Slight downward angle with gentle movement
         );
-        leftPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
+        leftPectoral.scale.set(10, 1.2, 12); // MUCH longer and bigger (was 5, 0.6, 6)
         leftPectoral.material.color.setStyle(tetrahedronColor);
         leftPectoral.material.opacity = 0.85 * blend;
         leftPectoral.material.wireframe = false;
         
-        // Right pectoral fin (mirror)
+        // Right pectoral fin (mirror) - MUCH longer and bigger
         const rightPectoral = obj.tetras[2];
         rightPectoral.position.set(
-          pectoralPos.x + 3, // Out from body
-          pectoralPos.y - 1.0,
-          pectoralPos.z + 1
+          pectoralPos.x + 3, // Out from body (same position)
+          pectoralPos.y - 1.0, // Same position
+          pectoralPos.z + 1 // Same position
         );
         rightPectoral.rotation.set(
           -0.3,
           pectoralPos.yaw + 0.8,
           0.4 - Math.sin(swimTime * 1.5) * 0.1
         );
-        rightPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
+        rightPectoral.scale.set(10, 1.2, 12); // MUCH longer and bigger (was 5, 0.6, 6)
         rightPectoral.material.color.setStyle(tetrahedronColor);
         rightPectoral.material.opacity = 0.85 * blend;
         rightPectoral.material.wireframe = false;
