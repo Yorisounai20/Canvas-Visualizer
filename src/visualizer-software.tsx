@@ -5380,6 +5380,12 @@ export default function ThreeDVisualizer() {
             🎵 Waveforms
           </button>
           <button 
+            onClick={() => setActiveTab('presets')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            ⏱️ Presets
+          </button>
+          <button 
             onClick={() => setActiveTab('controls')} 
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'controls' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
@@ -5414,12 +5420,6 @@ export default function ThreeDVisualizer() {
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'postfx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             🎭 Post-FX
-          </button>
-          <button 
-            onClick={() => setActiveTab('presets')} 
-            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'presets' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
-          >
-            ⏱️ Presets
           </button>
           <button 
             onClick={() => setActiveTab('textAnimator')} 
