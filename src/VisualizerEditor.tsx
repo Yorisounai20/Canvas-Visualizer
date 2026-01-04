@@ -1532,191 +1532,232 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           }
         });
       } else if (type === 'hammerhead') {
-        // Hammerhead Shark - Swimming shark with distinctive hammer-shaped head
-        // Constants for shark anatomy
-        const TAIL_SEGMENT_COUNT = 2; // Last 2 cubes form the tail
-        const HAMMER_TETRA_COUNT = 8; // Total tetras for hammerhead
-        const HAMMER_BAR_TETRA_COUNT = 6; // Tetras forming horizontal bar
-        const FIN_TETRA_START = 8; // Start index for fin tetras
-        const FIN_TETRA_END = 12; // End index for fin tetras
-        const BUBBLE_COUNT = 15; // Number of rising bubbles in ocean
+        // Hammerhead Shark - Distinctive T-shaped head with smooth predatory swimming
+        // GEOMETRY ALLOCATION:
+        // Cubes 0-2: Hammer head (center core + left wing + right wing)
+        // Cubes 3-6: Tapered body segments
+        // Cube 7: Tail segment
+        // Tetras 0: Dorsal fin (tall, sharp)
+        // Tetras 1-2: Pectoral fins (left and right)
+        // Tetras 3: Tail fin (asymmetric, vertical)
         
-        const swimSpeed = el * speed * 0.8;
-        const rotationSpeed = cameraAutoRotate ? el * 0.2 : 0;
+        const swimTime = el * speed * 0.6; // Slower, more gliding motion
+        const rotationSpeed = cameraAutoRotate ? el * 0.15 : 0;
         
-        // Camera follows shark from side/above angle
+        // Camera positioned for 3/4 view to show hammer shape clearly
+        const camAngle = rotationSpeed + activeCameraRotation;
         cam.position.set(
-          Math.sin(rotationSpeed + activeCameraRotation) * activeCameraDistance * 0.8 + Math.sin(swimSpeed * 0.3) * 2,
-          5 + activeCameraHeight + Math.sin(swimSpeed * 0.5) * 1,
-          activeCameraDistance * 0.8
+          Math.sin(camAngle) * activeCameraDistance * 0.9,
+          4 + activeCameraHeight + Math.sin(swimTime * 0.3) * 0.5,
+          Math.cos(camAngle) * activeCameraDistance * 0.6
         );
-        cam.lookAt(0, 0, -5);
+        cam.lookAt(0, 0, -8);
         
-        // Shark body using cubes - serpentine swimming motion
-        obj.cubes.forEach((c, i) => {
-          const progress = i / obj.cubes.length;
-          const isHead = i === 0;
-          const isTail = i >= obj.cubes.length - TAIL_SEGMENT_COUNT;
-          
-          // Swimming path - gentle side-to-side motion
-          const swayAmount = (1 - progress) * 2 + reactiveF.bass * 1.5;
-          const x = Math.sin(swimSpeed - i * 0.4) * swayAmount;
-          const y = Math.sin(swimSpeed * 0.6 - i * 0.3) * 0.5;
-          const z = progress * -20 - 5;
-          
-          c.position.set(x, y, z);
-          
-          // Scale: larger head, medium body, thin tail
-          let scaleX, scaleY, scaleZ;
-          if (isHead) {
-            scaleX = 2 + reactiveF.bass * 0.5;
-            scaleY = 1.5 + reactiveF.bass * 0.3;
-            scaleZ = 2 + reactiveF.bass * 0.5;
-          } else if (isTail) {
-            const tailProgress = (i - (obj.cubes.length - TAIL_SEGMENT_COUNT)) / TAIL_SEGMENT_COUNT;
-            scaleX = 0.8 - tailProgress * 0.5;
-            scaleY = 0.6 - tailProgress * 0.4;
-            scaleZ = 1.2 + reactiveF.bass * 0.3;
-          } else {
-            scaleX = 1.5;
-            scaleY = 1.2;
-            scaleZ = 1.8;
-          }
-          c.scale.set(scaleX, scaleY, scaleZ);
-          
-          // Rotation to follow swimming path
-          const nextI = Math.min(i + 1, obj.cubes.length - 1);
-          const nextProgress = nextI / obj.cubes.length;
-          const nextSwayAmount = (1 - nextProgress) * 2 + reactiveF.bass * 1.5;
-          const nextX = Math.sin(swimSpeed - nextI * 0.4) * nextSwayAmount;
-          const nextY = Math.sin(swimSpeed * 0.6 - nextI * 0.3) * 0.5;
-          const nextZ = nextProgress * -20 - 5;
-          
-          c.rotation.y = Math.atan2(nextX - x, nextZ - z);
-          c.rotation.x = Math.atan2(nextY - y, nextZ - z) * 0.5;
-          c.rotation.z = Math.sin(swimSpeed - i * 0.4) * 0.1;
-          
-          (c.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-          (c.material as THREE.MeshBasicMaterial).opacity = (0.85 + reactiveF.bass * 0.15) * blend;
-          (c.material as THREE.MeshBasicMaterial).wireframe = false;
-        });
+        // === SWIMMING ANIMATION ===
+        // Smooth gliding motion - low amplitude, calm and predatory
+        const headSway = Math.sin(swimTime) * 0.3; // Subtle head movement
+        const bodyWaveAmp = 0.4; // Low amplitude body wave
+        const tailPhaseDelay = 1.2; // Tail lags behind body
         
-        // Hammerhead shape using tetras - distinctive T-shaped head
-        const head = obj.cubes[0];
-        obj.tetras.slice(0, HAMMER_TETRA_COUNT).forEach((hammer, i) => {
-          if (i < HAMMER_BAR_TETRA_COUNT) {
-            // Horizontal hammer bar (6 tetras spread across)
-            const hammerWidth = 7;
-            const hammerPosition = (i / 5 - 0.5) * hammerWidth;
-            hammer.position.x = head.position.x + hammerPosition;
-            hammer.position.y = head.position.y + 0.3;
-            hammer.position.z = head.position.z + 2;
-            hammer.rotation.x = 0;
-            hammer.rotation.y = head.rotation.y;
-            hammer.rotation.z = Math.PI / 2;
-            const hammerSize = 0.8 + reactiveF.highs * 0.3;
-            hammer.scale.set(hammerSize, hammerSize * 0.4, hammerSize * 1.5);
-            (hammer.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
-            (hammer.material as THREE.MeshBasicMaterial).opacity = (0.9 + reactiveF.highs * 0.1) * blend;
-            (hammer.material as THREE.MeshBasicMaterial).wireframe = false;
-          } else {
-            // Eyes on ends of hammer (2 tetras)
-            const side = i === 6 ? 1 : -1;
-            const hammerWidth = 3.5;
-            hammer.position.x = head.position.x + side * hammerWidth;
-            hammer.position.y = head.position.y + 0.5;
-            hammer.position.z = head.position.z + 2.2;
-            hammer.rotation.copy(head.rotation);
-            const eyeSize = 0.5 + reactiveF.highs * 0.2;
-            hammer.scale.set(eyeSize, eyeSize, eyeSize * 0.6);
-            (hammer.material as THREE.MeshBasicMaterial).color.setStyle('#ffffff');
-            (hammer.material as THREE.MeshBasicMaterial).opacity = (0.95 + reactiveF.highs * 0.05) * blend;
-            (hammer.material as THREE.MeshBasicMaterial).wireframe = false;
-          }
-        });
-        
-        // Dorsal fin and side fins using remaining tetras
-        obj.tetras.slice(FIN_TETRA_START, FIN_TETRA_END).forEach((fin, i) => {
-          const bodySegment = Math.floor(obj.cubes.length * 0.3); // Fins near front
-          const body = obj.cubes[bodySegment];
+        // Calculate body center line positions for each segment
+        const bodyPositions: { x: number; y: number; z: number; yaw: number }[] = [];
+        for (let i = 0; i < 8; i++) {
+          const progress = i / 7; // 0 to 1 from head to tail
+          // Body wave increases toward tail
+          const wavePhase = swimTime - progress * tailPhaseDelay;
+          const waveAmp = bodyWaveAmp * progress * progress; // Amplitude increases quadratically toward tail
+          const x = Math.sin(wavePhase) * waveAmp * (3 + reactiveF.bass * 0.5);
+          const y = Math.sin(swimTime * 0.4 - progress * 0.3) * 0.3;
+          const z = -progress * 18; // Shark length ~18 units
           
-          if (i === 0) {
-            // Dorsal fin (top)
-            fin.position.x = body.position.x;
-            fin.position.y = body.position.y + 2.5 + reactiveF.mids * 0.5;
-            fin.position.z = body.position.z;
-            fin.rotation.x = -Math.PI / 6;
-            fin.rotation.y = body.rotation.y;
-            const finSize = 1.8 + reactiveF.mids * 0.3;
-            fin.scale.set(finSize * 0.3, finSize, finSize * 0.5);
-          } else {
-            // Pectoral fins (sides)
-            const side = i % 2 === 0 ? 1 : -1;
-            const finAngle = side * Math.PI / 3 + Math.sin(swimSpeed * 2) * 0.3;
-            fin.position.x = body.position.x + Math.cos(finAngle) * 2;
-            fin.position.y = body.position.y - 0.5 + Math.sin(swimSpeed * 2 + i) * 0.3;
-            fin.position.z = body.position.z + 1;
-            fin.rotation.x = -Math.PI / 4;
-            fin.rotation.y = body.rotation.y + finAngle;
-            fin.rotation.z = side * Math.PI / 6 + Math.sin(swimSpeed * 2 + i) * 0.2;
-            const pectSize = 1.2 + reactiveF.mids * 0.2;
-            fin.scale.set(pectSize * 0.4, pectSize * 1.2, pectSize * 0.3);
-          }
+          // Calculate yaw (y-rotation) based on swimming direction
+          const nextProgress = Math.min(1, progress + 0.14);
+          const nextWavePhase = swimTime - nextProgress * tailPhaseDelay;
+          const nextWaveAmp = bodyWaveAmp * nextProgress * nextProgress;
+          const nextX = Math.sin(nextWavePhase) * nextWaveAmp * (3 + reactiveF.bass * 0.5);
+          const nextZ = -nextProgress * 18;
+          const yaw = Math.atan2(nextX - x, nextZ - z);
           
-          (fin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
-          (fin.material as THREE.MeshBasicMaterial).opacity = (0.8 + reactiveF.mids * 0.2) * blend;
-          (fin.material as THREE.MeshBasicMaterial).wireframe = false;
-        });
+          bodyPositions.push({ x, y, z, yaw });
+        }
         
-        // Ocean environment - bubbles and particles using octas
-        obj.octas.forEach((bubble, i) => {
-          if (i < BUBBLE_COUNT) {
-            // Rising bubbles
-            const bubbleSpeed = 0.5 + (i % 3) * 0.2;
-            const riseHeight = (el * bubbleSpeed + i) % 20;
-            const xOffset = Math.sin(i * 2) * 8;
-            const zOffset = -5 - (i % 5) * 3;
-            
-            bubble.position.x = xOffset + Math.sin(el + i) * 2;
-            bubble.position.y = riseHeight - 10 + Math.sin(el * 2 + i) * 0.5;
-            bubble.position.z = zOffset;
-            
-            const bubbleSize = 0.3 + reactiveF.highs * 0.2;
-            bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
-            bubble.rotation.x += 0.05;
-            bubble.rotation.y += 0.03;
-            
-            (bubble.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
-            (bubble.material as THREE.MeshBasicMaterial).opacity = (0.4 + reactiveF.highs * 0.3) * blend;
-            (bubble.material as THREE.MeshBasicMaterial).wireframe = true;
-          } else {
-            // Ocean floor rocks/coral
-            const rockIndex = i - 15;
-            const rockX = (rockIndex % 5 - 2) * 6 + Math.sin(rockIndex) * 2;
-            const rockZ = -Math.floor(rockIndex / 5) * 4 - 10;
-            
-            bubble.position.x = rockX;
-            bubble.position.y = -6 + Math.sin(rockIndex * 3) * 0.5 + reactiveF.bass * 0.3;
-            bubble.position.z = rockZ;
-            
-            const rockSize = 1 + (rockIndex % 3) * 0.5 + reactiveF.bass * 0.2;
-            bubble.scale.set(rockSize, rockSize * 0.8, rockSize);
-            bubble.rotation.y = rockIndex * 0.8;
-            
-            (bubble.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
-            (bubble.material as THREE.MeshBasicMaterial).opacity = (0.5 + reactiveF.mids * 0.2) * blend;
-            (bubble.material as THREE.MeshBasicMaterial).wireframe = true;
-          }
-        });
+        // === HEAD (3 CUBES FORMING T-SHAPE) ===
+        // Cube 0: CENTER HEAD CORE
+        const headCore = obj.cubes[0];
+        const headPos = bodyPositions[0];
+        headCore.position.set(headPos.x + headSway, headPos.y, headPos.z);
+        headCore.scale.set(2.2 + reactiveF.bass * 0.2, 1.6 + reactiveF.bass * 0.1, 3.5 + reactiveF.bass * 0.3);
+        headCore.rotation.set(0, headPos.yaw, 0);
+        (headCore.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (headCore.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (headCore.material as THREE.MeshBasicMaterial).wireframe = false;
         
-        // Hide sphere or use as distant light source
-        obj.sphere.position.set(10, 15, -30);
-        const sunSize = 8 + reactiveF.bass * 2;
-        obj.sphere.scale.set(sunSize, sunSize, sunSize);
-        obj.sphere.rotation.y += 0.005;
-        (obj.sphere.material as THREE.MeshBasicMaterial).color.setStyle('#ffeb99');
-        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.bass * 0.1) * blend;
-        (obj.sphere.material as THREE.MeshBasicMaterial).wireframe = false;
+        // Cube 1: LEFT HAMMER WING (extends clearly beyond body)
+        const leftWing = obj.cubes[1];
+        const hammerWidth = 5.5; // Total head width ~11 units, body width ~4.4 units = 1.4x ratio
+        leftWing.position.set(
+          headPos.x + headSway - hammerWidth,
+          headPos.y - 0.2, // Slight downward tilt
+          headPos.z + 1.5 // Forward of head center
+        );
+        leftWing.scale.set(4.5 + reactiveF.highs * 0.2, 1.1 + reactiveF.highs * 0.1, 1.8);
+        leftWing.rotation.set(0.1, headPos.yaw, 0); // Slight downward angle
+        (leftWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (leftWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (leftWing.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // Cube 2: RIGHT HAMMER WING (mirror of left)
+        const rightWing = obj.cubes[2];
+        rightWing.position.set(
+          headPos.x + headSway + hammerWidth,
+          headPos.y - 0.2, // Slight downward tilt
+          headPos.z + 1.5 // Forward of head center
+        );
+        rightWing.scale.set(4.5 + reactiveF.highs * 0.2, 1.1 + reactiveF.highs * 0.1, 1.8);
+        rightWing.rotation.set(0.1, headPos.yaw, 0); // Slight downward angle
+        (rightWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (rightWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (rightWing.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // === TAPERED BODY (CUBES 3-6) ===
+        // Body segments taper aggressively from head toward tail
+        const bodyTaperX = [2.0, 1.6, 1.2, 0.8]; // Width taper
+        const bodyTaperY = [1.5, 1.2, 0.9, 0.6]; // Height taper
+        const bodyTaperZ = [3.0, 2.8, 2.5, 2.2]; // Length
+        
+        for (let i = 0; i < 4; i++) {
+          const cube = obj.cubes[3 + i];
+          const pos = bodyPositions[2 + i]; // Body starts at segment 2
+          cube.position.set(pos.x, pos.y, pos.z);
+          cube.scale.set(
+            bodyTaperX[i] + reactiveF.bass * 0.1,
+            bodyTaperY[i] + reactiveF.bass * 0.05,
+            bodyTaperZ[i]
+          );
+          cube.rotation.set(0, pos.yaw, Math.sin(swimTime - (2 + i) * 0.3) * 0.05);
+          (cube.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+          (cube.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
+          (cube.material as THREE.MeshBasicMaterial).wireframe = false;
+        }
+        
+        // === TAIL SEGMENT (CUBE 7) ===
+        const tailCube = obj.cubes[7];
+        const tailPos = bodyPositions[7];
+        // Tail has strongest oscillation with phase delay
+        const tailSwing = Math.sin(swimTime - tailPhaseDelay * 1.5) * 1.5;
+        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z);
+        tailCube.scale.set(0.5, 0.4, 2.0);
+        tailCube.rotation.set(0, tailPos.yaw + tailSwing * 0.15, 0);
+        (tailCube.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (tailCube.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
+        (tailCube.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // === DORSAL FIN (TETRA 0) - Tall, sharp, positioned behind head ===
+        const dorsalFin = obj.tetras[0];
+        const dorsalPos = bodyPositions[3]; // Behind head, on first body segment
+        dorsalFin.position.set(
+          dorsalPos.x,
+          dorsalPos.y + 3.5 + reactiveF.mids * 0.5, // Tall fin
+          dorsalPos.z - 1
+        );
+        dorsalFin.rotation.set(0, dorsalPos.yaw, Math.PI); // Point upward
+        dorsalFin.scale.set(1.5, 4 + reactiveF.mids * 0.4, 2.5); // Tall and sharp
+        (dorsalFin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+        (dorsalFin.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
+        (dorsalFin.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // === PECTORAL FINS (TETRAS 1-2) - Flat triangular, slight downward angle ===
+        const pectoralPos = bodyPositions[2]; // Just behind head
+        
+        // Left pectoral fin
+        const leftPectoral = obj.tetras[1];
+        leftPectoral.position.set(
+          pectoralPos.x - 2.5,
+          pectoralPos.y - 0.8, // Below body
+          pectoralPos.z + 0.5
+        );
+        leftPectoral.rotation.set(
+          -0.3, // Slight backward angle
+          pectoralPos.yaw - 0.8, // Angled outward
+          -0.4 + Math.sin(swimTime * 1.5) * 0.1 // Slight downward angle with gentle movement
+        );
+        leftPectoral.scale.set(2.5, 0.3, 3); // Flat triangular plane
+        (leftPectoral.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+        (leftPectoral.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
+        (leftPectoral.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // Right pectoral fin (mirror)
+        const rightPectoral = obj.tetras[2];
+        rightPectoral.position.set(
+          pectoralPos.x + 2.5,
+          pectoralPos.y - 0.8,
+          pectoralPos.z + 0.5
+        );
+        rightPectoral.rotation.set(
+          -0.3,
+          pectoralPos.yaw + 0.8,
+          0.4 - Math.sin(swimTime * 1.5) * 0.1
+        );
+        rightPectoral.scale.set(2.5, 0.3, 3);
+        (rightPectoral.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+        (rightPectoral.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
+        (rightPectoral.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // === TAIL FIN (TETRA 3) - Asymmetric, vertical, top lobe larger ===
+        const tailFin = obj.tetras[3];
+        const tailFinSwing = Math.sin(swimTime - tailPhaseDelay * 2) * 0.6; // Most delayed, strongest swing
+        tailFin.position.set(
+          tailPos.x + tailSwing * 0.5,
+          tailPos.y + 0.8, // Offset up for asymmetry (top lobe larger)
+          tailPos.z - 2.5 // Behind tail segment
+        );
+        tailFin.rotation.set(
+          Math.PI / 2 + 0.2, // Vertical orientation, slight upward bias
+          tailPos.yaw + tailFinSwing,
+          0
+        );
+        tailFin.scale.set(0.8, 4 + reactiveF.bass * 0.5, 3); // Taller than wide, longer than body width
+        (tailFin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
+        (tailFin.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
+        (tailFin.material as THREE.MeshBasicMaterial).wireframe = false;
+        
+        // Hide remaining tetras (4-29)
+        for (let i = 4; i < obj.tetras.length; i++) {
+          obj.tetras[i].position.set(0, -1000, 0);
+          obj.tetras[i].scale.set(0.001, 0.001, 0.001);
+          (obj.tetras[i].material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+        
+        // === AMBIENT BUBBLES (OCTAS 0-4) - Sparse atmosphere ===
+        for (let i = 0; i < 5; i++) {
+          const bubble = obj.octas[i];
+          const bubbleSpeed = 0.4 + (i % 3) * 0.15;
+          const riseHeight = (el * bubbleSpeed + i * 5) % 30;
+          bubble.position.set(
+            Math.sin(i * 2.5) * 12,
+            riseHeight - 15,
+            -10 - i * 3
+          );
+          const bubbleSize = 0.35 + reactiveF.highs * 0.15;
+          bubble.scale.set(bubbleSize, bubbleSize, bubbleSize);
+          bubble.rotation.x += 0.03;
+          bubble.rotation.y += 0.02;
+          (bubble.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
+          (bubble.material as THREE.MeshBasicMaterial).opacity = (0.25 + reactiveF.highs * 0.15) * blend;
+          (bubble.material as THREE.MeshBasicMaterial).wireframe = true;
+        }
+        
+        // Hide remaining octahedrons (5+)
+        for (let i = 5; i < obj.octas.length; i++) {
+          obj.octas[i].position.set(0, -1000, 0);
+          obj.octas[i].scale.set(0.001, 0.001, 0.001);
+          (obj.octas[i].material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+        
+        // Hide sphere completely
+        obj.sphere.position.set(0, -1000, 0);
+        obj.sphere.scale.set(0.001, 0.001, 0.001);
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = 0;
       }
 
       // ENVIRONMENT RENDERING - Independent from presets
