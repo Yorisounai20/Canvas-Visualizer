@@ -1768,6 +1768,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       }
 
       // ENVIRONMENT RENDERING - Independent from presets
+      // Uses octahedrons indices 30-44 (15 objects created specifically for environment)
+      // Positioned within visible camera range (default camera at z=15, looking at origin)
+      const ENV_START_INDEX = 30;
+      const ENV_MAX_COUNT = 15;
+      
       // Find active environment keyframe
       const activeEnvKeyframe = [...environmentKeyframes]
         .reverse()
@@ -1778,55 +1783,58 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const envIntensity = activeEnvKeyframe.intensity;
         const envColor = activeEnvKeyframe.color;
         
-        // Use a subset of available objects for environment (don't interfere with presets)
-        // We'll use objects that might not be fully utilized by some presets
-        const envObjectCount = Math.floor(envIntensity * 15); // 0-15 environment objects
+        // Use octahedrons indices 30-44 (15 objects) for environment
+        const envObjectCount = Math.min(Math.floor(envIntensity * ENV_MAX_COUNT), ENV_MAX_COUNT);
         
         if (envType === 'ocean') {
-          // Ocean environment: water surface, light rays from above
-          // Use remaining octas as light rays and particles
-          for (let i = 30; i < 30 + envObjectCount; i++) {
-            if (i >= obj.octas.length) break;
-            const envObj = obj.octas[i];
+          // Ocean environment: light rays from above + animated particles
+          // Positioned within the visible frame around the center
+          for (let i = 0; i < envObjectCount; i++) {
+            const idx = ENV_START_INDEX + i;
+            if (idx >= obj.octas.length) break;
+            const envObj = obj.octas[idx];
             
-            // Light rays from surface
-            const rayX = (i % 5 - 2) * 8;
-            const rayZ = -20 + (Math.floor(i / 5)) * 5;
-            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 2;
-            envObj.position.y = 10 - i * 0.3 + Math.sin(el + i) * 0.5;
+            // Light rays from surface - positioned in visible area
+            // Spread rays across the visible area (-8 to +8 on X, -5 to +5 on Z)
+            const rayX = ((i % 5) - 2) * 4; // -8 to +8
+            const rayZ = ((Math.floor(i / 5)) - 1) * 5; // -5 to +5
+            envObj.position.x = rayX + Math.sin(el * 0.5 + i) * 1.5;
+            envObj.position.y = 6 + Math.sin(el + i) * 0.5; // Above center, visible in frame
             envObj.position.z = rayZ;
             envObj.rotation.x = Math.PI / 4;
             envObj.rotation.z = Math.sin(el * 0.3 + i) * 0.2;
             const raySize = 0.5 + reactiveF.highs * 0.3;
-            envObj.scale.set(raySize * 0.3, raySize * 8, raySize * 0.3);
+            envObj.scale.set(raySize * 0.3, raySize * 6, raySize * 0.3);
             (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#40e0d0');
-            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.2 + reactiveF.highs * 0.2) * envIntensity;
+            (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.highs * 0.3) * envIntensity;
             (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
           }
         } else if (envType === 'forest') {
           // Forest environment: trees, ground fog
-          for (let i = 30; i < 30 + envObjectCount; i++) {
-            if (i >= obj.octas.length) break;
-            const envObj = obj.octas[i];
+          // Positioned around the edges of the visible frame
+          for (let i = 0; i < envObjectCount; i++) {
+            const idx = ENV_START_INDEX + i;
+            if (idx >= obj.octas.length) break;
+            const envObj = obj.octas[idx];
             
             if (i % 3 === 0) {
-              // Trees (tall vertical octas)
-              const treeX = ((i % 5) - 2) * 6;
-              const treeZ = -15 - Math.floor((i - 30) / 5) * 4;
-              envObj.position.set(treeX, -2, treeZ);
+              // Trees (tall vertical octas) - positioned at back of scene
+              const treeX = ((i % 5) - 2) * 4; // -8 to +8
+              const treeZ = -5 - (Math.floor(i / 5)) * 3; // Behind center
+              envObj.position.set(treeX, 0, treeZ);
               envObj.rotation.set(0, el * 0.1 + i, 0);
               const treeHeight = 4 + (i % 3);
               envObj.scale.set(1, treeHeight, 1);
               (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#2d5016');
               (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + reactiveF.mids * 0.2) * envIntensity;
             } else {
-              // Fog/foliage particles
-              const fogX = Math.sin(i * 3) * 10;
-              const fogY = -3 + Math.sin(el * 0.3 + i) * 2;
-              const fogZ = -10 - (i % 10) * 2;
+              // Fog/foliage particles - floating in visible area
+              const fogX = Math.sin(i * 3) * 6;
+              const fogY = -2 + Math.sin(el * 0.3 + i) * 2;
+              const fogZ = Math.cos(i * 2) * 4;
               envObj.position.set(fogX, fogY, fogZ);
               envObj.rotation.y += 0.02;
-              envObj.scale.set(2, 2, 2);
+              envObj.scale.set(1.5, 1.5, 1.5);
               (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#4a7c59');
               (envObj.material as THREE.MeshBasicMaterial).opacity = (0.3 + reactiveF.bass * 0.1) * envIntensity;
             }
@@ -1834,50 +1842,56 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           }
         } else if (envType === 'space') {
           // Space environment: stars, distant planets
-          for (let i = 30; i < 30 + envObjectCount; i++) {
-            if (i >= obj.octas.length) break;
-            const envObj = obj.octas[i];
+          // Positioned as a backdrop sphere around the scene
+          for (let i = 0; i < envObjectCount; i++) {
+            const idx = ENV_START_INDEX + i;
+            if (idx >= obj.octas.length) break;
+            const envObj = obj.octas[idx];
             
             if (i % 4 === 0) {
-              // Distant planets
-              const planetDist = 30 + (i % 3) * 10;
+              // Distant planets - visible in background
+              const planetDist = 12 + (i % 3) * 3;
               const planetAngle = (i / 4) * Math.PI * 2 + el * 0.1;
               envObj.position.x = Math.cos(planetAngle) * planetDist;
-              envObj.position.y = ((i % 7) - 3) * 5;
-              envObj.position.z = Math.sin(planetAngle) * planetDist;
+              envObj.position.y = ((i % 5) - 2) * 3;
+              envObj.position.z = Math.sin(planetAngle) * planetDist - 5;
               envObj.rotation.x += 0.01;
               envObj.rotation.y += 0.02;
-              const planetSize = 3 + (i % 3);
+              const planetSize = 2 + (i % 3);
               envObj.scale.set(planetSize, planetSize, planetSize);
               (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#8b5cf6');
               (envObj.material as THREE.MeshBasicMaterial).opacity = (0.4 + reactiveF.mids * 0.2) * envIntensity;
               (envObj.material as THREE.MeshBasicMaterial).wireframe = true;
             } else {
-              // Stars (small dots)
-              const starX = (Math.sin(i * 7) * 40);
-              const starY = (Math.cos(i * 5) * 30);
-              const starZ = (Math.sin(i * 3) * 40) - 30;
+              // Stars (small dots) - distributed in visible area
+              const starAngle = (i / envObjectCount) * Math.PI * 2;
+              const starDist = 8 + (i % 5) * 2;
+              const starX = Math.cos(starAngle + el * 0.05) * starDist;
+              const starY = ((i % 7) - 3) * 2 + Math.sin(el * 0.3 + i) * 0.5;
+              const starZ = Math.sin(starAngle + el * 0.05) * starDist - 3;
               envObj.position.set(starX, starY, starZ);
-              const starTwinkle = 0.2 + Math.sin(el * 2 + i) * 0.1 + reactiveF.highs * 0.2;
+              const starTwinkle = 0.3 + Math.sin(el * 2 + i) * 0.15 + reactiveF.highs * 0.2;
               envObj.scale.set(starTwinkle, starTwinkle, starTwinkle);
               (envObj.material as THREE.MeshBasicMaterial).color.setStyle(envColor || '#ffffff');
-              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.6 + Math.sin(el * 3 + i) * 0.3) * envIntensity;
+              (envObj.material as THREE.MeshBasicMaterial).opacity = (0.7 + Math.sin(el * 3 + i) * 0.3) * envIntensity;
               (envObj.material as THREE.MeshBasicMaterial).wireframe = false;
             }
           }
         } else if (envType === 'city') {
           // City environment: buildings, lights, grid floor
-          for (let i = 30; i < 30 + envObjectCount; i++) {
-            if (i >= obj.octas.length) break;
-            const envObj = obj.octas[i];
+          // Positioned as a backdrop around the scene
+          for (let i = 0; i < envObjectCount; i++) {
+            const idx = ENV_START_INDEX + i;
+            if (idx >= obj.octas.length) break;
+            const envObj = obj.octas[idx];
             
-            // Buildings in a grid
-            const gridX = ((i % 5) - 2) * 8;
-            const gridZ = -15 - Math.floor((i - 30) / 5) * 6;
+            // Buildings in a grid - visible behind center
+            const gridX = ((i % 5) - 2) * 4;
+            const gridZ = -5 - Math.floor(i / 5) * 4;
             const buildingHeight = 3 + ((i * 7) % 5) + reactiveF.bass * 2;
-            envObj.position.set(gridX, buildingHeight / 2 - 5, gridZ);
+            envObj.position.set(gridX, buildingHeight / 2 - 3, gridZ);
             envObj.rotation.y = 0;
-            envObj.scale.set(2, buildingHeight, 2);
+            envObj.scale.set(1.5, buildingHeight, 1.5);
             
             // Window lights (pulsing with music)
             const lightIntensity = Math.sin(el * 2 + i) * 0.3 + reactiveF.mids * 0.5;
@@ -1887,15 +1901,17 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           }
         } else if (envType === 'abstract') {
           // Abstract environment: geometric grid, floating shapes
-          for (let i = 30; i < 30 + envObjectCount; i++) {
-            if (i >= obj.octas.length) break;
-            const envObj = obj.octas[i];
+          // Positioned as orbiting shapes in visible area
+          for (let i = 0; i < envObjectCount; i++) {
+            const idx = ENV_START_INDEX + i;
+            if (idx >= obj.octas.length) break;
+            const envObj = obj.octas[idx];
             
-            // Floating geometric shapes in patterns
+            // Floating geometric shapes in patterns - within visible range
             const layerAngle = (i / envObjectCount) * Math.PI * 2 + el * 0.5;
-            const layerRadius = 15 + (i % 3) * 5;
+            const layerRadius = 6 + (i % 3) * 2;
             envObj.position.x = Math.cos(layerAngle) * layerRadius;
-            envObj.position.y = Math.sin(el + i * 0.5) * 8;
+            envObj.position.y = Math.sin(el + i * 0.5) * 4;
             envObj.position.z = Math.sin(layerAngle) * layerRadius;
             envObj.rotation.x += 0.03 * (i % 3 + 1);
             envObj.rotation.y += 0.02 * (i % 2 + 1);
@@ -2212,6 +2228,19 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         scene.add(o);
         octas.push(o);
       }
+    }
+    
+    // Add 15 additional octahedrons for Environment System (indices 30-44)
+    // Positioned off-screen initially, they will be positioned by the environment rendering code
+    for (let i = 0; i < 15; i++) {
+      const envOcta = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.5),
+        new THREE.MeshBasicMaterial({ color: 0x40e0d0, wireframe: true, transparent: true, opacity: 0.5 })
+      );
+      envOcta.position.set(0, -1000, 0); // Start off-screen
+      envOcta.scale.set(0.001, 0.001, 0.001);
+      scene.add(envOcta);
+      octas.push(envOcta);
     }
 
     const tetras: THREE.Mesh[] = [];
