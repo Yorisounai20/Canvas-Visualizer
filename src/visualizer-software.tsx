@@ -85,6 +85,7 @@ export default function ThreeDVisualizer() {
   const [highsGain, setHighsGain] = useState(1.0);
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
+  const [textColor, setTextColor] = useState('#ffffff'); // NEW: User-defined text color
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
   const fontRef = useRef<any>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -459,13 +460,9 @@ export default function ThreeDVisualizer() {
             textGeo.computeBoundingBox();
             
             const freqIndex = (wordIndex + charIndex) % 3;
-            let color;
-            if (freqIndex === 0) color = bassColor;
-            else if (freqIndex === 1) color = midsColor;
-            else color = highsColor;
             
             const material = new THREE.MeshBasicMaterial({
-              color: new THREE.Color(color),
+              color: new THREE.Color(textColor),
               wireframe: false,
               transparent: true,
               opacity: 0.9
@@ -4538,9 +4535,7 @@ export default function ThreeDVisualizer() {
           else bounce = f.highs * 2;
           mesh.position.y = mesh.userData.baseY + bounce;
           mesh.lookAt(cam.position);
-          if (freqIndex === 0) mesh.material.color.setStyle(bassColor);
-          else if (freqIndex === 1) mesh.material.color.setStyle(midsColor);
-          else mesh.material.color.setStyle(highsColor);
+          mesh.material.color.setStyle(textColor);
         });
       }
 
@@ -5050,7 +5045,7 @@ export default function ThreeDVisualizer() {
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -6965,6 +6960,11 @@ export default function ThreeDVisualizer() {
               <div className="flex gap-2 mb-2">
                 <input type="text" id="customSongName" name="customSongName" value={customSongName} onChange={(e) => setCustomSongName(e.target.value)} placeholder="Enter song name" className="flex-1 bg-gray-600 text-white text-sm px-3 py-2 rounded" />
                 <button onClick={toggleSongName} disabled={!fontLoaded} className={`px-4 py-2 rounded font-semibold ${fontLoaded ? (showSongName ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-500 cursor-not-allowed'} text-white`}>{!fontLoaded ? 'Loading...' : showSongName ? 'Hide' : 'Show'}</button>
+              </div>
+              <div className="flex gap-2 mb-2 items-center">
+                <label className="text-xs text-gray-400">Text Color</label>
+                <input type="color" id="textColor" name="textColor" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="w-12 h-8 rounded cursor-pointer" />
+                <span className="text-xs text-gray-500 font-mono">{textColor}</span>
               </div>
               <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
             </div>
