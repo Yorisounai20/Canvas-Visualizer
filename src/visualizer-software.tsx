@@ -3264,11 +3264,11 @@ export default function ThreeDVisualizer() {
         const dorsalPos = bodyPositions[3]; // Behind head, on first body segment
         dorsalFin.position.set(
           dorsalPos.x,
-          dorsalPos.y + 3.5 + f.mids * 0.5, // Tall fin
+          dorsalPos.y + 5.5 + f.mids * 0.8, // Tall fin - raised higher
           dorsalPos.z - 1
         );
         dorsalFin.rotation.set(0, dorsalPos.yaw, Math.PI); // Point upward
-        dorsalFin.scale.set(1.5, 4 + f.mids * 0.4, 2.5); // Tall and sharp
+        dorsalFin.scale.set(3, 8 + f.mids * 0.8, 5); // MUCH taller and sharper
         dorsalFin.material.color.setStyle(tetrahedronColor);
         dorsalFin.material.opacity = 0.9 * blend;
         dorsalFin.material.wireframe = false;
@@ -3279,8 +3279,8 @@ export default function ThreeDVisualizer() {
         // Left pectoral fin
         const leftPectoral = obj.tetras[1];
         leftPectoral.position.set(
-          pectoralPos.x - 2.5,
-          pectoralPos.y - 0.8, // Below body
+          pectoralPos.x - 4, // Further out from body
+          pectoralPos.y - 1.2, // Below body
           pectoralPos.z + 0.5
         );
         leftPectoral.rotation.set(
@@ -3288,7 +3288,7 @@ export default function ThreeDVisualizer() {
           pectoralPos.yaw - 0.8, // Angled outward
           -0.4 + Math.sin(swimTime * 1.5) * 0.1 // Slight downward angle with gentle movement
         );
-        leftPectoral.scale.set(2.5, 0.3, 3); // Flat triangular plane
+        leftPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
         leftPectoral.material.color.setStyle(tetrahedronColor);
         leftPectoral.material.opacity = 0.85 * blend;
         leftPectoral.material.wireframe = false;
@@ -3296,8 +3296,8 @@ export default function ThreeDVisualizer() {
         // Right pectoral fin (mirror)
         const rightPectoral = obj.tetras[2];
         rightPectoral.position.set(
-          pectoralPos.x + 2.5,
-          pectoralPos.y - 0.8,
+          pectoralPos.x + 4, // Further out from body
+          pectoralPos.y - 1.2,
           pectoralPos.z + 0.5
         );
         rightPectoral.rotation.set(
@@ -3305,7 +3305,7 @@ export default function ThreeDVisualizer() {
           pectoralPos.yaw + 0.8,
           0.4 - Math.sin(swimTime * 1.5) * 0.1
         );
-        rightPectoral.scale.set(2.5, 0.3, 3);
+        rightPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
         rightPectoral.material.color.setStyle(tetrahedronColor);
         rightPectoral.material.opacity = 0.85 * blend;
         rightPectoral.material.wireframe = false;
@@ -3315,15 +3315,15 @@ export default function ThreeDVisualizer() {
         const tailFinSwing = Math.sin(swimTime - tailPhaseDelay * 2) * 0.6; // Most delayed, strongest swing
         tailFin.position.set(
           tailPos.x + tailSwing * 0.5,
-          tailPos.y + 0.8, // Offset up for asymmetry (top lobe larger)
-          tailPos.z - 2.5 // Behind tail segment
+          tailPos.y + 1.5, // Offset up more for asymmetry (top lobe larger)
+          tailPos.z - 4 // Further behind tail segment
         );
         tailFin.rotation.set(
           Math.PI / 2 + 0.2, // Vertical orientation, slight upward bias
           tailPos.yaw + tailFinSwing,
           0
         );
-        tailFin.scale.set(0.8, 4 + f.bass * 0.5, 3); // Taller than wide, longer than body width
+        tailFin.scale.set(1.6, 8 + f.bass * 1.0, 6); // MUCH taller tail fin
         tailFin.material.color.setStyle(tetrahedronColor);
         tailFin.material.opacity = 0.9 * blend;
         tailFin.material.wireframe = false;

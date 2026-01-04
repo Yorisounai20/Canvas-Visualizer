@@ -1659,11 +1659,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const dorsalPos = bodyPositions[3]; // Behind head, on first body segment
         dorsalFin.position.set(
           dorsalPos.x,
-          dorsalPos.y + 3.5 + reactiveF.mids * 0.5, // Tall fin
+          dorsalPos.y + 5.5 + reactiveF.mids * 0.8, // Tall fin - raised higher
           dorsalPos.z - 1
         );
         dorsalFin.rotation.set(0, dorsalPos.yaw, Math.PI); // Point upward
-        dorsalFin.scale.set(1.5, 4 + reactiveF.mids * 0.4, 2.5); // Tall and sharp
+        dorsalFin.scale.set(3, 8 + reactiveF.mids * 0.8, 5); // MUCH taller and sharper
         (dorsalFin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         (dorsalFin.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
         (dorsalFin.material as THREE.MeshBasicMaterial).wireframe = false;
@@ -1674,8 +1674,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         // Left pectoral fin
         const leftPectoral = obj.tetras[1];
         leftPectoral.position.set(
-          pectoralPos.x - 2.5,
-          pectoralPos.y - 0.8, // Below body
+          pectoralPos.x - 4, // Further out from body
+          pectoralPos.y - 1.2, // Below body
           pectoralPos.z + 0.5
         );
         leftPectoral.rotation.set(
@@ -1683,7 +1683,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           pectoralPos.yaw - 0.8, // Angled outward
           -0.4 + Math.sin(swimTime * 1.5) * 0.1 // Slight downward angle with gentle movement
         );
-        leftPectoral.scale.set(2.5, 0.3, 3); // Flat triangular plane
+        leftPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
         (leftPectoral.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         (leftPectoral.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
         (leftPectoral.material as THREE.MeshBasicMaterial).wireframe = false;
@@ -1691,8 +1691,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         // Right pectoral fin (mirror)
         const rightPectoral = obj.tetras[2];
         rightPectoral.position.set(
-          pectoralPos.x + 2.5,
-          pectoralPos.y - 0.8,
+          pectoralPos.x + 4, // Further out from body
+          pectoralPos.y - 1.2,
           pectoralPos.z + 0.5
         );
         rightPectoral.rotation.set(
@@ -1700,7 +1700,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           pectoralPos.yaw + 0.8,
           0.4 - Math.sin(swimTime * 1.5) * 0.1
         );
-        rightPectoral.scale.set(2.5, 0.3, 3);
+        rightPectoral.scale.set(5, 0.6, 6); // MUCH larger flat triangular plane
         (rightPectoral.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         (rightPectoral.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
         (rightPectoral.material as THREE.MeshBasicMaterial).wireframe = false;
@@ -1710,15 +1710,15 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const tailFinSwing = Math.sin(swimTime - tailPhaseDelay * 2) * 0.6; // Most delayed, strongest swing
         tailFin.position.set(
           tailPos.x + tailSwing * 0.5,
-          tailPos.y + 0.8, // Offset up for asymmetry (top lobe larger)
-          tailPos.z - 2.5 // Behind tail segment
+          tailPos.y + 1.5, // Offset up more for asymmetry (top lobe larger)
+          tailPos.z - 4 // Further behind tail segment
         );
         tailFin.rotation.set(
           Math.PI / 2 + 0.2, // Vertical orientation, slight upward bias
           tailPos.yaw + tailFinSwing,
           0
         );
-        tailFin.scale.set(0.8, 4 + reactiveF.bass * 0.5, 3); // Taller than wide, longer than body width
+        tailFin.scale.set(1.6, 8 + reactiveF.bass * 1.0, 6); // MUCH taller tail fin
         (tailFin.material as THREE.MeshBasicMaterial).color.setStyle(midsColor);
         (tailFin.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
         (tailFin.material as THREE.MeshBasicMaterial).wireframe = false;
