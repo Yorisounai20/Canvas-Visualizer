@@ -1826,6 +1826,24 @@ export default function ThreeDVisualizer() {
         octas.push(o);
       }
     }
+    
+    // Add 15 additional octahedrons for Environment System (indices 30-44)
+    for (let i = 0; i < 15; i++) {
+      const envOctaMaterial = createMaterial(
+        octahedronMaterialType,
+        octahedronColor,
+        octahedronWireframe,
+        octahedronOpacity,
+        octahedronMetalness,
+        octahedronRoughness
+      );
+      const envOcta = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), envOctaMaterial);
+      // Position off-screen initially (will be positioned by environment system)
+      envOcta.position.set(0, -1000, 0);
+      envOcta.scale.set(0.001, 0.001, 0.001);
+      scene.add(envOcta);
+      octas.push(envOcta);
+    }
 
     const tetras: THREE.Mesh[] = [];
     for (let i=0; i<30; i++) {
