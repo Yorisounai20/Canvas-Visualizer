@@ -1583,60 +1583,65 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           bodyPositions.push({ x, y, z, yaw });
         }
         
-        // === HEAD (3 CUBES FORMING T-SHAPE) ===
-        // Cube 0: CENTER HEAD CORE
-        const headCore = obj.cubes[0];
+        // === HEAD (3 CUBES FORMING |-------| SHAPE FROM TOP) ===
+        // The hammerhead should look like: |-------| from above
+        // Cube 0: The long horizontal hammer bar (the -------)
+        const hammerBar = obj.cubes[0];
         const headPos = bodyPositions[0];
-        headCore.position.set(headPos.x + headSway, headPos.y, headPos.z);
-        headCore.scale.set(2.2 + reactiveF.bass * 0.2, 1.6 + reactiveF.bass * 0.1, 3.5 + reactiveF.bass * 0.3);
-        headCore.rotation.set(0, headPos.yaw, 0);
-        (headCore.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-        (headCore.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
-        (headCore.material as THREE.MeshBasicMaterial).wireframe = false;
+        const hammerTotalWidth = 14; // Wide hammer bar
+        hammerBar.position.set(headPos.x + headSway, headPos.y, headPos.z + 2); // Forward position
+        hammerBar.scale.set(hammerTotalWidth, 1.2 + reactiveF.bass * 0.1, 2.0 + reactiveF.bass * 0.2); // Wide and flat
+        hammerBar.rotation.set(0, headPos.yaw, 0);
+        (hammerBar.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (hammerBar.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (hammerBar.material as THREE.MeshBasicMaterial).wireframe = false;
         
-        // Cube 1: LEFT HAMMER WING (extends clearly beyond body)
-        const leftWing = obj.cubes[1];
-        const hammerWidth = 5.5; // Total head width ~11 units, body width ~4.4 units = 1.4x ratio
-        leftWing.position.set(
-          headPos.x + headSway - hammerWidth,
-          headPos.y - 0.2, // Slight downward tilt
-          headPos.z + 1.5 // Forward of head center
+        // Cube 1: Left eye wing (the left |) - short stubby projection where eyes are
+        const leftEyeWing = obj.cubes[1];
+        leftEyeWing.position.set(
+          headPos.x + headSway - hammerTotalWidth / 2,
+          headPos.y,
+          headPos.z + 3 // Slightly forward of the bar
         );
-        leftWing.scale.set(4.5 + reactiveF.highs * 0.2, 1.1 + reactiveF.highs * 0.1, 1.8);
-        leftWing.rotation.set(0.1, headPos.yaw, 0); // Slight downward angle
-        (leftWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-        (leftWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
-        (leftWing.material as THREE.MeshBasicMaterial).wireframe = false;
+        leftEyeWing.scale.set(1.2, 1.2 + reactiveF.highs * 0.1, 0.8); // Short and stubby (small z)
+        leftEyeWing.rotation.set(0, headPos.yaw, 0);
+        (leftEyeWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (leftEyeWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (leftEyeWing.material as THREE.MeshBasicMaterial).wireframe = false;
         
-        // Cube 2: RIGHT HAMMER WING (mirror of left)
-        const rightWing = obj.cubes[2];
-        rightWing.position.set(
-          headPos.x + headSway + hammerWidth,
-          headPos.y - 0.2, // Slight downward tilt
-          headPos.z + 1.5 // Forward of head center
+        // Cube 2: Right eye wing (the right |) - short stubby projection where eyes are
+        const rightEyeWing = obj.cubes[2];
+        rightEyeWing.position.set(
+          headPos.x + headSway + hammerTotalWidth / 2,
+          headPos.y,
+          headPos.z + 3 // Slightly forward of the bar
         );
-        rightWing.scale.set(4.5 + reactiveF.highs * 0.2, 1.1 + reactiveF.highs * 0.1, 1.8);
-        rightWing.rotation.set(0.1, headPos.yaw, 0); // Slight downward angle
-        (rightWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
-        (rightWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
-        (rightWing.material as THREE.MeshBasicMaterial).wireframe = false;
+        rightEyeWing.scale.set(1.2, 1.2 + reactiveF.highs * 0.1, 0.8); // Short and stubby (small z)
+        rightEyeWing.rotation.set(0, headPos.yaw, 0);
+        (rightEyeWing.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+        (rightEyeWing.material as THREE.MeshBasicMaterial).opacity = 0.95 * blend;
+        (rightEyeWing.material as THREE.MeshBasicMaterial).wireframe = false;
         
         // === TAPERED BODY (CUBES 3-6) ===
         // Body segments taper aggressively from head toward tail
-        const bodyTaperX = [2.0, 1.6, 1.2, 0.8]; // Width taper
-        const bodyTaperY = [1.5, 1.2, 0.9, 0.6]; // Height taper
-        const bodyTaperZ = [3.0, 2.8, 2.5, 2.2]; // Length
+        // Increased z-lengths to eliminate gaps between segments
+        const bodyTaperX = [2.2, 1.8, 1.4, 1.0]; // Width taper
+        const bodyTaperY = [1.6, 1.3, 1.0, 0.7]; // Height taper
+        const bodyTaperZ = [4.0, 3.8, 3.5, 3.2]; // Longer lengths to close gaps
         
         for (let i = 0; i < 4; i++) {
           const cube = obj.cubes[3 + i];
-          const pos = bodyPositions[2 + i]; // Body starts at segment 2
-          cube.position.set(pos.x, pos.y, pos.z);
+          // Adjust positions to connect segments without gaps
+          const segmentIndex = 1 + i; // Start from position 1 (just behind head)
+          const pos = bodyPositions[segmentIndex];
+          // Offset z slightly forward to overlap with previous segment
+          cube.position.set(pos.x, pos.y, pos.z + 0.5);
           cube.scale.set(
             bodyTaperX[i] + reactiveF.bass * 0.1,
             bodyTaperY[i] + reactiveF.bass * 0.05,
             bodyTaperZ[i]
           );
-          cube.rotation.set(0, pos.yaw, Math.sin(swimTime - (2 + i) * 0.3) * 0.05);
+          cube.rotation.set(0, pos.yaw, Math.sin(swimTime - (1 + i) * 0.3) * 0.05);
           (cube.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
           (cube.material as THREE.MeshBasicMaterial).opacity = 0.9 * blend;
           (cube.material as THREE.MeshBasicMaterial).wireframe = false;
@@ -1644,11 +1649,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         
         // === TAIL SEGMENT (CUBE 7) ===
         const tailCube = obj.cubes[7];
-        const tailPos = bodyPositions[7];
+        const tailPos = bodyPositions[6]; // Position closer to body
         // Tail has strongest oscillation with phase delay
         const tailSwing = Math.sin(swimTime - tailPhaseDelay * 1.5) * 1.5;
-        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z);
-        tailCube.scale.set(0.5, 0.4, 2.0);
+        tailCube.position.set(tailPos.x + tailSwing * 0.3, tailPos.y, tailPos.z - 1); // Adjusted to connect to body
+        tailCube.scale.set(0.6, 0.5, 3.0); // Longer tail segment
         tailCube.rotation.set(0, tailPos.yaw + tailSwing * 0.15, 0);
         (tailCube.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
         (tailCube.material as THREE.MeshBasicMaterial).opacity = 0.85 * blend;
@@ -1656,11 +1661,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         
         // === DORSAL FIN (TETRA 0) - Tall, sharp, positioned behind head ===
         const dorsalFin = obj.tetras[0];
-        const dorsalPos = bodyPositions[3]; // Behind head, on first body segment
+        const dorsalPos = bodyPositions[2]; // Behind head, on first body segment
         dorsalFin.position.set(
           dorsalPos.x,
-          dorsalPos.y + 5.5 + reactiveF.mids * 0.8, // Tall fin - raised higher
-          dorsalPos.z - 1
+          dorsalPos.y + 2.5 + reactiveF.mids * 0.5, // Closer to body - reduced from 5.5 to 2.5
+          dorsalPos.z
         );
         dorsalFin.rotation.set(0, dorsalPos.yaw, Math.PI); // Point upward
         dorsalFin.scale.set(3, 8 + reactiveF.mids * 0.8, 5); // MUCH taller and sharper
@@ -1669,14 +1674,14 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         (dorsalFin.material as THREE.MeshBasicMaterial).wireframe = false;
         
         // === PECTORAL FINS (TETRAS 1-2) - Flat triangular, slight downward angle ===
-        const pectoralPos = bodyPositions[2]; // Just behind head
+        const pectoralPos = bodyPositions[1]; // Just behind head
         
         // Left pectoral fin
         const leftPectoral = obj.tetras[1];
         leftPectoral.position.set(
-          pectoralPos.x - 4, // Further out from body
-          pectoralPos.y - 1.2, // Below body
-          pectoralPos.z + 0.5
+          pectoralPos.x - 3, // Out from body
+          pectoralPos.y - 1.0, // Below body
+          pectoralPos.z + 1
         );
         leftPectoral.rotation.set(
           -0.3, // Slight backward angle
@@ -1691,9 +1696,9 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         // Right pectoral fin (mirror)
         const rightPectoral = obj.tetras[2];
         rightPectoral.position.set(
-          pectoralPos.x + 4, // Further out from body
-          pectoralPos.y - 1.2,
-          pectoralPos.z + 0.5
+          pectoralPos.x + 3, // Out from body
+          pectoralPos.y - 1.0,
+          pectoralPos.z + 1
         );
         rightPectoral.rotation.set(
           -0.3,
