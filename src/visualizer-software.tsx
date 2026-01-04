@@ -2646,7 +2646,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.rotation.x = 0;
         obj.sphere.rotation.y += 0.01;
         obj.sphere.rotation.z = 0;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
         obj.cubes.forEach((planet, i) => {
@@ -2663,8 +2663,7 @@ export default function ThreeDVisualizer() {
           planet.rotation.x = tilt;
           planet.rotation.y += 0.02 + i * 0.005;
           planet.rotation.z = 0;
-          const colorIndex = i % 3;
-          planet.material.color.setStyle(colorIndex === 0 ? bassColor : colorIndex === 1 ? midsColor : highsColor);
+          planet.material.color.setStyle(cubeColor);
           planet.material.opacity = (0.8 + f.bass * 0.2) * blend;
           planet.material.wireframe = false;
         });
@@ -2682,7 +2681,7 @@ export default function ThreeDVisualizer() {
           moon.rotation.x += 0.05;
           moon.rotation.y += 0.03;
           moon.rotation.z = 0;
-          moon.material.color.setStyle(midsColor);
+          moon.material.color.setStyle(octahedronColor);
           moon.material.opacity = (0.6 + f.mids * 0.4) * blend;
           moon.material.wireframe = false;
         });
@@ -2699,7 +2698,7 @@ export default function ThreeDVisualizer() {
           rogue.rotation.x = elScaled * 0.05 + i;
           rogue.rotation.y = elScaled * 0.03;
           rogue.rotation.z = 0;
-          rogue.material.color.setStyle(midsColor);
+          rogue.material.color.setStyle(octahedronColor);
           rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
           rogue.material.wireframe = true;
         });
@@ -2716,7 +2715,7 @@ export default function ThreeDVisualizer() {
           asteroid.rotation.z += 0.01;
           const asteroidSize = 0.2 + f.highs * 0.3;
           asteroid.scale.set(asteroidSize, asteroidSize, asteroidSize);
-          asteroid.material.color.setStyle(highsColor);
+          asteroid.material.color.setStyle(tetrahedronColor);
           asteroid.material.opacity = (0.5 + f.highs * 0.4) * blend;
           asteroid.material.wireframe = true;
         });
@@ -2730,7 +2729,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.rotation.y += 0.01;
         obj.sphere.rotation.z = 0;
         obj.sphere.material.opacity = (0.4+f.bass*0.4) * blend;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.wireframe = true;
         obj.cubes.forEach((c,i) => {
           const rad = 15+f.bass*10;
@@ -2742,7 +2741,7 @@ export default function ThreeDVisualizer() {
           c.scale.set(s,s,s);
           c.rotation.z = 0;
           c.material.opacity = (0.6+f.bass*0.4) * blend;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.wireframe = true;
         });
         obj.octas.forEach((o,i) => {
@@ -2757,7 +2756,7 @@ export default function ThreeDVisualizer() {
           const s = 1.2 + f.mids * 0.8;
           o.scale.set(s,s,s);
           o.material.opacity = (0.4 + f.mids * 0.5) * blend;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.wireframe = true;
         });
         obj.tetras.forEach((tr,i) => {
@@ -2769,7 +2768,7 @@ export default function ThreeDVisualizer() {
           const s = 0.5 + f.highs * 0.5;
           tr.scale.set(s,s,s);
           tr.material.opacity = (0.4+f.highs*0.6) * blend;
-          tr.material.color.setStyle(highsColor);
+          tr.material.color.setStyle(tetrahedronColor);
           tr.material.wireframe = true;
         });
       } else if (type === 'chill') {
@@ -2784,7 +2783,7 @@ export default function ThreeDVisualizer() {
           const s = 0.8+f.bass*0.4;
           c.scale.set(s,s,s);
           c.material.opacity = (0.4+f.bass*0.3) * blend;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
         });
         obj.octas.forEach((o,i) => {
           o.rotation.x += 0.008 + f.mids * 0.05;
@@ -2793,7 +2792,7 @@ export default function ThreeDVisualizer() {
           const s = 0.8+f.mids*0.3;
           o.scale.set(s,s,s);
           o.material.opacity = (0.3+f.mids*0.3) * blend;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
         });
         obj.tetras.forEach((t,i) => {
           const ringAngle = (i/obj.tetras.length)*Math.PI*2;
@@ -2808,7 +2807,7 @@ export default function ThreeDVisualizer() {
           const s = 0.6+f.highs*0.4;
           t.scale.set(s,s,s);
           t.material.opacity = (0.25+f.highs*0.35) * blend;
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.wireframe = true;
         });
         obj.sphere.position.set(0, Math.sin(el*0.4)*2, 0);
@@ -2816,7 +2815,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(sphereSize,sphereSize,sphereSize);
         obj.sphere.rotation.x += 0.003;
         obj.sphere.rotation.y += 0.005;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.2+f.bass*0.2) * blend;
         obj.sphere.material.wireframe = false;
       } else if (type === 'wave') {
@@ -2835,7 +2834,7 @@ export default function ThreeDVisualizer() {
           segment.rotation.x = 0;
           segment.rotation.y = 0;
           segment.rotation.z = 0;
-          segment.material.color.setStyle(bassColor);
+          segment.material.color.setStyle(octahedronColor);
           segment.material.opacity = (0.8 + f.bass * 0.2) * blend;
           segment.material.wireframe = false;
         });
@@ -2857,7 +2856,7 @@ export default function ThreeDVisualizer() {
           c.rotation.x = 0;
           c.rotation.y = 0;
           c.rotation.z = t;
-          c.material.color.setStyle(midsColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.mids * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -2875,7 +2874,7 @@ export default function ThreeDVisualizer() {
           halo.rotation.x = 0;
           halo.rotation.y = angle;
           halo.rotation.z = 0;
-          halo.material.color.setStyle(highsColor);
+          halo.material.color.setStyle(tetrahedronColor);
           halo.material.opacity = (0.5 + f.highs * 0.4) * blend;
           halo.material.wireframe = true;
         });
@@ -2886,7 +2885,7 @@ export default function ThreeDVisualizer() {
           marker.rotation.x = 0;
           marker.rotation.y = el + i;
           marker.rotation.z = 0;
-          marker.material.color.setStyle(midsColor);
+          marker.material.color.setStyle(octahedronColor);
           marker.material.opacity = (0.3 + f.mids * 0.2) * blend;
           marker.material.wireframe = true;
         });
@@ -2906,7 +2905,7 @@ export default function ThreeDVisualizer() {
           const s = 1.5 + f.bass * 1.2;
           c.scale.set(s,s,s);
           c.material.opacity = (0.5 + f.bass * 0.4) * blend;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
         });
         obj.octas.forEach((o,i) => {
           const angle = elScaled * 2 + i * 0.3;
@@ -2919,7 +2918,7 @@ export default function ThreeDVisualizer() {
           const s = 1 + f.mids * 0.7;
           o.scale.set(s,s,s);
           o.material.opacity = (0.4 + f.mids * 0.4) * blend;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
         });
       } else if (type === 'pulse') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
@@ -2933,7 +2932,7 @@ export default function ThreeDVisualizer() {
           const s = 1.5 + f.bass * 2.5;
           c.scale.set(s,s,s);
           c.material.opacity = (0.5 + f.bass * 0.5) * blend;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
         });
         obj.octas.forEach((o,i) => {
           const gridPos = i % 16;
@@ -2946,7 +2945,7 @@ export default function ThreeDVisualizer() {
           const s = 0.8 + f.mids * 0.8;
           o.scale.set(s,s,s);
           o.material.opacity = (0.4 + f.mids * 0.5) * blend;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
         });
       } else if (type === 'vortex') {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
@@ -2961,7 +2960,7 @@ export default function ThreeDVisualizer() {
           const s = 1.8 + f.bass * 1.5;
           c.scale.set(s,s,s);
           c.material.opacity = (0.6 + f.bass * 0.4) * blend;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
         });
         obj.octas.forEach((o,i) => {
           const angle = -elScaled * 3 + i * 0.5;
@@ -2973,7 +2972,7 @@ export default function ThreeDVisualizer() {
           const s = 1.2 + f.mids * 0.8;
           o.scale.set(s,s,s);
           o.material.opacity = (0.5 + f.mids * 0.4) * blend;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
         });
       } else if (type === 'seiryu') {
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
@@ -2996,7 +2995,7 @@ export default function ThreeDVisualizer() {
           const lookZ = (progress + 0.1) * -15;
           c.rotation.x = Math.atan2(lookY - y, lookZ - z);
           c.rotation.y = Math.atan2(lookX - x, lookZ - z);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = isHead ? false : true;
         });
@@ -3012,7 +3011,7 @@ export default function ThreeDVisualizer() {
           horn.rotation.z = side * 0.2;
           const hornSize = 2 + f.highs * 0.5;
           horn.scale.set(hornSize * 0.6, hornSize * 2.5, hornSize * 0.6);
-          horn.material.color.setStyle(highsColor);
+          horn.material.color.setStyle(tetrahedronColor);
           horn.material.opacity = (0.9 + f.highs * 0.1) * blend;
           horn.material.wireframe = false;
         });
@@ -3025,7 +3024,7 @@ export default function ThreeDVisualizer() {
           mountain.rotation.y = elScaled * 0.1 + i;
           const s = 8 + (i % 3) * 3;
           mountain.scale.set(s, mountainHeight * 2, s);
-          mountain.material.color.setStyle(midsColor);
+          mountain.material.color.setStyle(octahedronColor);
           mountain.material.opacity = (0.4 + f.mids * 0.2) * blend;
           mountain.material.wireframe = true;
         });
@@ -3041,7 +3040,7 @@ export default function ThreeDVisualizer() {
           o.rotation.y += 0.08;
           const s = 0.5 + f.mids * 0.4;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = false;
         });
@@ -3055,7 +3054,7 @@ export default function ThreeDVisualizer() {
           cloud.rotation.y += 0.02;
           const cloudSize = 1.5 + (i % 3) * 0.5;
           cloud.scale.set(cloudSize, cloudSize * 0.6, cloudSize);
-          cloud.material.color.setStyle(highsColor);
+          cloud.material.color.setStyle(tetrahedronColor);
           cloud.material.opacity = (0.3 + f.highs * 0.2) * blend;
           cloud.material.wireframe = false;
         });
@@ -3154,11 +3153,7 @@ export default function ThreeDVisualizer() {
           }
           
           // Color hammer differently
-          if (isHammer) {
-            c.material.color.setStyle(highsColor);
-          } else {
-            c.material.color.setStyle(bassColor);
-          }
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.9 + f.bass * 0.1) * blend;
           c.material.wireframe = false;
         });
@@ -3175,7 +3170,7 @@ export default function ThreeDVisualizer() {
         dorsalFin.rotation.z = Math.PI; // Flip to point upward
         const dorsalSize = 5 + f.mids * 0.8; // VERY LARGE
         dorsalFin.scale.set(dorsalSize * 0.5, dorsalSize * 1.2, dorsalSize * 0.4);
-        dorsalFin.material.color.setStyle(midsColor);
+        dorsalFin.material.color.setStyle(tetrahedronColor);
         dorsalFin.material.opacity = (0.9 + f.mids * 0.1) * blend;
         dorsalFin.material.wireframe = false;
         
@@ -3190,7 +3185,7 @@ export default function ThreeDVisualizer() {
         tailFin.rotation.z = Math.sin(swimSpeed * 3) * 0.4; // Animated wagging
         const tailSize = 4 + f.bass * 0.8; // VERY LARGE
         tailFin.scale.set(tailSize * 0.6, tailSize * 1.3, tailSize * 0.3);
-        tailFin.material.color.setStyle(midsColor);
+        tailFin.material.color.setStyle(tetrahedronColor);
         tailFin.material.opacity = (0.9 + f.bass * 0.1) * blend;
         tailFin.material.wireframe = false;
         
@@ -3220,7 +3215,7 @@ export default function ThreeDVisualizer() {
             bubble.rotation.x += 0.05;
             bubble.rotation.y += 0.03;
             
-            bubble.material.color.setStyle(highsColor);
+            bubble.material.color.setStyle(octahedronColor);
             bubble.material.opacity = (0.3 + f.highs * 0.2) * blend; // More subtle
             bubble.material.wireframe = true;
           } else {
@@ -3253,7 +3248,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = angle * 2;
           const s = 1.2 + f.bass * 0.8;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.7 + f.bass * 0.3) * blend;
           c.material.wireframe = true;
         });
@@ -3271,7 +3266,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = -angle;
           const s = 0.9 + f.mids * 0.6;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -3289,7 +3284,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = angle;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.5 + f.highs * 0.5) * blend;
           t.material.wireframe = true;
         });
@@ -3298,7 +3293,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.scale.set(sphereSize, sphereSize, sphereSize);
         obj.sphere.rotation.x = elScaled * 0.5;
         obj.sphere.rotation.y = el;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
       } else if (type === 'meteor') {
@@ -3321,7 +3316,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = angle * 0.7;
           const s = 1 + f.bass * 1.5 * (1 - fallProgress);
           c.scale.set(s, s * 2, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - fallProgress) * 0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3340,7 +3335,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z += 0.12;
           const s = 0.8 + f.mids * 0.6 * (1 - fallProgress);
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = ((1 - fallProgress) * 0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -3356,7 +3351,7 @@ export default function ThreeDVisualizer() {
           t.rotation.y = meteorTime * 3;
           const s = 0.4 + f.highs * 0.4;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = ((1 - fallProgress) * 0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3381,7 +3376,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = 1 + f.bass * 0.8;
           c.scale.set(s, s * 0.5, s);
-          c.material.color.setStyle(strand === 0 ? bassColor : midsColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3405,7 +3400,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = Math.PI / 2;
           const s = 0.3 + f.mids * 0.2;
           t.scale.set(s * 3, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.6 + f.mids * 0.3) * blend;
           t.material.wireframe = false;
         });
@@ -3421,7 +3416,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.5 + f.highs * 0.4;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(highsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.4 + f.highs * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -3429,7 +3424,7 @@ export default function ThreeDVisualizer() {
         const centerSize = 0.5 + f.mids * 0.3;
         obj.sphere.scale.set(centerSize, 20, centerSize);
         obj.sphere.rotation.y = el;
-        obj.sphere.material.color.setStyle(midsColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.2 + f.mids * 0.1) * blend;
         obj.sphere.material.wireframe = true;
       } else if (type === 'fireworks') {
@@ -3457,7 +3452,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z += 0.05;
           const s = (burstTime < 2 ? 1 : 1.5) + f.bass * 0.8;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - fadeProgress) * 0.9 + f.bass * 0.1) * blend;
           c.material.wireframe = burstTime < 2;
         });
@@ -3483,7 +3478,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z += 0.08;
           const s = (burstTime < 2 ? 0.8 : 1.2) + f.mids * 0.6;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = ((1 - fadeProgress) * 0.8 + f.mids * 0.2) * blend;
           o.material.wireframe = true;
         });
@@ -3508,7 +3503,7 @@ export default function ThreeDVisualizer() {
             t.rotation.z += 0.1;
             const s = 0.6 + f.highs * 0.5;
             t.scale.set(s, s, s);
-            t.material.color.setStyle(highsColor);
+            t.material.color.setStyle(tetrahedronColor);
             t.material.opacity = ((1 - fadeProgress) * 0.7 + f.highs * 0.3) * blend;
             t.material.wireframe = true;
           }
@@ -3534,7 +3529,7 @@ export default function ThreeDVisualizer() {
           const s = 0.8 + f.bass * 0.6;
           c.scale.set(s, s * 0.3, s);
           const brightness = 1 - (fallOffset / 30);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (brightness * 0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3552,7 +3547,7 @@ export default function ThreeDVisualizer() {
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s * 0.2, s);
           const brightness = 1 - (fallOffset / 35);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (brightness * 0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -3570,7 +3565,7 @@ export default function ThreeDVisualizer() {
           const s = 0.4 + f.highs * 0.4;
           t.scale.set(s, s * 0.15, s);
           const brightness = 1 - (fallOffset / 40);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (brightness * 0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3594,7 +3589,7 @@ export default function ThreeDVisualizer() {
           const s = 1.2 + f.bass * 0.8;
           c.scale.set(s, s * 0.5, s);
           const fade = 1 - (rippleRadius / 20);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (fade * 0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3612,7 +3607,7 @@ export default function ThreeDVisualizer() {
           const s = 0.9 + f.mids * 0.6;
           o.scale.set(s, s, s);
           const fade = 1 - (rippleRadius / 25);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (fade * 0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -3630,7 +3625,7 @@ export default function ThreeDVisualizer() {
           const s = 0.6 + f.highs * 0.5;
           t.scale.set(s, s, s);
           const fade = 1 - (rippleRadius / 22);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (fade * 0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3638,7 +3633,7 @@ export default function ThreeDVisualizer() {
         const pulseSize = 2 + f.bass * 3;
         obj.sphere.scale.set(pulseSize, pulseSize * 0.2, pulseSize);
         obj.sphere.rotation.y = el;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.4) * blend;
         obj.sphere.material.wireframe = true;
       } else if (type === 'constellation') {
@@ -3657,7 +3652,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = 0.8 + f.bass * 1;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3677,7 +3672,7 @@ export default function ThreeDVisualizer() {
           o.rotation.y = Math.atan2(dx, dz);
           o.rotation.x = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz));
           o.rotation.z = 0;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = ((0.5 + pulse * 0.3) + f.mids * 0.2) * blend;
           o.material.wireframe = false;
         });
@@ -3693,7 +3688,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z += 0.05;
           const s = 0.4 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3720,7 +3715,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = 1 + f.bass * 0.8;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -3742,7 +3737,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = el + i;
           const s = 0.3 + f.mids * 0.3;
           o.scale.set(s, s * 4, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.5 + f.mids * 0.3) * blend;
           o.material.wireframe = false;
         });
@@ -3763,7 +3758,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = 0;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3789,7 +3784,7 @@ export default function ThreeDVisualizer() {
           const s = 2 + f.bass * 1.5;
           c.scale.set(s, s, s * 0.5);
           const depth = Math.abs(zProgress) / 25;
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - depth * 0.5) + f.bass * 0.3) * blend;
           c.material.wireframe = true;
         });
@@ -3808,7 +3803,7 @@ export default function ThreeDVisualizer() {
           const s = 1.2 + f.mids * 0.8;
           o.scale.set(s, s, s);
           const depth = Math.abs(zProgress) / 22.5;
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = ((1 - depth * 0.5) + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -3827,7 +3822,7 @@ export default function ThreeDVisualizer() {
           const s = 0.7 + f.highs * 0.6;
           t.scale.set(s, s, s);
           const depth = Math.abs(zProgress) / 20;
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = ((1 - depth * 0.5) + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -3851,7 +3846,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = Math.sin(el + i) * 0.5;
           const s = 1.5 + bloomProgress + f.bass * 0.8;
           c.scale.set(s * 0.5, s * 2, s);
-          c.material.color.setStyle(i < petals ? bassColor : midsColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.7 + f.bass * 0.3) * blend;
           c.material.wireframe = false;
         });
@@ -3868,7 +3863,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -3883,7 +3878,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = 0;
           const s = 0.3 + f.highs * 0.4;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.7 + f.highs * 0.3) * blend;
           t.material.wireframe = true;
         });
@@ -3891,7 +3886,7 @@ export default function ThreeDVisualizer() {
         const centerSize = 2 + Math.sin(el) * 0.5 + f.bass * 1;
         obj.sphere.scale.set(centerSize, centerSize, centerSize);
         obj.sphere.rotation.y = el;
-        obj.sphere.material.color.setStyle(highsColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.8 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = false;
       } else if (type === 'tornado') {
@@ -3911,7 +3906,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = height * 0.1;
           const s = 1 + heightFactor * 0.5 + f.bass * 0.8;
           c.scale.set(s, s * 0.5, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (heightFactor * 0.7 + f.bass * 0.3) * blend;
           c.material.wireframe = true;
         });
@@ -3928,7 +3923,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z += 0.05;
           const s = 0.8 + heightFactor * 0.4 + f.mids * 0.6;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (heightFactor * 0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -3945,7 +3940,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = elScaled * 3;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (heightFactor * 0.5 + f.highs * 0.5) * blend;
           t.material.wireframe = true;
         });
@@ -3970,7 +3965,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = elScaled * 0.5;
           const s = 1.5 + f.bass * 1;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.6 + f.bass * 0.4) * blend;
           c.material.wireframe = true;
         });
@@ -4000,7 +3995,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = false;
         });
@@ -4015,7 +4010,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = orbit;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.5 + f.highs * 0.5) * blend;
           t.material.wireframe = true;
         });
@@ -4025,7 +4020,7 @@ export default function ThreeDVisualizer() {
         obj.sphere.rotation.x = el;
         obj.sphere.rotation.y = elScaled * 1.5;
         obj.sphere.rotation.z = elScaled * 0.5;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
       } else if (type === 'fractal') {
@@ -4047,7 +4042,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = (1.5 - level * 0.15) + f.bass * 0.5;
           c.scale.set(s * 0.4, s * 2, s * 0.4);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - level * 0.1) * 0.7 + f.bass * 0.3) * blend;
           c.material.wireframe = false;
         });
@@ -4069,7 +4064,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = (0.8 - level * 0.1) + f.mids * 0.4;
           o.scale.set(s, s * 0.5, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = ((1 - level * 0.1) * 0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -4085,7 +4080,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.5 + f.highs * 0.5) * blend;
           t.material.wireframe = true;
         });
@@ -4093,7 +4088,7 @@ export default function ThreeDVisualizer() {
         const trunkSize = 1.5 + f.bass * 0.5;
         obj.sphere.scale.set(trunkSize, 3, trunkSize);
         obj.sphere.rotation.y = elScaled * 0.2;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.8 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = false;
       } else if (type === 'orbit2') {
@@ -4115,7 +4110,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = 0.8 + f.bass * 0.6;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -4131,7 +4126,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = 0;
           const s = 0.8 + f.bass * 0.6;
           c.scale.set(s, s, s);
-          c.material.color.setStyle(midsColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -4146,7 +4141,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.5 + f.mids * 0.5;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(bassColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -4161,7 +4156,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.5 + f.mids * 0.5;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.6 + f.mids * 0.4) * blend;
           o.material.wireframe = true;
         });
@@ -4177,7 +4172,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = el;
           const s = 0.4 + f.highs * 0.4;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = ((1 - Math.abs(t1 - 0.5) * 2) * 0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -4208,7 +4203,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = Math.sin(el + i) * 0.3;
           const s = 0.8 + f.bass * 0.6;
           c.scale.set(s * 0.3, s * 0.3, s * 2);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - Math.abs(t - 0.5) * 2) * 0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -4225,7 +4220,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = elScaled * 3;
           const s = 0.4 + f.mids * 0.4;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -4240,7 +4235,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = elScaled * 2;
           const s = 0.5 + f.highs * 0.5;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.5 + f.highs * 0.5) * blend;
           t.material.wireframe = true;
         });
@@ -4263,7 +4258,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = yPos * 0.1;
           const s = 1 + f.bass * 0.8;
           c.scale.set(s, s * 0.5, s);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.6 + f.bass * 0.4) * blend;
           c.material.wireframe = true;
         });
@@ -4293,7 +4288,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.3;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.7 + f.highs * 0.3) * blend;
           t.material.wireframe = false;
         });
@@ -4309,7 +4304,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.5;
           o.scale.set(s, s, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.4 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -4317,7 +4312,7 @@ export default function ThreeDVisualizer() {
         const neckSize = 0.8 + f.bass * 0.3;
         obj.sphere.scale.set(neckSize, neckSize * 0.5, neckSize);
         obj.sphere.rotation.y = el;
-        obj.sphere.material.color.setStyle(bassColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.5 + f.bass * 0.3) * blend;
         obj.sphere.material.wireframe = true;
       } else if (type === 'snowflake') {
@@ -4337,7 +4332,7 @@ export default function ThreeDVisualizer() {
           c.rotation.z = el + i;
           const s = (1.2 - segmentIndex * 0.15) + f.bass * 0.6;
           c.scale.set(s * 0.5, s * 0.3, s * 1.5);
-          c.material.color.setStyle(bassColor);
+          c.material.color.setStyle(cubeColor);
           c.material.opacity = ((1 - segmentIndex * 0.1) * 0.8 + f.bass * 0.2) * blend;
           c.material.wireframe = false;
         });
@@ -4356,7 +4351,7 @@ export default function ThreeDVisualizer() {
           o.rotation.z = 0;
           const s = 0.6 + f.mids * 0.4;
           o.scale.set(s, s * 0.2, s);
-          o.material.color.setStyle(midsColor);
+          o.material.color.setStyle(octahedronColor);
           o.material.opacity = (0.7 + f.mids * 0.3) * blend;
           o.material.wireframe = true;
         });
@@ -4372,7 +4367,7 @@ export default function ThreeDVisualizer() {
           t.rotation.z = el;
           const s = 0.3 + f.highs * 0.4;
           t.scale.set(s, s, s);
-          t.material.color.setStyle(highsColor);
+          t.material.color.setStyle(tetrahedronColor);
           t.material.opacity = (0.6 + f.highs * 0.4) * blend;
           t.material.wireframe = true;
         });
@@ -4380,7 +4375,7 @@ export default function ThreeDVisualizer() {
         const coreSize = 1.5 + Math.sin(el) * 0.3 + f.bass * 0.8;
         obj.sphere.scale.set(coreSize, coreSize * 0.5, coreSize);
         obj.sphere.rotation.y = elScaled * 0.5;
-        obj.sphere.material.color.setStyle(highsColor);
+        obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
       }
@@ -5055,7 +5050,7 @@ export default function ThreeDVisualizer() {
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
