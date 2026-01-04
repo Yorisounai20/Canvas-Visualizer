@@ -85,7 +85,12 @@ export default function ThreeDVisualizer() {
   const [highsGain, setHighsGain] = useState(1.0);
   const [showSongName, setShowSongName] = useState(false);
   const [customSongName, setCustomSongName] = useState('');
-  const [textColor, setTextColor] = useState('#ffffff'); // NEW: User-defined text color
+  const [textColor, setTextColor] = useState('#ffffff'); // User-defined text color
+  const [textMaterialType, setTextMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [textWireframe, setTextWireframe] = useState(false);
+  const [textOpacity, setTextOpacity] = useState(0.9);
+  const [textMetalness, setTextMetalness] = useState(0.5);
+  const [textRoughness, setTextRoughness] = useState(0.5);
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
   const fontRef = useRef<any>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -461,12 +466,37 @@ export default function ThreeDVisualizer() {
             
             const freqIndex = (wordIndex + charIndex) % 3;
             
-            const material = new THREE.MeshBasicMaterial({
-              color: new THREE.Color(textColor),
-              wireframe: false,
+            // Create material based on selected type
+            let material: THREE.Material;
+            const baseColor = new THREE.Color(textColor);
+            const commonProps = {
+              color: baseColor,
+              wireframe: textWireframe,
               transparent: true,
-              opacity: 0.9
-            });
+              opacity: textOpacity
+            };
+            
+            switch (textMaterialType) {
+              case 'standard':
+                material = new THREE.MeshStandardMaterial({
+                  ...commonProps,
+                  metalness: textMetalness,
+                  roughness: textRoughness
+                });
+                break;
+              case 'phong':
+                material = new THREE.MeshPhongMaterial({
+                  ...commonProps,
+                  shininess: 30
+                });
+                break;
+              case 'lambert':
+                material = new THREE.MeshLambertMaterial(commonProps);
+                break;
+              case 'basic':
+              default:
+                material = new THREE.MeshBasicMaterial(commonProps);
+            }
             
             const mesh = new THREE.Mesh(textGeo, material);
             
@@ -4583,7 +4613,11 @@ export default function ThreeDVisualizer() {
           else bounce = f.highs * 2;
           mesh.position.y = mesh.userData.baseY + bounce;
           mesh.lookAt(cam.position);
-          mesh.material.color.setStyle(textColor);
+          // Update material properties
+          const mat = mesh.material as THREE.Material & { color?: THREE.Color; wireframe?: boolean; opacity?: number };
+          if (mat.color) mat.color.setStyle(textColor);
+          if ('wireframe' in mat) mat.wireframe = textWireframe;
+          if ('opacity' in mat) mat.opacity = textOpacity;
         });
       }
 
@@ -5093,7 +5127,7 @@ export default function ThreeDVisualizer() {
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -7014,6 +7048,42 @@ export default function ThreeDVisualizer() {
                 <input type="color" id="textColor" name="textColor" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="w-12 h-8 rounded cursor-pointer" />
                 <span className="text-xs text-gray-500 font-mono">{textColor}</span>
               </div>
+              
+              {/* Text Material Controls */}
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Material Type</label>
+                  <select value={textMaterialType} onChange={(e) => setTextMaterialType(e.target.value as any)} className="w-full bg-gray-600 text-white text-xs px-2 py-1.5 rounded cursor-pointer">
+                    <option value="basic">Basic</option>
+                    <option value="standard">Standard (PBR)</option>
+                    <option value="phong">Phong (Shiny)</option>
+                    <option value="lambert">Lambert (Matte)</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-400">Wireframe</label>
+                  <input type="checkbox" checked={textWireframe} onChange={(e) => setTextWireframe(e.target.checked)} className="w-4 h-4 rounded cursor-pointer" />
+                </div>
+              </div>
+              
+              <div className="mb-2">
+                <label className="text-xs text-gray-400 block mb-1">Opacity: {textOpacity.toFixed(2)}</label>
+                <input type="range" min="0" max="1" step="0.05" value={textOpacity} onChange={(e) => setTextOpacity(parseFloat(e.target.value))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
+              </div>
+              
+              {textMaterialType === 'standard' && (
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Metalness: {textMetalness.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={textMetalness} onChange={(e) => setTextMetalness(parseFloat(e.target.value))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Roughness: {textRoughness.toFixed(2)}</label>
+                    <input type="range" min="0" max="1" step="0.05" value={textRoughness} onChange={(e) => setTextRoughness(parseFloat(e.target.value))} className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer" />
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-gray-400">3D text that bounces to the music!</p>
             </div>
 
