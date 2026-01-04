@@ -4677,7 +4677,7 @@ export default function ThreeDVisualizer() {
           }
         }
       } else if (!activeEnvKeyframe || activeEnvKeyframe.type === 'none') {
-        // Hide all environment objects (indices 20-29)
+        // Hide all environment objects (indices 30-44)
         for (let i = 0; i < ENV_MAX_COUNT; i++) {
           const idx = ENV_START_INDEX + i;
           if (idx >= obj.octas.length) break;
