@@ -2,9 +2,7 @@
 
 ## **Development Status**
 
-**Version 2.5 - Camera Rig Polish & Enhancements**
-**Version 2.4 - Camera Rig Path Visualization**
-**Version 2.4 - Advanced Skybox & Material System (Software Mode)**
+**Current Version:** 2.5 - Camera Rig Polish & Enhancements
 
 Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls.
 
@@ -12,38 +10,6 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 - 🎬 **Editor Mode** - Professional interface with layers, timeline, workspace, and advanced controls
 - ⚡ **Software Mode** - Simple, streamlined interface for quick visualizations
 - 🎨 Main Dashboard for mode selection at startup
-
-**Editor Mode Features:**
-- ✅ Professional panel-based layout (Top Bar, Scene Explorer, Canvas, Properties, Timeline)
-- ✅ Scene Explorer - Blender-style object hierarchy panel
-- ✅ Extended object types - Support for cameras and lights as workspace objects
-- ✅ Layer management (select, reorder, lock, delete, duplicate, visibility toggle)
-- ✅ Timeline editing with multiple tabs (Sections, Presets, Camera, Text)
-- ✅ Complete keyframe systems (Presets, Camera, Text)
-- ✅ Blender-like 3D workspace (toggle with `W` key)
-- ✅ Keyboard shortcuts modal, undo/redo functionality
-- ✅ Parameter-driven presets (density, speed, intensity, spread)
-
-**Software Mode Features:**
-- ✅ Simple, streamlined interface for quick setup
-- ✅ Direct audio upload and instant preview
-- ✅ Animated letterbox with keyframe system
-- ✅ Camera shake events and visual effects
-- ✅ Parameter events (background flash, vignette pulse, saturation burst)
-- ✅ Multiple audio track support with mixing
-- ✅ Scrolling and static waveform visualization modes
-- ✅ **6 skybox/background modes**: Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
-- ✅ **Professional material system**: 4 material types (Basic, Standard PBR, Phong, Lambert) with per-shape controls
-- ✅ **PBR rendering**: Metalness and roughness controls for physically-based materials
-
-**Shared Features (Both Modes):**
-- ✅ 25 animation presets with audio-reactive 3D visuals
-- ✅ 3D text overlay with font loading
-- ✅ Waveform visualization
-- ✅ Debug console (toggle with `` ` `` key)
-- ✅ Per-shape color pickers and camera controls
-- ✅ Export modal with resolution selection
-- ✅ Manual control mode for non-audio-reactive animations
 
 ---
 
@@ -55,7 +21,7 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 
 - **⚡ Software Mode** - A streamlined, simplified visualizer for quick music visualizations. Upload audio, choose a preset, customize colors, and export. Ideal for rapid prototyping and simple projects.
 
-Both modes create audio-reactive 3D animations synchronized to music, with support for 9 different animation presets, custom colors, camera controls, and high-quality video export.
+Both modes create audio-reactive 3D animations synchronized to music, with support for 25 animation presets, custom colors, camera controls, and high-quality video export.
 
 ---
 
@@ -265,51 +231,6 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
       - Circle and rectangle mask types
       - Blend modes and feathering
 
-### 🎬 **Editor Mode: Timeline-Based Animation System**
-- Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
-- Assign different animation presets to each section
-- Smooth transitions between animation styles
-- Real-time audio frequency analysis (bass, mids, highs)
-
-### 🎨 **Customization Options (Both Modes)**
-
-**Shape Materials (Software Mode):**
-- Individual material controls for each shape type (Cubes, Octahedrons, Tetrahedrons, Sphere)
-- **Material Types:**
-  - **Basic (Unlit)** - Simple flat material, no lighting required, always visible
-  - **Standard (PBR)** - Physically-based rendering with metalness (0.0-1.0) and roughness (0.0-1.0) controls
-  - **Phong (Shiny)** - Classic shiny material with specular highlights (fixed shininess: 30)
-  - **Lambert (Matte)** - Diffuse matte material for soft appearance
-- Color picker per shape (independent from frequency colors)
-- Opacity slider per shape (0.0-1.0)
-- Wireframe toggle per shape
-- PBR controls (metalness/roughness) visible only when Standard material selected
-- Reset all materials to defaults button
-
-**Frequency Gain (Software Mode):**
-- Bass gain multiplier (0-3x) - Controls sensitivity of bass frequency band
-- Mids gain multiplier (0-3x) - Controls sensitivity of mids frequency band
-- Highs gain multiplier (0-3x) - Controls sensitivity of highs frequency band
-- Reset frequency gains button
-
-**Camera Controls:**
-- Zoom distance (5-50 units)
-- Height offset (-10 to +10)
-- Rotation offset (0-360°)
-- Auto-rotate toggle (orbits around scene automatically)
-
-**Visual Effects:**
-- **Skybox/Background (Software Mode):**
-  - **Solid Color** - Single-color background (hex color picker)
-  - **Gradient** - Vertical gradient with top and bottom colors
-  - **Image/Skybox** - Equirectangular panoramic images (enter URL, supports CORS-enabled resources, try [Poly Haven](https://polyhaven.com/hdris))
-  - **Stars** - Procedural star field with adjustable star count (1,000-10,000)
-  - **Galaxy** - Procedural spiral galaxy with customizable color tint
-  - **Nebula** - Procedural nebula with dual-color gas clouds and shader-based fog effects
-- Border color customization
-- Letterbox toggle (basic on/off in Editor mode, keyframe animation in Software mode)
-- Ambient and directional lighting controls
-
 ### ✨ **Advanced Features (Editor Mode)**
 
 **Keyframe System:**
@@ -350,31 +271,10 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
 
 ### ✨ **Advanced Features (Software Mode)**
 
-**Parameter Events System:**
-- Manual or automated event triggering
-- Background flash effects
-- Camera shake with intensity control
-- Vignette pulse effects
-- Saturation bursts
-- Color tint flashes
-- Time-based and audio-reactive triggers
-
-**Multi-Track Audio:**
-- Support for multiple audio files simultaneously
-- Independent volume control per track
-- Mute/unmute individual tracks
-- Select which track drives the visualization
-- Mix multiple sources for complex compositions
-
-**Animated Letterbox:**
-- Keyframe-based letterbox animation
-- Curtain-style opening/closing effects
-- Customizable timing and transitions
-
-**Camera Shake Events:**
-- Time-triggered shake effects
-- Adjustable intensity
-- Impact effects synchronized to audio
+- **Parameter Events** - Background flash, vignette pulse, saturation burst, color tint flash
+- **Multi-Track Audio** - Mix multiple audio files with independent volume control
+- **Animated Letterbox** - Keyframe-based curtain effects
+- **Camera Shake Events** - Time-triggered shake with adjustable intensity
 
 ### 🎥 **Video Export System**
 
@@ -483,8 +383,6 @@ Six cinematic presets that modify existing rig parameters:
 
 📚 **[Complete Camera Rig Documentation](CAMERA_RIG_DOCUMENTATION.md)**  
 📖 **[Quick Reference Guide](docs/CAMERA_RIG_QUICK_REFERENCE.md)**
-
-⚠️ **Current Status:** Animation presets are defined and objects are rendered, but the animation playback logic is not yet integrated into the new UI. Objects appear static. This is a priority for the next development phase.
 
 ---
 
@@ -614,68 +512,26 @@ When you first launch Canvas Visualizer, you'll see the **Main Dashboard** with 
   - Canvas always displays at 960x540 for optimal performance
   - Export resolution selected at export time (960x540, 1280x720, 1920x1080)
 
-### **2. Editor Mode Overview:**
+### **2. Editor Mode Workflow:**
 
-The Editor interface is divided into 5 main areas, inspired by professional video editing software:
+1. **Configure Project** - Select resolution preset (720p-4K, Instagram formats) and set FPS
+2. **Upload Audio** - Load your audio file (optional during project creation)
+3. **Create Sections** - Split your song into timeline sections
+4. **Assign Presets** - Choose animation presets for each section
+5. **Customize** - Adjust colors, camera, effects in the Properties panel
+6. **Add Keyframes** - Create preset, camera, or text keyframes on the timeline
+7. **Preview** - Click Play to preview your composition
+8. **Export** - Click Export to render the final video at project resolution
 
-1. **Top Bar (Purple/Dark):**
-   - Title and current section indicator
-   - Time display
-   - Play/Stop button
-   - Undo/Redo buttons (**PHASE 5:** Ctrl+Z / Ctrl+Shift+Z)
-   - Keyboard shortcuts button (? icon) (**PHASE 5**)
-   - Export button (purple, top-right)
+### **3. Software Mode Workflow:**
 
-2. **Left Panel - Layers/Sections (Dark Gray):**
-   - List of all animation sections
-   - Each layer shows: icon, name, time range, duration
-   - Controls: visibility (eye), lock, delete (trash)
-   - Drag layers to reorder
-   - Selected layer highlighted in blue
-
-3. **Center Canvas (Black Background):**
-   - 960x540 3D visualization preview
-   - Real-time rendering of your composition
-   - Optional border (can be toggled)
-   - Letterbox overlays when enabled
-   - Filename overlay (top-left when audio loaded)
-
-4. **Right Panel - Properties/Effects (Dark Gray):**
-   - Shows when a layer is selected
-   - **Layer Properties:** preset, start/end time
-   - **Colors:** bass, mids, highs color pickers
-   - **Camera:** auto-rotate, distance, height, rotation
-   - **Effects:** letterbox, background, border
-   - **Lighting:** ambient and directional intensity
-
-5. **Bottom Timeline (Dark Gray):**
-   - Visual representation of all sections
-   - Horizontal bars for each section
-   - Drag bars to move sections
-   - Resize handles on edges to adjust duration
-   - Red playhead shows current time
-   - Click anywhere to seek
-   - Time ruler at top
-   - "Add Section" button (purple, top-right)
-
-### **3. Software Mode Overview:**
-
-The Software interface is streamlined with tabbed controls at the bottom:
-
-- **Top Section:** Title bar with export button and keyboard shortcuts
-- **Center Canvas:** 960x540 3D preview with optional overlays and border effects
-- **Bottom Section:** 
-  - **Waveform Display** - Scrolling or static waveform visualization with playback controls and time display
-  - **Tabbed Controls** - Access all features through tabs:
-    - **🎵 Waveforms** - Audio track management with volume/mute controls and active track selection
-    - **🎨 Controls** - Frequency gain controls and per-shape material customization
-    - **📷 Camera Settings** - Distance, height, rotation, auto-rotate controls
-    - **🎥 Camera Rig** - Advanced camera rig system with transitions, framing, FX, and shot presets
-    - **✨ Effects** - Skybox modes, letterbox animation, camera shake events, parameter events
-    - **🎭 Post-FX** - Post-processing effects (vignette, saturation, contrast, gamma, color tint)
-    - **⏱️ Presets** - Animation preset selector
-    - **📝 Text Animator** - 3D text overlay with custom font loading
-    - **🎭 Masks** - Masking system for advanced compositing
+1. **Upload Audio** - Navigate to the Waveforms tab and click "Add Track"
+2. **Choose Preset** - Switch to the Presets tab and select an animation preset
+3. **Customize** - Use the Controls tab to adjust frequency gains and shape materials
+4. **Configure Camera** - Set up camera position or create camera rigs
+5. **Add Effects** - Go to the Effects tab to set up skybox, letterbox, or shake events
+6. **Preview** - Click Play in the waveform section to watch your visualization
+7. **Export** - Click Export button to select resolution and render the final video
 
 ### **Development:**
 ```bash
@@ -686,26 +542,6 @@ npm run preview      # Preview production build
 npm run typecheck    # Run TypeScript type checking
 npm run lint         # Run ESLint
 ```
-
-### **Basic Workflow (Editor Mode):**
-1. **Select Mode** - Choose Editor Mode from the Main Dashboard
-2. **Configure Project** - In the New Project Modal, select resolution preset (720p, 1080p, 4K, Instagram formats, etc.) and set FPS
-3. **Upload Audio** - Click "Choose File" to load an audio file (optional during project creation)
-4. **Select Layer** - Click on a layer in the left panel to edit its properties
-5. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
-6. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
-7. **Preview** - Click Play button in top bar to preview your composition
-8. **Export** - Click Export button to select format and render the final video at project resolution
-
-### **Basic Workflow (Software Mode):**
-1. **Select Mode** - Choose Software Mode from the Main Dashboard
-2. **Upload Audio** - Navigate to the Waveforms tab and click "Add Track" to upload your audio file
-3. **Choose Preset** - Switch to the Presets tab and select an animation preset
-4. **Customize** - Use the Controls tab to adjust frequency gains and shape materials
-5. **Adjust Camera** - Configure camera position in the Camera Settings tab or set up advanced rigs in the Camera Rig tab
-6. **Add Effects** - Go to the Effects tab to set up skybox, letterbox, camera shakes, or parameter events
-7. **Preview** - Click Play in the waveform section to watch your visualization in real-time
-8. **Export** - Click Export button (top-right) to select resolution and render the final video
 
 ### **Keyboard Shortcuts:**
 
@@ -765,15 +601,10 @@ npm run lint         # Run ESLint
 
 ### **Target Performance:**
 - 30 FPS during video recording
-- 60 FPS during live playback (when animation implemented)
+- 60 FPS during live playback
 - FFT size: 2048 (good balance of resolution and performance)
 - Video bitrate: 5 Mbps
 - Memory usage scales with audio file length
-
-### **Current Status:**
-- Scene renders at 60 FPS (idle rendering loop active)
-- Audio analysis infrastructure in place
-- Animation loop not yet connected to visualization
 
 ---
 
@@ -786,159 +617,33 @@ npm run lint         # Run ESLint
 
 ---
 
-## **Known Limitations**
-
-### **Browser/Environment:**
-- No localStorage/sessionStorage support (environment limitation)
-- All state is in-memory only (resets on refresh)
-- Cannot access local filesystem directly (must use file input)
-
-### **In Development (Final Architecture Refactor):**
-- Scene Explorer integration into main layout (created, not yet integrated)
-- Canvas resize based on timeline height (planned)
-- Camera settings migration to object properties (planned)
-- Preset menu relocation to workspace controls (planned)
-- Multiple camera implementation (type system ready)
-- Form field ID additions for accessibility (planned)
-
----
-
 ## **Recent Changes & Improvements**
 
 ### **Version 2.5 - Camera Rig Polish & Enhancements (Latest):**
-- ✨ **Rig Transitions** - Smooth interpolation between camera states with configurable duration and easing
-  - Position, rotation, and FOV interpolation over 0.1-5 second duration
-  - Four easing curves: Linear, Ease In, Ease Out, Ease In-Out
-  - Toggle for hard cuts vs smooth transitions
-  - UI controls for future state tracking implementation
-- ✨ **Framing Controls** - Professional framing and composition tools
-  - Look-at offset X/Y sliders (±10 units) for reframing shots
-  - Framing lock checkbox to keep subject centered
-  - Rule of thirds bias toggle with dynamic composition
-- ✨ **Camera FX Layer** - Non-destructive camera effects applied post-rig transformation
-  - Configurable shake intensity multiplier (0-3x) for existing shake events
-  - Adjustable shake frequency (10-100Hz) for different shake effects
-  - Handheld drift using multi-frequency noise synthesis (0-1 intensity)
-  - FOV ramping based on camera velocity (0-20°) for dynamic perspective
-- ✨ **Shot Presets** - Six cinematic presets that modify existing rig parameters
-  - Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking
-  - Presets adjust radius, position, rotation, and speed without creating new rig instances
-  - Visual selection UI with active state highlighting
-- 🎯 **Focus on Polish** - Enhanced usability without modifying core architecture
-  - All controls integrated into existing Camera Rig tab
-  - No new UI panels added
-  - Performance and stability maintained
-  - Zero security vulnerabilities (CodeQL scan passed)
+- ✨ Rig transitions with smooth interpolation and easing curves
+- ✨ Framing controls (look-at offset, framing lock, rule of thirds)
+- ✨ Camera FX layer (shake intensity, handheld drift, FOV ramping)
+- ✨ Six cinematic shot presets (Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking)
 
-### **Version 2.4 - Camera Rig Path Visualization:**
-- ✨ **3D Path Visualization** - Real-time visual feedback of camera rig trajectories in the viewport
-  - Color-coded paths: Orbit (Cyan), Dolly (Green), Crane (Magenta), Custom (White)
-  - Sphere markers at keyframe positions with size variations based on easing type
-  - "Show Paths" and "Show Keyframe Markers" toggles in Camera Rig tab
-  - Paths update in real-time as rig parameters change
-  - Automatic path sampling (2-60 samples per rig for optimal performance)
-  - Proper memory management with geometry disposal on updates
-- 🐛 **Fixed Dolly Rig Behavior** - Camera now correctly looks at scene center instead of following the rig position
-  - Creates proper tracking shots while keeping the scene in view
-  - Dolly rig now useful for forward/backward, lateral, and vertical camera movements
+### **Version 2.4:**
+- ✨ 3D path visualization for camera rigs with color-coded trajectories
+- ✨ Fixed Dolly Rig behavior for proper tracking shots
+- ✨ 6 skybox/background modes (Solid, Gradient, Image, Stars, Galaxy, Nebula)
+- ✨ Professional material system with 4 types (Basic, Standard PBR, Phong, Lambert)
+- ✨ Per-shape material controls with metalness and roughness
 
-### **Version 2.4 - Advanced Skybox & Material System:**
-- ✨ **6 Skybox/Background Modes (Software Mode)** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
-  - **Gradient Skybox** - Vertical color gradients with custom GLSL shaders (top/bottom color control)
-  - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI from Poly Haven)
-  - **Procedural Stars** - 1,000-10,000 randomly distributed stars with adjustable count
-  - **Procedural Galaxy** - Spiral galaxy visualization with customizable color tint
-  - **Procedural Nebula** - Multi-color gas clouds with dual-color customization and shader-based fog effects
-- ✨ **Professional Material System (Software Mode)** - Per-shape material controls
-  - **4 Material Types** - Basic (Unlit), Standard (PBR), Phong (Shiny), Lambert (Matte)
-  - **PBR Support** - Metalness and roughness sliders for Standard materials (0.0-1.0 range)
-  - **Per-Shape Controls** - Independent material, color, opacity, and wireframe settings for Cubes, Octahedrons, Tetrahedrons, and Sphere
-  - **Reset Functionality** - One-click reset to default material values
-- 🔧 **Removed Redundant UI** - Removed "🎨 Colors" section from Software Mode (replaced by per-shape material controls)
-- 🎨 **Enhanced Visual Fidelity** - Physically-based rendering for realistic material appearance with scene lighting
+### **Version 2.3:**
+- ✨ Keyboard shortcuts modal and camera rig visual hints
+- ✨ Keyframe-based camera rotation and parameter events
+- ✨ Comprehensive camera rig documentation
 
-### **Version 2.3 - UI/UX Enhancements & Keyframe Architecture:**
-- ✨ **Keyboard Shortcuts Modal** - Software Mode now has ? button to show available shortcuts
-- ✨ **Camera Rig Visual Hints** - Toggleable position markers, target indicators, path preview, reference grid
-- ✨ **Keyframe-Based Camera Rotation** - Removed global rotation slider, now exclusively keyframe-controlled
-- ✨ **Keyframe-Based Parameter Events** - Changed from time+duration to startTime+endTime model
-- ✨ **Camera Rig Documentation** - Comprehensive documentation (1,377 lines) covering all rig systems
-- ✨ **Frequency Gain Controls** - Restored bass/mids/highs gain multipliers (0-3x range)
-- 🐛 **Audio Duplication Fix** - Fixed bug where dragging time slider during playback caused audio duplication
-- 🐛 **Post-FX Tab Fix** - Fixed ReferenceError crash, documented unimplemented features
-- 📝 **Enhanced README** - Added detailed keyboard shortcuts for both modes, organized by category
-
-### **Version 2.2 - Dual-Mode Architecture:**
-- ✨ **Main Dashboard** - Mode selection screen for Editor vs Software modes
-- ✨ **Software Mode** - Complete streamlined visualizer with tabbed interface
-- ✨ **Multiple Audio Tracks** - Software mode supports mixing multiple audio files
-- ✨ **Parameter Events System** - Advanced effects in Software mode
-- ✨ **Animated Letterbox** - Keyframe-based letterbox in Software mode
-- ✨ **Camera Shake Events** - Time-triggered shake effects
-- ✨ **Dual Workflow** - Professional and simple modes for different use cases
-
-### **Version 2.1 - Architecture Refactor:**
-- ✨ Scene Explorer Component - Blender-style object hierarchy panel
-- ✨ Extended WorkspaceObject Types - Support for camera and light objects
-- ✨ Camera Object Properties - Type system for camera-specific settings
-- ✨ Multiple Cameras Foundation - Architecture supports camera animation
-
-### **Phase 5 - UI Structure:**
-- ✨ Keyboard shortcuts modal with comprehensive reference
-- ✨ Undo/Redo functionality with full history tracking
-- ✨ After Effects-style layout refinements
-- ✨ Professional keyboard shortcut system
-
-### **Phase 4 - Preset Rework:**
-- ✨ Parameter-driven presets (density, speed, intensity, spread)
-- ✨ Real-time parameter editing with live preview
-- ✨ No hardcoded geometry or camera
-- ✨ Presets as starting configurations
-
-### **Phase 3 - Workspace:**
-- ✨ Blender-like 3D workspace mode (toggle with W key)
-- ✨ OrbitControls for camera navigation
-- ✨ TransformControls with visual gizmos
-- ✨ Manual object creation and editing
-
-### **Phase 2 - Project System:**
-- ✨ New Project modal before editor loads
-- ✨ Project settings schema for save/load
-- ✨ Resolution presets and FPS configuration
-
-### **Phase 1 - Core Stability:**
-- ✨ Single unified render loop
-- ✨ Stabilized Three.js lifecycle
+### **Version 2.2:**
+- ✨ Dual-mode architecture (Editor + Software modes)
+- ✨ Main dashboard for mode selection
+- ✨ Multiple audio track support with mixing
+- ✨ Animated letterbox and camera shake events
 - ✨ Enhanced audio system with validation
 - ✨ Timeline as single source of truth
-
----
-
-## **Future Enhancement Ideas**
-
-### **Priority:**
-- **Database Persistence** - Save/load projects with Neon
-- **More Animation Presets** - Expand the visual library
-- **Color Tags** - Organize layers with color labels (Editor mode)
-- **Enhanced Post-Processing** - Bloom, chromatic aberration effects
-
-### **Next Phase:**
-- **Enhanced Keyboard Shortcuts** - Extended hotkey system for faster workflow
-- **Collapsible Panels** - Maximize canvas by hiding panels (Editor mode)
-- **More Easing Functions** - Additional easing options for camera keyframes
-- **Preset Transition Controls** - Customize blend time between presets
-- **Multi-select Keyframes** - Select and edit multiple keyframes at once
-
-### **Long-term:**
-- **Particle Systems** - Additional visual effects
-- **MIDI Controller Support** - Hardware control integration
-- **Real-time Microphone Input** - Live audio visualization
-- **Multiple Export Formats** - MP4, GIF, image sequences
-- **Preset Saving/Loading** - Save compositions as templates
-- **Beat Detection** - Automated section creation
-- **Lyrics Overlay System** - Synchronized text display
-- **Layer Grouping** - Organize complex compositions (Editor mode)
-- **Effect Stack** - Multiple effects per layer
 
 ---
 
@@ -949,19 +654,10 @@ npm run lint         # Run ESLint
 - **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig documentation
 - **[Camera Rig Quick Reference](docs/CAMERA_RIG_QUICK_REFERENCE.md)** - Quick reference for developers
 
-### **Technical Guides:**
-- Camera keyframe animation with smooth interpolation
-- Four camera rig types (Orbit, Dolly, Crane, Custom)
-- Easing functions and motion curves
-- Camera shake system for impact effects
-- Audio-reactive camera positioning
-
 ---
 
 **Version:** 2.5 (Camera Rig Polish & Enhancements)  
-**Version:** 2.4 (Camera Rig Path Visualization)  
-**Version:** 2.4 (Advanced Skybox & Material System)  
-**Last Updated:** 01/03/2026  
+**Last Updated:** January 2026  
 **License:** MIT  
 **Author:** Yorisounai20
 
@@ -970,31 +666,33 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
-- Version 2.5: Camera Rig Polish & Enhancements (Rig Transitions, Framing Controls, Camera FX Layer, Shot Presets)
-- Version 2.4: Camera Rig Path Visualization, Dolly Rig Fix
-- Version 2.4: Advanced Skybox & Material System (6 skybox modes, 4 material types, PBR support)
-- Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
-- Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
-- Version 2.1: Scene Explorer, extended object types, camera/light support
-- Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
-- Phase 1: Core Stability (unified render loop, stabilized lifecycle)
-- Phase 2: Project System (new project modal, settings schema)
-- Phase 3: Workspace (Blender-like viewport, object creation, transform controls)
-- Phase 4: Preset Rework (parameter-driven templates)
-- Phase 5: UI Structure (keyboard shortcuts, undo/redo)
-- Final Refactor: Scene Explorer component, extended object types
-
-### **🔨 In Progress:**
-- Scene Explorer integration into main layout
-- Canvas resize based on timeline height
-- Camera settings migration to object properties
-- Preset menu relocation to workspace controls
-- Multiple camera implementation
-- Form field accessibility improvements
+- Version 2.5: Camera Rig Polish & Enhancements
+- Version 2.4: Camera Rig Path Visualization & Advanced Skybox/Material System
+- Version 2.3: UI/UX Enhancements & Keyframe Architecture
+- Version 2.2: Dual-mode architecture (Editor + Software modes)
+- Version 2.1: Scene Explorer & extended object types
+- Core features: Timeline system, 25 animation presets, workspace mode, project system, keyboard shortcuts, undo/redo
 
 ### **📋 Planned:**
+
+**Priority:**
 - Database persistence with Neon
 - Save/Load project functionality
-- Advanced camera animation system
-- Enhanced lighting controls
 - More animation presets
+- Enhanced post-processing (bloom, chromatic aberration)
+- Color tags for layer organization
+
+**Next Phase:**
+- Collapsible panels to maximize canvas
+- More easing functions for keyframes
+- Preset transition controls
+- Multi-select keyframes
+
+**Long-term:**
+- Particle systems and additional visual effects
+- MIDI controller support
+- Real-time microphone input
+- Multiple export formats (MP4, GIF, image sequences)
+- Beat detection for automated section creation
+- Lyrics overlay system
+- Layer grouping and effect stacks
