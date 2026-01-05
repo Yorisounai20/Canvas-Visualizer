@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle } from 'lucide-react';
+import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle, Save, FolderOpen } from 'lucide-react';
 
 interface TopBarProps {
   isPlaying: boolean;
@@ -18,6 +18,9 @@ interface TopBarProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onShowKeyboardShortcuts?: () => void; // PHASE 5: Keyboard shortcuts modal
+  onSave?: () => void; // Save project to database
+  onLoad?: () => void; // Open saved projects
+  isSaving?: boolean; // Saving state indicator
 }
 
 /**
@@ -42,7 +45,10 @@ export default function TopBar({
   onRedo,
   canUndo = false,
   canRedo = false,
-  onShowKeyboardShortcuts
+  onShowKeyboardShortcuts,
+  onSave,
+  onLoad,
+  isSaving = false
 }: TopBarProps) {
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
@@ -139,6 +145,32 @@ export default function TopBar({
         >
           <Redo2 size={18} />
         </button>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-gray-700 mx-2" />
+
+        {/* Save/Load Buttons */}
+        {onSave && (
+          <button
+            onClick={onSave}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Save Project (Ctrl+S)"
+          >
+            <Save size={18} />
+            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+          </button>
+        )}
+        {onLoad && (
+          <button
+            onClick={onLoad}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors"
+            title="Open Project (Ctrl+O)"
+          >
+            <FolderOpen size={18} />
+            <span>Open</span>
+          </button>
+        )}
 
         {/* Divider */}
         <div className="w-px h-6 bg-gray-700 mx-2" />

@@ -14,7 +14,10 @@ import DebugConsole from './components/Debug/DebugConsole';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
 import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
+import ProjectsModal from './components/Modals/ProjectsModal'; // Save/Load functionality
 import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, EnvironmentKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
+import { saveProject, loadProject, isDatabaseAvailable, initializeDatabase } from './lib/database';
+import { serializeProjectState, deserializeProjectState } from './lib/projectState';
 
 // Animation types/presets
 const ANIMATION_TYPES: AnimationType[] = [
@@ -302,6 +305,9 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
 
   // PHASE 5: UI state
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
 
   // PHASE 5: Undo/Redo state
   const [history, setHistory] = useState<Section[][]>([]);
@@ -337,6 +343,24 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     }
   }, []); // Only run once on mount
 
+  // Initialize database on mount
+  useEffect(() => {
+    const initDB = async () => {
+      if (isDatabaseAvailable()) {
+        try {
+          await initializeDatabase();
+          addLog('Database initialized', 'success');
+        } catch (error) {
+          addLog('Database initialization failed', 'error');
+          console.error('Database initialization error:', error);
+        }
+      } else {
+        addLog('Database not configured (optional)', 'info');
+      }
+    };
+    initDB();
+  }, []);
+
   // Helper functions
   const addLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -368,6 +392,106 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       setHistoryIndex(historyIndex + 1);
       setSections(JSON.parse(JSON.stringify(history[historyIndex + 1])));
       addLog('Redo performed', 'info');
+    }
+  };
+
+  // Save/Load project functionality
+  const handleSaveProject = async () => {
+    if (!isDatabaseAvailable()) {
+      alert('Database is not configured. Please set VITE_DATABASE_URL in your .env file.');
+      addLog('Save failed: Database not configured', 'error');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      addLog('Saving project...', 'info');
+
+      // Serialize current state
+      const projectState = serializeProjectState(projectSettings, {
+        sections,
+        presetKeyframes,
+        textKeyframes,
+        environmentKeyframes,
+        cameraDistance,
+        cameraHeight,
+        cameraRotation,
+        cameraAutoRotate,
+        ambientLightIntensity,
+        directionalLightIntensity,
+        showBorder,
+        borderColor,
+        showLetterbox,
+        letterboxSize,
+        bassColor,
+        midsColor,
+        highsColor,
+        showSongName,
+        customSongName,
+        manualMode
+      });
+
+      // Save to database
+      const savedProject = await saveProject(projectState, currentProjectId);
+      setCurrentProjectId(savedProject.id);
+      
+      addLog(`Project "${projectSettings.name}" saved successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to save project. Check console for details.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadProject = async (projectId: string) => {
+    try {
+      addLog('Loading project...', 'info');
+      
+      const projectState = await loadProject(projectId);
+      
+      if (!projectState) {
+        addLog('Project not found', 'error');
+        alert('Project not found');
+        return;
+      }
+
+      // Deserialize and apply state
+      const state = deserializeProjectState(projectState);
+      
+      // Update all state variables
+      setSections(state.sections);
+      setPresetKeyframes(state.presetKeyframes);
+      setTextKeyframes(state.textKeyframes);
+      setEnvironmentKeyframes(state.environmentKeyframes);
+      setCameraDistance(state.cameraDistance);
+      setCameraHeight(state.cameraHeight);
+      setCameraRotation(state.cameraRotation);
+      setCameraAutoRotate(state.cameraAutoRotate);
+      setAmbientLightIntensity(state.ambientLightIntensity);
+      setDirectionalLightIntensity(state.directionalLightIntensity);
+      setShowBorder(state.showBorder);
+      setBorderColor(state.borderColor);
+      setShowLetterbox(state.showLetterbox);
+      setLetterboxSize(state.letterboxSize);
+      setBassColor(state.bassColor);
+      setMidsColor(state.midsColor);
+      setHighsColor(state.highsColor);
+      setShowSongName(state.showSongName);
+      setCustomSongName(state.customSongName);
+      setManualMode(state.manualMode);
+      
+      // Reset history with loaded state
+      setHistory([JSON.parse(JSON.stringify(state.sections))]);
+      setHistoryIndex(0);
+      
+      setCurrentProjectId(projectId);
+      addLog(`Project "${state.settings.name}" loaded successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to load project. Check console for details.');
     }
   };
 
@@ -2084,10 +2208,25 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         handleRedo();
       }
 
+      // Save/Load keyboard shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveProject();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        setShowProjectsModal(true);
+      }
+
       // PHASE 5: Keyboard shortcuts modal (Escape to close)
       if (e.key === 'Escape' && showKeyboardShortcuts) {
         e.preventDefault();
         setShowKeyboardShortcuts(false);
+      }
+
+      // Close projects modal with Escape
+      if (e.key === 'Escape' && showProjectsModal) {
+        e.preventDefault();
+        setShowProjectsModal(false);
       }
 
       // Camera controls
@@ -2114,6 +2253,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     showDebugConsole,
     workspaceMode,
     showKeyboardShortcuts,
+    showProjectsModal,
     historyIndex,
     history
   ]);
@@ -2544,6 +2684,9 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         canUndo={historyIndex > 0} // PHASE 5: Can undo if history exists
         canRedo={historyIndex < history.length - 1} // PHASE 5: Can redo if not at end
         onShowKeyboardShortcuts={() => setShowKeyboardShortcuts(true)} // PHASE 5: Keyboard shortcuts modal
+        onSave={handleSaveProject} // Save project handler
+        onLoad={() => setShowProjectsModal(true)} // Load project handler
+        isSaving={isSaving} // Saving state
       />
 
       {/* Main Content Area - Calculate height based on available space minus timeline */}
@@ -2736,6 +2879,15 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         isOpen={showKeyboardShortcuts}
         onClose={() => setShowKeyboardShortcuts(false)}
       />
+
+      {/* Projects Modal - Save/Load */}
+      {showProjectsModal && (
+        <ProjectsModal
+          onClose={() => setShowProjectsModal(false)}
+          onLoadProject={handleLoadProject}
+          currentProjectId={currentProjectId}
+        />
+      )}
     </div>
   );
 }
