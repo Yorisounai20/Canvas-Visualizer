@@ -6,7 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu } from 'lucide-react';
+import ProjectsModal from './components/Modals/ProjectsModal';
+import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
+import { ProjectSettings, ProjectState } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -33,7 +36,11 @@ import {
 import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
 import { VideoExportModal } from './components/VisualizerSoftware/components';
 
-export default function ThreeDVisualizer() {
+interface ThreeDVisualizerProps {
+  onBackToDashboard?: () => void;
+}
+
+export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -209,6 +216,13 @@ export default function ThreeDVisualizer() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   
+  // Save/Load project state
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
@@ -350,6 +364,108 @@ export default function ThreeDVisualizer() {
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // Save/Load project functionality (Software mode)
+  const handleSaveProject = async () => {
+    if (!isDatabaseAvailable()) {
+      alert('Database is not configured. Please set VITE_DATABASE_URL in your .env file.');
+      addLog('Save failed: Database not configured', 'error');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      addLog('Saving project...', 'info');
+
+      // Create project settings
+      const projectSettings: ProjectSettings = {
+        name: projectName,
+        resolution: { width: 960, height: 540 },
+        fps: 30,
+        backgroundColor: '#000000',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+      };
+
+      // Serialize Software mode state
+      const projectState: ProjectState = {
+        settings: projectSettings,
+        sections: [], // Software mode doesn't use sections
+        presetKeyframes: [],
+        textKeyframes: [],
+        environmentKeyframes: environmentKeyframes,
+        cameraDistance,
+        cameraHeight,
+        cameraRotation,
+        cameraAutoRotate,
+        ambientLightIntensity,
+        directionalLightIntensity,
+        showBorder,
+        borderColor,
+        showLetterbox,
+        letterboxSize,
+        bassColor,
+        midsColor,
+        highsColor,
+        showSongName,
+        customSongName,
+        manualMode: false
+      };
+
+      // Save to database
+      const savedProject = await saveProject(projectState, currentProjectId);
+      setCurrentProjectId(savedProject.id);
+      
+      addLog(`Project "${projectName}" saved successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to save project. Check console for details.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadProject = async (projectId: string) => {
+    try {
+      addLog('Loading project...', 'info');
+      
+      const projectState = await loadProject(projectId);
+      
+      if (!projectState) {
+        addLog('Project not found', 'error');
+        alert('Project not found');
+        return;
+      }
+
+      // Apply loaded state
+      setProjectName(projectState.settings.name);
+      setEnvironmentKeyframes(projectState.environmentKeyframes);
+      setCameraDistance(projectState.cameraDistance);
+      setCameraHeight(projectState.cameraHeight);
+      setCameraRotation(projectState.cameraRotation);
+      setCameraAutoRotate(projectState.cameraAutoRotate);
+      setShowBorder(projectState.showBorder);
+      setBorderColor(projectState.borderColor);
+      setShowLetterbox(projectState.showLetterbox);
+      setLetterboxSize(projectState.letterboxSize);
+      setBassColor(projectState.bassColor);
+      setMidsColor(projectState.midsColor);
+      setHighsColor(projectState.highsColor);
+      setShowSongName(projectState.showSongName);
+      setCustomSongName(projectState.customSongName);
+      setAmbientLightIntensity(projectState.ambientLightIntensity);
+      setDirectionalLightIntensity(projectState.directionalLightIntensity);
+      
+      setCurrentProjectId(projectId);
+      setShowProjectsModal(false);
+      addLog(`Project "${projectState.settings.name}" loaded successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to load project. Check console for details.');
+    }
   };
 
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -5351,7 +5467,19 @@ export default function ThreeDVisualizer() {
         } else if (showEventModal) {
           setShowEventModal(false);
           setEditingEventId(null);
+        } else if (showProjectsModal) {
+          setShowProjectsModal(false);
+        } else if (showFileMenu) {
+          setShowFileMenu(false);
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        // Save project
+        e.preventDefault();
+        handleSaveProject();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        // Open project
+        e.preventDefault();
+        setShowProjectsModal(true);
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
@@ -5369,7 +5497,25 @@ export default function ThreeDVisualizer() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+
+  // Close file menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showFileMenu) {
+        const target = e.target as HTMLElement;
+        // Check if click is outside the file menu
+        if (!target.closest('.file-menu-container')) {
+          setShowFileMenu(false);
+        }
+      }
+    };
+
+    if (showFileMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showFileMenu]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -5378,7 +5524,64 @@ export default function ThreeDVisualizer() {
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
           
-          {/* Export and Help Buttons - Top Right */}
+          {/* Left Side - Back to Dashboard and File Menu */}
+          <div className="absolute top-0 left-0 flex items-center gap-2">
+            {/* Back to Dashboard Button */}
+            {onBackToDashboard && (
+              <button
+                onClick={onBackToDashboard}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="Back to Dashboard"
+              >
+                <Home size={18} />
+                <span className="text-sm font-semibold">Dashboard</span>
+              </button>
+            )}
+            
+            {/* File Menu Dropdown */}
+            <div className="relative file-menu-container">
+              <button
+                onClick={() => setShowFileMenu(!showFileMenu)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="File Menu"
+              >
+                <Menu size={18} />
+                <span className="text-sm font-semibold">File</span>
+                <ChevronDown size={16} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showFileMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
+                  <button
+                    onClick={() => {
+                      handleSaveProject();
+                      setShowFileMenu(false);
+                    }}
+                    disabled={isSaving}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-t-lg transition-colors"
+                  >
+                    <Save size={16} />
+                    <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProjectsModal(true);
+                      setShowFileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
+                  >
+                    <FolderOpen size={16} />
+                    <span className="text-sm">Open Project</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Side - Keyboard Shortcuts and Export */}
           <div className="absolute top-0 right-0 flex items-center gap-2">
             {/* Keyboard Shortcuts Button */}
             <button
@@ -8667,6 +8870,15 @@ export default function ThreeDVisualizer() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Projects Modal - Save/Load */}
+      {showProjectsModal && (
+        <ProjectsModal
+          onClose={() => setShowProjectsModal(false)}
+          onLoadProject={handleLoadProject}
+          currentProjectId={currentProjectId}
+        />
       )}
     </div>
   );
