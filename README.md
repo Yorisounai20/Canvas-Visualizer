@@ -2,9 +2,7 @@
 
 ## **Development Status**
 
-**Version 2.5 - Camera Rig Polish & Enhancements**
-**Version 2.4 - Camera Rig Path Visualization**
-**Version 2.4 - Advanced Skybox & Material System (Software Mode)**
+**Current Version:** 2.5 - Camera Rig Polish & Enhancements
 
 Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls.
 
@@ -484,8 +482,6 @@ Six cinematic presets that modify existing rig parameters:
 📚 **[Complete Camera Rig Documentation](CAMERA_RIG_DOCUMENTATION.md)**  
 📖 **[Quick Reference Guide](docs/CAMERA_RIG_QUICK_REFERENCE.md)**
 
-⚠️ **Current Status:** Animation presets are defined and objects are rendered, but the animation playback logic is not yet integrated into the new UI. Objects appear static. This is a priority for the next development phase.
-
 ---
 
 ## **Technical Stack**
@@ -765,15 +761,10 @@ npm run lint         # Run ESLint
 
 ### **Target Performance:**
 - 30 FPS during video recording
-- 60 FPS during live playback (when animation implemented)
+- 60 FPS during live playback
 - FFT size: 2048 (good balance of resolution and performance)
 - Video bitrate: 5 Mbps
 - Memory usage scales with audio file length
-
-### **Current Status:**
-- Scene renders at 60 FPS (idle rendering loop active)
-- Audio analysis infrastructure in place
-- Animation loop not yet connected to visualization
 
 ---
 
@@ -786,129 +777,31 @@ npm run lint         # Run ESLint
 
 ---
 
-## **Known Limitations**
-
-### **Browser/Environment:**
-- No localStorage/sessionStorage support (environment limitation)
-- All state is in-memory only (resets on refresh)
-- Cannot access local filesystem directly (must use file input)
-
-### **In Development (Final Architecture Refactor):**
-- Scene Explorer integration into main layout (created, not yet integrated)
-- Canvas resize based on timeline height (planned)
-- Camera settings migration to object properties (planned)
-- Preset menu relocation to workspace controls (planned)
-- Multiple camera implementation (type system ready)
-- Form field ID additions for accessibility (planned)
-
----
-
 ## **Recent Changes & Improvements**
 
 ### **Version 2.5 - Camera Rig Polish & Enhancements (Latest):**
-- ✨ **Rig Transitions** - Smooth interpolation between camera states with configurable duration and easing
-  - Position, rotation, and FOV interpolation over 0.1-5 second duration
-  - Four easing curves: Linear, Ease In, Ease Out, Ease In-Out
-  - Toggle for hard cuts vs smooth transitions
-  - UI controls for future state tracking implementation
-- ✨ **Framing Controls** - Professional framing and composition tools
-  - Look-at offset X/Y sliders (±10 units) for reframing shots
-  - Framing lock checkbox to keep subject centered
-  - Rule of thirds bias toggle with dynamic composition
-- ✨ **Camera FX Layer** - Non-destructive camera effects applied post-rig transformation
-  - Configurable shake intensity multiplier (0-3x) for existing shake events
-  - Adjustable shake frequency (10-100Hz) for different shake effects
-  - Handheld drift using multi-frequency noise synthesis (0-1 intensity)
-  - FOV ramping based on camera velocity (0-20°) for dynamic perspective
-- ✨ **Shot Presets** - Six cinematic presets that modify existing rig parameters
-  - Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking
-  - Presets adjust radius, position, rotation, and speed without creating new rig instances
-  - Visual selection UI with active state highlighting
-- 🎯 **Focus on Polish** - Enhanced usability without modifying core architecture
-  - All controls integrated into existing Camera Rig tab
-  - No new UI panels added
-  - Performance and stability maintained
-  - Zero security vulnerabilities (CodeQL scan passed)
+- ✨ Rig transitions with smooth interpolation and easing curves
+- ✨ Framing controls (look-at offset, framing lock, rule of thirds)
+- ✨ Camera FX layer (shake intensity, handheld drift, FOV ramping)
+- ✨ Six cinematic shot presets (Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking)
 
-### **Version 2.4 - Camera Rig Path Visualization:**
-- ✨ **3D Path Visualization** - Real-time visual feedback of camera rig trajectories in the viewport
-  - Color-coded paths: Orbit (Cyan), Dolly (Green), Crane (Magenta), Custom (White)
-  - Sphere markers at keyframe positions with size variations based on easing type
-  - "Show Paths" and "Show Keyframe Markers" toggles in Camera Rig tab
-  - Paths update in real-time as rig parameters change
-  - Automatic path sampling (2-60 samples per rig for optimal performance)
-  - Proper memory management with geometry disposal on updates
-- 🐛 **Fixed Dolly Rig Behavior** - Camera now correctly looks at scene center instead of following the rig position
-  - Creates proper tracking shots while keeping the scene in view
-  - Dolly rig now useful for forward/backward, lateral, and vertical camera movements
+### **Version 2.4:**
+- ✨ 3D path visualization for camera rigs with color-coded trajectories
+- ✨ Fixed Dolly Rig behavior for proper tracking shots
+- ✨ 6 skybox/background modes (Solid, Gradient, Image, Stars, Galaxy, Nebula)
+- ✨ Professional material system with 4 types (Basic, Standard PBR, Phong, Lambert)
+- ✨ Per-shape material controls with metalness and roughness
 
-### **Version 2.4 - Advanced Skybox & Material System:**
-- ✨ **6 Skybox/Background Modes (Software Mode)** - Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
-  - **Gradient Skybox** - Vertical color gradients with custom GLSL shaders (top/bottom color control)
-  - **Image/Skybox** - Load equirectangular panoramic images via URL (supports HDRI from Poly Haven)
-  - **Procedural Stars** - 1,000-10,000 randomly distributed stars with adjustable count
-  - **Procedural Galaxy** - Spiral galaxy visualization with customizable color tint
-  - **Procedural Nebula** - Multi-color gas clouds with dual-color customization and shader-based fog effects
-- ✨ **Professional Material System (Software Mode)** - Per-shape material controls
-  - **4 Material Types** - Basic (Unlit), Standard (PBR), Phong (Shiny), Lambert (Matte)
-  - **PBR Support** - Metalness and roughness sliders for Standard materials (0.0-1.0 range)
-  - **Per-Shape Controls** - Independent material, color, opacity, and wireframe settings for Cubes, Octahedrons, Tetrahedrons, and Sphere
-  - **Reset Functionality** - One-click reset to default material values
-- 🔧 **Removed Redundant UI** - Removed "🎨 Colors" section from Software Mode (replaced by per-shape material controls)
-- 🎨 **Enhanced Visual Fidelity** - Physically-based rendering for realistic material appearance with scene lighting
+### **Version 2.3:**
+- ✨ Keyboard shortcuts modal and camera rig visual hints
+- ✨ Keyframe-based camera rotation and parameter events
+- ✨ Comprehensive camera rig documentation
 
-### **Version 2.3 - UI/UX Enhancements & Keyframe Architecture:**
-- ✨ **Keyboard Shortcuts Modal** - Software Mode now has ? button to show available shortcuts
-- ✨ **Camera Rig Visual Hints** - Toggleable position markers, target indicators, path preview, reference grid
-- ✨ **Keyframe-Based Camera Rotation** - Removed global rotation slider, now exclusively keyframe-controlled
-- ✨ **Keyframe-Based Parameter Events** - Changed from time+duration to startTime+endTime model
-- ✨ **Camera Rig Documentation** - Comprehensive documentation (1,377 lines) covering all rig systems
-- ✨ **Frequency Gain Controls** - Restored bass/mids/highs gain multipliers (0-3x range)
-- 🐛 **Audio Duplication Fix** - Fixed bug where dragging time slider during playback caused audio duplication
-- 🐛 **Post-FX Tab Fix** - Fixed ReferenceError crash, documented unimplemented features
-- 📝 **Enhanced README** - Added detailed keyboard shortcuts for both modes, organized by category
-
-### **Version 2.2 - Dual-Mode Architecture:**
-- ✨ **Main Dashboard** - Mode selection screen for Editor vs Software modes
-- ✨ **Software Mode** - Complete streamlined visualizer with tabbed interface
-- ✨ **Multiple Audio Tracks** - Software mode supports mixing multiple audio files
-- ✨ **Parameter Events System** - Advanced effects in Software mode
-- ✨ **Animated Letterbox** - Keyframe-based letterbox in Software mode
-- ✨ **Camera Shake Events** - Time-triggered shake effects
-- ✨ **Dual Workflow** - Professional and simple modes for different use cases
-
-### **Version 2.1 - Architecture Refactor:**
-- ✨ Scene Explorer Component - Blender-style object hierarchy panel
-- ✨ Extended WorkspaceObject Types - Support for camera and light objects
-- ✨ Camera Object Properties - Type system for camera-specific settings
-- ✨ Multiple Cameras Foundation - Architecture supports camera animation
-
-### **Phase 5 - UI Structure:**
-- ✨ Keyboard shortcuts modal with comprehensive reference
-- ✨ Undo/Redo functionality with full history tracking
-- ✨ After Effects-style layout refinements
-- ✨ Professional keyboard shortcut system
-
-### **Phase 4 - Preset Rework:**
-- ✨ Parameter-driven presets (density, speed, intensity, spread)
-- ✨ Real-time parameter editing with live preview
-- ✨ No hardcoded geometry or camera
-- ✨ Presets as starting configurations
-
-### **Phase 3 - Workspace:**
-- ✨ Blender-like 3D workspace mode (toggle with W key)
-- ✨ OrbitControls for camera navigation
-- ✨ TransformControls with visual gizmos
-- ✨ Manual object creation and editing
-
-### **Phase 2 - Project System:**
-- ✨ New Project modal before editor loads
-- ✨ Project settings schema for save/load
-- ✨ Resolution presets and FPS configuration
-
-### **Phase 1 - Core Stability:**
-- ✨ Single unified render loop
-- ✨ Stabilized Three.js lifecycle
+### **Version 2.2:**
+- ✨ Dual-mode architecture (Editor + Software modes)
+- ✨ Main dashboard for mode selection
+- ✨ Multiple audio track support with mixing
+- ✨ Animated letterbox and camera shake events
 - ✨ Enhanced audio system with validation
 - ✨ Timeline as single source of truth
 
@@ -949,19 +842,10 @@ npm run lint         # Run ESLint
 - **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig documentation
 - **[Camera Rig Quick Reference](docs/CAMERA_RIG_QUICK_REFERENCE.md)** - Quick reference for developers
 
-### **Technical Guides:**
-- Camera keyframe animation with smooth interpolation
-- Four camera rig types (Orbit, Dolly, Crane, Custom)
-- Easing functions and motion curves
-- Camera shake system for impact effects
-- Audio-reactive camera positioning
-
 ---
 
 **Version:** 2.5 (Camera Rig Polish & Enhancements)  
-**Version:** 2.4 (Camera Rig Path Visualization)  
-**Version:** 2.4 (Advanced Skybox & Material System)  
-**Last Updated:** 01/03/2026  
+**Last Updated:** January 2026  
 **License:** MIT  
 **Author:** Yorisounai20
 
@@ -970,27 +854,12 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
-- Version 2.5: Camera Rig Polish & Enhancements (Rig Transitions, Framing Controls, Camera FX Layer, Shot Presets)
-- Version 2.4: Camera Rig Path Visualization, Dolly Rig Fix
-- Version 2.4: Advanced Skybox & Material System (6 skybox modes, 4 material types, PBR support)
-- Version 2.3: UI/UX Enhancements, Keyframe Architecture, Camera Rig Documentation
-- Version 2.2: Dual-mode architecture (Main Dashboard, Editor + Software modes)
-- Version 2.1: Scene Explorer, extended object types, camera/light support
-- Phase 10: All 9 features (waveform, 3D text, keyframes, debug console, etc.)
-- Phase 1: Core Stability (unified render loop, stabilized lifecycle)
-- Phase 2: Project System (new project modal, settings schema)
-- Phase 3: Workspace (Blender-like viewport, object creation, transform controls)
-- Phase 4: Preset Rework (parameter-driven templates)
-- Phase 5: UI Structure (keyboard shortcuts, undo/redo)
-- Final Refactor: Scene Explorer component, extended object types
-
-### **🔨 In Progress:**
-- Scene Explorer integration into main layout
-- Canvas resize based on timeline height
-- Camera settings migration to object properties
-- Preset menu relocation to workspace controls
-- Multiple camera implementation
-- Form field accessibility improvements
+- Version 2.5: Camera Rig Polish & Enhancements
+- Version 2.4: Camera Rig Path Visualization & Advanced Skybox/Material System
+- Version 2.3: UI/UX Enhancements & Keyframe Architecture
+- Version 2.2: Dual-mode architecture (Editor + Software modes)
+- Version 2.1: Scene Explorer & extended object types
+- Core features: Timeline system, 25 animation presets, workspace mode, project system, keyboard shortcuts, undo/redo
 
 ### **📋 Planned:**
 - Database persistence with Neon
