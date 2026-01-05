@@ -518,68 +518,26 @@ When you first launch Canvas Visualizer, you'll see the **Main Dashboard** with 
   - Canvas always displays at 960x540 for optimal performance
   - Export resolution selected at export time (960x540, 1280x720, 1920x1080)
 
-### **2. Editor Mode Overview:**
+### **2. Editor Mode Workflow:**
 
-The Editor interface is divided into 5 main areas, inspired by professional video editing software:
+1. **Configure Project** - Select resolution preset (720p-4K, Instagram formats) and set FPS
+2. **Upload Audio** - Load your audio file (optional during project creation)
+3. **Create Sections** - Split your song into timeline sections
+4. **Assign Presets** - Choose animation presets for each section
+5. **Customize** - Adjust colors, camera, effects in the Properties panel
+6. **Add Keyframes** - Create preset, camera, or text keyframes on the timeline
+7. **Preview** - Click Play to preview your composition
+8. **Export** - Click Export to render the final video at project resolution
 
-1. **Top Bar (Purple/Dark):**
-   - Title and current section indicator
-   - Time display
-   - Play/Stop button
-   - Undo/Redo buttons (**PHASE 5:** Ctrl+Z / Ctrl+Shift+Z)
-   - Keyboard shortcuts button (? icon) (**PHASE 5**)
-   - Export button (purple, top-right)
+### **3. Software Mode Workflow:**
 
-2. **Left Panel - Layers/Sections (Dark Gray):**
-   - List of all animation sections
-   - Each layer shows: icon, name, time range, duration
-   - Controls: visibility (eye), lock, delete (trash)
-   - Drag layers to reorder
-   - Selected layer highlighted in blue
-
-3. **Center Canvas (Black Background):**
-   - 960x540 3D visualization preview
-   - Real-time rendering of your composition
-   - Optional border (can be toggled)
-   - Letterbox overlays when enabled
-   - Filename overlay (top-left when audio loaded)
-
-4. **Right Panel - Properties/Effects (Dark Gray):**
-   - Shows when a layer is selected
-   - **Layer Properties:** preset, start/end time
-   - **Colors:** bass, mids, highs color pickers
-   - **Camera:** auto-rotate, distance, height, rotation
-   - **Effects:** letterbox, background, border
-   - **Lighting:** ambient and directional intensity
-
-5. **Bottom Timeline (Dark Gray):**
-   - Visual representation of all sections
-   - Horizontal bars for each section
-   - Drag bars to move sections
-   - Resize handles on edges to adjust duration
-   - Red playhead shows current time
-   - Click anywhere to seek
-   - Time ruler at top
-   - "Add Section" button (purple, top-right)
-
-### **3. Software Mode Overview:**
-
-The Software interface is streamlined with tabbed controls at the bottom:
-
-- **Top Section:** Title bar with export button and keyboard shortcuts
-- **Center Canvas:** 960x540 3D preview with optional overlays and border effects
-- **Bottom Section:** 
-  - **Waveform Display** - Scrolling or static waveform visualization with playback controls and time display
-  - **Tabbed Controls** - Access all features through tabs:
-    - **🎵 Waveforms** - Audio track management with volume/mute controls and active track selection
-    - **🎨 Controls** - Frequency gain controls and per-shape material customization
-    - **📷 Camera Settings** - Distance, height, rotation, auto-rotate controls
-    - **🎥 Camera Rig** - Advanced camera rig system with transitions, framing, FX, and shot presets
-    - **✨ Effects** - Skybox modes, letterbox animation, camera shake events, parameter events
-    - **🎭 Post-FX** - Post-processing effects (vignette, saturation, contrast, gamma, color tint)
-    - **⏱️ Presets** - Animation preset selector
-    - **📝 Text Animator** - 3D text overlay with custom font loading
-    - **🎭 Masks** - Masking system for advanced compositing
+1. **Upload Audio** - Navigate to the Waveforms tab and click "Add Track"
+2. **Choose Preset** - Switch to the Presets tab and select an animation preset
+3. **Customize** - Use the Controls tab to adjust frequency gains and shape materials
+4. **Configure Camera** - Set up camera position or create camera rigs
+5. **Add Effects** - Go to the Effects tab to set up skybox, letterbox, or shake events
+6. **Preview** - Click Play in the waveform section to watch your visualization
+7. **Export** - Click Export button to select resolution and render the final video
 
 ### **Development:**
 ```bash
@@ -590,26 +548,6 @@ npm run preview      # Preview production build
 npm run typecheck    # Run TypeScript type checking
 npm run lint         # Run ESLint
 ```
-
-### **Basic Workflow (Editor Mode):**
-1. **Select Mode** - Choose Editor Mode from the Main Dashboard
-2. **Configure Project** - In the New Project Modal, select resolution preset (720p, 1080p, 4K, Instagram formats, etc.) and set FPS
-3. **Upload Audio** - Click "Choose File" to load an audio file (optional during project creation)
-4. **Select Layer** - Click on a layer in the left panel to edit its properties
-5. **Edit Properties** - Adjust animation preset, colors, camera, effects in right panel
-6. **Arrange Timeline** - Drag section bars to move them, use resize handles to adjust duration
-7. **Preview** - Click Play button in top bar to preview your composition
-8. **Export** - Click Export button to select format and render the final video at project resolution
-
-### **Basic Workflow (Software Mode):**
-1. **Select Mode** - Choose Software Mode from the Main Dashboard
-2. **Upload Audio** - Navigate to the Waveforms tab and click "Add Track" to upload your audio file
-3. **Choose Preset** - Switch to the Presets tab and select an animation preset
-4. **Customize** - Use the Controls tab to adjust frequency gains and shape materials
-5. **Adjust Camera** - Configure camera position in the Camera Settings tab or set up advanced rigs in the Camera Rig tab
-6. **Add Effects** - Go to the Effects tab to set up skybox, letterbox, camera shakes, or parameter events
-7. **Preview** - Click Play in the waveform section to watch your visualization in real-time
-8. **Export** - Click Export button (top-right) to select resolution and render the final video
 
 ### **Keyboard Shortcuts:**
 
