@@ -231,12 +231,6 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
       - Circle and rectangle mask types
       - Blend modes and feathering
 
-### 🎬 **Editor Mode: Timeline-Based Animation System**
-- Split your song into sections (e.g., 0:00-0:20, 0:20-0:45, etc.)
-- Assign different animation presets to each section
-- Smooth transitions between animation styles
-- Real-time audio frequency analysis (bass, mids, highs)
-
 ### ✨ **Advanced Features (Editor Mode)**
 
 **Keyframe System:**
@@ -653,34 +647,6 @@ npm run lint         # Run ESLint
 
 ---
 
-## **Future Enhancement Ideas**
-
-### **Priority:**
-- **Database Persistence** - Save/load projects with Neon
-- **More Animation Presets** - Expand the visual library
-- **Color Tags** - Organize layers with color labels (Editor mode)
-- **Enhanced Post-Processing** - Bloom, chromatic aberration effects
-
-### **Next Phase:**
-- **Enhanced Keyboard Shortcuts** - Extended hotkey system for faster workflow
-- **Collapsible Panels** - Maximize canvas by hiding panels (Editor mode)
-- **More Easing Functions** - Additional easing options for camera keyframes
-- **Preset Transition Controls** - Customize blend time between presets
-- **Multi-select Keyframes** - Select and edit multiple keyframes at once
-
-### **Long-term:**
-- **Particle Systems** - Additional visual effects
-- **MIDI Controller Support** - Hardware control integration
-- **Real-time Microphone Input** - Live audio visualization
-- **Multiple Export Formats** - MP4, GIF, image sequences
-- **Preset Saving/Loading** - Save compositions as templates
-- **Beat Detection** - Automated section creation
-- **Lyrics Overlay System** - Synchronized text display
-- **Layer Grouping** - Organize complex compositions (Editor mode)
-- **Effect Stack** - Multiple effects per layer
-
----
-
 ## **Documentation**
 
 ### **Core Documentation:**
@@ -708,8 +674,25 @@ npm run lint         # Run ESLint
 - Core features: Timeline system, 25 animation presets, workspace mode, project system, keyboard shortcuts, undo/redo
 
 ### **📋 Planned:**
+
+**Priority:**
 - Database persistence with Neon
 - Save/Load project functionality
-- Advanced camera animation system
-- Enhanced lighting controls
 - More animation presets
+- Enhanced post-processing (bloom, chromatic aberration)
+- Color tags for layer organization
+
+**Next Phase:**
+- Collapsible panels to maximize canvas
+- More easing functions for keyframes
+- Preset transition controls
+- Multi-select keyframes
+
+**Long-term:**
+- Particle systems and additional visual effects
+- MIDI controller support
+- Real-time microphone input
+- Multiple export formats (MP4, GIF, image sequences)
+- Beat detection for automated section creation
+- Lyrics overlay system
+- Layer grouping and effect stacks
