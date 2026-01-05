@@ -11,38 +11,6 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 - ⚡ **Software Mode** - Simple, streamlined interface for quick visualizations
 - 🎨 Main Dashboard for mode selection at startup
 
-**Editor Mode Features:**
-- ✅ Professional panel-based layout (Top Bar, Scene Explorer, Canvas, Properties, Timeline)
-- ✅ Scene Explorer - Blender-style object hierarchy panel
-- ✅ Extended object types - Support for cameras and lights as workspace objects
-- ✅ Layer management (select, reorder, lock, delete, duplicate, visibility toggle)
-- ✅ Timeline editing with multiple tabs (Sections, Presets, Camera, Text)
-- ✅ Complete keyframe systems (Presets, Camera, Text)
-- ✅ Blender-like 3D workspace (toggle with `W` key)
-- ✅ Keyboard shortcuts modal, undo/redo functionality
-- ✅ Parameter-driven presets (density, speed, intensity, spread)
-
-**Software Mode Features:**
-- ✅ Simple, streamlined interface for quick setup
-- ✅ Direct audio upload and instant preview
-- ✅ Animated letterbox with keyframe system
-- ✅ Camera shake events and visual effects
-- ✅ Parameter events (background flash, vignette pulse, saturation burst)
-- ✅ Multiple audio track support with mixing
-- ✅ Scrolling and static waveform visualization modes
-- ✅ **6 skybox/background modes**: Solid Color, Gradient, Image/Skybox, Stars, Galaxy, Nebula
-- ✅ **Professional material system**: 4 material types (Basic, Standard PBR, Phong, Lambert) with per-shape controls
-- ✅ **PBR rendering**: Metalness and roughness controls for physically-based materials
-
-**Shared Features (Both Modes):**
-- ✅ 25 animation presets with audio-reactive 3D visuals
-- ✅ 3D text overlay with font loading
-- ✅ Waveform visualization
-- ✅ Debug console (toggle with `` ` `` key)
-- ✅ Per-shape color pickers and camera controls
-- ✅ Export modal with resolution selection
-- ✅ Manual control mode for non-audio-reactive animations
-
 ---
 
 ## **What Is This?**
@@ -53,7 +21,7 @@ Professional music video creation tool with **two workflow modes**: A comprehens
 
 - **⚡ Software Mode** - A streamlined, simplified visualizer for quick music visualizations. Upload audio, choose a preset, customize colors, and export. Ideal for rapid prototyping and simple projects.
 
-Both modes create audio-reactive 3D animations synchronized to music, with support for 9 different animation presets, custom colors, camera controls, and high-quality video export.
+Both modes create audio-reactive 3D animations synchronized to music, with support for 25 animation presets, custom colors, camera controls, and high-quality video export.
 
 ---
 
@@ -269,45 +237,6 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
 - Smooth transitions between animation styles
 - Real-time audio frequency analysis (bass, mids, highs)
 
-### 🎨 **Customization Options (Both Modes)**
-
-**Shape Materials (Software Mode):**
-- Individual material controls for each shape type (Cubes, Octahedrons, Tetrahedrons, Sphere)
-- **Material Types:**
-  - **Basic (Unlit)** - Simple flat material, no lighting required, always visible
-  - **Standard (PBR)** - Physically-based rendering with metalness (0.0-1.0) and roughness (0.0-1.0) controls
-  - **Phong (Shiny)** - Classic shiny material with specular highlights (fixed shininess: 30)
-  - **Lambert (Matte)** - Diffuse matte material for soft appearance
-- Color picker per shape (independent from frequency colors)
-- Opacity slider per shape (0.0-1.0)
-- Wireframe toggle per shape
-- PBR controls (metalness/roughness) visible only when Standard material selected
-- Reset all materials to defaults button
-
-**Frequency Gain (Software Mode):**
-- Bass gain multiplier (0-3x) - Controls sensitivity of bass frequency band
-- Mids gain multiplier (0-3x) - Controls sensitivity of mids frequency band
-- Highs gain multiplier (0-3x) - Controls sensitivity of highs frequency band
-- Reset frequency gains button
-
-**Camera Controls:**
-- Zoom distance (5-50 units)
-- Height offset (-10 to +10)
-- Rotation offset (0-360°)
-- Auto-rotate toggle (orbits around scene automatically)
-
-**Visual Effects:**
-- **Skybox/Background (Software Mode):**
-  - **Solid Color** - Single-color background (hex color picker)
-  - **Gradient** - Vertical gradient with top and bottom colors
-  - **Image/Skybox** - Equirectangular panoramic images (enter URL, supports CORS-enabled resources, try [Poly Haven](https://polyhaven.com/hdris))
-  - **Stars** - Procedural star field with adjustable star count (1,000-10,000)
-  - **Galaxy** - Procedural spiral galaxy with customizable color tint
-  - **Nebula** - Procedural nebula with dual-color gas clouds and shader-based fog effects
-- Border color customization
-- Letterbox toggle (basic on/off in Editor mode, keyframe animation in Software mode)
-- Ambient and directional lighting controls
-
 ### ✨ **Advanced Features (Editor Mode)**
 
 **Keyframe System:**
@@ -348,31 +277,10 @@ The Software Mode features a streamlined tabbed interface at the bottom for easy
 
 ### ✨ **Advanced Features (Software Mode)**
 
-**Parameter Events System:**
-- Manual or automated event triggering
-- Background flash effects
-- Camera shake with intensity control
-- Vignette pulse effects
-- Saturation bursts
-- Color tint flashes
-- Time-based and audio-reactive triggers
-
-**Multi-Track Audio:**
-- Support for multiple audio files simultaneously
-- Independent volume control per track
-- Mute/unmute individual tracks
-- Select which track drives the visualization
-- Mix multiple sources for complex compositions
-
-**Animated Letterbox:**
-- Keyframe-based letterbox animation
-- Curtain-style opening/closing effects
-- Customizable timing and transitions
-
-**Camera Shake Events:**
-- Time-triggered shake effects
-- Adjustable intensity
-- Impact effects synchronized to audio
+- **Parameter Events** - Background flash, vignette pulse, saturation burst, color tint flash
+- **Multi-Track Audio** - Mix multiple audio files with independent volume control
+- **Animated Letterbox** - Keyframe-based curtain effects
+- **Camera Shake Events** - Time-triggered shake with adjustable intensity
 
 ### 🎥 **Video Export System**
 
