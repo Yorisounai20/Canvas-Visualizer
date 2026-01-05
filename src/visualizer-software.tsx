@@ -7923,6 +7923,53 @@ export default function ThreeDVisualizer() {
               <div className="mt-6">
                 <h4 className="text-md font-bold text-cyan-400 mb-3">Camera Rig Keyframes</h4>
                 <p className="text-xs text-gray-400 mb-3">Edit keyframe timing, position, rotation, and animation settings.</p>
+                
+                {/* Timeline bar with keyframe markers */}
+                <div className="relative bg-gray-900 rounded h-12 mb-3">
+                  {/* Current time indicator */}
+                  <div 
+                    className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
+                    style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                  >
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
+                  </div>
+                  
+                  {/* Keyframe markers */}
+                  {cameraRigKeyframes.map((kf, idx) => {
+                    const rig = cameraRigs.find(r => r.id === kf.rigId);
+                    // Generate a color based on the rig (use a hash of the rig name or cycle through colors)
+                    const rigColors = ['#f97316', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f59e0b'];
+                    const rigIndex = cameraRigs.findIndex(r => r.id === kf.rigId);
+                    const markerColor = rigColors[rigIndex % rigColors.length] || '#9333ea';
+                    
+                    return (
+                      <div
+                        key={kf.id || idx}
+                        className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
+                        style={{ left: `${duration > 0 ? (kf.time / duration) * 100 : 0}%` }}
+                        title={`${formatTime(kf.time)} - ${rig?.name || 'Unknown Rig'}`}
+                      >
+                        <div 
+                          className="w-3 h-8 hover:scale-110 transition-transform flex items-center justify-center rounded"
+                          style={{ backgroundColor: markerColor }}
+                        >
+                          <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                        </div>
+                        <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+                          {formatTime(kf.time)}: {rig?.name || 'Unknown'} ({kf.easing})
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* Empty state message inside timeline */}
+                  {cameraRigKeyframes.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-xs pointer-events-none">
+                      No keyframes yet. Click "+ Keyframe" on a rig to add one.
+                    </div>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                   {cameraRigKeyframes.map(kf => {
                     const rig = cameraRigs.find(r => r.id === kf.rigId);
