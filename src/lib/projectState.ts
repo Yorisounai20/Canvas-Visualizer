@@ -98,12 +98,31 @@ export function validateProjectState(data: any): data is ProjectState {
   return (
     data &&
     typeof data === 'object' &&
+    // Validate settings
     data.settings &&
     typeof data.settings === 'object' &&
-    data.settings.name &&
+    typeof data.settings.name === 'string' &&
     data.settings.resolution &&
+    typeof data.settings.resolution.width === 'number' &&
+    typeof data.settings.resolution.height === 'number' &&
+    // Validate arrays
     Array.isArray(data.sections) &&
+    Array.isArray(data.presetKeyframes) &&
+    Array.isArray(data.textKeyframes) &&
+    Array.isArray(data.environmentKeyframes) &&
+    // Validate camera properties
     typeof data.cameraDistance === 'number' &&
-    typeof data.bassColor === 'string'
+    typeof data.cameraHeight === 'number' &&
+    typeof data.cameraRotation === 'number' &&
+    typeof data.cameraAutoRotate === 'boolean' &&
+    // Validate colors
+    typeof data.bassColor === 'string' &&
+    typeof data.midsColor === 'string' &&
+    typeof data.highsColor === 'string' &&
+    typeof data.borderColor === 'string' &&
+    // Validate boolean flags
+    typeof data.showBorder === 'boolean' &&
+    typeof data.showLetterbox === 'boolean' &&
+    typeof data.manualMode === 'boolean'
   );
 }

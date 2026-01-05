@@ -192,11 +192,14 @@ export async function deleteProject(projectId: string): Promise<boolean> {
 
 /**
  * Check if database is available and configured
+ * Note: This only checks if the environment variable exists,
+ * not if the connection is actually valid. Database operations
+ * will handle connection errors appropriately.
  */
 export function isDatabaseAvailable(): boolean {
   try {
     const url = import.meta.env.VITE_DATABASE_URL;
-    return !!url;
+    return !!url && url.length > 0;
   } catch {
     return false;
   }

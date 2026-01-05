@@ -394,8 +394,8 @@ export default function ThreeDVisualizer() {
         cameraHeight,
         cameraRotation,
         cameraAutoRotate,
-        ambientLightIntensity: 0.5,
-        directionalLightIntensity: 0.5,
+        ambientLightIntensity,
+        directionalLightIntensity,
         showBorder,
         borderColor,
         showLetterbox,
@@ -450,6 +450,8 @@ export default function ThreeDVisualizer() {
       setHighsColor(projectState.highsColor);
       setShowSongName(projectState.showSongName);
       setCustomSongName(projectState.customSongName);
+      setAmbientLightIntensity(projectState.ambientLightIntensity);
+      setDirectionalLightIntensity(projectState.directionalLightIntensity);
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
