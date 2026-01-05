@@ -543,6 +543,53 @@ npm run typecheck    # Run TypeScript type checking
 npm run lint         # Run ESLint
 ```
 
+### **Database Setup (Optional - For Save/Load Functionality):**
+
+Canvas Visualizer supports saving and loading projects to a Neon PostgreSQL database. This is **optional** - the application works perfectly fine without it.
+
+#### **Setup Steps:**
+
+1. **Create a Neon Database:**
+   - Visit [neon.tech](https://neon.tech) and create a free account
+   - Create a new project and database
+   - Copy your connection string (it will look like: `postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require`)
+
+2. **Configure Environment Variable:**
+   - Copy `.env.example` to `.env`:
+     ```bash
+     cp .env.example .env
+     ```
+   - Edit `.env` and add your Neon connection string:
+     ```
+     VITE_DATABASE_URL=postgresql://user:password@ep-xxx-xxx.us-east-2.aws.neon.tech/dbname?sslmode=require
+     ```
+
+3. **Initialize Database:**
+   - The database schema is automatically created when you first launch the app
+   - A `projects` table will be created to store your saved projects
+
+4. **Using Save/Load:**
+   - **Save Project:** Click the "Save" button in the top bar or press `Ctrl+S` (Cmd+S on Mac)
+   - **Open Project:** Click the "Open" button in the top bar or press `Ctrl+O` (Cmd+O on Mac)
+   - **Projects are saved with:**
+     - All timeline sections and keyframes (Editor mode)
+     - Camera settings and animations
+     - Color schemes and visual settings
+     - Environment and effect configurations
+   - **Note:** Audio files are NOT saved - you'll need to re-upload them when loading a project
+
+#### **Database Schema:**
+```sql
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  user_id VARCHAR(255),
+  project_data JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
 ### **Keyboard Shortcuts:**
 
 #### **Editor Mode:**
@@ -563,6 +610,8 @@ npm run lint         # Run ESLint
 | **Editing** | Ctrl/Cmd + Z | Undo |
 | | Ctrl/Cmd + Shift + Z | Redo |
 | | Ctrl/Cmd + Y | Redo (alternative) |
+| | Ctrl/Cmd + S | Save project |
+| | Ctrl/Cmd + O | Open/Load project |
 | **Sections** | 1-9 | Change selected section preset |
 | | ↑ / ↓ | Navigate sections |
 | **Effects** | G | Toggle letterbox |
@@ -584,6 +633,8 @@ npm run lint         # Run ESLint
 | Space | Play/Pause audio |
 | Esc | Close modals/dialogs |
 | G | Toggle camera rig visual hints |
+| Ctrl/Cmd + S | Save project |
+| Ctrl/Cmd + O | Open/Load project |
 
 *Software Mode has a streamlined set of shortcuts focused on essential playback and camera controls.*
 
@@ -624,6 +675,8 @@ npm run lint         # Run ESLint
 - ✨ Framing controls (look-at offset, framing lock, rule of thirds)
 - ✨ Camera FX layer (shake intensity, handheld drift, FOV ramping)
 - ✨ Six cinematic shot presets (Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking)
+- ✨ **Database persistence with Neon PostgreSQL**
+- ✨ **Save/Load project functionality for both Editor and Software modes**
 
 ### **Version 2.4:**
 - ✨ 3D path visualization for camera rigs with color-coded trajectories
@@ -666,18 +719,18 @@ npm run lint         # Run ESLint
 ## **Development Roadmap**
 
 ### **✅ Completed:**
-- Version 2.5: Camera Rig Polish & Enhancements
+- Version 2.5: Camera Rig Polish & Enhancements + Database Persistence
 - Version 2.4: Camera Rig Path Visualization & Advanced Skybox/Material System
 - Version 2.3: UI/UX Enhancements & Keyframe Architecture
 - Version 2.2: Dual-mode architecture (Editor + Software modes)
 - Version 2.1: Scene Explorer & extended object types
 - Core features: Timeline system, 25 animation presets, workspace mode, project system, keyboard shortcuts, undo/redo
+- **Database persistence with Neon PostgreSQL**
+- **Save/Load project functionality (both Editor and Software modes)**
 
 ### **📋 Planned:**
 
 **Priority:**
-- Database persistence with Neon
-- Save/Load project functionality
 - More animation presets
 - Enhanced post-processing (bloom, chromatic aberration)
 - Color tags for layer organization
