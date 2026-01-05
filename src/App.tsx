@@ -50,7 +50,7 @@ function App() {
   if (selectedMode === 'software') {
     return (
       <Suspense fallback={<div className="flex items-center justify-center h-screen bg-gray-900 text-white">Loading...</div>}>
-        <ThreeDVisualizer />
+        <ThreeDVisualizer onBackToDashboard={handleBackToDashboard} />
       </Suspense>
     );
   }

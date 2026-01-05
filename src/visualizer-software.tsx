@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState } from './types';
@@ -36,7 +36,11 @@ import {
 import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
 import { VideoExportModal } from './components/VisualizerSoftware/components';
 
-export default function ThreeDVisualizer() {
+interface ThreeDVisualizerProps {
+  onBackToDashboard?: () => void;
+}
+
+export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -217,6 +221,7 @@ export default function ThreeDVisualizer() {
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
+  const [showFileMenu, setShowFileMenu] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
@@ -5464,6 +5469,8 @@ export default function ThreeDVisualizer() {
           setEditingEventId(null);
         } else if (showProjectsModal) {
           setShowProjectsModal(false);
+        } else if (showFileMenu) {
+          setShowFileMenu(false);
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         // Save project
@@ -5490,7 +5497,25 @@ export default function ThreeDVisualizer() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+
+  // Close file menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showFileMenu) {
+        const target = e.target as HTMLElement;
+        // Check if click is outside the file menu
+        if (!target.closest('.file-menu-container')) {
+          setShowFileMenu(false);
+        }
+      }
+    };
+
+    if (showFileMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showFileMenu]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -5499,29 +5524,65 @@ export default function ThreeDVisualizer() {
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
           
-          {/* Export and Help Buttons - Top Right */}
+          {/* Left Side - Back to Dashboard and File Menu */}
+          <div className="absolute top-0 left-0 flex items-center gap-2">
+            {/* Back to Dashboard Button */}
+            {onBackToDashboard && (
+              <button
+                onClick={onBackToDashboard}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="Back to Dashboard"
+              >
+                <Home size={18} />
+                <span className="text-sm font-semibold">Dashboard</span>
+              </button>
+            )}
+            
+            {/* File Menu Dropdown */}
+            <div className="relative file-menu-container">
+              <button
+                onClick={() => setShowFileMenu(!showFileMenu)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="File Menu"
+              >
+                <Menu size={18} />
+                <span className="text-sm font-semibold">File</span>
+                <ChevronDown size={16} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showFileMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
+                  <button
+                    onClick={() => {
+                      handleSaveProject();
+                      setShowFileMenu(false);
+                    }}
+                    disabled={isSaving}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-t-lg transition-colors"
+                  >
+                    <Save size={16} />
+                    <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProjectsModal(true);
+                      setShowFileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
+                  >
+                    <FolderOpen size={16} />
+                    <span className="text-sm">Open Project</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Side - Keyboard Shortcuts and Export */}
           <div className="absolute top-0 right-0 flex items-center gap-2">
-            {/* Save Button */}
-            <button
-              onClick={handleSaveProject}
-              disabled={isSaving}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Save Project (Ctrl+S)"
-            >
-              <Save size={18} />
-              <span className="text-sm font-semibold">{isSaving ? 'Saving...' : 'Save'}</span>
-            </button>
-            
-            {/* Open Button */}
-            <button
-              onClick={() => setShowProjectsModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              title="Open Project (Ctrl+O)"
-            >
-              <FolderOpen size={18} />
-              <span className="text-sm font-semibold">Open</span>
-            </button>
-            
             {/* Keyboard Shortcuts Button */}
             <button
               onClick={() => setShowKeyboardShortcuts(true)}
