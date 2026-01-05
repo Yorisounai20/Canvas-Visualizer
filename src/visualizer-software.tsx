@@ -7929,7 +7929,7 @@ export default function ThreeDVisualizer() {
                   {/* Current time indicator */}
                   <div 
                     className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10"
-                    style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                    style={{ left: `${(currentTime / duration) * 100}%` }}
                   >
                     <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-cyan-400 rounded-full"></div>
                   </div>
@@ -7937,7 +7937,7 @@ export default function ThreeDVisualizer() {
                   {/* Keyframe markers */}
                   {cameraRigKeyframes.map((kf, idx) => {
                     const rig = cameraRigs.find(r => r.id === kf.rigId);
-                    // Generate a color based on the rig (use a hash of the rig name or cycle through colors)
+                    // Color-code keyframe markers by cycling through colors based on rig index
                     const rigColors = ['#f97316', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f59e0b'];
                     const rigIndex = cameraRigs.findIndex(r => r.id === kf.rigId);
                     const markerColor = rigColors[rigIndex % rigColors.length] || '#9333ea';
@@ -7946,7 +7946,7 @@ export default function ThreeDVisualizer() {
                       <div
                         key={kf.id || idx}
                         className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
-                        style={{ left: `${duration > 0 ? (kf.time / duration) * 100 : 0}%` }}
+                        style={{ left: `${(kf.time / duration) * 100}%` }}
                         title={`${formatTime(kf.time)} - ${rig?.name || 'Unknown Rig'}`}
                       >
                         <div 
@@ -7955,7 +7955,7 @@ export default function ThreeDVisualizer() {
                         >
                           <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
                         </div>
-                        <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+                        <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                           {formatTime(kf.time)}: {rig?.name || 'Unknown'} ({kf.easing})
                         </div>
                       </div>
