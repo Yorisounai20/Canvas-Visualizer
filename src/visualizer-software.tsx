@@ -6,7 +6,10 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen } from 'lucide-react';
+import ProjectsModal from './components/Modals/ProjectsModal';
+import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
+import { ProjectSettings, ProjectState } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -209,6 +212,12 @@ export default function ThreeDVisualizer() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   
+  // Save/Load project state
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
@@ -350,6 +359,106 @@ export default function ThreeDVisualizer() {
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // Save/Load project functionality (Software mode)
+  const handleSaveProject = async () => {
+    if (!isDatabaseAvailable()) {
+      alert('Database is not configured. Please set VITE_DATABASE_URL in your .env file.');
+      addLog('Save failed: Database not configured', 'error');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      addLog('Saving project...', 'info');
+
+      // Create project settings
+      const projectSettings: ProjectSettings = {
+        name: projectName,
+        resolution: { width: 960, height: 540 },
+        fps: 30,
+        backgroundColor: '#000000',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+      };
+
+      // Serialize Software mode state
+      const projectState: ProjectState = {
+        settings: projectSettings,
+        sections: [], // Software mode doesn't use sections
+        presetKeyframes: [],
+        textKeyframes: [],
+        environmentKeyframes: environmentKeyframes,
+        cameraDistance,
+        cameraHeight,
+        cameraRotation,
+        cameraAutoRotate,
+        ambientLightIntensity: 0.5,
+        directionalLightIntensity: 0.5,
+        showBorder,
+        borderColor,
+        showLetterbox,
+        letterboxSize,
+        bassColor,
+        midsColor,
+        highsColor,
+        showSongName,
+        customSongName,
+        manualMode: false
+      };
+
+      // Save to database
+      const savedProject = await saveProject(projectState, currentProjectId);
+      setCurrentProjectId(savedProject.id);
+      
+      addLog(`Project "${projectName}" saved successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to save project. Check console for details.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadProject = async (projectId: string) => {
+    try {
+      addLog('Loading project...', 'info');
+      
+      const projectState = await loadProject(projectId);
+      
+      if (!projectState) {
+        addLog('Project not found', 'error');
+        alert('Project not found');
+        return;
+      }
+
+      // Apply loaded state
+      setProjectName(projectState.settings.name);
+      setEnvironmentKeyframes(projectState.environmentKeyframes);
+      setCameraDistance(projectState.cameraDistance);
+      setCameraHeight(projectState.cameraHeight);
+      setCameraRotation(projectState.cameraRotation);
+      setCameraAutoRotate(projectState.cameraAutoRotate);
+      setShowBorder(projectState.showBorder);
+      setBorderColor(projectState.borderColor);
+      setShowLetterbox(projectState.showLetterbox);
+      setLetterboxSize(projectState.letterboxSize);
+      setBassColor(projectState.bassColor);
+      setMidsColor(projectState.midsColor);
+      setHighsColor(projectState.highsColor);
+      setShowSongName(projectState.showSongName);
+      setCustomSongName(projectState.customSongName);
+      
+      setCurrentProjectId(projectId);
+      setShowProjectsModal(false);
+      addLog(`Project "${projectState.settings.name}" loaded successfully`, 'success');
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to load project. Check console for details.');
+    }
   };
 
   const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -5351,7 +5460,17 @@ export default function ThreeDVisualizer() {
         } else if (showEventModal) {
           setShowEventModal(false);
           setEditingEventId(null);
+        } else if (showProjectsModal) {
+          setShowProjectsModal(false);
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        // Save project
+        e.preventDefault();
+        handleSaveProject();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        // Open project
+        e.preventDefault();
+        setShowProjectsModal(true);
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
@@ -5369,7 +5488,7 @@ export default function ThreeDVisualizer() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal]);
 
   return (
     <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
@@ -5380,6 +5499,27 @@ export default function ThreeDVisualizer() {
           
           {/* Export and Help Buttons - Top Right */}
           <div className="absolute top-0 right-0 flex items-center gap-2">
+            {/* Save Button */}
+            <button
+              onClick={handleSaveProject}
+              disabled={isSaving}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Save Project (Ctrl+S)"
+            >
+              <Save size={18} />
+              <span className="text-sm font-semibold">{isSaving ? 'Saving...' : 'Save'}</span>
+            </button>
+            
+            {/* Open Button */}
+            <button
+              onClick={() => setShowProjectsModal(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              title="Open Project (Ctrl+O)"
+            >
+              <FolderOpen size={18} />
+              <span className="text-sm font-semibold">Open</span>
+            </button>
+            
             {/* Keyboard Shortcuts Button */}
             <button
               onClick={() => setShowKeyboardShortcuts(true)}
@@ -8667,6 +8807,15 @@ export default function ThreeDVisualizer() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Projects Modal - Save/Load */}
+      {showProjectsModal && (
+        <ProjectsModal
+          onClose={() => setShowProjectsModal(false)}
+          onLoadProject={handleLoadProject}
+          currentProjectId={currentProjectId}
+        />
       )}
     </div>
   );
