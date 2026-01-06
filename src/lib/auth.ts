@@ -18,10 +18,15 @@ if (!projectId) {
 /**
  * Stack Auth client instance
  * Use this instance to access authentication features throughout the app
+ * 
+ * Configuration:
+ * - tokenStore: "cookie" - Stores auth tokens in cookies for better security
+ * - projectId & publishableClientKey - From Stack Auth dashboard
  */
 export const stackApp = new StackClientApp({
   projectId: projectId || '',
   publishableClientKey: publishableClientKey || undefined,
+  tokenStore: 'cookie', // Recommended by Stack Auth for better security
 });
 
 export default stackApp;
