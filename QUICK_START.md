@@ -2,23 +2,15 @@
 
 ## What You Need to Do (Simple Steps)
 
-### Step 1: Create Your Environment File
+### Step 1: Check Your Environment File ✅
 
-Copy the example file to create your own `.env` file:
+Good news! The `.env` file is already set up with:
+- ✅ Your Stack Auth credentials
+- ✅ Your Neon database connection
 
-```bash
-cp .env.example .env
-```
+**No setup needed!** Everything is ready to go.
 
-**That's it!** The `.env.example` file already has your Stack Auth credentials in it.
-
-### Step 2: Add Your Database Connection (Optional for now)
-
-If you want to save projects, you'll need to add your Neon database URL to the `.env` file. 
-
-You can skip this for now and just test the authentication first.
-
-### Step 3: Start the App
+### Step 2: Start the App
 
 ```bash
 npm install
