@@ -393,7 +393,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const projectState: ProjectState = {
         settings: projectSettings,
         sections: [], // Software mode doesn't use sections
-        presetKeyframes: [],
+        presetKeyframes: presetKeyframes,
         textKeyframes: [],
         environmentKeyframes: environmentKeyframes,
         cameraDistance,
@@ -411,7 +411,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         highsColor,
         showSongName,
         customSongName,
-        manualMode: false
+        manualMode: false,
+        // Post-FX properties
+        blendMode,
+        vignetteStrength,
+        vignetteSoftness,
+        colorSaturation,
+        colorContrast,
+        colorGamma,
+        colorTintR,
+        colorTintG,
+        colorTintB
       };
 
       // Save to database
@@ -443,6 +453,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Apply loaded state
       setProjectName(projectState.settings.name);
       setEnvironmentKeyframes(projectState.environmentKeyframes);
+      setPresetKeyframes(projectState.presetKeyframes || []);
       setCameraDistance(projectState.cameraDistance);
       setCameraHeight(projectState.cameraHeight);
       setCameraRotation(projectState.cameraRotation);
@@ -458,6 +469,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setCustomSongName(projectState.customSongName);
       setAmbientLightIntensity(projectState.ambientLightIntensity);
       setDirectionalLightIntensity(projectState.directionalLightIntensity);
+      
+      // Restore Post-FX properties if they exist
+      if (projectState.blendMode !== undefined) setBlendMode(projectState.blendMode);
+      if (projectState.vignetteStrength !== undefined) setVignetteStrength(projectState.vignetteStrength);
+      if (projectState.vignetteSoftness !== undefined) setVignetteSoftness(projectState.vignetteSoftness);
+      if (projectState.colorSaturation !== undefined) setColorSaturation(projectState.colorSaturation);
+      if (projectState.colorContrast !== undefined) setColorContrast(projectState.colorContrast);
+      if (projectState.colorGamma !== undefined) setColorGamma(projectState.colorGamma);
+      if (projectState.colorTintR !== undefined) setColorTintR(projectState.colorTintR);
+      if (projectState.colorTintG !== undefined) setColorTintG(projectState.colorTintG);
+      if (projectState.colorTintB !== undefined) setColorTintB(projectState.colorTintB);
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);

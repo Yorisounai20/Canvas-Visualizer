@@ -38,6 +38,16 @@ export interface ProjectState {
   showSongName: boolean;
   customSongName: string;
   manualMode: boolean;
+  // Post-FX properties
+  blendMode?: 'normal' | 'additive' | 'multiply' | 'screen';
+  vignetteStrength?: number;
+  vignetteSoftness?: number;
+  colorSaturation?: number;
+  colorContrast?: number;
+  colorGamma?: number;
+  colorTintR?: number;
+  colorTintG?: number;
+  colorTintB?: number;
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations
