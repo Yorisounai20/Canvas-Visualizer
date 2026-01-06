@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useUser } from '@stackframe/stack';
 import NewProjectModal from './components/Modals/NewProjectModal';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
@@ -58,9 +58,15 @@ function EditorMode() {
  * Software Mode Component - direct access to the visualizer
  */
 function SoftwareMode() {
+  const navigate = useNavigate();
+  
+  const handleBackToDashboard = () => {
+    navigate('/');
+  };
+  
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <ThreeDVisualizer onBackToDashboard={() => window.location.href = '/'} />
+      <ThreeDVisualizer onBackToDashboard={handleBackToDashboard} />
     </Suspense>
   );
 }

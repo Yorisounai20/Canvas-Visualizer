@@ -454,11 +454,12 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     try {
       addLog('Loading project...', 'info');
       
-      const projectState = await loadProject(projectId);
+      const userId = user?.id;
+      const projectState = await loadProject(projectId, userId);
       
       if (!projectState) {
-        addLog('Project not found', 'error');
-        alert('Project not found');
+        addLog('Project not found or you don\'t have permission to access it', 'error');
+        alert('Project not found or you don\'t have permission to access it');
         return;
       }
 

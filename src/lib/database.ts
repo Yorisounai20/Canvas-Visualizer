@@ -122,16 +122,23 @@ export async function saveProject(
 
 /**
  * Load a project by ID
+ * Optionally verify user ownership for security
  */
-export async function loadProject(projectId: string): Promise<ProjectState | null> {
+export async function loadProject(projectId: string, userId?: string): Promise<ProjectState | null> {
   const sql = getSql();
   
   try {
-    const result = await sql`
-      SELECT project_data
-      FROM projects
-      WHERE id = ${projectId}
-    `;
+    const result = userId
+      ? await sql`
+          SELECT project_data
+          FROM projects
+          WHERE id = ${projectId} AND user_id = ${userId}
+        `
+      : await sql`
+          SELECT project_data
+          FROM projects
+          WHERE id = ${projectId}
+        `;
     
     if (result.length === 0) {
       return null;
