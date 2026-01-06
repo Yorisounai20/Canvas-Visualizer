@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, FolderOpen, Trash2, Calendar, Clock } from 'lucide-react';
+import { useUser } from '@stackframe/stack';
 import { SavedProject, listProjects, deleteProject, isDatabaseAvailable } from '../../lib/database';
 
 interface ProjectsModalProps {
@@ -11,12 +12,14 @@ interface ProjectsModalProps {
 /**
  * ProjectsModal Component
  * Displays a list of saved projects with load and delete functionality
+ * Now filtered by authenticated user
  */
 export default function ProjectsModal({
   onClose,
   onLoadProject,
   currentProjectId
 }: ProjectsModalProps) {
+  const user = useUser();
   const [projects, setProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +27,7 @@ export default function ProjectsModal({
 
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [user]);
 
   const loadProjects = async () => {
     if (!isDatabaseAvailable()) {
@@ -33,10 +36,17 @@ export default function ProjectsModal({
       return;
     }
 
+    // Wait for user to be loaded
+    if (user === undefined) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const result = await listProjects();
+      // Filter projects by user ID
+      const userId = user?.id;
+      const result = await listProjects(userId);
       setProjects(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects');
@@ -53,7 +63,8 @@ export default function ProjectsModal({
 
     try {
       setDeletingId(projectId);
-      await deleteProject(projectId);
+      const userId = user?.id;
+      await deleteProject(projectId, userId);
       setProjects(projects.filter(p => p.id !== projectId));
     } catch (err) {
       alert('Failed to delete project: ' + (err instanceof Error ? err.message : 'Unknown error'));

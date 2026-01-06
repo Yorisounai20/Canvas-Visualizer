@@ -2,13 +2,14 @@
 
 ## **Development Status**
 
-**Current Version:** 2.5 - Camera Rig Polish & Enhancements
+**Current Version:** 2.6 - User Authentication & Account Management
 
-Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls.
+Professional music video creation tool with **two workflow modes**: A comprehensive **Editor Mode** with After Effects-style interface, Blender-like workspace, Scene Explorer, timeline-based animation, and keyframe systems; plus a streamlined **Software Mode** for quick, simple visualizations with advanced skybox backgrounds and professional material controls. Now with **user authentication and per-user project storage** powered by Stack Auth and Neon PostgreSQL.
 
 **Dual-Mode Architecture:**
 - 🎬 **Editor Mode** - Professional interface with layers, timeline, workspace, and advanced controls
 - ⚡ **Software Mode** - Simple, streamlined interface for quick visualizations
+- 🔐 **User Authentication** - Secure accounts with per-user project storage
 - 🎨 Main Dashboard for mode selection at startup
 
 ---
@@ -386,16 +387,115 @@ Six cinematic presets that modify existing rig parameters:
 
 ---
 
+## **Setup & Installation**
+
+### **Prerequisites**
+
+- Node.js 18+ and npm
+- A [Neon PostgreSQL](https://neon.tech) account (for project persistence)
+- A [Stack Auth](https://stack-auth.com) account (for user authentication)
+
+### **Environment Setup**
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Yorisounai20/Canvas-Visualizer.git
+   cd Canvas-Visualizer
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables:**
+   
+   Copy `.env.example` to `.env` and fill in your credentials:
+   ```env
+   # Neon Database Configuration
+   VITE_DATABASE_URL=postgresql://your_user:your_password@your_host/your_database?sslmode=require
+   
+   # Stack Auth Configuration
+   VITE_STACK_PROJECT_ID=your_project_id
+   VITE_STACK_PUBLISHABLE_CLIENT_KEY=your_publishable_key
+   VITE_STACK_SECRET_SERVER_KEY=your_secret_key
+   ```
+
+4. **Set up Neon PostgreSQL:**
+   - Create a new project at [neon.tech](https://neon.tech)
+   - Copy the connection string to `VITE_DATABASE_URL`
+   - The database schema will be created automatically on first use
+
+5. **Set up Stack Auth:**
+   - Create a new project at [Stack Auth Dashboard](https://app.stack-auth.com/projects)
+   - Copy the Project ID, Publishable Client Key, and Secret Server Key to your `.env` file
+   - Configure your allowed redirect URLs in Stack Auth settings
+
+6. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+7. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+### **Authentication Features**
+
+Canvas Visualizer now includes user authentication powered by Stack Auth:
+
+- 🔐 **Secure sign-up and sign-in** - Email/password authentication
+- 👤 **User accounts** - Manage your profile and settings
+- 💾 **Per-user project storage** - Your projects are saved to your account
+- 🔒 **Protected routes** - Editor and Software modes require authentication
+- 🚪 **Session management** - View and revoke active sessions
+
+**First-time users:**
+1. Visit the app and click "Sign up" to create an account
+2. After signing in, you'll be redirected to the home dashboard
+3. Choose between Editor or Software mode to start creating
+
+**Project persistence:**
+- All saved projects are associated with your user account
+- You can only view and edit your own projects
+- Projects are stored securely in Neon PostgreSQL
+
+### **Troubleshooting**
+
+**Authentication issues:**
+- Make sure all Stack Auth environment variables are correctly set
+- Verify your Stack Auth project is active and properly configured
+- Check browser console for any auth-related errors
+
+**Database connection issues:**
+- Ensure your Neon database URL is correct and includes `?sslmode=require`
+- Verify your Neon project is active and not suspended
+- Check that your IP is allowed to connect (Neon usually allows all IPs by default)
+
+**Build errors:**
+- Clear `node_modules` and reinstall: `rm -rf node_modules && npm install`
+- Clear build cache: `rm -rf dist`
+- Ensure you're using Node.js 18 or higher
+
+---
+
 ## **Technical Stack**
 
+### **Frontend:**
 - **React 18** - UI and component-based architecture
 - **TypeScript** - Type safety and better development experience
+- **React Router DOM** - Client-side routing and navigation
 - **Three.js** (0.182.0) - 3D graphics rendering via WebGL
 - **Web Audio API** - Audio loading and real-time frequency analysis
 - **MediaRecorder API** - Video recording and export
 - **Tailwind CSS** - Utility-first styling framework
 - **Lucide React** - Icon library
 - **Vite** - Build tool and development server
+
+### **Backend & Authentication:**
+- **Stack Auth** (@stackframe/stack) - User authentication and account management
+- **Neon PostgreSQL** (@neondatabase/serverless) - Serverless PostgreSQL for project persistence
 
 ---
 
@@ -670,7 +770,16 @@ CREATE TABLE projects (
 
 ## **Recent Changes & Improvements**
 
-### **Version 2.5 - Camera Rig Polish & Enhancements (Latest):**
+### **Version 2.6 - User Authentication & Account Management (Latest):**
+- ✨ **User authentication** with Stack Auth integration
+- ✨ **Secure sign-up and sign-in** with email/password
+- ✨ **User accounts** with profile management
+- ✨ **Protected routes** - authentication required for Editor and Software modes
+- ✨ **Per-user project storage** - projects are saved to your account
+- ✨ **Session management** - view and revoke active sessions
+- ✨ **Account settings page** with password management
+
+### **Version 2.5 - Camera Rig Polish & Enhancements:**
 - ✨ Rig transitions with smooth interpolation and easing curves
 - ✨ Framing controls (look-at offset, framing lock, rule of thirds)
 - ✨ Camera FX layer (shake intensity, handheld drift, FOV ramping)

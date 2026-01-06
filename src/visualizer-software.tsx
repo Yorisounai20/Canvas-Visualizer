@@ -7,6 +7,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu } from 'lucide-react';
+import { useUser } from '@stackframe/stack';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState } from './types';
@@ -41,6 +42,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Get authenticated user
+  const user = useUser();
+  
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -425,7 +429,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       };
 
       // Save to database
-      const savedProject = await saveProject(projectState, currentProjectId);
+      const userId = user?.id;
+      const savedProject = await saveProject(projectState, currentProjectId, userId);
       setCurrentProjectId(savedProject.id);
       
       addLog(`Project "${projectName}" saved successfully`, 'success');
@@ -442,11 +447,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     try {
       addLog('Loading project...', 'info');
       
-      const projectState = await loadProject(projectId);
+      const userId = user?.id;
+      const projectState = await loadProject(projectId, userId);
       
       if (!projectState) {
-        addLog('Project not found', 'error');
-        alert('Project not found');
+        addLog('Project not found or you don\'t have permission to access it', 'error');
+        alert('Project not found or you don\'t have permission to access it');
         return;
       }
 

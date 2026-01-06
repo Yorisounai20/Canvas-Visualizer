@@ -73,6 +73,13 @@ export async function initializeDatabase(): Promise<void> {
 
 /**
  * Save a new project or update an existing one
+ * 
+ * @param projectState - The project state to save
+ * @param projectId - Optional ID for updating existing project
+ * @param userId - User ID for ownership verification (recommended for security)
+ * 
+ * Note: While userId is optional for backward compatibility, it should always be 
+ * provided in production to ensure proper authorization and project ownership.
  */
 export async function saveProject(
   projectState: ProjectState,
@@ -83,7 +90,7 @@ export async function saveProject(
   
   try {
     if (projectId) {
-      // Update existing project
+      // Update existing project - verify user ownership when userId is provided
       const result = await sql`
         UPDATE projects
         SET 
@@ -91,11 +98,12 @@ export async function saveProject(
           project_data = ${JSON.stringify(projectState)},
           updated_at = NOW()
         WHERE id = ${projectId}
+        ${userId ? sql`AND user_id = ${userId}` : sql``}
         RETURNING *
       `;
       
       if (result.length === 0) {
-        throw new Error(`Project with id ${projectId} not found`);
+        throw new Error(`Project with id ${projectId} not found or you don't have permission to update it`);
       }
       
       return result[0] as SavedProject;
@@ -121,16 +129,28 @@ export async function saveProject(
 
 /**
  * Load a project by ID
+ * 
+ * @param projectId - The project ID to load
+ * @param userId - Optional user ID for ownership verification (recommended for security)
+ * 
+ * Note: While userId is optional for backward compatibility, it should always be 
+ * provided in production to ensure users can only load their own projects.
  */
-export async function loadProject(projectId: string): Promise<ProjectState | null> {
+export async function loadProject(projectId: string, userId?: string): Promise<ProjectState | null> {
   const sql = getSql();
   
   try {
-    const result = await sql`
-      SELECT project_data
-      FROM projects
-      WHERE id = ${projectId}
-    `;
+    const result = userId
+      ? await sql`
+          SELECT project_data
+          FROM projects
+          WHERE id = ${projectId} AND user_id = ${userId}
+        `
+      : await sql`
+          SELECT project_data
+          FROM projects
+          WHERE id = ${projectId}
+        `;
     
     if (result.length === 0) {
       return null;
@@ -172,14 +192,21 @@ export async function listProjects(userId?: string): Promise<SavedProject[]> {
 
 /**
  * Delete a project by ID
+ * 
+ * @param projectId - The project ID to delete
+ * @param userId - Optional user ID for ownership verification (recommended for security)
+ * 
+ * Note: While userId is optional for backward compatibility, it should always be 
+ * provided in production to ensure users can only delete their own projects.
  */
-export async function deleteProject(projectId: string): Promise<boolean> {
+export async function deleteProject(projectId: string, userId?: string): Promise<boolean> {
   const sql = getSql();
   
   try {
     const result = await sql`
       DELETE FROM projects
       WHERE id = ${projectId}
+      ${userId ? sql`AND user_id = ${userId}` : sql``}
       RETURNING id
     `;
     

@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
+import { useUser } from '@stackframe/stack';
 import TopBar from './components/Controls/TopBar';
 import LeftPanel from './components/Panels/LeftPanel';
 import RightPanel from './components/Panels/RightPanel';
@@ -188,6 +189,9 @@ interface VisualizerEditorProps {
  * Coordinates all panels and manages the 3D visualization state
  */
 export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
+  // Get authenticated user
+  const user = useUser();
+  
   // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -432,7 +436,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       });
 
       // Save to database
-      const savedProject = await saveProject(projectState, currentProjectId);
+      const userId = user?.id;
+      const savedProject = await saveProject(projectState, currentProjectId, userId);
       setCurrentProjectId(savedProject.id);
       
       addLog(`Project "${projectSettings.name}" saved successfully`, 'success');
@@ -449,11 +454,12 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     try {
       addLog('Loading project...', 'info');
       
-      const projectState = await loadProject(projectId);
+      const userId = user?.id;
+      const projectState = await loadProject(projectId, userId);
       
       if (!projectState) {
-        addLog('Project not found', 'error');
-        alert('Project not found');
+        addLog('Project not found or you don\'t have permission to access it', 'error');
+        alert('Project not found or you don\'t have permission to access it');
         return;
       }
 
