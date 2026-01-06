@@ -4,17 +4,10 @@
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SignIn, SignUp } from '@stackframe/stack';
 
 export function Auth() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const navigate = useNavigate();
-
-  const handleSuccess = () => {
-    // Redirect to home page after successful authentication
-    navigate('/');
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
@@ -30,9 +23,9 @@ export function Auth() {
         {/* Auth Form Card */}
         <div className="bg-gray-800 rounded-lg shadow-xl p-8">
           {mode === 'signin' ? (
-            <SignIn onSignIn={handleSuccess} />
+            <SignIn />
           ) : (
-            <SignUp onSignUp={handleSuccess} />
+            <SignUp />
           )}
 
           {/* Toggle between sign in and sign up */}

@@ -59,9 +59,6 @@ export function Account() {
               <div>
                 <p className="text-white font-medium text-lg">{user?.displayName || 'User'}</p>
                 <p className="text-gray-400">{user?.primaryEmail}</p>
-                <p className="text-gray-500 text-sm mt-1">
-                  Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                </p>
               </div>
             </div>
           </div>

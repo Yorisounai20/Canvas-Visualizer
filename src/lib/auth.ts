@@ -6,8 +6,8 @@
 import { StackClientApp } from '@stackframe/stack';
 
 // Get environment variables
-const projectId = import.meta.env.VITE_STACK_PROJECT_ID;
-const publishableClientKey = import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY;
+const projectId = import.meta.env.VITE_STACK_PROJECT_ID as string | undefined;
+const publishableClientKey = import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY as string | undefined;
 
 if (!projectId) {
   console.warn('VITE_STACK_PROJECT_ID is not set. Authentication features will be disabled.');
@@ -19,7 +19,7 @@ if (!projectId) {
  */
 export const stackApp = new StackClientApp({
   projectId: projectId || 'demo-project',
-  publishableClientKey: publishableClientKey,
+  publishableClientKey: publishableClientKey || undefined,
 });
 
 export default stackApp;

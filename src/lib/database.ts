@@ -83,7 +83,7 @@ export async function saveProject(
   
   try {
     if (projectId) {
-      // Update existing project
+      // Update existing project - verify user ownership
       const result = await sql`
         UPDATE projects
         SET 
@@ -91,11 +91,12 @@ export async function saveProject(
           project_data = ${JSON.stringify(projectState)},
           updated_at = NOW()
         WHERE id = ${projectId}
+        ${userId ? sql`AND user_id = ${userId}` : sql``}
         RETURNING *
       `;
       
       if (result.length === 0) {
-        throw new Error(`Project with id ${projectId} not found`);
+        throw new Error(`Project with id ${projectId} not found or you don't have permission to update it`);
       }
       
       return result[0] as SavedProject;
@@ -173,13 +174,14 @@ export async function listProjects(userId?: string): Promise<SavedProject[]> {
 /**
  * Delete a project by ID
  */
-export async function deleteProject(projectId: string): Promise<boolean> {
+export async function deleteProject(projectId: string, userId?: string): Promise<boolean> {
   const sql = getSql();
   
   try {
     const result = await sql`
       DELETE FROM projects
       WHERE id = ${projectId}
+      ${userId ? sql`AND user_id = ${userId}` : sql``}
       RETURNING id
     `;
     
