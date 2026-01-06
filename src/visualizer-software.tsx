@@ -106,6 +106,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [cameraDistance, setCameraDistance] = useState(DEFAULT_CAMERA_DISTANCE);
   const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
   const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
+  const [cameraAutoRotate, setCameraAutoRotate] = useState(false);
   
   // Camera Rig Visual Hints
   const [showRigHints, setShowRigHints] = useState(false);
