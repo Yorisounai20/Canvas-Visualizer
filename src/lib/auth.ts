@@ -9,8 +9,10 @@ import { StackClientApp } from '@stackframe/stack';
 const projectId = import.meta.env.VITE_STACK_PROJECT_ID as string | undefined;
 const publishableClientKey = import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY as string | undefined;
 
+// Validate required environment variables
 if (!projectId) {
-  console.warn('VITE_STACK_PROJECT_ID is not set. Authentication features will be disabled.');
+  console.error('VITE_STACK_PROJECT_ID is not set. Authentication will not work properly.');
+  console.error('Please configure your Stack Auth credentials in the .env file.');
 }
 
 /**
@@ -18,7 +20,7 @@ if (!projectId) {
  * Use this instance to access authentication features throughout the app
  */
 export const stackApp = new StackClientApp({
-  projectId: projectId || 'demo-project',
+  projectId: projectId || '',
   publishableClientKey: publishableClientKey || undefined,
 });
 
