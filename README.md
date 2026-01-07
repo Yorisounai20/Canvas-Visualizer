@@ -478,6 +478,60 @@ Canvas Visualizer now includes user authentication powered by Stack Auth:
 - Clear build cache: `rm -rf dist`
 - Ensure you're using Node.js 18 or higher
 
+**Deployment issues (Vercel 404 errors):**
+- If you encounter 404 NOT_FOUND errors on routes like `/editor` or `/software` when deploying to Vercel
+- The `vercel.json` file is already configured with SPA routing
+- See [VERCEL_DEPLOYMENT_FIX.md](VERCEL_DEPLOYMENT_FIX.md) for detailed explanation
+- This is a common issue with Single Page Applications using client-side routing
+
+---
+
+## **Deployment**
+
+### **Deploying to Vercel (Recommended)**
+
+Canvas Visualizer is configured for easy deployment to Vercel:
+
+1. **Connect your repository to Vercel:**
+   - Visit [vercel.com](https://vercel.com) and sign in
+   - Click "New Project" and import your GitHub repository
+   - Vercel will automatically detect the Vite configuration
+
+2. **Configure environment variables:**
+   - Add all variables from your `.env` file to Vercel:
+     - `VITE_DATABASE_URL`
+     - `VITE_STACK_PROJECT_ID`
+     - `VITE_STACK_PUBLISHABLE_CLIENT_KEY`
+     - `VITE_STACK_SECRET_SERVER_KEY`
+   - Go to Project Settings → Environment Variables
+
+3. **Deploy:**
+   - Click "Deploy" and wait for the build to complete
+   - Your app will be available at `https://your-project.vercel.app`
+
+**Important:** The included `vercel.json` file configures SPA routing automatically. This ensures routes like `/editor` and `/software` work correctly. See [VERCEL_DEPLOYMENT_FIX.md](VERCEL_DEPLOYMENT_FIX.md) for technical details.
+
+### **Deploying to Other Platforms**
+
+**Netlify:**
+Create a `_redirects` file in the `public` folder:
+```
+/*    /index.html   200
+```
+
+**Cloudflare Pages:**
+Works automatically with the build output from `npm run build`
+
+**Self-Hosted (Nginx):**
+Configure your Nginx server:
+```nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+See [VERCEL_DEPLOYMENT_FIX.md](VERCEL_DEPLOYMENT_FIX.md) for more deployment options and detailed configuration examples.
+
 ---
 
 ## **Technical Stack**
