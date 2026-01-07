@@ -1597,6 +1597,9 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const bodyLength = obj.cubes.length;
         const bodyPositions: { x: number; y: number; z: number; rx: number; ry: number }[] = [];
         
+        // Guard against edge cases (should always have 8 cubes, but be safe)
+        if (bodyLength < 2) return;
+        
         obj.cubes.forEach((c, i) => {
           const progress = i / (bodyLength - 1); // 0 to 1 from head to tail
           const segmentPhase = el * 1.2 - i * 0.5; // Wave propagation delay
