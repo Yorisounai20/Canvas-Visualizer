@@ -1,16 +1,15 @@
-import { useState, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { useUser } from '@stackframe/stack';
+import { useState, lazy, Suspense, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import NewProjectModal from './components/Modals/NewProjectModal';
-import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import Home from './pages/Home';
-import Auth from './pages/Auth';
-import Account from './pages/Account';
 import { ProjectSettings } from './types';
 
 // Lazy load the large visualizer components for code splitting
 const VisualizerEditor = lazy(() => import('./VisualizerEditor'));
 const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
+
+// LocalStorage key for mode persistence
+const MODE_STORAGE_KEY = 'canvas-visualizer-selected-mode';
 
 /**
  * Loading component for lazy-loaded routes
@@ -61,6 +60,8 @@ function SoftwareMode() {
   const navigate = useNavigate();
   
   const handleBackToDashboard = () => {
+    // Clear the persisted mode when going back to dashboard
+    localStorage.removeItem(MODE_STORAGE_KEY);
     navigate('/');
   };
   
@@ -72,55 +73,31 @@ function SoftwareMode() {
 }
 
 /**
- * App Component
- * Main routing and authentication flow
+ * App Component with mode persistence
  */
 function App() {
-  const user = useUser();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Show loading while checking authentication status
-  if (user === undefined) {
-    return <LoadingScreen />;
-  }
+  // On initial load, check if there's a persisted mode and redirect to it
+  useEffect(() => {
+    // Only redirect from root path
+    if (location.pathname === '/') {
+      const persistedMode = localStorage.getItem(MODE_STORAGE_KEY);
+      if (persistedMode === 'editor' || persistedMode === 'software') {
+        navigate(`/${persistedMode}`, { replace: true });
+      }
+    }
+  }, [location.pathname, navigate]);
 
   return (
     <Routes>
-      {/* Public routes */}
-      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
+      {/* Home/Dashboard route */}
+      <Route path="/" element={<Home />} />
 
-      {/* Protected routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Home />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/account"
-        element={
-          <ProtectedRoute>
-            <Account />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/editor"
-        element={
-          <ProtectedRoute>
-            <EditorMode />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/software"
-        element={
-          <ProtectedRoute>
-            <SoftwareMode />
-          </ProtectedRoute>
-        }
-      />
+      {/* Mode routes - no authentication required */}
+      <Route path="/editor" element={<EditorMode />} />
+      <Route path="/software" element={<SoftwareMode />} />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

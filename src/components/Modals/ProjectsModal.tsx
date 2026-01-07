@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { X, FolderOpen, Trash2, Calendar, Clock } from 'lucide-react';
-import { useUser } from '@stackframe/stack';
 import { SavedProject, listProjects, deleteProject, isDatabaseAvailable } from '../../lib/database';
 
 interface ProjectsModalProps {
@@ -19,8 +18,6 @@ export default function ProjectsModal({
   onLoadProject,
   currentProjectId
 }: ProjectsModalProps) {
-  const user = useUser();
-  const [projects, setProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
