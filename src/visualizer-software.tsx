@@ -1960,7 +1960,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     };
 
     const cubes: THREE.Mesh[] = [];
-    for (let i=0; i<8; i++) {
+    // Create 100 cubes - no shape limits for maximum preset flexibility
+    for (let i=0; i<100; i++) {
       const cubeMaterial = createMaterial(
         cubeMaterialType,
         cubeColor,
@@ -1970,7 +1971,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         cubeRoughness
       );
       const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), cubeMaterial);
-      const a = (i/8)*Math.PI*2;
+      const a = (i/100)*Math.PI*2;
       c.position.x = Math.cos(a)*8;
       c.position.z = Math.sin(a)*8;
       scene.add(c);
@@ -1978,28 +1979,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     const octas: THREE.Mesh[] = [];
-    for (let r=0; r<3; r++) {
-      for (let i=0; i<6+r*4; i++) {
-        const octaMaterial = createMaterial(
-          octahedronMaterialType,
-          octahedronColor,
-          octahedronWireframe,
-          octahedronOpacity,
-          octahedronMetalness,
-          octahedronRoughness
-        );
-        const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
-        const a = (i/(6+r*4))*Math.PI*2;
-        const rad = 5+r*2;
-        o.position.x = Math.cos(a)*rad;
-        o.position.y = Math.sin(a)*rad;
-        o.position.z = -r*2;
-        scene.add(o);
-        octas.push(o);
-      }
+    // Create 100 octahedrons - no shape limits for maximum preset flexibility
+    for (let i=0; i<100; i++) {
+      const octaMaterial = createMaterial(
+        octahedronMaterialType,
+        octahedronColor,
+        octahedronWireframe,
+        octahedronOpacity,
+        octahedronMetalness,
+        octahedronRoughness
+      );
+      const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
+      const a = (i/100)*Math.PI*2;
+      const rad = 5 + (i % 3) * 2;
+      o.position.x = Math.cos(a)*rad;
+      o.position.y = Math.sin(a)*rad;
+      o.position.z = -(i % 5)*2;
+      scene.add(o);
+      octas.push(o);
     }
     
-    // Add 15 additional octahedrons for Environment System (indices 30-44)
+    // Add 15 additional octahedrons for Environment System (indices 100-114)
     for (let i = 0; i < 15; i++) {
       const envOctaMaterial = createMaterial(
         octahedronMaterialType,
@@ -2018,7 +2018,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     const tetras: THREE.Mesh[] = [];
-    for (let i=0; i<30; i++) {
+    // Create 100 tetrahedrons - no shape limits for maximum preset flexibility
+    for (let i=0; i<100; i++) {
       const tetraMaterial = createMaterial(
         tetrahedronMaterialType,
         tetrahedronColor,
@@ -2839,7 +2840,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           c.material.opacity = 0;
         });
         
-        // Hide all octahedrons (except environment ones at indices 30-44)
+        // Hide all octahedrons (except environment ones at indices 100-114)
         obj.octas.slice(0, 30).forEach((o) => {
           o.position.set(0, -1000, 0);
           o.scale.set(0.001, 0.001, 0.001);
@@ -3095,7 +3096,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           halo.material.opacity = (0.5 + f.highs * 0.4) * blend;
           halo.material.wireframe = true;
         });
-        obj.octas.slice(30).forEach((marker, i) => {
+        obj.octas.slice(100).forEach((marker, i) => {
           marker.position.set((i % 2 === 0 ? -1 : 1) * (10 + i * 2), Math.sin(el + i) * 2, -10 - i * 5);
           const s = 1 + f.mids * 0.5;
           marker.scale.set(s, s, s);
@@ -3193,22 +3194,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         });
       } else if (type === 'seiryu') {
         // Seiryu (Azure Dragon / 青龍) - Traditional Eastern dragon with very long serpentine body
-        // Features: Extended sinuous body using ALL available shapes, deer-like antlers, whiskers, mane, scales, and a magical pearl
+        // Features: Extended sinuous body using ALL 100 cubes, deer-like antlers, whiskers, mane, scales, and a magical pearl
         // Note: Mountains should be added via the Environments tab for better customization
         
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
         
         // === EXTENDED DRAGON BODY ===
-        // Total body segments: 8 cubes + 22 octahedrons = 30 segments for a very long dragon
-        const cubeCount = obj.cubes.length; // 8
-        const octaBodyCount = 22; // Use 22 octahedrons as additional body segments
-        const totalBodySegments = cubeCount + octaBodyCount; // 30 total body segments
+        // Now uses ALL 100 cubes for the dragon body - no shape limits!
+        const totalBodySegments = obj.cubes.length; // All 100 cubes
         
-        // Store ALL body positions for attachments (from all 30 segments)
+        // Store ALL body positions for attachments
         const bodyPositions: { x: number; y: number; z: number; rx: number; ry: number }[] = [];
         
         // Guard against edge cases
-        if (cubeCount < 2) return;
+        if (totalBodySegments < 2) return;
         
         // Dynamic camera that follows the dragon's sweeping movement
         const camFollowX = Math.sin(elScaled * 0.25) * 8;
@@ -3218,16 +3217,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           camFollowY + activeCameraHeight + shakeY,
           activeCameraDistance + 15 + shakeZ
         );
-        cam.lookAt(camFollowX * 0.2, -2, -25);
+        cam.lookAt(camFollowX * 0.2, -2, -35);
         
-        // === Calculate body positions for ALL 30 segments ===
+        // === Calculate body positions for ALL segments ===
         for (let i = 0; i < totalBodySegments; i++) {
           const progress = i / (totalBodySegments - 1); // 0 to 1 from head to tail
-          const segmentPhase = elScaled * 1.0 - i * 0.25; // Wave propagation with tighter spacing
+          const segmentPhase = elScaled * 1.0 - i * 0.2; // Wave propagation with tighter spacing
           
           // Extended S-curve serpentine motion
-          const waveAmplitude = 8 + f.bass * 4;
-          const verticalWave = 4 + f.mids * 2;
+          const waveAmplitude = 10 + f.bass * 5;
+          const verticalWave = 5 + f.mids * 3;
           
           // Primary horizontal wave (large S-shape)
           const x = Math.sin(segmentPhase) * waveAmplitude * (0.3 + progress * 0.7);
@@ -3235,14 +3234,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           const y = Math.sin(segmentPhase * 0.6 + progress * Math.PI * 1.5) * verticalWave + 
                     Math.cos(segmentPhase * 0.25) * 2;
           // Z progression - dragon body extends far into the scene
-          const z = progress * -60 + Math.sin(segmentPhase * 0.3) * 4;
+          const z = progress * -80 + Math.sin(segmentPhase * 0.3) * 5;
           
           // Calculate rotation to follow the body curve
-          const nextProgress = Math.min(progress + 0.05, 1);
-          const nextPhase = elScaled * 1.0 - (i + 1) * 0.25;
+          const nextProgress = Math.min(progress + 0.04, 1);
+          const nextPhase = elScaled * 1.0 - (i + 1) * 0.2;
           const nextX = Math.sin(nextPhase) * waveAmplitude * (0.3 + nextProgress * 0.7);
           const nextY = Math.sin(nextPhase * 0.6 + nextProgress * Math.PI * 1.5) * verticalWave;
-          const nextZ = nextProgress * -60;
+          const nextZ = nextProgress * -80;
           
           const dx = nextX - x;
           const dy = nextY - y;
@@ -3253,56 +3252,32 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           bodyPositions.push({ x, y, z, rx, ry });
         }
         
-        // === MAIN BODY - HEAD (Cubes 0-7) ===
+        // === DRAGON BODY - ALL 30 CUBES ===
         obj.cubes.forEach((c, i) => {
           const bp = bodyPositions[i];
           c.position.set(bp.x, bp.y, bp.z);
           c.rotation.x = bp.rx;
           c.rotation.y = bp.ry;
-          c.rotation.z = Math.sin(elScaled * 1.0 - i * 0.25) * 0.15;
+          c.rotation.z = Math.sin(elScaled * 1.0 - i * 0.2) * 0.15;
           
-          // Scale: large head, tapering towards neck
+          // Scale: large head, tapering body, slight tail flare
+          const progress = i / (totalBodySegments - 1);
           const isHead = i === 0;
-          const progress = i / (cubeCount - 1);
+          const isTail = i >= totalBodySegments - 3;
           let baseScale;
           if (isHead) {
-            baseScale = 4.0; // Large majestic head
+            baseScale = 4.5; // Large majestic head
+          } else if (isTail) {
+            baseScale = 1.5 + f.bass * 0.4 + (totalBodySegments - 1 - i) * 0.15; // Tail flare
           } else {
-            baseScale = 3.0 - progress * 1.2; // Gradual taper to neck
+            baseScale = 3.5 - progress * 2.0; // Gradual taper
           }
-          const scaleSize = baseScale + f.bass * 0.5;
+          const scaleSize = baseScale + f.bass * 0.4;
           c.scale.set(scaleSize * 1.3, scaleSize * 1.0, scaleSize * 1.8);
           
           c.material.color.setStyle(cubeColor);
           c.material.opacity = (0.9 + f.bass * 0.1) * blend;
           c.material.wireframe = false;
-        });
-        
-        // === EXTENDED BODY (Octahedrons 0-21) - Additional body segments ===
-        obj.octas.slice(0, octaBodyCount).forEach((segment, i) => {
-          const bodyIdx = cubeCount + i; // Start after cubes
-          const bp = bodyPositions[bodyIdx];
-          
-          segment.position.set(bp.x, bp.y, bp.z);
-          segment.rotation.x = bp.rx;
-          segment.rotation.y = bp.ry;
-          segment.rotation.z = Math.sin(elScaled * 1.0 - bodyIdx * 0.25) * 0.2;
-          
-          // Taper from neck size down to tail
-          const progress = (cubeCount + i) / (totalBodySegments - 1);
-          const isTail = i >= octaBodyCount - 3;
-          let baseScale;
-          if (isTail) {
-            baseScale = 1.2 + f.bass * 0.4 + (octaBodyCount - 1 - i) * 0.2; // Tail flare
-          } else {
-            baseScale = 2.2 - progress * 1.0; // Continue tapering
-          }
-          const scaleSize = baseScale + f.mids * 0.3;
-          segment.scale.set(scaleSize * 1.2, scaleSize * 0.9, scaleSize * 1.5);
-          
-          segment.material.color.setStyle(octahedronColor);
-          segment.material.opacity = (0.85 + f.mids * 0.15) * blend;
-          segment.material.wireframe = false;
         });
         
         const head = obj.cubes[0];
@@ -3345,12 +3320,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           whisker.material.wireframe = false;
         });
         
-        // === MANE/SPINES (Tetras 6-19) - Extended flowing mane along the longer body ===
-        obj.tetras.slice(6, 20).forEach((spine, i) => {
+        // === MANE/SPINES (Tetras 6-49) - Extended flowing mane along the longer body ===
+        obj.tetras.slice(6, 50).forEach((spine, i) => {
           // Distribute spines evenly along the body
-          const spineBodyIdx = Math.floor((i / 14) * Math.min(totalBodySegments - 1, 20));
+          const spineBodyIdx = Math.floor((i / 44) * Math.min(totalBodySegments - 1, 80));
           const bp = bodyPositions[Math.min(spineBodyIdx, bodyPositions.length - 1)];
-          const flowPhase = elScaled * 2 - i * 0.2;
+          const flowPhase = elScaled * 2 - i * 0.15;
           const flowWave = Math.sin(flowPhase) * 0.6;
           
           spine.position.x = bp.x + Math.sin(bp.ry + Math.PI / 2) * 0.4;
@@ -3359,53 +3334,53 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           spine.rotation.x = -0.9 + flowWave * 0.35 + bp.rx;
           spine.rotation.y = bp.ry + flowWave * 0.25;
           spine.rotation.z = flowWave * 0.35;
-          const spineSize = 1.8 - i * 0.06 + f.mids * 0.35;
+          const spineSize = 1.8 - i * 0.02 + f.mids * 0.35;
           spine.scale.set(spineSize * 0.5, spineSize * 2.2, spineSize * 0.4);
           spine.material.color.setStyle(tetrahedronColor);
           spine.material.opacity = (0.85 + f.mids * 0.15) * blend;
           spine.material.wireframe = false;
         });
         
-        // === CLOUDS (Tetras 20-29) - Mystical clouds the dragon weaves through ===
-        obj.tetras.slice(20).forEach((cloud, i) => {
-          const layer = Math.floor(i / 3);
-          const cloudPhase = elScaled * 0.15 + i * 0.6;
+        // === CLOUDS (Tetras 50-99) - Mystical clouds the dragon weaves through ===
+        obj.tetras.slice(50).forEach((cloud, i) => {
+          const layer = Math.floor(i / 10);
+          const cloudPhase = elScaled * 0.15 + i * 0.4;
           const driftY = Math.cos(cloudPhase * 0.5) * 3;
           
-          cloud.position.x = ((i * 10 + elScaled * 3) % 80) - 40;
-          cloud.position.y = 12 + layer * 5 + driftY;
-          cloud.position.z = -20 - layer * 10 + Math.sin(cloudPhase) * 5;
-          cloud.rotation.x = elScaled * 0.04 + i * 0.15;
+          cloud.position.x = ((i * 8 + elScaled * 3) % 100) - 50;
+          cloud.position.y = 15 + layer * 4 + driftY;
+          cloud.position.z = -30 - layer * 8 + Math.sin(cloudPhase) * 5;
+          cloud.rotation.x = elScaled * 0.04 + i * 0.1;
           cloud.rotation.y = elScaled * 0.06;
-          const cloudSize = 3.5 + (i % 3) * 1.2;
+          const cloudSize = 3.5 + (i % 4) * 1.0;
           cloud.scale.set(cloudSize * 2, cloudSize * 0.6, cloudSize * 1.5);
           cloud.material.color.setStyle(tetrahedronColor);
           cloud.material.opacity = (0.2 + f.highs * 0.12) * blend;
           cloud.material.wireframe = false;
         });
         
-        // === SCALES/PARTICLES (Octas 22-29) - Shimmering particles around the dragon ===
-        obj.octas.slice(22, 30).forEach((particle, i) => {
+        // === SCALES/PARTICLES (Octas 0-99) - Shimmering scales around the dragon ===
+        obj.octas.slice(0, 100).forEach((particle, i) => {
           // Particles follow along the dragon's path
-          const followIdx = Math.floor((i / 8) * (totalBodySegments - 1));
+          const followIdx = Math.floor((i / 100) * (totalBodySegments - 1));
           const bp = bodyPositions[Math.min(followIdx, bodyPositions.length - 1)];
-          const orbitPhase = elScaled * 3 + i * (Math.PI * 2 / 8);
-          const orbitRadius = 3 + Math.sin(elScaled + i) * 1.5;
+          const orbitPhase = elScaled * 3 + i * (Math.PI * 2 / 50);
+          const orbitRadius = 2.5 + Math.sin(elScaled + i) * 1.2;
           
           particle.position.x = bp.x + Math.cos(orbitPhase) * orbitRadius;
           particle.position.y = bp.y + Math.sin(orbitPhase) * orbitRadius * 0.6;
           particle.position.z = bp.z + Math.sin(orbitPhase * 0.5) * 2;
           particle.rotation.x = elScaled * 2.5;
           particle.rotation.y = elScaled * 2;
-          const particleSize = 0.5 + f.highs * 0.4;
+          const particleSize = 0.4 + f.mids * 0.3;
           particle.scale.set(particleSize, particleSize, particleSize);
           particle.material.color.setStyle(octahedronColor);
-          particle.material.opacity = (0.6 + f.highs * 0.4) * blend;
+          particle.material.opacity = (0.5 + f.mids * 0.3) * blend;
           particle.material.wireframe = false;
         });
         
-        // === Hide unused environment octahedrons (30-44) - Let environment system handle them ===
-        obj.octas.slice(30).forEach((envOcta) => {
+        // === Hide unused environment octahedrons (100-114) - Let environment system handle them ===
+        obj.octas.slice(100).forEach((envOcta) => {
           envOcta.position.set(0, -1000, 0);
           envOcta.scale.set(0.001, 0.001, 0.001);
           envOcta.material.opacity = 0;
@@ -3413,13 +3388,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         // === DRAGON PEARL (Sphere) - The magical pearl the dragon chases ===
         const pearlOrbitPhase = elScaled * 0.6;
-        const pearlDistance = 10 + Math.sin(elScaled * 0.4) * 4;
+        const pearlDistance = 12 + Math.sin(elScaled * 0.4) * 5;
         const pearlX = head.position.x + Math.sin(pearlOrbitPhase) * pearlDistance;
-        const pearlY = head.position.y + 5 + Math.cos(pearlOrbitPhase * 1.2) * 3;
-        const pearlZ = head.position.z + 8 + Math.cos(pearlOrbitPhase) * 5;
+        const pearlY = head.position.y + 6 + Math.cos(pearlOrbitPhase * 1.2) * 4;
+        const pearlZ = head.position.z + 10 + Math.cos(pearlOrbitPhase) * 6;
         
         obj.sphere.position.set(pearlX, pearlY, pearlZ);
-        const pearlSize = 1.8 + f.bass * 0.6 + Math.sin(elScaled * 2.5) * 0.3;
+        const pearlSize = 2.0 + f.bass * 0.7 + Math.sin(elScaled * 2.5) * 0.3;
         obj.sphere.scale.set(pearlSize, pearlSize, pearlSize);
         obj.sphere.rotation.x = elScaled * 1.5;
         obj.sphere.rotation.y = elScaled * 2;
@@ -4811,7 +4786,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       // ENVIRONMENT RENDERING - Independent from presets
-      // Uses octahedrons indices 30-44 (15 objects created specifically for environment)
+      // Uses octahedrons indices 100-114 (15 objects created specifically for environment)
       // Positioned within visible camera range (default camera at z=15, looking at origin)
       const ENV_START_INDEX = 30;
       const ENV_MAX_COUNT = 15;
@@ -4826,7 +4801,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         const envIntensity = activeEnvKeyframe.intensity;
         const envColor = activeEnvKeyframe.color;
         
-        // Use octahedrons indices 30-44 (15 objects) for environment
+        // Use octahedrons indices 100-114 (15 objects) for environment
         const envObjectCount = Math.min(Math.floor(envIntensity * ENV_MAX_COUNT), ENV_MAX_COUNT);
         
         if (envType === 'ocean') {
@@ -4967,7 +4942,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           }
         }
       } else if (!activeEnvKeyframe || activeEnvKeyframe.type === 'none') {
-        // Hide all environment objects (indices 30-44)
+        // Hide all environment objects (indices 100-114)
         for (let i = 0; i < ENV_MAX_COUNT; i++) {
           const idx = ENV_START_INDEX + i;
           if (idx >= obj.octas.length) break;
