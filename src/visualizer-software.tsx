@@ -520,9 +520,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setCameraRotation(DEFAULT_CAMERA_ROTATION);
       setCameraAutoRotate(false);
       setCameraKeyframes([
-        { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
-        { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' },
-        { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
+        { time: 0, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
+        { time: 20, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
+        { time: 40, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' }
       ]);
       
       // Reset colors
