@@ -4,7 +4,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
-import { useUser } from '@stackframe/stack';
 import TopBar from './components/Controls/TopBar';
 import LeftPanel from './components/Panels/LeftPanel';
 import RightPanel from './components/Panels/RightPanel';
@@ -190,8 +189,6 @@ interface VisualizerEditorProps {
  */
 export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
   // Get authenticated user
-  const user = useUser();
-  
   // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
