@@ -1580,16 +1580,16 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
 
       } else if (type === 'seiryu') {
         // Seiryu (Azure Dragon / 青龍) - Traditional Eastern dragon with very long serpentine body
-        // Features: Extended sinuous body using ALL 100 cubes, deer-like antlers, whiskers, mane, scales, and a magical pearl
+        // Features: Extended sinuous body using 40 cubes for performance, deer-like antlers, whiskers, mane, scales, and a magical pearl
         // Note: Mountains should be added via the Environments tab for better customization
         
         const rotationSpeed = cameraAutoRotate ? el * 0.3 : 0;
         
         // === EXTENDED DRAGON BODY ===
-        // Now uses ALL 100 cubes for the dragon body - no shape limits!
-        const totalBodySegments = obj.cubes.length; // All 100 cubes
+        // Uses 40 cubes for the dragon body - optimized for performance while maintaining aesthetic
+        const totalBodySegments = 40;
         
-        // Store ALL body positions for attachments
+        // Store body positions for attachments
         const bodyPositions: { x: number; y: number; z: number; rx: number; ry: number }[] = [];
         
         // Guard against edge cases
@@ -1605,7 +1605,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         );
         cam.lookAt(camFollowX * 0.2, -2, -35);
         
-        // === Calculate body positions for ALL segments ===
+        // === Calculate body positions for segments ===
         for (let i = 0; i < totalBodySegments; i++) {
           const progress = i / (totalBodySegments - 1); // 0 to 1 from head to tail
           const segmentPhase = el * 1.0 - i * 0.2; // Wave propagation with tighter spacing
@@ -1638,8 +1638,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           bodyPositions.push({ x, y, z, rx, ry });
         }
         
-        // === DRAGON BODY - ALL 100 CUBES ===
-        obj.cubes.forEach((c, i) => {
+        // === DRAGON BODY - 40 CUBES ===
+        obj.cubes.slice(0, totalBodySegments).forEach((c, i) => {
           const bp = bodyPositions[i];
           c.position.set(bp.x, bp.y, bp.z);
           c.rotation.x = bp.rx;
@@ -1664,6 +1664,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           (c.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
           (c.material as THREE.MeshBasicMaterial).opacity = (0.9 + f.bass * 0.1) * blend;
           (c.material as THREE.MeshBasicMaterial).wireframe = false;
+        });
+        
+        // === Hide unused body cubes ===
+        obj.cubes.slice(totalBodySegments).forEach((c) => {
+          c.position.set(0, -1000, 0);
+          c.scale.set(0.001, 0.001, 0.001);
+          (c.material as THREE.MeshBasicMaterial).opacity = 0;
         });
         
         const head = obj.cubes[0];
@@ -1706,10 +1713,11 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           (whisker.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // === MANE/SPINES (Tetras 6-49) - Extended flowing mane along the longer body ===
-        obj.tetras.slice(6, 50).forEach((spine, i) => {
+        // === MANE/SPINES (Tetras 6-25) - Flowing mane along the body ===
+        const maneCount = 20;
+        obj.tetras.slice(6, 6 + maneCount).forEach((spine, i) => {
           // Distribute spines evenly along the body
-          const spineBodyIdx = Math.floor((i / 44) * Math.min(totalBodySegments - 1, 80));
+          const spineBodyIdx = Math.floor((i / (maneCount - 1)) * Math.min(totalBodySegments - 1, 35));
           const bp = bodyPositions[Math.min(spineBodyIdx, bodyPositions.length - 1)];
           const flowPhase = el * 2 - i * 0.15;
           const flowWave = Math.sin(flowPhase) * 0.6;
@@ -1720,37 +1728,46 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           spine.rotation.x = -0.9 + flowWave * 0.35 + bp.rx;
           spine.rotation.y = bp.ry + flowWave * 0.25;
           spine.rotation.z = flowWave * 0.35;
-          const spineSize = 1.8 - i * 0.02 + f.mids * 0.35;
+          const spineSize = 1.8 - i * 0.03 + f.mids * 0.35;
           spine.scale.set(spineSize * 0.5, spineSize * 2.2, spineSize * 0.4);
           (spine.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
           (spine.material as THREE.MeshBasicMaterial).opacity = (0.85 + f.mids * 0.15) * blend;
           (spine.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // === CLOUDS (Tetras 50-99) - Mystical clouds the dragon weaves through ===
-        obj.tetras.slice(50).forEach((cloud, i) => {
-          const layer = Math.floor(i / 10);
-          const cloudPhase = el * 0.15 + i * 0.4;
+        // === CLOUDS (Tetras 26-45) - Mystical clouds the dragon weaves through ===
+        const cloudCount = 20;
+        obj.tetras.slice(6 + maneCount, 6 + maneCount + cloudCount).forEach((cloud, i) => {
+          const layer = Math.floor(i / 5);
+          const cloudPhase = el * 0.15 + i * 0.8;
           const driftY = Math.cos(cloudPhase * 0.5) * 3;
           
-          cloud.position.x = ((i * 8 + el * 3) % 100) - 50;
-          cloud.position.y = 15 + layer * 4 + driftY;
-          cloud.position.z = -30 - layer * 8 + Math.sin(cloudPhase) * 5;
-          cloud.rotation.x = el * 0.04 + i * 0.1;
+          cloud.position.x = ((i * 16 + el * 3) % 100) - 50;
+          cloud.position.y = 15 + layer * 5 + driftY;
+          cloud.position.z = -30 - layer * 10 + Math.sin(cloudPhase) * 5;
+          cloud.rotation.x = el * 0.04 + i * 0.2;
           cloud.rotation.y = el * 0.06;
-          const cloudSize = 3.5 + (i % 4) * 1.0;
+          const cloudSize = 4.0 + (i % 4) * 1.2;
           cloud.scale.set(cloudSize * 2, cloudSize * 0.6, cloudSize * 1.5);
           (cloud.material as THREE.MeshBasicMaterial).color.setStyle(highsColor);
           (cloud.material as THREE.MeshBasicMaterial).opacity = (0.2 + f.highs * 0.12) * blend;
           (cloud.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // === SCALES/PARTICLES (Octas 0-99) - Shimmering scales around the dragon ===
-        obj.octas.slice(0, 100).forEach((particle, i) => {
+        // === Hide unused tetras ===
+        obj.tetras.slice(6 + maneCount + cloudCount).forEach((t) => {
+          t.position.set(0, -1000, 0);
+          t.scale.set(0.001, 0.001, 0.001);
+          (t.material as THREE.MeshBasicMaterial).opacity = 0;
+        });
+        
+        // === SCALES/PARTICLES (Octas 0-49) - Shimmering scales around the dragon ===
+        const scaleCount = 50;
+        obj.octas.slice(0, scaleCount).forEach((particle, i) => {
           // Particles follow along the dragon's path
-          const followIdx = Math.floor((i / 100) * (totalBodySegments - 1));
+          const followIdx = Math.floor((i / scaleCount) * (totalBodySegments - 1));
           const bp = bodyPositions[Math.min(followIdx, bodyPositions.length - 1)];
-          const orbitPhase = el * 3 + i * (Math.PI * 2 / 50);
+          const orbitPhase = el * 3 + i * (Math.PI * 2 / 25);
           const orbitRadius = 2.5 + Math.sin(el + i) * 1.2;
           
           particle.position.x = bp.x + Math.cos(orbitPhase) * orbitRadius;
@@ -1765,8 +1782,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           (particle.material as THREE.MeshBasicMaterial).wireframe = false;
         });
         
-        // === Hide unused environment octahedrons (100-114) - Let environment system handle them ===
-        obj.octas.slice(100).forEach((envOcta) => {
+        // === Hide unused octahedrons ===
+        obj.octas.slice(scaleCount).forEach((envOcta) => {
           envOcta.position.set(0, -1000, 0);
           envOcta.scale.set(0.001, 0.001, 0.001);
           (envOcta.material as THREE.MeshBasicMaterial).opacity = 0;
