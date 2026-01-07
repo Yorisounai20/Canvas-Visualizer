@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu } from 'lucide-react';
+import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu, FilePlus } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState } from './types';
@@ -491,6 +491,87 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.error('Failed to load project:', error);
       addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
       alert('Failed to load project. Check console for details.');
+    }
+  };
+
+  const handleNewProject = () => {
+    // Confirm if user wants to create a new project (losing unsaved changes)
+    const confirmNew = window.confirm(
+      'Create a new project? Any unsaved changes will be lost.'
+    );
+    
+    if (!confirmNew) return;
+    
+    try {
+      addLog('Creating new project...', 'info');
+      
+      // Stop playback
+      if (isPlaying) {
+        stopAudio();
+      }
+      
+      // Reset project metadata
+      setProjectName('Untitled Project');
+      setCurrentProjectId(undefined);
+      
+      // Reset camera settings
+      setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+      setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+      setCameraRotation(DEFAULT_CAMERA_ROTATION);
+      setCameraAutoRotate(false);
+      setCameraKeyframes([
+        { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+        { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' },
+        { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
+      ]);
+      
+      // Reset colors
+      setBassColor('#8a2be2');
+      setMidsColor('#40e0d0');
+      setHighsColor('#c8b4ff');
+      
+      // Reset visual settings
+      setShowBorder(true);
+      setBorderColor('#9333ea');
+      setShowLetterbox(false);
+      setLetterboxSize(0);
+      setShowSongName(false);
+      setCustomSongName('');
+      
+      // Reset lighting
+      setAmbientLightIntensity(0.5);
+      setDirectionalLightIntensity(0.5);
+      
+      // Reset Post-FX
+      setBlendMode('normal');
+      setVignetteStrength(0);
+      setVignetteSoftness(0.5);
+      setColorSaturation(1.0);
+      setColorContrast(1.0);
+      setColorGamma(1.0);
+      setColorTintR(1.0);
+      setColorTintG(1.0);
+      setColorTintB(1.0);
+      
+      // Reset keyframes and events
+      setEnvironmentKeyframes([]);
+      setPresetKeyframes([]);
+      setLetterboxKeyframes([]);
+      setCameraShakes([]);
+      setParameterEvents([]);
+      
+      // Reset audio (clear all tracks)
+      setAudioTracks([]);
+      audioTracksRef.current = [];
+      setAudioReady(false);
+      setAudioFileName('');
+      setCurrentTime(0);
+      setDuration(0);
+      
+      addLog('New project created successfully', 'success');
+    } catch (error) {
+      console.error('Failed to create new project:', error);
+      addLog('Failed to create new project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
     }
   };
 
@@ -5646,6 +5727,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Open project
         e.preventDefault();
         setShowProjectsModal(true);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        // New project
+        e.preventDefault();
+        handleNewProject();
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
@@ -5721,11 +5806,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
                   <button
                     onClick={() => {
+                      handleNewProject();
+                      setShowFileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-t-lg transition-colors"
+                  >
+                    <FilePlus size={16} />
+                    <span className="text-sm">New Project</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+N</span>
+                  </button>
+                  <button
+                    onClick={() => {
                       handleSaveProject();
                       setShowFileMenu(false);
                     }}
                     disabled={isSaving}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed rounded-t-lg transition-colors"
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     <Save size={16} />
                     <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
