@@ -3192,78 +3192,117 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           o.material.color.setStyle(octahedronColor);
         });
       } else if (type === 'seiryu') {
-        // Seiryu (Azure Dragon / 青龍) - Traditional Eastern dragon with serpentine body
-        // Features: Long sinuous body, deer-like antlers, whiskers, mane, scales, and a magical pearl
+        // Seiryu (Azure Dragon / 青龍) - Traditional Eastern dragon with very long serpentine body
+        // Features: Extended sinuous body using ALL available shapes, deer-like antlers, whiskers, mane, scales, and a magical pearl
+        // Note: Mountains should be added via the Environments tab for better customization
         
         const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
-        // Dynamic camera that follows the dragon's movement
-        const camFollowX = Math.sin(elScaled * 0.3) * 3;
-        const camFollowY = 6 + Math.cos(elScaled * 0.15) * 2;
-        cam.position.set(
-          Math.sin(rotationSpeed + activeCameraRotation) * 8 + camFollowX + shakeX,
-          camFollowY + activeCameraHeight + shakeY,
-          activeCameraDistance + 5 + shakeZ
-        );
-        cam.lookAt(camFollowX * 0.3, 0, -5);
         
-        // === DRAGON BODY (Cubes) - Serpentine undulating motion ===
-        const bodyLength = obj.cubes.length;
+        // === EXTENDED DRAGON BODY ===
+        // Total body segments: 8 cubes + 22 octahedrons = 30 segments for a very long dragon
+        const cubeCount = obj.cubes.length; // 8
+        const octaBodyCount = 22; // Use 22 octahedrons as additional body segments
+        const totalBodySegments = cubeCount + octaBodyCount; // 30 total body segments
+        
+        // Store ALL body positions for attachments (from all 30 segments)
         const bodyPositions: { x: number; y: number; z: number; rx: number; ry: number }[] = [];
         
-        // Guard against edge cases (should always have 8 cubes, but be safe)
-        if (bodyLength < 2) return;
+        // Guard against edge cases
+        if (cubeCount < 2) return;
         
-        obj.cubes.forEach((c, i) => {
-          const progress = i / (bodyLength - 1); // 0 to 1 from head to tail
-          const segmentPhase = elScaled * 1.2 - i * 0.5; // Wave propagation delay
+        // Dynamic camera that follows the dragon's sweeping movement
+        const camFollowX = Math.sin(elScaled * 0.25) * 8;
+        const camFollowY = 10 + Math.cos(elScaled * 0.12) * 4;
+        cam.position.set(
+          Math.sin(rotationSpeed + activeCameraRotation) * 12 + camFollowX + shakeX,
+          camFollowY + activeCameraHeight + shakeY,
+          activeCameraDistance + 15 + shakeZ
+        );
+        cam.lookAt(camFollowX * 0.2, -2, -25);
+        
+        // === Calculate body positions for ALL 30 segments ===
+        for (let i = 0; i < totalBodySegments; i++) {
+          const progress = i / (totalBodySegments - 1); // 0 to 1 from head to tail
+          const segmentPhase = elScaled * 1.0 - i * 0.25; // Wave propagation with tighter spacing
           
-          // More pronounced S-curve serpentine motion
-          const waveAmplitude = 4 + f.bass * 2;
-          const verticalWave = 2 + f.mids * 1.5;
+          // Extended S-curve serpentine motion
+          const waveAmplitude = 8 + f.bass * 4;
+          const verticalWave = 4 + f.mids * 2;
           
-          // Primary horizontal wave (S-shape)
-          const x = Math.sin(segmentPhase) * waveAmplitude * (0.5 + progress * 0.5);
+          // Primary horizontal wave (large S-shape)
+          const x = Math.sin(segmentPhase) * waveAmplitude * (0.3 + progress * 0.7);
           // Secondary vertical wave (undulating up/down)
-          const y = Math.sin(segmentPhase * 0.7 + progress * Math.PI) * verticalWave + 
-                    Math.cos(segmentPhase * 0.3) * 1.5;
-          // Z progression with slight wave
-          const z = progress * -20 + Math.sin(segmentPhase * 0.4) * 2;
-          
-          c.position.set(x, y, z);
+          const y = Math.sin(segmentPhase * 0.6 + progress * Math.PI * 1.5) * verticalWave + 
+                    Math.cos(segmentPhase * 0.25) * 2;
+          // Z progression - dragon body extends far into the scene
+          const z = progress * -60 + Math.sin(segmentPhase * 0.3) * 4;
           
           // Calculate rotation to follow the body curve
-          const nextPhase = elScaled * 1.2 - (i + 1) * 0.5;
-          const nextX = Math.sin(nextPhase) * waveAmplitude * (0.5 + (progress + 0.1) * 0.5);
-          const nextY = Math.sin(nextPhase * 0.7 + (progress + 0.1) * Math.PI) * verticalWave;
-          const nextZ = (progress + 0.1) * -20;
+          const nextProgress = Math.min(progress + 0.05, 1);
+          const nextPhase = elScaled * 1.0 - (i + 1) * 0.25;
+          const nextX = Math.sin(nextPhase) * waveAmplitude * (0.3 + nextProgress * 0.7);
+          const nextY = Math.sin(nextPhase * 0.6 + nextProgress * Math.PI * 1.5) * verticalWave;
+          const nextZ = nextProgress * -60;
           
           const dx = nextX - x;
           const dy = nextY - y;
           const dz = nextZ - z;
-          c.rotation.x = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz));
-          c.rotation.y = Math.atan2(dx, dz);
-          c.rotation.z = Math.sin(segmentPhase * 2) * 0.2; // Slight body twist
+          const rx = Math.atan2(dy, Math.sqrt(dx * dx + dz * dz));
+          const ry = Math.atan2(dx, dz);
           
-          // Scale: large head, tapering body, slight flare at tail
+          bodyPositions.push({ x, y, z, rx, ry });
+        }
+        
+        // === MAIN BODY - HEAD (Cubes 0-7) ===
+        obj.cubes.forEach((c, i) => {
+          const bp = bodyPositions[i];
+          c.position.set(bp.x, bp.y, bp.z);
+          c.rotation.x = bp.rx;
+          c.rotation.y = bp.ry;
+          c.rotation.z = Math.sin(elScaled * 1.0 - i * 0.25) * 0.15;
+          
+          // Scale: large head, tapering towards neck
           const isHead = i === 0;
-          const isTail = i === bodyLength - 1;
+          const progress = i / (cubeCount - 1);
           let baseScale;
           if (isHead) {
-            baseScale = 3.5; // Large majestic head
-          } else if (isTail) {
-            baseScale = 1.0 + f.bass * 0.3; // Tail flare with bass
+            baseScale = 4.0; // Large majestic head
           } else {
-            baseScale = 2.0 - progress * 0.8; // Gradual taper
+            baseScale = 3.0 - progress * 1.2; // Gradual taper to neck
           }
-          const scaleSize = baseScale + f.bass * 0.4;
-          c.scale.set(scaleSize * 1.2, scaleSize * 0.9, scaleSize * 1.5); // Elongated segments
+          const scaleSize = baseScale + f.bass * 0.5;
+          c.scale.set(scaleSize * 1.3, scaleSize * 1.0, scaleSize * 1.8);
           
           c.material.color.setStyle(cubeColor);
-          c.material.opacity = (0.85 + f.bass * 0.15) * blend;
-          c.material.wireframe = false; // Solid body for more presence
+          c.material.opacity = (0.9 + f.bass * 0.1) * blend;
+          c.material.wireframe = false;
+        });
+        
+        // === EXTENDED BODY (Octahedrons 0-21) - Additional body segments ===
+        obj.octas.slice(0, octaBodyCount).forEach((segment, i) => {
+          const bodyIdx = cubeCount + i; // Start after cubes
+          const bp = bodyPositions[bodyIdx];
           
-          // Store positions for attachments
-          bodyPositions.push({ x, y, z, rx: c.rotation.x, ry: c.rotation.y });
+          segment.position.set(bp.x, bp.y, bp.z);
+          segment.rotation.x = bp.rx;
+          segment.rotation.y = bp.ry;
+          segment.rotation.z = Math.sin(elScaled * 1.0 - bodyIdx * 0.25) * 0.2;
+          
+          // Taper from neck size down to tail
+          const progress = (cubeCount + i) / (totalBodySegments - 1);
+          const isTail = i >= octaBodyCount - 3;
+          let baseScale;
+          if (isTail) {
+            baseScale = 1.2 + f.bass * 0.4 + (octaBodyCount - 1 - i) * 0.2; // Tail flare
+          } else {
+            baseScale = 2.2 - progress * 1.0; // Continue tapering
+          }
+          const scaleSize = baseScale + f.mids * 0.3;
+          segment.scale.set(scaleSize * 1.2, scaleSize * 0.9, scaleSize * 1.5);
+          
+          segment.material.color.setStyle(octahedronColor);
+          segment.material.opacity = (0.85 + f.mids * 0.15) * blend;
+          segment.material.wireframe = false;
         });
         
         const head = obj.cubes[0];
@@ -3273,16 +3312,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.tetras.slice(0, 2).forEach((antler, i) => {
           const side = i === 0 ? 1 : -1;
           const antlerSway = Math.sin(elScaled * 2 + i) * 0.1;
-          antler.position.x = head.position.x + side * 2.5;
-          antler.position.y = head.position.y + 3 + f.highs * 0.5;
-          antler.position.z = head.position.z + 0.5;
-          antler.rotation.x = -0.5 + antlerSway;
-          antler.rotation.y = side * 0.6 + headPos.ry;
-          antler.rotation.z = side * 0.4;
-          const antlerSize = 1.8 + f.highs * 0.4;
-          antler.scale.set(antlerSize * 0.5, antlerSize * 3, antlerSize * 0.5);
+          antler.position.x = head.position.x + side * 3;
+          antler.position.y = head.position.y + 4 + f.highs * 0.6;
+          antler.position.z = head.position.z + 1;
+          antler.rotation.x = -0.6 + antlerSway;
+          antler.rotation.y = side * 0.7 + headPos.ry;
+          antler.rotation.z = side * 0.5;
+          const antlerSize = 2.2 + f.highs * 0.5;
+          antler.scale.set(antlerSize * 0.6, antlerSize * 3.5, antlerSize * 0.6);
           antler.material.color.setStyle(tetrahedronColor);
-          antler.material.opacity = (0.95) * blend;
+          antler.material.opacity = 0.95 * blend;
           antler.material.wireframe = false;
         });
         
@@ -3291,141 +3330,99 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           const side = i < 2 ? 1 : -1;
           const whiskerIndex = i % 2;
           const flowPhase = elScaled * 3 + i * 0.5;
-          const flowAmount = Math.sin(flowPhase) * 0.8;
+          const flowAmount = Math.sin(flowPhase) * 1.0;
           
-          whisker.position.x = head.position.x + side * (1.5 + whiskerIndex * 0.5);
-          whisker.position.y = head.position.y - 0.5 + whiskerIndex * 0.3;
-          whisker.position.z = head.position.z + 2 + flowAmount;
-          whisker.rotation.x = 0.3 + flowAmount * 0.2;
-          whisker.rotation.y = side * (0.8 + flowAmount * 0.3) + headPos.ry;
-          whisker.rotation.z = side * 0.2;
-          const whiskerLen = 2.5 + f.highs * 0.8 - whiskerIndex * 0.5;
-          whisker.scale.set(0.15, whiskerLen, 0.15);
+          whisker.position.x = head.position.x + side * (2 + whiskerIndex * 0.6);
+          whisker.position.y = head.position.y - 0.5 + whiskerIndex * 0.4;
+          whisker.position.z = head.position.z + 3 + flowAmount;
+          whisker.rotation.x = 0.4 + flowAmount * 0.25;
+          whisker.rotation.y = side * (0.9 + flowAmount * 0.35) + headPos.ry;
+          whisker.rotation.z = side * 0.25;
+          const whiskerLen = 3.5 + f.highs * 1.0 - whiskerIndex * 0.6;
+          whisker.scale.set(0.2, whiskerLen, 0.2);
           whisker.material.color.setStyle(tetrahedronColor);
           whisker.material.opacity = (0.8 + f.highs * 0.2) * blend;
           whisker.material.wireframe = false;
         });
         
-        // === MANE/SPINES (Tetras 6-13) - Flowing mane along the back ===
-        obj.tetras.slice(6, 14).forEach((spine, i) => {
-          const bodyIdx = Math.min(i, bodyLength - 2);
-          const bp = bodyPositions[bodyIdx];
-          const flowPhase = elScaled * 2 - i * 0.3;
-          const flowWave = Math.sin(flowPhase) * 0.5;
+        // === MANE/SPINES (Tetras 6-19) - Extended flowing mane along the longer body ===
+        obj.tetras.slice(6, 20).forEach((spine, i) => {
+          // Distribute spines evenly along the body
+          const spineBodyIdx = Math.floor((i / 14) * Math.min(totalBodySegments - 1, 20));
+          const bp = bodyPositions[Math.min(spineBodyIdx, bodyPositions.length - 1)];
+          const flowPhase = elScaled * 2 - i * 0.2;
+          const flowWave = Math.sin(flowPhase) * 0.6;
           
-          spine.position.x = bp.x + Math.sin(bp.ry + Math.PI / 2) * 0.3;
-          spine.position.y = bp.y + 1.8 + flowWave * 0.5 + f.mids * 0.3;
-          spine.position.z = bp.z - i * 0.3;
-          spine.rotation.x = -0.8 + flowWave * 0.3 + bp.rx;
-          spine.rotation.y = bp.ry + flowWave * 0.2;
-          spine.rotation.z = flowWave * 0.3;
-          const spineSize = 1.5 - i * 0.1 + f.mids * 0.3;
-          spine.scale.set(spineSize * 0.4, spineSize * 1.8, spineSize * 0.3);
+          spine.position.x = bp.x + Math.sin(bp.ry + Math.PI / 2) * 0.4;
+          spine.position.y = bp.y + 2.2 + flowWave * 0.6 + f.mids * 0.4;
+          spine.position.z = bp.z;
+          spine.rotation.x = -0.9 + flowWave * 0.35 + bp.rx;
+          spine.rotation.y = bp.ry + flowWave * 0.25;
+          spine.rotation.z = flowWave * 0.35;
+          const spineSize = 1.8 - i * 0.06 + f.mids * 0.35;
+          spine.scale.set(spineSize * 0.5, spineSize * 2.2, spineSize * 0.4);
           spine.material.color.setStyle(tetrahedronColor);
           spine.material.opacity = (0.85 + f.mids * 0.15) * blend;
           spine.material.wireframe = false;
         });
         
-        // === CLOUDS (Tetras 14-29) - Mystical clouds the dragon weaves through ===
-        obj.tetras.slice(14).forEach((cloud, i) => {
-          const layer = Math.floor(i / 4);
-          const cloudPhase = elScaled * 0.2 + i * 0.8;
-          const driftX = Math.sin(cloudPhase) * 8;
-          const driftY = Math.cos(cloudPhase * 0.7) * 2;
+        // === CLOUDS (Tetras 20-29) - Mystical clouds the dragon weaves through ===
+        obj.tetras.slice(20).forEach((cloud, i) => {
+          const layer = Math.floor(i / 3);
+          const cloudPhase = elScaled * 0.15 + i * 0.6;
+          const driftY = Math.cos(cloudPhase * 0.5) * 3;
           
-          cloud.position.x = ((i * 7 + elScaled * 2) % 60) - 30;
-          cloud.position.y = 8 + layer * 4 + driftY;
-          cloud.position.z = -15 - layer * 6 + Math.sin(cloudPhase) * 3;
-          cloud.rotation.x = elScaled * 0.05 + i * 0.2;
-          cloud.rotation.y = elScaled * 0.08;
-          const cloudSize = 2.5 + (i % 3) * 0.8;
-          cloud.scale.set(cloudSize * 1.5, cloudSize * 0.5, cloudSize);
+          cloud.position.x = ((i * 10 + elScaled * 3) % 80) - 40;
+          cloud.position.y = 12 + layer * 5 + driftY;
+          cloud.position.z = -20 - layer * 10 + Math.sin(cloudPhase) * 5;
+          cloud.rotation.x = elScaled * 0.04 + i * 0.15;
+          cloud.rotation.y = elScaled * 0.06;
+          const cloudSize = 3.5 + (i % 3) * 1.2;
+          cloud.scale.set(cloudSize * 2, cloudSize * 0.6, cloudSize * 1.5);
           cloud.material.color.setStyle(tetrahedronColor);
-          cloud.material.opacity = (0.25 + f.highs * 0.15) * blend;
+          cloud.material.opacity = (0.2 + f.highs * 0.12) * blend;
           cloud.material.wireframe = false;
         });
         
-        // === SCALES (Octas 0-23) - Shimmering scales along the body ===
-        obj.octas.slice(0, 24).forEach((scale, i) => {
-          const bodyIdx = Math.floor(i / 3) % (bodyLength - 1);
-          const scaleRing = i % 3; // 3 scales per body segment
-          const bp = bodyPositions[bodyIdx];
-          const nextBp = bodyPositions[Math.min(bodyIdx + 1, bodyLength - 1)];
+        // === SCALES/PARTICLES (Octas 22-29) - Shimmering particles around the dragon ===
+        obj.octas.slice(22, 30).forEach((particle, i) => {
+          // Particles follow along the dragon's path
+          const followIdx = Math.floor((i / 8) * (totalBodySegments - 1));
+          const bp = bodyPositions[Math.min(followIdx, bodyPositions.length - 1)];
+          const orbitPhase = elScaled * 3 + i * (Math.PI * 2 / 8);
+          const orbitRadius = 3 + Math.sin(elScaled + i) * 1.5;
           
-          // Position scales around the body in a spiral pattern
-          const ringAngle = (scaleRing / 3) * Math.PI * 2 + elScaled * 0.5 + bodyIdx * 0.3;
-          const scaleRadius = 1.2 + f.mids * 0.3;
-          
-          // Interpolate between body segments
-          const t = (i % 3) / 3;
-          const interpX = bp.x + (nextBp.x - bp.x) * t;
-          const interpY = bp.y + (nextBp.y - bp.y) * t;
-          const interpZ = bp.z + (nextBp.z - bp.z) * t;
-          
-          scale.position.x = interpX + Math.cos(ringAngle) * scaleRadius;
-          scale.position.y = interpY + Math.sin(ringAngle) * scaleRadius * 0.7;
-          scale.position.z = interpZ;
-          
-          // Scales shimmer and rotate
-          scale.rotation.x = ringAngle + elScaled;
-          scale.rotation.y = bp.ry;
-          const scaleSize = 0.4 + f.mids * 0.2;
-          scale.scale.set(scaleSize, scaleSize, scaleSize * 0.5);
-          scale.material.color.setStyle(octahedronColor);
-          scale.material.opacity = (0.6 + f.mids * 0.3) * blend;
-          scale.material.wireframe = false;
-        });
-        
-        // === MOUNTAINS/LANDSCAPE (Octas 24-34) - Misty mountain backdrop ===
-        obj.octas.slice(24, 35).forEach((mountain, i) => {
-          const mountainX = (i - 5) * 10;
-          const mountainHeight = 4 + (i % 3) * 3;
-          const mountainZ = -35 - (i % 2) * 8;
-          mountain.position.set(mountainX, -8 + mountainHeight, mountainZ);
-          mountain.rotation.x = 0;
-          mountain.rotation.y = i * 0.5;
-          const s = 10 + (i % 3) * 4;
-          mountain.scale.set(s, mountainHeight * 2.5, s);
-          mountain.material.color.setStyle(octahedronColor);
-          mountain.material.opacity = (0.3 + f.bass * 0.1) * blend;
-          mountain.material.wireframe = true;
-        });
-        
-        // === ENERGY PARTICLES (Octas 35-44) - Magical energy swirling around dragon ===
-        obj.octas.slice(35).forEach((particle, i) => {
-          const orbitPhase = elScaled * 4 + i * (Math.PI * 2 / 10);
-          const orbitRadius = 5 + Math.sin(elScaled + i) * 2;
-          const orbitY = Math.sin(orbitPhase * 0.5) * 3;
-          
-          // Particles orbit around the dragon's path
-          const centerX = Math.sin(elScaled * 0.3) * 3;
-          const centerZ = -8;
-          
-          particle.position.x = centerX + Math.cos(orbitPhase) * orbitRadius;
-          particle.position.y = orbitY + 2 + f.highs * 2;
-          particle.position.z = centerZ + Math.sin(orbitPhase) * orbitRadius * 0.5;
-          particle.rotation.x = elScaled * 3;
+          particle.position.x = bp.x + Math.cos(orbitPhase) * orbitRadius;
+          particle.position.y = bp.y + Math.sin(orbitPhase) * orbitRadius * 0.6;
+          particle.position.z = bp.z + Math.sin(orbitPhase * 0.5) * 2;
+          particle.rotation.x = elScaled * 2.5;
           particle.rotation.y = elScaled * 2;
-          const particleSize = 0.3 + f.highs * 0.4;
+          const particleSize = 0.5 + f.highs * 0.4;
           particle.scale.set(particleSize, particleSize, particleSize);
           particle.material.color.setStyle(octahedronColor);
-          particle.material.opacity = (0.5 + f.highs * 0.5) * blend;
+          particle.material.opacity = (0.6 + f.highs * 0.4) * blend;
           particle.material.wireframe = false;
         });
         
+        // === Hide unused environment octahedrons (30-44) - Let environment system handle them ===
+        obj.octas.slice(30).forEach((envOcta) => {
+          envOcta.position.set(0, -1000, 0);
+          envOcta.scale.set(0.001, 0.001, 0.001);
+          envOcta.material.opacity = 0;
+        });
+        
         // === DRAGON PEARL (Sphere) - The magical pearl the dragon chases ===
-        // In Eastern mythology, dragons are often shown chasing or guarding a flaming pearl
-        const pearlOrbitPhase = elScaled * 0.8;
-        const pearlDistance = 6 + Math.sin(elScaled * 0.5) * 2;
+        const pearlOrbitPhase = elScaled * 0.6;
+        const pearlDistance = 10 + Math.sin(elScaled * 0.4) * 4;
         const pearlX = head.position.x + Math.sin(pearlOrbitPhase) * pearlDistance;
-        const pearlY = head.position.y + 3 + Math.cos(pearlOrbitPhase * 1.5) * 2;
-        const pearlZ = head.position.z + 5 + Math.cos(pearlOrbitPhase) * 3;
+        const pearlY = head.position.y + 5 + Math.cos(pearlOrbitPhase * 1.2) * 3;
+        const pearlZ = head.position.z + 8 + Math.cos(pearlOrbitPhase) * 5;
         
         obj.sphere.position.set(pearlX, pearlY, pearlZ);
-        const pearlSize = 1.2 + f.bass * 0.5 + Math.sin(elScaled * 3) * 0.2;
+        const pearlSize = 1.8 + f.bass * 0.6 + Math.sin(elScaled * 2.5) * 0.3;
         obj.sphere.scale.set(pearlSize, pearlSize, pearlSize);
-        obj.sphere.rotation.x = elScaled * 2;
-        obj.sphere.rotation.y = elScaled * 3;
+        obj.sphere.rotation.x = elScaled * 1.5;
+        obj.sphere.rotation.y = elScaled * 2;
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
