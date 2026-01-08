@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu, FilePlus } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
-import { ProjectSettings, ProjectState } from './types';
+import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -229,7 +229,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
+  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -342,13 +342,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [enableFramingLock, setEnableFramingLock] = useState(false);
   const [enableRuleOfThirds, setEnableRuleOfThirds] = useState(false);
   
-  // Camera FX Layer
+  // Camera FX Layer (existing camera shake)
   const [cameraShakeIntensity, setCameraShakeIntensity] = useState(1.0); // multiplier for existing shake
   const [cameraShakeFrequency, setCameraShakeFrequency] = useState(50); // Hz
   const [enableHandheldDrift, setEnableHandheldDrift] = useState(false);
   const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
   const [enableFovRamping, setEnableFovRamping] = useState(false);
   const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
+  
+  // Camera FX System (Grid Tiling, Kaleidoscope, PIP)
+  const [cameraFXClips, setCameraFXClips] = useState<CameraFXClip[]>([]);
+  const [selectedFXClipId, setSelectedFXClipId] = useState<string | null>(null);
+  const [cameraFXKeyframes, setCameraFXKeyframes] = useState<CameraFXKeyframe[]>([]);
+  const [cameraFXAudioModulations, setCameraFXAudioModulations] = useState<CameraFXAudioModulation[]>([]);
+  const [showFXOverlays, setShowFXOverlays] = useState(true);
   
   // Shot Presets
   const [selectedShotPreset, setSelectedShotPreset] = useState<string | null>(null);
@@ -1251,6 +1258,87 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
     ));
     addLog('Updated environment keyframe', 'success');
+  };
+
+  // Camera FX handlers
+  const addCameraFXClip = (type: 'grid' | 'kaleidoscope' | 'pip') => {
+    const startTime = currentTime;
+    const newClip: CameraFXClip = {
+      id: `fx-${Date.now()}`,
+      name: `${type} FX`,
+      type,
+      startTime: parseFloat(startTime.toFixed(2)),
+      endTime: parseFloat((startTime + 5).toFixed(2)),
+      enabled: true,
+      ...(type === 'grid' && { gridRows: 2, gridColumns: 2 }),
+      ...(type === 'kaleidoscope' && { kaleidoscopeSegments: 6, kaleidoscopeRotation: 0 }),
+      ...(type === 'pip' && { pipScale: 0.25, pipPositionX: 0.65, pipPositionY: 0.65, pipBorderWidth: 2, pipBorderColor: '#ffffff' })
+    };
+    setCameraFXClips([...cameraFXClips, newClip].sort((a, b) => a.startTime - b.startTime));
+    setSelectedFXClipId(newClip.id);
+    addLog(`Added ${type} FX clip at ${formatTime(startTime)}`, 'success');
+  };
+
+  const updateCameraFXClip = (id: string, updates: Partial<CameraFXClip>) => {
+    setCameraFXClips(cameraFXClips.map(clip => 
+      clip.id === id ? { ...clip, ...updates } : clip
+    ));
+  };
+
+  const deleteCameraFXClip = (id: string) => {
+    setCameraFXClips(cameraFXClips.filter(clip => clip.id !== id));
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.clipId !== id));
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.clipId !== id));
+    if (selectedFXClipId === id) setSelectedFXClipId(null);
+    addLog('Deleted Camera FX clip', 'info');
+  };
+
+  const addCameraFXKeyframe = (clipId: string, parameter: string, value: number) => {
+    const time = currentTime;
+    const newKeyframe: CameraFXKeyframe = {
+      id: `kf-${Date.now()}`,
+      clipId,
+      time: parseFloat(time.toFixed(2)),
+      parameter,
+      value,
+      easing: 'linear'
+    };
+    setCameraFXKeyframes([...cameraFXKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added keyframe for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXKeyframe = (id: string, updates: Partial<CameraFXKeyframe>) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf => 
+      kf.id === id ? { ...kf, ...updates } : kf
+    ));
+  };
+
+  const deleteCameraFXKeyframe = (id: string) => {
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted Camera FX keyframe', 'info');
+  };
+
+  const addCameraFXAudioModulation = (clipId: string, parameter: string, audioTrack: 'bass' | 'mids' | 'highs', amount: number) => {
+    const newModulation: CameraFXAudioModulation = {
+      id: `mod-${Date.now()}`,
+      clipId,
+      parameter,
+      audioTrack,
+      amount
+    };
+    setCameraFXAudioModulations([...cameraFXAudioModulations, newModulation]);
+    addLog(`Added audio modulation for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXAudioModulation = (id: string, updates: Partial<CameraFXAudioModulation>) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.map(mod => 
+      mod.id === id ? { ...mod, ...updates } : mod
+    ));
+  };
+
+  const deleteCameraFXAudioModulation = (id: string) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.id !== id));
+    addLog('Deleted audio modulation', 'info');
   };
 
   // NEW: Recording functions
@@ -5564,17 +5652,236 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         uniforms.tintB.value = colorTintB;
       }
 
-      // Render with post-processing
-      if (composerRef.current) {
-        composerRef.current.render();
+      // Camera FX Rendering
+      const t = elapsed;
+      const activeFXClips = cameraFXClips.filter(clip => 
+        clip.enabled && t >= clip.startTime && t < clip.endTime
+      );
+
+      if (activeFXClips.length > 0) {
+        // Apply Camera FX using viewport/scissor rendering
+        const canvasWidth = rend.domElement.width;
+        const canvasHeight = rend.domElement.height;
+
+        // Pre-index keyframes and modulations by clipId for performance
+        const keyframesByClip = new Map<string, Map<string, CameraFXKeyframe[]>>();
+        const modulationsByClip = new Map<string, Map<string, CameraFXAudioModulation>>();
+        
+        activeFXClips.forEach(clip => {
+          const paramMap = new Map<string, CameraFXKeyframe[]>();
+          cameraFXKeyframes
+            .filter(kf => kf.clipId === clip.id)
+            .forEach(kf => {
+              if (!paramMap.has(kf.parameter)) paramMap.set(kf.parameter, []);
+              paramMap.get(kf.parameter)!.push(kf);
+            });
+          paramMap.forEach(kfs => kfs.sort((a, b) => a.time - b.time));
+          keyframesByClip.set(clip.id, paramMap);
+          
+          const modMap = new Map<string, CameraFXAudioModulation>();
+          cameraFXAudioModulations
+            .filter(mod => mod.clipId === clip.id)
+            .forEach(mod => modMap.set(mod.parameter, mod));
+          modulationsByClip.set(clip.id, modMap);
+        });
+
+        const getInterpolatedValue = (clipId: string, parameter: string, defaultValue: number): number => {
+          const paramMap = keyframesByClip.get(clipId);
+          if (!paramMap) return defaultValue;
+          
+          const clipKeyframes = paramMap.get(parameter);
+          if (!clipKeyframes || clipKeyframes.length === 0) return defaultValue;
+          
+          let prevKf = clipKeyframes[0];
+          let nextKf = clipKeyframes[clipKeyframes.length - 1];
+          
+          for (let i = 0; i < clipKeyframes.length - 1; i++) {
+            if (t >= clipKeyframes[i].time && t <= clipKeyframes[i + 1].time) {
+              prevKf = clipKeyframes[i];
+              nextKf = clipKeyframes[i + 1];
+              break;
+            }
+          }
+          
+          if (prevKf === nextKf) return prevKf.value;
+          
+          const duration = nextKf.time - prevKf.time;
+          const elapsedTime = t - prevKf.time;
+          let progress = duration > 0 ? elapsedTime / duration : 0;
+          
+          if (nextKf.easing === 'easeIn') {
+            progress = progress * progress;
+          } else if (nextKf.easing === 'easeOut') {
+            progress = 1 - (1 - progress) * (1 - progress);
+          } else if (nextKf.easing === 'easeInOut') {
+            progress = progress < 0.5 
+              ? 2 * progress * progress 
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          }
+          
+          return prevKf.value + (nextKf.value - prevKf.value) * progress;
+        };
+
+        const applyAudioModulation = (clipId: string, baseValue: number, parameter: string): number => {
+          const modMap = modulationsByClip.get(clipId);
+          if (!modMap) return baseValue;
+          
+          const modulation = modMap.get(parameter);
+          if (!modulation || !isPlaying) return baseValue;
+          
+          const audioValue = modulation.audioTrack === 'bass' ? f.bass :
+                             modulation.audioTrack === 'mids' ? f.mids :
+                             f.highs;
+          
+          return baseValue + (audioValue * modulation.amount * baseValue);
+        };
+
+        activeFXClips.forEach(clip => {
+          if (clip.type === 'grid') {
+            const rows = Math.round(applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'gridRows', clip.gridRows || 2),
+              'gridRows'
+            ));
+            const cols = Math.round(applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'gridColumns', clip.gridColumns || 2),
+              'gridColumns'
+            ));
+
+            rend.setScissorTest(true);
+            const cellWidth = canvasWidth / cols;
+            const cellHeight = canvasHeight / rows;
+
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < cols; col++) {
+                const x = col * cellWidth;
+                const y = row * cellHeight;
+                
+                rend.setViewport(x, y, cellWidth, cellHeight);
+                rend.setScissor(x, y, cellWidth, cellHeight);
+                if (composerRef.current) {
+                  composerRef.current.render();
+                } else {
+                  rend.render(scene, cam);
+                }
+              }
+            }
+
+            rend.setScissorTest(false);
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+
+          } else if (clip.type === 'kaleidoscope') {
+            const segments = Math.round(applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'kaleidoscopeSegments', clip.kaleidoscopeSegments || 6),
+              'kaleidoscopeSegments'
+            ));
+            const rotation = applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'kaleidoscopeRotation', clip.kaleidoscopeRotation || 0),
+              'kaleidoscopeRotation'
+            );
+
+            rend.setScissorTest(true);
+            
+            const wedgeAngle = (Math.PI * 2) / segments;
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight / 2;
+            const radius = Math.sqrt(centerX * centerX + centerY * centerY);
+
+            for (let i = 0; i < segments; i++) {
+              const angle = (i * wedgeAngle) + (rotation * Math.PI / 180);
+              
+              const x1 = centerX + Math.cos(angle) * radius;
+              const y1 = centerY + Math.sin(angle) * radius;
+              const x2 = centerX + Math.cos(angle + wedgeAngle) * radius;
+              const y2 = centerY + Math.sin(angle + wedgeAngle) * radius;
+              
+              const minX = Math.min(centerX, x1, x2);
+              const maxX = Math.max(centerX, x1, x2);
+              const minY = Math.min(centerY, y1, y2);
+              const maxY = Math.max(centerY, y1, y2);
+              
+              rend.setViewport(minX, minY, maxX - minX, maxY - minY);
+              rend.setScissor(minX, minY, maxX - minX, maxY - minY);
+              
+              if (i % 2 === 1 && cam) {
+                const tempRot = cam.rotation.clone();
+                cam.rotation.y *= -1;
+                if (composerRef.current) {
+                  composerRef.current.render();
+                } else {
+                  rend.render(scene, cam);
+                }
+                cam.rotation.copy(tempRot);
+              } else {
+                if (composerRef.current) {
+                  composerRef.current.render();
+                } else {
+                  rend.render(scene, cam);
+                }
+              }
+            }
+
+            rend.setScissorTest(false);
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+
+          } else if (clip.type === 'pip') {
+            const scale = applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipScale', clip.pipScale || 0.25),
+              'pipScale'
+            );
+            const posX = applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipPositionX', clip.pipPositionX || 0.65),
+              'pipPositionX'
+            );
+            const posY = applyAudioModulation(
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipPositionY', clip.pipPositionY || 0.65),
+              'pipPositionY'
+            );
+
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+            if (composerRef.current) {
+              composerRef.current.render();
+            } else {
+              rend.render(scene, cam);
+            }
+
+            const pipWidth = canvasWidth * scale;
+            const pipHeight = canvasHeight * scale;
+            const pipX = ((posX + 1) / 2) * (canvasWidth - pipWidth);
+            const pipY = ((posY + 1) / 2) * (canvasHeight - pipHeight);
+
+            rend.setScissorTest(true);
+            rend.setViewport(pipX, pipY, pipWidth, pipHeight);
+            rend.setScissor(pipX, pipY, pipWidth, pipHeight);
+            if (composerRef.current) {
+              composerRef.current.render();
+            } else {
+              rend.render(scene, cam);
+            }
+            rend.setScissorTest(false);
+            
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+          }
+        });
       } else {
-        rend.render(scene, cam);
+        // Normal render (no FX active)
+        if (composerRef.current) {
+          composerRef.current.render();
+        } else {
+          rend.render(scene, cam);
+        }
       }
     };
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -5985,6 +6292,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'cameraRig' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
           >
             🎥 Camera Rig
+          </button>
+          <button 
+            onClick={() => setActiveTab('camerafx')} 
+            className={`px-4 py-2 font-semibold transition-colors ${activeTab === 'camerafx' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-300'}`}
+          >
+            🎬 Camera FX
           </button>
           <button 
             onClick={() => setActiveTab('effects')} 
@@ -6843,6 +7156,350 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Camera FX Tab */}
+        {activeTab === 'camerafx' && (
+          <div>
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎬 Camera FX System</h3>
+              <p className="text-xs text-gray-400 mb-3">Create viewport effects like Grid Tiling, Kaleidoscope, and Picture-in-Picture using timeline keyframes.</p>
+              
+              {/* FX Overlays Toggle */}
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="checkbox"
+                  id="showFXOverlays"
+                  checked={showFXOverlays}
+                  onChange={(e) => setShowFXOverlays(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showFXOverlays" className="text-sm text-white cursor-pointer">
+                  Show FX Overlays (Grid/Symmetry/Bounds)
+                </label>
+              </div>
+              <p className="text-xs text-gray-500">Visual guides for Camera FX editing</p>
+            </div>
+
+            {/* Add FX Clip Buttons */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <h4 className="text-sm font-semibold text-purple-400 mb-3">Add FX Clip</h4>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => addCameraFXClip('grid')}
+                  className="flex-1 px-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
+                  title="Add Grid Tiling FX"
+                >
+                  🔲 Grid
+                </button>
+                <button
+                  onClick={() => addCameraFXClip('kaleidoscope')}
+                  className="flex-1 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                  title="Add Kaleidoscope FX"
+                >
+                  🔮 Kaleidoscope
+                </button>
+                <button
+                  onClick={() => addCameraFXClip('pip')}
+                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                  title="Add Picture-in-Picture FX"
+                >
+                  📺 PIP
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Creates a new FX clip at current time</p>
+            </div>
+
+            {/* FX Clips Timeline */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <h4 className="text-sm font-semibold text-purple-400 mb-3">FX Clips Timeline</h4>
+              <div className="relative h-16 bg-gray-900 rounded border border-gray-700">
+                {/* Playhead */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10 pointer-events-none"
+                  style={{ left: `${(currentTime / duration) * 100}%` }}
+                />
+
+                {/* FX Clips */}
+                {cameraFXClips.map(clip => {
+                  const clipLeft = (clip.startTime / duration) * 100;
+                  const clipWidth = ((clip.endTime - clip.startTime) / duration) * 100;
+                  const isSelected = clip.id === selectedFXClipId;
+                  
+                  return (
+                    <div
+                      key={clip.id}
+                      className={`absolute top-1 bottom-1 rounded cursor-pointer transition-all ${
+                        isSelected ? 'ring-2 ring-cyan-400' : ''
+                      } ${
+                        clip.type === 'grid' ? 'bg-cyan-600' :
+                        clip.type === 'kaleidoscope' ? 'bg-purple-600' :
+                        'bg-blue-600'
+                      } hover:brightness-110 ${!clip.enabled ? 'opacity-50' : ''}`}
+                      style={{
+                        left: `${clipLeft}%`,
+                        width: `${clipWidth}%`
+                      }}
+                      onClick={() => setSelectedFXClipId(clip.id)}
+                    >
+                      <div className="px-2 py-1 text-xs text-white truncate pointer-events-none">
+                        {clip.type === 'grid' && '🔲'}
+                        {clip.type === 'kaleidoscope' && '🔮'}
+                        {clip.type === 'pip' && '📺'}
+                        {' '}{clip.name}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {cameraFXClips.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                    Click buttons above to add Camera FX clips
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Selected FX Clip Properties */}
+            {(() => {
+              const selectedClip = selectedFXClipId ? cameraFXClips.find(c => c.id === selectedFXClipId) : null;
+              if (!selectedClip) return (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  Select a Camera FX clip from the timeline to view properties
+                </div>
+              );
+              
+              return (
+                <>
+                  {/* FX Clip Info */}
+                  <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                    <h4 className="text-sm font-semibold text-purple-400 mb-3">FX Clip Properties</h4>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Name</label>
+                        <input
+                          type="text"
+                          value={selectedClip.name}
+                          onChange={(e) => updateCameraFXClip(selectedClip.id, { name: e.target.value })}
+                          className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Type</label>
+                        <div className="text-sm text-white bg-gray-800 px-3 py-2 rounded border border-gray-600">
+                          {selectedClip.type === 'grid' && '🔲 Grid Tiling'}
+                          {selectedClip.type === 'kaleidoscope' && '🔮 Kaleidoscope'}
+                          {selectedClip.type === 'pip' && '📺 Picture-in-Picture'}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="fxEnabled"
+                          checked={selectedClip.enabled}
+                          onChange={(e) => updateCameraFXClip(selectedClip.id, { enabled: e.target.checked })}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                        <label htmlFor="fxEnabled" className="text-sm text-white cursor-pointer">
+                          Enabled
+                        </label>
+                      </div>
+
+                      <button
+                        onClick={() => deleteCameraFXClip(selectedClip.id)}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                      >
+                        Delete FX Clip
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Grid Tiling Parameters */}
+                  {selectedClip.type === 'grid' && (
+                    <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                      <h4 className="text-sm font-semibold text-cyan-400 mb-3">Grid Tiling</h4>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Rows: {selectedClip.gridRows || 2}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="8"
+                            value={selectedClip.gridRows || 2}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { gridRows: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Columns: {selectedClip.gridColumns || 2}
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="8"
+                            value={selectedClip.gridColumns || 2}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { gridColumns: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => addCameraFXKeyframe(selectedClip.id, 'gridRows', selectedClip.gridRows || 2)}
+                          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                        >
+                          Add Rows Keyframe
+                        </button>
+
+                        <button
+                          onClick={() => addCameraFXKeyframe(selectedClip.id, 'gridColumns', selectedClip.gridColumns || 2)}
+                          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                        >
+                          Add Columns Keyframe
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kaleidoscope Parameters */}
+                  {selectedClip.type === 'kaleidoscope' && (
+                    <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                      <h4 className="text-sm font-semibold text-purple-400 mb-3">Kaleidoscope</h4>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Segments: {selectedClip.kaleidoscopeSegments || 6}
+                          </label>
+                          <input
+                            type="range"
+                            min="2"
+                            max="12"
+                            value={selectedClip.kaleidoscopeSegments || 6}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { kaleidoscopeSegments: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Rotation: {selectedClip.kaleidoscopeRotation?.toFixed(1) || '0.0'}°
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            value={selectedClip.kaleidoscopeRotation || 0}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { kaleidoscopeRotation: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => addCameraFXKeyframe(selectedClip.id, 'kaleidoscopeSegments', selectedClip.kaleidoscopeSegments || 6)}
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                        >
+                          Add Segments Keyframe
+                        </button>
+
+                        <button
+                          onClick={() => addCameraFXKeyframe(selectedClip.id, 'kaleidoscopeRotation', selectedClip.kaleidoscopeRotation || 0)}
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                        >
+                          Add Rotation Keyframe
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Picture-in-Picture Parameters */}
+                  {selectedClip.type === 'pip' && (
+                    <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                      <h4 className="text-sm font-semibold text-blue-400 mb-3">Picture-in-Picture</h4>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Scale: {(selectedClip.pipScale || 0.25).toFixed(2)}
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="0.9"
+                            step="0.05"
+                            value={selectedClip.pipScale || 0.25}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { pipScale: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Position X: {(selectedClip.pipPositionX || 0.65).toFixed(2)}
+                          </label>
+                          <input
+                            type="range"
+                            min="-1"
+                            max="1"
+                            step="0.05"
+                            value={selectedClip.pipPositionX || 0.65}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { pipPositionX: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Position Y: {(selectedClip.pipPositionY || 0.65).toFixed(2)}
+                          </label>
+                          <input
+                            type="range"
+                            min="-1"
+                            max="1"
+                            step="0.05"
+                            value={selectedClip.pipPositionY || 0.65}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { pipPositionY: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">
+                            Border Width: {selectedClip.pipBorderWidth || 2}px
+                          </label>
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            value={selectedClip.pipBorderWidth || 2}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { pipBorderWidth: Number(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+                          <input
+                            type="color"
+                            value={selectedClip.pipBorderColor || '#ffffff'}
+                            onChange={(e) => updateCameraFXClip(selectedClip.id, { pipBorderColor: e.target.value })}
+                            className="w-full h-10 bg-gray-800 rounded border border-gray-600 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
