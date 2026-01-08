@@ -2304,72 +2304,100 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         const canvasWidth = rend.domElement.width;
         const canvasHeight = rend.domElement.height;
 
+        // Pre-index keyframes and modulations by clipId for performance
+        const keyframesByClip = new Map<string, Map<string, CameraFXKeyframe[]>>();
+        const modulationsByClip = new Map<string, Map<string, CameraFXAudioModulation>>();
+        
+        activeFXClips.forEach(clip => {
+          // Group keyframes by parameter
+          const paramMap = new Map<string, CameraFXKeyframe[]>();
+          cameraFXKeyframes
+            .filter(kf => kf.clipId === clip.id)
+            .forEach(kf => {
+              if (!paramMap.has(kf.parameter)) {
+                paramMap.set(kf.parameter, []);
+              }
+              paramMap.get(kf.parameter)!.push(kf);
+            });
+          // Sort each parameter's keyframes by time
+          paramMap.forEach(kfs => kfs.sort((a, b) => a.time - b.time));
+          keyframesByClip.set(clip.id, paramMap);
+          
+          // Index modulations by parameter
+          const modMap = new Map<string, CameraFXAudioModulation>();
+          cameraFXAudioModulations
+            .filter(mod => mod.clipId === clip.id)
+            .forEach(mod => modMap.set(mod.parameter, mod));
+          modulationsByClip.set(clip.id, modMap);
+        });
+
+        // Helper functions (defined once, outside the loop)
+        const getInterpolatedValue = (clipId: string, parameter: string, defaultValue: number): number => {
+          const paramMap = keyframesByClip.get(clipId);
+          if (!paramMap) return defaultValue;
+          
+          const clipKeyframes = paramMap.get(parameter);
+          if (!clipKeyframes || clipKeyframes.length === 0) return defaultValue;
+          
+          // Find surrounding keyframes
+          let prevKf = clipKeyframes[0];
+          let nextKf = clipKeyframes[clipKeyframes.length - 1];
+          
+          for (let i = 0; i < clipKeyframes.length - 1; i++) {
+            if (t >= clipKeyframes[i].time && t <= clipKeyframes[i + 1].time) {
+              prevKf = clipKeyframes[i];
+              nextKf = clipKeyframes[i + 1];
+              break;
+            }
+          }
+          
+          if (prevKf === nextKf) return prevKf.value;
+          
+          // Interpolate with easing
+          const duration = nextKf.time - prevKf.time;
+          const elapsed = t - prevKf.time;
+          let progress = duration > 0 ? elapsed / duration : 0;
+          
+          // Apply easing
+          if (nextKf.easing === 'easeIn') {
+            progress = progress * progress;
+          } else if (nextKf.easing === 'easeOut') {
+            progress = 1 - (1 - progress) * (1 - progress);
+          } else if (nextKf.easing === 'easeInOut') {
+            progress = progress < 0.5 
+              ? 2 * progress * progress 
+              : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          }
+          
+          return prevKf.value + (nextKf.value - prevKf.value) * progress;
+        };
+
+        const applyAudioModulation = (clipId: string, baseValue: number, parameter: string): number => {
+          const modMap = modulationsByClip.get(clipId);
+          if (!modMap) return baseValue;
+          
+          const modulation = modMap.get(parameter);
+          if (!modulation || !isPlaying) return baseValue;
+          
+          const audioValue = modulation.audioTrack === 'bass' ? reactiveF.bass :
+                             modulation.audioTrack === 'mids' ? reactiveF.mids :
+                             reactiveF.highs;
+          
+          return baseValue + (audioValue * modulation.amount * baseValue);
+        };
+
         // Process each active FX clip (they stack)
         activeFXClips.forEach(clip => {
-          // Get keyframe-interpolated values
-          const getInterpolatedValue = (parameter: string, defaultValue: number): number => {
-            const clipKeyframes = cameraFXKeyframes
-              .filter(kf => kf.clipId === clip.id && kf.parameter === parameter)
-              .sort((a, b) => a.time - b.time);
-            
-            if (clipKeyframes.length === 0) return defaultValue;
-            
-            // Find surrounding keyframes
-            let prevKf = clipKeyframes[0];
-            let nextKf = clipKeyframes[clipKeyframes.length - 1];
-            
-            for (let i = 0; i < clipKeyframes.length - 1; i++) {
-              if (t >= clipKeyframes[i].time && t <= clipKeyframes[i + 1].time) {
-                prevKf = clipKeyframes[i];
-                nextKf = clipKeyframes[i + 1];
-                break;
-              }
-            }
-            
-            if (prevKf === nextKf) return prevKf.value;
-            
-            // Interpolate with easing
-            const duration = nextKf.time - prevKf.time;
-            const elapsed = t - prevKf.time;
-            let progress = duration > 0 ? elapsed / duration : 0;
-            
-            // Apply easing
-            if (nextKf.easing === 'easeIn') {
-              progress = progress * progress;
-            } else if (nextKf.easing === 'easeOut') {
-              progress = 1 - (1 - progress) * (1 - progress);
-            } else if (nextKf.easing === 'easeInOut') {
-              progress = progress < 0.5 
-                ? 2 * progress * progress 
-                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-            }
-            
-            return prevKf.value + (nextKf.value - prevKf.value) * progress;
-          };
-
-          // Apply audio modulation
-          const applyAudioModulation = (baseValue: number, parameter: string): number => {
-            const modulation = cameraFXAudioModulations.find(
-              mod => mod.clipId === clip.id && mod.parameter === parameter
-            );
-            
-            if (!modulation || !isPlaying) return baseValue;
-            
-            const audioValue = modulation.audioTrack === 'bass' ? reactiveF.bass :
-                               modulation.audioTrack === 'mids' ? reactiveF.mids :
-                               reactiveF.highs;
-            
-            return baseValue + (audioValue * modulation.amount * baseValue);
-          };
-
           if (clip.type === 'grid') {
             // Grid Tiling FX
             const rows = Math.round(applyAudioModulation(
-              getInterpolatedValue('gridRows', clip.gridRows || 2),
+              clip.id,
+              getInterpolatedValue(clip.id, 'gridRows', clip.gridRows || 2),
               'gridRows'
             ));
             const cols = Math.round(applyAudioModulation(
-              getInterpolatedValue('gridColumns', clip.gridColumns || 2),
+              clip.id,
+              getInterpolatedValue(clip.id, 'gridColumns', clip.gridColumns || 2),
               'gridColumns'
             ));
 
@@ -2397,11 +2425,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           } else if (clip.type === 'kaleidoscope') {
             // Kaleidoscope FX
             const segments = Math.round(applyAudioModulation(
-              getInterpolatedValue('kaleidoscopeSegments', clip.kaleidoscopeSegments || 6),
+              clip.id,
+              getInterpolatedValue(clip.id, 'kaleidoscopeSegments', clip.kaleidoscopeSegments || 6),
               'kaleidoscopeSegments'
             ));
             const rotation = applyAudioModulation(
-              getInterpolatedValue('kaleidoscopeRotation', clip.kaleidoscopeRotation || 0),
+              clip.id,
+              getInterpolatedValue(clip.id, 'kaleidoscopeRotation', clip.kaleidoscopeRotation || 0),
               'kaleidoscopeRotation'
             );
 
@@ -2452,15 +2482,18 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           } else if (clip.type === 'pip') {
             // Picture-in-Picture FX
             const scale = applyAudioModulation(
-              getInterpolatedValue('pipScale', clip.pipScale || 0.25),
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipScale', clip.pipScale || 0.25),
               'pipScale'
             );
             const posX = applyAudioModulation(
-              getInterpolatedValue('pipPositionX', clip.pipPositionX || 0.65),
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipPositionX', clip.pipPositionX || 0.65),
               'pipPositionX'
             );
             const posY = applyAudioModulation(
-              getInterpolatedValue('pipPositionY', clip.pipPositionY || 0.65),
+              clip.id,
+              getInterpolatedValue(clip.id, 'pipPositionY', clip.pipPositionY || 0.65),
               'pipPositionY'
             );
 

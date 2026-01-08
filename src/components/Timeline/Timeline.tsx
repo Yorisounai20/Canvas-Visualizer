@@ -1057,18 +1057,23 @@ export default function Timeline({
               </div>
 
               {/* Selected FX Clip Info */}
-              {selectedFXClipId && cameraFXClips.find(c => c.id === selectedFXClipId) && (
-                <div className="mt-4 p-3 bg-gray-700 rounded text-xs text-gray-300">
-                  <div className="font-semibold mb-1">
-                    {cameraFXClips.find(c => c.id === selectedFXClipId)?.name}
+              {(() => {
+                const selectedClip = selectedFXClipId ? cameraFXClips.find(c => c.id === selectedFXClipId) : null;
+                if (!selectedClip) return null;
+                
+                return (
+                  <div className="mt-4 p-3 bg-gray-700 rounded text-xs text-gray-300">
+                    <div className="font-semibold mb-1">
+                      {selectedClip.name}
+                    </div>
+                    <div className="flex gap-4">
+                      <span>Start: {selectedClip.startTime.toFixed(2)}s</span>
+                      <span>End: {selectedClip.endTime.toFixed(2)}s</span>
+                      <span>Duration: {(selectedClip.endTime - selectedClip.startTime).toFixed(2)}s</span>
+                    </div>
                   </div>
-                  <div className="flex gap-4">
-                    <span>Start: {cameraFXClips.find(c => c.id === selectedFXClipId)?.startTime.toFixed(2)}s</span>
-                    <span>End: {cameraFXClips.find(c => c.id === selectedFXClipId)?.endTime.toFixed(2)}s</span>
-                    <span>Duration: {(cameraFXClips.find(c => c.id === selectedFXClipId)!.endTime - cameraFXClips.find(c => c.id === selectedFXClipId)!.startTime).toFixed(2)}s</span>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </>
         )}
