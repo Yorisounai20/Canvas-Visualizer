@@ -7407,12 +7407,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <label className="text-xs text-gray-400 block mb-1">Start Time (s)</label>
                           <input
                             type="number"
-                            min="0"
-                            max={selectedClip.endTime - 0.01}
-                            step="0.01"
-                            value={selectedClip.startTime.toFixed(2)}
+                            value={selectedClip.startTime}
                             onChange={(e) => {
-                              const newStart = Math.max(0, Math.min(parseFloat(e.target.value), selectedClip.endTime - 0.01));
+                              const newStart = Math.max(0, Math.min(parseFloat(e.target.value) || 0, selectedClip.endTime - 0.01));
                               updateCameraFXClip(selectedClip.id, { startTime: newStart });
                             }}
                             className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
@@ -7422,11 +7419,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <label className="text-xs text-gray-400 block mb-1">End Time (s)</label>
                           <input
                             type="number"
-                            min={selectedClip.startTime + 0.01}
-                            step="0.01"
-                            value={selectedClip.endTime.toFixed(2)}
+                            value={selectedClip.endTime}
                             onChange={(e) => {
-                              const newEnd = Math.max(selectedClip.startTime + 0.01, parseFloat(e.target.value));
+                              const newEnd = Math.max(selectedClip.startTime + 0.01, parseFloat(e.target.value) || selectedClip.startTime + 0.01);
                               updateCameraFXClip(selectedClip.id, { endTime: newEnd });
                             }}
                             className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
