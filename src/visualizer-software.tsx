@@ -5755,7 +5755,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             for (let row = 0; row < rows; row++) {
               for (let col = 0; col < cols; col++) {
                 const x = col * cellWidth;
-                const y = row * cellHeight;
+                // WebGL uses bottom-left origin, so invert Y coordinate
+                const y = (rows - 1 - row) * cellHeight;
                 
                 rend.setViewport(x, y, cellWidth, cellHeight);
                 rend.setScissor(x, y, cellWidth, cellHeight);
