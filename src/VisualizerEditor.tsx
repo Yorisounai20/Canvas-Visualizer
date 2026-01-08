@@ -2293,9 +2293,203 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         orbitControlsRef.current.update();
       }
 
-      // PHASE 1: Always render (whether playing or idle)
-      // Use activeCamera if it was switched via keyframes, otherwise use main camera
-      rend.render(scene, activeCamera || cam);
+      // Camera FX Rendering
+      // Find active FX clips at current time
+      const activeFXClips = cameraFXClips.filter(clip => 
+        clip.enabled && t >= clip.startTime && t < clip.endTime
+      );
+
+      if (activeFXClips.length > 0 && !isExporting) {
+        // Apply Camera FX using viewport/scissor rendering
+        const canvasWidth = rend.domElement.width;
+        const canvasHeight = rend.domElement.height;
+
+        // Process each active FX clip (they stack)
+        activeFXClips.forEach(clip => {
+          // Get keyframe-interpolated values
+          const getInterpolatedValue = (parameter: string, defaultValue: number): number => {
+            const clipKeyframes = cameraFXKeyframes
+              .filter(kf => kf.clipId === clip.id && kf.parameter === parameter)
+              .sort((a, b) => a.time - b.time);
+            
+            if (clipKeyframes.length === 0) return defaultValue;
+            
+            // Find surrounding keyframes
+            let prevKf = clipKeyframes[0];
+            let nextKf = clipKeyframes[clipKeyframes.length - 1];
+            
+            for (let i = 0; i < clipKeyframes.length - 1; i++) {
+              if (t >= clipKeyframes[i].time && t <= clipKeyframes[i + 1].time) {
+                prevKf = clipKeyframes[i];
+                nextKf = clipKeyframes[i + 1];
+                break;
+              }
+            }
+            
+            if (prevKf === nextKf) return prevKf.value;
+            
+            // Interpolate with easing
+            const duration = nextKf.time - prevKf.time;
+            const elapsed = t - prevKf.time;
+            let progress = duration > 0 ? elapsed / duration : 0;
+            
+            // Apply easing
+            if (nextKf.easing === 'easeIn') {
+              progress = progress * progress;
+            } else if (nextKf.easing === 'easeOut') {
+              progress = 1 - (1 - progress) * (1 - progress);
+            } else if (nextKf.easing === 'easeInOut') {
+              progress = progress < 0.5 
+                ? 2 * progress * progress 
+                : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+            }
+            
+            return prevKf.value + (nextKf.value - prevKf.value) * progress;
+          };
+
+          // Apply audio modulation
+          const applyAudioModulation = (baseValue: number, parameter: string): number => {
+            const modulation = cameraFXAudioModulations.find(
+              mod => mod.clipId === clip.id && mod.parameter === parameter
+            );
+            
+            if (!modulation || !isPlaying) return baseValue;
+            
+            const audioValue = modulation.audioTrack === 'bass' ? reactiveF.bass :
+                               modulation.audioTrack === 'mids' ? reactiveF.mids :
+                               reactiveF.highs;
+            
+            return baseValue + (audioValue * modulation.amount * baseValue);
+          };
+
+          if (clip.type === 'grid') {
+            // Grid Tiling FX
+            const rows = Math.round(applyAudioModulation(
+              getInterpolatedValue('gridRows', clip.gridRows || 2),
+              'gridRows'
+            ));
+            const cols = Math.round(applyAudioModulation(
+              getInterpolatedValue('gridColumns', clip.gridColumns || 2),
+              'gridColumns'
+            ));
+
+            // Enable scissor test
+            rend.setScissorTest(true);
+            const cellWidth = canvasWidth / cols;
+            const cellHeight = canvasHeight / rows;
+
+            // Render to each grid cell
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < cols; col++) {
+                const x = col * cellWidth;
+                const y = row * cellHeight;
+                
+                rend.setViewport(x, y, cellWidth, cellHeight);
+                rend.setScissor(x, y, cellWidth, cellHeight);
+                rend.render(scene, activeCamera || cam);
+              }
+            }
+
+            // Disable scissor test
+            rend.setScissorTest(false);
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+
+          } else if (clip.type === 'kaleidoscope') {
+            // Kaleidoscope FX
+            const segments = Math.round(applyAudioModulation(
+              getInterpolatedValue('kaleidoscopeSegments', clip.kaleidoscopeSegments || 6),
+              'kaleidoscopeSegments'
+            ));
+            const rotation = applyAudioModulation(
+              getInterpolatedValue('kaleidoscopeRotation', clip.kaleidoscopeRotation || 0),
+              'kaleidoscopeRotation'
+            );
+
+            // Enable scissor test
+            rend.setScissorTest(true);
+            
+            // Calculate wedge angle
+            const wedgeAngle = (Math.PI * 2) / segments;
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight / 2;
+            const radius = Math.sqrt(centerX * centerX + centerY * centerY);
+
+            // Render each kaleidoscope segment
+            for (let i = 0; i < segments; i++) {
+              const angle = (i * wedgeAngle) + (rotation * Math.PI / 180);
+              
+              // Create triangular scissor region for this segment
+              // Note: WebGL scissor test is rectangular, so we approximate with viewport
+              const x1 = centerX + Math.cos(angle) * radius;
+              const y1 = centerY + Math.sin(angle) * radius;
+              const x2 = centerX + Math.cos(angle + wedgeAngle) * radius;
+              const y2 = centerY + Math.sin(angle + wedgeAngle) * radius;
+              
+              // Use viewport for approximate wedge rendering
+              const minX = Math.min(centerX, x1, x2);
+              const maxX = Math.max(centerX, x1, x2);
+              const minY = Math.min(centerY, y1, y2);
+              const maxY = Math.max(centerY, y1, y2);
+              
+              rend.setViewport(minX, minY, maxX - minX, maxY - minY);
+              rend.setScissor(minX, minY, maxX - minX, maxY - minY);
+              
+              // Mirror alternate segments for kaleidoscope effect
+              if (i % 2 === 1 && activeCamera) {
+                const tempRot = activeCamera.rotation.clone();
+                activeCamera.rotation.y *= -1;
+                rend.render(scene, activeCamera);
+                activeCamera.rotation.copy(tempRot);
+              } else {
+                rend.render(scene, activeCamera || cam);
+              }
+            }
+
+            // Disable scissor test
+            rend.setScissorTest(false);
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+
+          } else if (clip.type === 'pip') {
+            // Picture-in-Picture FX
+            const scale = applyAudioModulation(
+              getInterpolatedValue('pipScale', clip.pipScale || 0.25),
+              'pipScale'
+            );
+            const posX = applyAudioModulation(
+              getInterpolatedValue('pipPositionX', clip.pipPositionX || 0.65),
+              'pipPositionX'
+            );
+            const posY = applyAudioModulation(
+              getInterpolatedValue('pipPositionY', clip.pipPositionY || 0.65),
+              'pipPositionY'
+            );
+
+            // Render main view first (full screen)
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+            rend.render(scene, activeCamera || cam);
+
+            // Render PIP overlay
+            const pipWidth = canvasWidth * scale;
+            const pipHeight = canvasHeight * scale;
+            const pipX = ((posX + 1) / 2) * (canvasWidth - pipWidth);
+            const pipY = ((posY + 1) / 2) * (canvasHeight - pipHeight);
+
+            // Enable scissor test for PIP
+            rend.setScissorTest(true);
+            rend.setViewport(pipX, pipY, pipWidth, pipHeight);
+            rend.setScissor(pipX, pipY, pipWidth, pipHeight);
+            rend.render(scene, activeCamera || cam);
+            rend.setScissorTest(false);
+            
+            // Reset viewport
+            rend.setViewport(0, 0, canvasWidth, canvasHeight);
+          }
+        });
+      } else {
+        // PHASE 1: Normal render (no FX active)
+        // Use activeCamera if it was switched via keyframes, otherwise use main camera
+        rend.render(scene, activeCamera || cam);
+      }
     };
 
     // PHASE 1: Start the unified render loop immediately
@@ -2310,7 +2504,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         addLog('Render loop stopped', 'info');
       }
     };
-  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime, workspaceMode]);
+  }, [sections, bassColor, midsColor, highsColor, cameraDistance, cameraHeight, cameraRotation, cameraAutoRotate, duration, isPlaying, currentTime, workspaceMode, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, isExporting]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -3013,6 +3207,10 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           ) : (
             <RightPanel
               selectedSection={selectedSection}
+              selectedFXClip={cameraFXClips.find(c => c.id === selectedFXClipId) || null}
+              cameraFXKeyframes={cameraFXKeyframes}
+              cameraFXAudioModulations={cameraFXAudioModulations}
+              currentTime={currentTime}
               animationTypes={ANIMATION_TYPES}
               bassColor={bassColor}
               midsColor={midsColor}
@@ -3048,6 +3246,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               onSetShowSongName={setShowSongName}
               onSetCustomSongName={setCustomSongName}
               onSetManualMode={setManualMode}
+              onUpdateCameraFXClip={updateCameraFXClip}
+              onAddCameraFXKeyframe={addCameraFXKeyframe}
+              onUpdateCameraFXKeyframe={updateCameraFXKeyframe}
+              onDeleteCameraFXKeyframe={deleteCameraFXKeyframe}
+              onAddCameraFXAudioModulation={addCameraFXAudioModulation}
+              onUpdateCameraFXAudioModulation={updateCameraFXAudioModulation}
+              onDeleteCameraFXAudioModulation={deleteCameraFXAudioModulation}
             />
           )}
         </div>
@@ -3074,6 +3279,8 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           textKeyframes={textKeyframes}
           environmentKeyframes={environmentKeyframes}
           workspaceObjects={workspaceObjects}
+          cameraFXClips={cameraFXClips}
+          selectedFXClipId={selectedFXClipId}
           onSelectSection={setSelectedSectionId}
           onUpdateSection={updateSection}
           onAddSection={addSection}
@@ -3090,6 +3297,10 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           onUpdateCameraKeyframe={updateCameraKeyframe}
           onUpdateTextKeyframe={updateTextKeyframe}
           onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
+          onSelectFXClip={setSelectedFXClipId}
+          onUpdateCameraFXClip={updateCameraFXClip}
+          onDeleteCameraFXClip={deleteCameraFXClip}
+          onAddCameraFXClip={addCameraFXClip}
         />
       </div>
 
