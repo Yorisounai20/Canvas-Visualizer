@@ -7408,11 +7408,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <input
                             type="number"
                             min="0"
-                            max={selectedClip.endTime - 0.1}
-                            step="0.1"
-                            value={selectedClip.startTime.toFixed(1)}
+                            max={selectedClip.endTime - 0.01}
+                            step="0.01"
+                            value={selectedClip.startTime.toFixed(2)}
                             onChange={(e) => {
-                              const newStart = Math.max(0, Math.min(parseFloat(e.target.value), selectedClip.endTime - 0.1));
+                              const newStart = Math.max(0, Math.min(parseFloat(e.target.value), selectedClip.endTime - 0.01));
                               updateCameraFXClip(selectedClip.id, { startTime: newStart });
                             }}
                             className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
@@ -7422,12 +7422,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <label className="text-xs text-gray-400 block mb-1">End Time (s)</label>
                           <input
                             type="number"
-                            min={selectedClip.startTime + 0.1}
+                            min={selectedClip.startTime + 0.01}
                             max={duration}
-                            step="0.1"
-                            value={selectedClip.endTime.toFixed(1)}
+                            step="0.01"
+                            value={selectedClip.endTime.toFixed(2)}
                             onChange={(e) => {
-                              const newEnd = Math.max(selectedClip.startTime + 0.1, Math.min(parseFloat(e.target.value), duration));
+                              const newEnd = Math.max(selectedClip.startTime + 0.01, Math.min(parseFloat(e.target.value), duration));
                               updateCameraFXClip(selectedClip.id, { endTime: newEnd });
                             }}
                             className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
@@ -7436,7 +7436,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                       </div>
 
                       <div className="text-xs text-gray-500">
-                        Duration: {(selectedClip.endTime - selectedClip.startTime).toFixed(1)}s
+                        Duration: {(selectedClip.endTime - selectedClip.startTime).toFixed(2)}s
                       </div>
 
                       <div className="flex items-center gap-2">
