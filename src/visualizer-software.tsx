@@ -7402,6 +7402,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Start Time (s)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={selectedClip.endTime - 0.1}
+                            step="0.1"
+                            value={selectedClip.startTime.toFixed(1)}
+                            onChange={(e) => {
+                              const newStart = Math.max(0, Math.min(parseFloat(e.target.value), selectedClip.endTime - 0.1));
+                              updateCameraFXClip(selectedClip.id, { startTime: newStart });
+                            }}
+                            className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">End Time (s)</label>
+                          <input
+                            type="number"
+                            min={selectedClip.startTime + 0.1}
+                            max={duration}
+                            step="0.1"
+                            value={selectedClip.endTime.toFixed(1)}
+                            onChange={(e) => {
+                              const newEnd = Math.max(selectedClip.startTime + 0.1, Math.min(parseFloat(e.target.value), duration));
+                              updateCameraFXClip(selectedClip.id, { endTime: newEnd });
+                            }}
+                            className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-gray-500">
+                        Duration: {(selectedClip.endTime - selectedClip.startTime).toFixed(1)}s
+                      </div>
+
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
