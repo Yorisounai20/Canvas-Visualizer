@@ -7496,6 +7496,94 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                       </div>
                     </div>
                   )}
+
+                  {/* Keyframe Management */}
+                  <div className="bg-gray-700 rounded-lg p-3 mb-4">
+                    <h4 className="text-sm font-semibold text-yellow-400 mb-3">⏱️ Keyframes</h4>
+                    
+                    {/* Display existing keyframes for this clip */}
+                    {(() => {
+                      const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedClip.id);
+                      
+                      if (clipKeyframes.length === 0) {
+                        return (
+                          <p className="text-xs text-gray-500 mb-3">
+                            No keyframes yet. Add keyframes using the buttons in the parameter sections above.
+                          </p>
+                        );
+                      }
+                      
+                      // Group keyframes by parameter
+                      const keyframesByParam = clipKeyframes.reduce((acc, kf) => {
+                        if (!acc[kf.parameter]) acc[kf.parameter] = [];
+                        acc[kf.parameter].push(kf);
+                        return acc;
+                      }, {} as Record<string, CameraFXKeyframe[]>);
+                      
+                      return (
+                        <div className="space-y-3">
+                          {Object.entries(keyframesByParam).map(([parameter, keyframes]) => (
+                            <div key={parameter} className="bg-gray-800 rounded p-2">
+                              <div className="text-xs font-semibold text-gray-300 mb-2 capitalize">
+                                {parameter.replace(/([A-Z])/g, ' $1').trim()}
+                              </div>
+                              <div className="space-y-2">
+                                {keyframes.sort((a, b) => a.time - b.time).map((kf) => (
+                                  <div key={kf.id} className="flex items-center gap-2 bg-gray-900 rounded p-2">
+                                    <div className="flex-1 space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-400 w-12">Time:</label>
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={duration}
+                                          step="0.1"
+                                          value={kf.time}
+                                          onChange={(e) => updateCameraFXKeyframe(kf.id, { time: parseFloat(e.target.value) })}
+                                          className="flex-1 bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                                        />
+                                        <span className="text-xs text-gray-500">s</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-400 w-12">Value:</label>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          value={kf.value}
+                                          onChange={(e) => updateCameraFXKeyframe(kf.id, { value: parseFloat(e.target.value) })}
+                                          className="flex-1 bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-xs text-gray-400 w-12">Easing:</label>
+                                        <select
+                                          value={kf.easing}
+                                          onChange={(e) => updateCameraFXKeyframe(kf.id, { easing: e.target.value as 'linear' | 'easeIn' | 'easeOut' | 'easeInOut' })}
+                                          className="flex-1 bg-gray-800 text-white text-xs px-2 py-1 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                                        >
+                                          <option value="linear">Linear</option>
+                                          <option value="easeIn">Ease In</option>
+                                          <option value="easeOut">Ease Out</option>
+                                          <option value="easeInOut">Ease In Out</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => deleteCameraFXKeyframe(kf.id)}
+                                      className="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded transition-colors"
+                                      title="Delete Keyframe"
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </>
               );
             })()}
