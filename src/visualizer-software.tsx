@@ -7213,7 +7213,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {/* FX Clips Timeline */}
             <div className="bg-gray-700 rounded-lg p-3 mb-4">
               <h4 className="text-sm font-semibold text-purple-400 mb-3">FX Clips Timeline</h4>
-              <div className="relative h-16 bg-gray-900 rounded border border-gray-700">
+              
+              {/* Clips Overview */}
+              <div className="relative h-12 bg-gray-900 rounded border border-gray-700 mb-3">
                 {/* Playhead */}
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10 pointer-events-none"
@@ -7252,40 +7254,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   );
                 })}
 
-                {/* Keyframe markers for selected clip */}
-                {selectedFXClipId && (() => {
-                  const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedFXClipId);
-                  const paramColors: Record<string, string> = {
-                    gridRows: '#06b6d4',
-                    gridColumns: '#0ea5e9',
-                    kaleidoscopeSegments: '#a855f7',
-                    kaleidoscopeRotation: '#c084fc',
-                    pipScale: '#3b82f6',
-                    pipPositionX: '#60a5fa',
-                    pipPositionY: '#93c5fd'
-                  };
-                  
-                  return clipKeyframes.map((kf, idx) => (
-                    <div
-                      key={kf.id || idx}
-                      className="absolute top-0 bottom-0 w-0.5 group cursor-pointer z-5"
-                      style={{ 
-                        left: `${(kf.time / duration) * 100}%`,
-                        backgroundColor: paramColors[kf.parameter] || '#fbbf24'
-                      }}
-                      title={`${formatTime(kf.time)} - ${kf.parameter}: ${kf.value.toFixed(2)}`}
-                    >
-                      <div 
-                        className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
-                        style={{ backgroundColor: paramColors[kf.parameter] || '#fbbf24' }}
-                      />
-                      <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
-                        {formatTime(kf.time)}: {kf.parameter} = {kf.value.toFixed(2)}
-                      </div>
-                    </div>
-                  ));
-                })()}
-
                 {cameraFXClips.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
                     Click buttons above to add Camera FX clips
@@ -7293,35 +7261,107 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 )}
               </div>
               
-              {/* Keyframe Legend for selected clip */}
+              {/* Parameter Tracks for Selected Clip */}
               {selectedFXClipId && (() => {
-                const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedFXClipId);
-                if (clipKeyframes.length === 0) return null;
+                const selectedClip = cameraFXClips.find(c => c.id === selectedFXClipId);
+                if (!selectedClip) return null;
                 
-                const uniqueParams = Array.from(new Set(clipKeyframes.map(kf => kf.parameter)));
-                const paramColors: Record<string, string> = {
-                  gridRows: '#06b6d4',
-                  gridColumns: '#0ea5e9',
-                  kaleidoscopeSegments: '#a855f7',
-                  kaleidoscopeRotation: '#c084fc',
-                  pipScale: '#3b82f6',
-                  pipPositionX: '#60a5fa',
-                  pipPositionY: '#93c5fd'
+                const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedFXClipId);
+                
+                // Group keyframes by parameter
+                const keyframesByParam = clipKeyframes.reduce((acc, kf) => {
+                  if (!acc[kf.parameter]) acc[kf.parameter] = [];
+                  acc[kf.parameter].push(kf);
+                  return acc;
+                }, {} as Record<string, CameraFXKeyframe[]>);
+                
+                // Define parameter display info
+                const paramInfo: Record<string, { name: string; color: string }> = {
+                  gridRows: { name: 'Grid Rows', color: '#06b6d4' },
+                  gridColumns: { name: 'Grid Columns', color: '#0ea5e9' },
+                  kaleidoscopeSegments: { name: 'Segments', color: '#a855f7' },
+                  kaleidoscopeRotation: { name: 'Rotation', color: '#c084fc' },
+                  pipScale: { name: 'PIP Scale', color: '#3b82f6' },
+                  pipPositionX: { name: 'PIP Position X', color: '#60a5fa' },
+                  pipPositionY: { name: 'PIP Position Y', color: '#93c5fd' }
                 };
                 
+                // Determine which parameters are relevant for this clip type
+                let relevantParams: string[] = [];
+                if (selectedClip.type === 'grid') {
+                  relevantParams = ['gridRows', 'gridColumns'];
+                } else if (selectedClip.type === 'kaleidoscope') {
+                  relevantParams = ['kaleidoscopeSegments', 'kaleidoscopeRotation'];
+                } else if (selectedClip.type === 'pip') {
+                  relevantParams = ['pipScale', 'pipPositionX', 'pipPositionY'];
+                }
+                
+                if (relevantParams.length === 0) return null;
+                
+                const clipLeft = (selectedClip.startTime / duration) * 100;
+                const clipWidth = ((selectedClip.endTime - selectedClip.startTime) / duration) * 100;
+                
                 return (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {uniqueParams.map(param => (
-                      <div key={param} className="flex items-center gap-1">
-                        <div 
-                          className="w-3 h-3 rounded"
-                          style={{ backgroundColor: paramColors[param] || '#fbbf24' }}
-                        />
-                        <span className="text-xs text-gray-400 capitalize">
-                          {param.replace(/([A-Z])/g, ' $1').trim()}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="space-y-1">
+                    <div className="text-xs text-gray-400 mb-2">Parameter Keyframes:</div>
+                    {relevantParams.map(param => {
+                      const paramKeyframes = keyframesByParam[param] || [];
+                      const info = paramInfo[param];
+                      
+                      return (
+                        <div key={param} className="relative h-8 bg-gray-900 rounded border border-gray-700 flex items-center">
+                          {/* Parameter label */}
+                          <div 
+                            className="absolute left-0 top-0 bottom-0 w-24 flex items-center px-2 text-xs text-white font-medium z-5 pointer-events-none"
+                            style={{ backgroundColor: info.color + '40' }}
+                          >
+                            {info.name}
+                          </div>
+                          
+                          {/* Clip background range */}
+                          <div 
+                            className="absolute top-0 bottom-0 bg-gray-800 opacity-30"
+                            style={{
+                              left: `${clipLeft}%`,
+                              width: `${clipWidth}%`
+                            }}
+                          />
+                          
+                          {/* Playhead */}
+                          <div
+                            className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10 pointer-events-none"
+                            style={{ left: `${(currentTime / duration) * 100}%` }}
+                          />
+                          
+                          {/* Keyframe markers */}
+                          {paramKeyframes.map((kf, idx) => (
+                            <div
+                              key={kf.id || idx}
+                              className="absolute top-1/2 -translate-y-1/2 group cursor-pointer z-5"
+                              style={{ left: `${(kf.time / duration) * 100}%` }}
+                              title={`${formatTime(kf.time)}: ${kf.value.toFixed(2)}`}
+                            >
+                              <div 
+                                className="w-3 h-6 hover:scale-110 transition-transform flex items-center justify-center rounded"
+                                style={{ backgroundColor: info.color }}
+                              >
+                                <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                              </div>
+                              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+                                {formatTime(kf.time)}: {kf.value.toFixed(2)} ({kf.easing})
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {/* No keyframes message */}
+                          {paramKeyframes.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center text-gray-600 text-xs pointer-events-none" style={{ marginLeft: '96px' }}>
+                              No keyframes - use buttons below to add
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })()}
