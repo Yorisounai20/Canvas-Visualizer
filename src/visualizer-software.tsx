@@ -7423,11 +7423,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <input
                             type="number"
                             min={selectedClip.startTime + 0.01}
-                            max={duration}
                             step="0.01"
                             value={selectedClip.endTime.toFixed(2)}
                             onChange={(e) => {
-                              const newEnd = Math.max(selectedClip.startTime + 0.01, Math.min(parseFloat(e.target.value), duration));
+                              const newEnd = Math.max(selectedClip.startTime + 0.01, parseFloat(e.target.value));
                               updateCameraFXClip(selectedClip.id, { endTime: newEnd });
                             }}
                             className="w-full bg-gray-800 text-white text-sm px-2 py-1.5 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
