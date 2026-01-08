@@ -7252,12 +7252,79 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   );
                 })}
 
+                {/* Keyframe markers for selected clip */}
+                {selectedFXClipId && (() => {
+                  const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedFXClipId);
+                  const paramColors: Record<string, string> = {
+                    gridRows: '#06b6d4',
+                    gridColumns: '#0ea5e9',
+                    kaleidoscopeSegments: '#a855f7',
+                    kaleidoscopeRotation: '#c084fc',
+                    pipScale: '#3b82f6',
+                    pipPositionX: '#60a5fa',
+                    pipPositionY: '#93c5fd'
+                  };
+                  
+                  return clipKeyframes.map((kf, idx) => (
+                    <div
+                      key={kf.id || idx}
+                      className="absolute top-0 bottom-0 w-0.5 group cursor-pointer z-5"
+                      style={{ 
+                        left: `${(kf.time / duration) * 100}%`,
+                        backgroundColor: paramColors[kf.parameter] || '#fbbf24'
+                      }}
+                      title={`${formatTime(kf.time)} - ${kf.parameter}: ${kf.value.toFixed(2)}`}
+                    >
+                      <div 
+                        className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
+                        style={{ backgroundColor: paramColors[kf.parameter] || '#fbbf24' }}
+                      />
+                      <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+                        {formatTime(kf.time)}: {kf.parameter} = {kf.value.toFixed(2)}
+                      </div>
+                    </div>
+                  ));
+                })()}
+
                 {cameraFXClips.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
                     Click buttons above to add Camera FX clips
                   </div>
                 )}
               </div>
+              
+              {/* Keyframe Legend for selected clip */}
+              {selectedFXClipId && (() => {
+                const clipKeyframes = cameraFXKeyframes.filter(kf => kf.clipId === selectedFXClipId);
+                if (clipKeyframes.length === 0) return null;
+                
+                const uniqueParams = Array.from(new Set(clipKeyframes.map(kf => kf.parameter)));
+                const paramColors: Record<string, string> = {
+                  gridRows: '#06b6d4',
+                  gridColumns: '#0ea5e9',
+                  kaleidoscopeSegments: '#a855f7',
+                  kaleidoscopeRotation: '#c084fc',
+                  pipScale: '#3b82f6',
+                  pipPositionX: '#60a5fa',
+                  pipPositionY: '#93c5fd'
+                };
+                
+                return (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {uniqueParams.map(param => (
+                      <div key={param} className="flex items-center gap-1">
+                        <div 
+                          className="w-3 h-3 rounded"
+                          style={{ backgroundColor: paramColors[param] || '#fbbf24' }}
+                        />
+                        <span className="text-xs text-gray-400 capitalize">
+                          {param.replace(/([A-Z])/g, ' $1').trim()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Selected FX Clip Properties */}
