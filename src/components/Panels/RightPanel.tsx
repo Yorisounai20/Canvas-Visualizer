@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Section, AnimationType, PresetParameters } from '../../types';
+import { Section, AnimationType, PresetParameters, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from '../../types';
 
 interface RightPanelProps {
   selectedSection: Section | null;
+  selectedFXClip?: CameraFXClip | null;
+  cameraFXKeyframes?: CameraFXKeyframe[];
+  cameraFXAudioModulations?: CameraFXAudioModulation[];
+  currentTime?: number;
+  showFXOverlays?: boolean;
   animationTypes: AnimationType[];
   bassColor: string;
   midsColor: string;
@@ -38,9 +43,18 @@ interface RightPanelProps {
   onSetShowSongName: (show: boolean) => void;
   onSetCustomSongName: (name: string) => void;
   onSetManualMode: (mode: boolean) => void;
+  onSetShowFXOverlays?: (show: boolean) => void;
+  // Camera FX handlers
+  onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
+  onAddCameraFXKeyframe?: (clipId: string, time: number, parameter: string, value: number) => void;
+  onUpdateCameraFXKeyframe?: (id: string, updates: Partial<CameraFXKeyframe>) => void;
+  onDeleteCameraFXKeyframe?: (id: string) => void;
+  onAddCameraFXAudioModulation?: (clipId: string, parameter: string, audioTrack: 'bass' | 'mids' | 'highs', amount: number) => void;
+  onUpdateCameraFXAudioModulation?: (id: string, updates: Partial<CameraFXAudioModulation>) => void;
+  onDeleteCameraFXAudioModulation?: (id: string) => void;
 }
 
-type RightPanelTab = 'layer' | 'canvas';
+type RightPanelTab = 'layer' | 'canvas' | 'camerafx';
 
 /**
  * RightPanel Component - Properties/Effects panel (After Effects-style)
@@ -49,6 +63,11 @@ type RightPanelTab = 'layer' | 'canvas';
  */
 export default function RightPanel({
   selectedSection,
+  selectedFXClip,
+  cameraFXKeyframes,
+  cameraFXAudioModulations,
+  currentTime,
+  showFXOverlays,
   animationTypes,
   bassColor,
   midsColor,
@@ -83,7 +102,15 @@ export default function RightPanel({
   onSetShowBorder,
   onSetShowSongName,
   onSetCustomSongName,
-  onSetManualMode
+  onSetManualMode,
+  onSetShowFXOverlays,
+  onUpdateCameraFXClip,
+  onAddCameraFXKeyframe,
+  onUpdateCameraFXKeyframe,
+  onDeleteCameraFXKeyframe,
+  onAddCameraFXAudioModulation,
+  onUpdateCameraFXAudioModulation,
+  onDeleteCameraFXAudioModulation
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<RightPanelTab>('layer');
   const formatTime = (s: number) => 
@@ -124,6 +151,16 @@ export default function RightPanel({
           }`}
         >
           Canvas
+        </button>
+        <button
+          onClick={() => setActiveTab('camerafx')}
+          className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
+            activeTab === 'camerafx'
+              ? 'bg-gray-700 text-cyan-400 border-b-2 border-cyan-400'
+              : 'text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Camera FX
         </button>
       </div>
 
@@ -329,7 +366,7 @@ export default function RightPanel({
             Select a layer to view properties
           </div>
         )
-      ) : (
+      ) : activeTab === 'canvas' ? (
         /* Canvas Tab */
         <div className="p-4 space-y-4">
           {/* Background & Border */}
@@ -496,7 +533,333 @@ export default function RightPanel({
             </div>
           </div>
         </div>
-      )}
+      ) : activeTab === 'camerafx' ? (
+        /* Camera FX Tab */
+        <div className="p-4 space-y-4">
+          {/* FX Overlays Toggle */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showFXOverlays"
+                checked={showFXOverlays ?? true}
+                onChange={(e) => onSetShowFXOverlays?.(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="showFXOverlays" className="text-sm text-white cursor-pointer">
+                Show FX Overlays (Grid/Symmetry/Bounds)
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Visual guides for Camera FX editing (hidden during export)
+            </p>
+          </div>
+
+          {selectedFXClip ? (
+            <>
+              {/* FX Clip Info */}
+              <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                  FX Clip Properties
+                </h3>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={selectedFXClip.name}
+                      onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { name: e.target.value })}
+                      className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Type</label>
+                    <div className="text-sm text-white bg-gray-800 px-3 py-2 rounded border border-gray-600">
+                      {selectedFXClip.type === 'grid' && '🔲 Grid Tiling'}
+                      {selectedFXClip.type === 'kaleidoscope' && '🔮 Kaleidoscope'}
+                      {selectedFXClip.type === 'pip' && '📺 Picture-in-Picture'}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="fxEnabled"
+                      checked={selectedFXClip.enabled}
+                      onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { enabled: e.target.checked })}
+                      className="w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="fxEnabled" className="text-sm text-white cursor-pointer">
+                      Enabled
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid Tiling Parameters */}
+              {selectedFXClip.type === 'grid' && (
+                <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                    Grid Tiling
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Rows: {selectedFXClip.gridRows || 2}
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="8"
+                        value={selectedFXClip.gridRows || 2}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { gridRows: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Columns: {selectedFXClip.gridColumns || 2}
+                      </label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="8"
+                        value={selectedFXClip.gridColumns || 2}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { gridColumns: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (currentTime !== undefined) {
+                          onAddCameraFXKeyframe?.(selectedFXClip.id, currentTime, 'gridRows', selectedFXClip.gridRows || 2);
+                        }
+                      }}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                    >
+                      Add Rows Keyframe
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (currentTime !== undefined) {
+                          onAddCameraFXKeyframe?.(selectedFXClip.id, currentTime, 'gridColumns', selectedFXClip.gridColumns || 2);
+                        }
+                      }}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                    >
+                      Add Columns Keyframe
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Kaleidoscope Parameters */}
+              {selectedFXClip.type === 'kaleidoscope' && (
+                <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                    Kaleidoscope
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Segments: {selectedFXClip.kaleidoscopeSegments || 6}
+                      </label>
+                      <input
+                        type="range"
+                        min="2"
+                        max="12"
+                        value={selectedFXClip.kaleidoscopeSegments || 6}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { kaleidoscopeSegments: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Rotation: {selectedFXClip.kaleidoscopeRotation?.toFixed(1) || '0.0'}°
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        value={selectedFXClip.kaleidoscopeRotation || 0}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { kaleidoscopeRotation: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (currentTime !== undefined) {
+                          onAddCameraFXKeyframe?.(selectedFXClip.id, currentTime, 'kaleidoscopeSegments', selectedFXClip.kaleidoscopeSegments || 6);
+                        }
+                      }}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                    >
+                      Add Segments Keyframe
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        if (currentTime !== undefined) {
+                          onAddCameraFXKeyframe?.(selectedFXClip.id, currentTime, 'kaleidoscopeRotation', selectedFXClip.kaleidoscopeRotation || 0);
+                        }
+                      }}
+                      className="w-full bg-cyan-600 hover:bg-cyan-700 text-white text-xs py-2 px-3 rounded transition-colors"
+                    >
+                      Add Rotation Keyframe
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Picture-in-Picture Parameters */}
+              {selectedFXClip.type === 'pip' && (
+                <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                    Picture-in-Picture
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Scale: {(selectedFXClip.pipScale || 0.25).toFixed(2)}
+                      </label>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.9"
+                        step="0.05"
+                        value={selectedFXClip.pipScale || 0.25}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { pipScale: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Position X: {(selectedFXClip.pipPositionX || 0.65).toFixed(2)}
+                      </label>
+                      <input
+                        type="range"
+                        min="-1"
+                        max="1"
+                        step="0.05"
+                        value={selectedFXClip.pipPositionX || 0.65}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { pipPositionX: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Position Y: {(selectedFXClip.pipPositionY || 0.65).toFixed(2)}
+                      </label>
+                      <input
+                        type="range"
+                        min="-1"
+                        max="1"
+                        step="0.05"
+                        value={selectedFXClip.pipPositionY || 0.65}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { pipPositionY: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">
+                        Border Width: {selectedFXClip.pipBorderWidth || 2}px
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="10"
+                        value={selectedFXClip.pipBorderWidth || 2}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { pipBorderWidth: Number(e.target.value) })}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+                      <input
+                        type="color"
+                        value={selectedFXClip.pipBorderColor || '#ffffff'}
+                        onChange={(e) => onUpdateCameraFXClip?.(selectedFXClip.id, { pipBorderColor: e.target.value })}
+                        className="w-full h-10 bg-gray-800 rounded border border-gray-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Audio Modulation */}
+              <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase mb-3">
+                  Audio Reactivity
+                </h3>
+                
+                <div className="space-y-2">
+                  <p className="text-xs text-gray-500">
+                    Add audio modulation to parameters for dynamic effects
+                  </p>
+                  
+                  {cameraFXAudioModulations?.filter(mod => mod.clipId === selectedFXClip.id).map(mod => (
+                    <div key={mod.id} className="bg-gray-800 bg-opacity-50 rounded p-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-white">{mod.parameter}</span>
+                        <button
+                          onClick={() => onDeleteCameraFXAudioModulation?.(mod.id)}
+                          className="text-red-400 hover:text-red-300 text-xs"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Track</label>
+                        <select
+                          value={mod.audioTrack}
+                          onChange={(e) => onUpdateCameraFXAudioModulation?.(mod.id, { audioTrack: e.target.value as 'bass' | 'mids' | 'highs' })}
+                          className="w-full bg-gray-900 text-white text-xs px-2 py-1 rounded border border-gray-600"
+                        >
+                          <option value="bass">Bass</option>
+                          <option value="mids">Mids</option>
+                          <option value="highs">Highs</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">
+                          Amount: {mod.amount.toFixed(2)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={mod.amount}
+                          onChange={(e) => onUpdateCameraFXAudioModulation?.(mod.id, { amount: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="p-4 text-center text-gray-500 text-sm">
+              Select a Camera FX clip from the timeline to view properties
+            </div>
+          )}
+        </div>
+      ) : null}
       </div>
     </div>
   );
