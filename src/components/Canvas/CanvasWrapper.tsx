@@ -1,4 +1,6 @@
 import React, { useRef } from 'react';
+import CameraFXOverlay from './CameraFXOverlay';
+import { CameraFXClip } from '../../types';
 
 interface CanvasWrapperProps {
   containerRef: React.RefObject<HTMLDivElement>;
@@ -10,6 +12,8 @@ interface CanvasWrapperProps {
   maxLetterboxHeight: number;
   showFilename: boolean;
   audioFileName: string;
+  activeFXClips?: CameraFXClip[];
+  showFXOverlays?: boolean;
 }
 
 /**
@@ -25,7 +29,9 @@ export default function CanvasWrapper({
   activeLetterboxInvert,
   maxLetterboxHeight,
   showFilename,
-  audioFileName
+  audioFileName,
+  activeFXClips = [],
+  showFXOverlays = true
 }: CanvasWrapperProps) {
   // Calculate actual letterbox bar height
   const actualBarHeight = activeLetterboxInvert 
@@ -45,6 +51,14 @@ export default function CanvasWrapper({
             borderColor: showBorder ? borderColor : 'transparent',
             margin: '0 auto'
           }}
+        />
+
+        {/* Camera FX Overlay */}
+        <CameraFXOverlay
+          activeFXClips={activeFXClips}
+          showOverlays={showFXOverlays}
+          canvasWidth={960}
+          canvasHeight={540}
         />
 
         {/* Letterbox overlay */}

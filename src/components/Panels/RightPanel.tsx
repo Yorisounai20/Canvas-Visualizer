@@ -7,6 +7,7 @@ interface RightPanelProps {
   cameraFXKeyframes?: CameraFXKeyframe[];
   cameraFXAudioModulations?: CameraFXAudioModulation[];
   currentTime?: number;
+  showFXOverlays?: boolean;
   animationTypes: AnimationType[];
   bassColor: string;
   midsColor: string;
@@ -42,6 +43,7 @@ interface RightPanelProps {
   onSetShowSongName: (show: boolean) => void;
   onSetCustomSongName: (name: string) => void;
   onSetManualMode: (mode: boolean) => void;
+  onSetShowFXOverlays?: (show: boolean) => void;
   // Camera FX handlers
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onAddCameraFXKeyframe?: (clipId: string, time: number, parameter: string, value: number) => void;
@@ -65,6 +67,7 @@ export default function RightPanel({
   cameraFXKeyframes,
   cameraFXAudioModulations,
   currentTime,
+  showFXOverlays,
   animationTypes,
   bassColor,
   midsColor,
@@ -100,6 +103,7 @@ export default function RightPanel({
   onSetShowSongName,
   onSetCustomSongName,
   onSetManualMode,
+  onSetShowFXOverlays,
   onUpdateCameraFXClip,
   onAddCameraFXKeyframe,
   onUpdateCameraFXKeyframe,
@@ -532,6 +536,25 @@ export default function RightPanel({
       ) : activeTab === 'camerafx' ? (
         /* Camera FX Tab */
         <div className="p-4 space-y-4">
+          {/* FX Overlays Toggle */}
+          <div className="bg-gray-700 bg-opacity-50 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="showFXOverlays"
+                checked={showFXOverlays ?? true}
+                onChange={(e) => onSetShowFXOverlays?.(e.target.checked)}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <label htmlFor="showFXOverlays" className="text-sm text-white cursor-pointer">
+                Show FX Overlays (Grid/Symmetry/Bounds)
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Visual guides for Camera FX editing (hidden during export)
+            </p>
+          </div>
+
           {selectedFXClip ? (
             <>
               {/* FX Clip Info */}

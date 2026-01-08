@@ -3158,6 +3158,10 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
             maxLetterboxHeight={maxLetterboxHeight}
             showFilename={showFilename}
             audioFileName={audioFileName}
+            activeFXClips={cameraFXClips.filter(clip => 
+              clip.enabled && currentTime >= clip.startTime && currentTime < clip.endTime
+            )}
+            showFXOverlays={showFXOverlays && !isExporting}
           />
           
           {/* PHASE 3: Workspace Controls Overlay */}
@@ -3211,6 +3215,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               cameraFXKeyframes={cameraFXKeyframes}
               cameraFXAudioModulations={cameraFXAudioModulations}
               currentTime={currentTime}
+              showFXOverlays={showFXOverlays}
               animationTypes={ANIMATION_TYPES}
               bassColor={bassColor}
               midsColor={midsColor}
@@ -3246,6 +3251,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
               onSetShowSongName={setShowSongName}
               onSetCustomSongName={setCustomSongName}
               onSetManualMode={setManualMode}
+              onSetShowFXOverlays={setShowFXOverlays}
               onUpdateCameraFXClip={updateCameraFXClip}
               onAddCameraFXKeyframe={addCameraFXKeyframe}
               onUpdateCameraFXKeyframe={updateCameraFXKeyframe}
