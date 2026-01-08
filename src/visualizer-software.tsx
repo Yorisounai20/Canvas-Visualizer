@@ -5653,7 +5653,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       // Camera FX Rendering
-      const t = elapsed;
       const activeFXClips = cameraFXClips.filter(clip => 
         clip.enabled && t >= clip.startTime && t < clip.endTime
       );
