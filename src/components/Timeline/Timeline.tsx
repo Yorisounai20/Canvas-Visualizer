@@ -93,6 +93,15 @@ export default function Timeline({
     initialEnd: number;
   }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
 
+  // FX clip drag state
+  const [fxDragState, setFxDragState] = useState<{
+    type: 'move' | 'resize-start' | 'resize-end' | null;
+    clipId: string | null;
+    startX: number;
+    initialStart: number;
+    initialEnd: number;
+  }>({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
@@ -322,6 +331,66 @@ export default function Timeline({
       };
     }
   }, [dragState, sections, onUpdateSection]);
+
+  // Handle FX clip dragging
+  useEffect(() => {
+    if (!fxDragState.type || !fxDragState.clipId) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!timelineRef.current) return;
+      
+      const rect = timelineRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const deltaX = currentX - fxDragState.startX;
+      const deltaTime = (deltaX / rect.width) * duration;
+
+      const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
+      if (!clip) return;
+
+      let newStart = fxDragState.initialStart;
+      let newEnd = fxDragState.initialEnd;
+
+      if (fxDragState.type === 'move') {
+        newStart = Math.max(0, fxDragState.initialStart + deltaTime);
+        newEnd = Math.min(duration, fxDragState.initialEnd + deltaTime);
+        const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
+        
+        // Keep duration constant when moving
+        if (newStart + clipDuration > duration) {
+          newStart = duration - clipDuration;
+          newEnd = duration;
+        }
+      } else if (fxDragState.type === 'resize-start') {
+        newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
+      } else if (fxDragState.type === 'resize-end') {
+        newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
+      }
+
+      onUpdateCameraFXClip?.(fxDragState.clipId, {
+        startTime: parseFloat(newStart.toFixed(2)),
+        endTime: parseFloat(newEnd.toFixed(2))
+      });
+    };
+
+    const handleMouseUp = () => {
+      setFxDragState({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (fxDragState.type) {
+      document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [fxDragState, cameraFXClips, duration, onUpdateCameraFXClip]);
 
   // Handle scroll wheel for horizontal scrolling - CRITICAL FIX: Updated dependencies
   useEffect(() => {
@@ -903,7 +972,7 @@ export default function Timeline({
                   return (
                     <div
                       key={clip.id}
-                      className={`absolute top-1 bottom-1 rounded cursor-pointer transition-all ${
+                      className={`absolute top-1 bottom-1 rounded cursor-move transition-all ${
                         isSelected ? 'ring-2 ring-cyan-400' : ''
                       } ${
                         clip.type === 'grid' ? 'bg-cyan-600' :
@@ -915,8 +984,50 @@ export default function Timeline({
                         width: `${clipWidth}%`
                       }}
                       onClick={() => onSelectFXClip?.(clip.id)}
+                      onMouseDown={(e) => {
+                        if (!timelineRef.current) return;
+                        const rect = timelineRef.current.getBoundingClientRect();
+                        const relativeX = e.clientX - rect.left;
+                        const clipElement = e.currentTarget;
+                        const clipRect = clipElement.getBoundingClientRect();
+                        const clipRelativeX = e.clientX - clipRect.left;
+                        
+                        // Determine if clicking near edges for resize
+                        if (clipRelativeX < 8) {
+                          // Resize start
+                          setFxDragState({
+                            type: 'resize-start',
+                            clipId: clip.id,
+                            startX: relativeX,
+                            initialStart: clip.startTime,
+                            initialEnd: clip.endTime
+                          });
+                        } else if (clipRelativeX > clipRect.width - 8) {
+                          // Resize end
+                          setFxDragState({
+                            type: 'resize-end',
+                            clipId: clip.id,
+                            startX: relativeX,
+                            initialStart: clip.startTime,
+                            initialEnd: clip.endTime
+                          });
+                        } else {
+                          // Move
+                          setFxDragState({
+                            type: 'move',
+                            clipId: clip.id,
+                            startX: relativeX,
+                            initialStart: clip.startTime,
+                            initialEnd: clip.endTime
+                          });
+                        }
+                      }}
                     >
-                      <div className="px-2 py-1 text-xs text-white truncate">
+                      {/* Resize handles */}
+                      <div className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-20" />
+                      <div className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-20" />
+                      
+                      <div className="px-2 py-1 text-xs text-white truncate pointer-events-none">
                         {clip.type === 'grid' && '🔲'}
                         {clip.type === 'kaleidoscope' && '🔮'}
                         {clip.type === 'pip' && '📺'}
