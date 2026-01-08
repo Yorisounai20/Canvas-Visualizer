@@ -248,6 +248,47 @@ export interface WorkspaceObject {
   letterboxSize?: number; // 0-100 pixels
 }
 
+// Camera FX System - Keyframe-based camera tiling effects
+export type CameraFXType = 'grid' | 'kaleidoscope' | 'pip';
+
+export interface CameraFXClip {
+  id: string;
+  name: string;
+  type: CameraFXType;
+  startTime: number;
+  endTime: number;
+  enabled: boolean;
+  // Grid Tiling parameters
+  gridRows?: number;
+  gridColumns?: number;
+  // Kaleidoscope parameters
+  kaleidoscopeSegments?: number;
+  kaleidoscopeRotation?: number;
+  // Picture-in-Picture parameters
+  pipScale?: number;
+  pipPositionX?: number; // -1 to 1 (normalized screen space)
+  pipPositionY?: number; // -1 to 1 (normalized screen space)
+  pipBorderWidth?: number;
+  pipBorderColor?: string;
+}
+
+export interface CameraFXKeyframe {
+  id: string;
+  clipId: string;
+  time: number;
+  parameter: string; // e.g., 'gridRows', 'kaleidoscopeRotation', 'pipScale'
+  value: number;
+  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+}
+
+export interface CameraFXAudioModulation {
+  id: string;
+  clipId: string;
+  parameter: string;
+  audioTrack: 'bass' | 'mids' | 'highs';
+  amount: number; // Modulation strength (0-1)
+}
+
 export interface AppState {
   // Audio
   isPlaying: boolean;

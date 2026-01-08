@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 
@@ -17,6 +17,8 @@ interface TimelineProps {
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
   workspaceObjects?: WorkspaceObject[]; // For camera selection in camera keyframes
+  cameraFXClips?: CameraFXClip[];
+  selectedFXClipId?: string | null;
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onAddSection: () => void;
@@ -33,9 +35,13 @@ interface TimelineProps {
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
+  onSelectFXClip?: (id: string) => void;
+  onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
+  onDeleteCameraFXClip?: (id: string) => void;
+  onAddCameraFXClip?: (type: 'grid' | 'kaleidoscope' | 'pip', startTime: number) => void;
 }
 
-type TimelineTab = 'sections' | 'presets' | 'camera' | 'text' | 'environment';
+type TimelineTab = 'sections' | 'presets' | 'camera' | 'text' | 'environment' | 'camerafx';
 
 /**
  * Timeline Component - After Effects-style timeline with tabs
@@ -55,6 +61,8 @@ export default function Timeline({
   textKeyframes,
   environmentKeyframes,
   workspaceObjects = [],
+  cameraFXClips = [],
+  selectedFXClipId,
   onSelectSection,
   onUpdateSection,
   onAddSection,
@@ -70,7 +78,11 @@ export default function Timeline({
   onUpdatePresetKeyframe,
   onUpdateCameraKeyframe,
   onUpdateTextKeyframe,
-  onUpdateEnvironmentKeyframe
+  onUpdateEnvironmentKeyframe,
+  onSelectFXClip,
+  onUpdateCameraFXClip,
+  onDeleteCameraFXClip,
+  onAddCameraFXClip
 }: TimelineProps) {
   const [activeTab, setActiveTab] = useState<TimelineTab>('sections');
   const [dragState, setDragState] = useState<{
@@ -361,7 +373,8 @@ export default function Timeline({
             { id: 'presets' as TimelineTab, label: 'Presets', icon: '🎨' },
             { id: 'camera' as TimelineTab, label: 'Camera', icon: '📷' },
             { id: 'text' as TimelineTab, label: 'Text', icon: '📝' },
-            { id: 'environment' as TimelineTab, label: 'Environment', icon: '🌍' }
+            { id: 'environment' as TimelineTab, label: 'Environment', icon: '🌍' },
+            { id: 'camerafx' as TimelineTab, label: 'Camera FX', icon: '🎬' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -824,6 +837,125 @@ export default function Timeline({
               {environmentKeyframes.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
                   Click timeline to add environment keyframes
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Camera FX Tab */}
+        {activeTab === 'camerafx' && (
+          <>
+            {/* Camera FX Track */}
+            <div className="relative bg-gray-800 rounded border border-gray-700 p-4" style={{ minHeight: '120px' }}>
+              {/* Add FX Clip Buttons */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => onAddCameraFXClip?.('grid', currentTime)}
+                  className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors"
+                  title="Add Grid Tiling FX"
+                >
+                  🔲 Grid
+                </button>
+                <button
+                  onClick={() => onAddCameraFXClip?.('kaleidoscope', currentTime)}
+                  className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs rounded transition-colors"
+                  title="Add Kaleidoscope FX"
+                >
+                  🔮 Kaleidoscope
+                </button>
+                <button
+                  onClick={() => onAddCameraFXClip?.('pip', currentTime)}
+                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                  title="Add Picture-in-Picture FX"
+                >
+                  📺 PIP
+                </button>
+              </div>
+
+              {/* FX Clips Timeline */}
+              <div className="relative h-16 bg-gray-900 rounded border border-gray-700">
+                {/* Time ruler marks */}
+                {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => i).map(second => (
+                  <div
+                    key={second}
+                    className="absolute top-0 bottom-0 border-l border-gray-700"
+                    style={{ left: `${(second / duration) * 100}%` }}
+                  >
+                    <span className="absolute -top-4 -translate-x-1/2 text-[10px] text-gray-500">
+                      {second}s
+                    </span>
+                  </div>
+                ))}
+
+                {/* Playhead */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-10 pointer-events-none"
+                  style={{ left: `${(currentTime / duration) * 100}%` }}
+                />
+
+                {/* FX Clips */}
+                {cameraFXClips.map(clip => {
+                  const clipLeft = (clip.startTime / duration) * 100;
+                  const clipWidth = ((clip.endTime - clip.startTime) / duration) * 100;
+                  const isSelected = clip.id === selectedFXClipId;
+                  
+                  return (
+                    <div
+                      key={clip.id}
+                      className={`absolute top-1 bottom-1 rounded cursor-pointer transition-all ${
+                        isSelected ? 'ring-2 ring-cyan-400' : ''
+                      } ${
+                        clip.type === 'grid' ? 'bg-cyan-600' :
+                        clip.type === 'kaleidoscope' ? 'bg-purple-600' :
+                        'bg-blue-600'
+                      } hover:brightness-110 ${!clip.enabled ? 'opacity-50' : ''}`}
+                      style={{
+                        left: `${clipLeft}%`,
+                        width: `${clipWidth}%`
+                      }}
+                      onClick={() => onSelectFXClip?.(clip.id)}
+                    >
+                      <div className="px-2 py-1 text-xs text-white truncate">
+                        {clip.type === 'grid' && '🔲'}
+                        {clip.type === 'kaleidoscope' && '🔮'}
+                        {clip.type === 'pip' && '📺'}
+                        {' '}{clip.name}
+                      </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteCameraFXClip?.(clip.id);
+                        }}
+                        className="absolute top-0 right-0 p-1 bg-red-600 hover:bg-red-700 rounded-tr text-white opacity-0 hover:opacity-100 transition-opacity"
+                        title="Delete FX Clip"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {cameraFXClips.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm pointer-events-none">
+                    Click buttons above to add Camera FX clips
+                  </div>
+                )}
+              </div>
+
+              {/* Selected FX Clip Info */}
+              {selectedFXClipId && cameraFXClips.find(c => c.id === selectedFXClipId) && (
+                <div className="mt-4 p-3 bg-gray-700 rounded text-xs text-gray-300">
+                  <div className="font-semibold mb-1">
+                    {cameraFXClips.find(c => c.id === selectedFXClipId)?.name}
+                  </div>
+                  <div className="flex gap-4">
+                    <span>Start: {cameraFXClips.find(c => c.id === selectedFXClipId)?.startTime.toFixed(2)}s</span>
+                    <span>End: {cameraFXClips.find(c => c.id === selectedFXClipId)?.endTime.toFixed(2)}s</span>
+                    <span>Duration: {(cameraFXClips.find(c => c.id === selectedFXClipId)!.endTime - cameraFXClips.find(c => c.id === selectedFXClipId)!.startTime).toFixed(2)}s</span>
+                  </div>
                 </div>
               )}
             </div>

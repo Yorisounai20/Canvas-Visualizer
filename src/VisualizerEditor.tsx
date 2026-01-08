@@ -15,7 +15,7 @@ import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
 import KeyboardShortcutsModal from './components/Modals/KeyboardShortcutsModal'; // PHASE 5
 import ProjectsModal from './components/Modals/ProjectsModal'; // Save/Load functionality
-import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, EnvironmentKeyframe, ProjectSettings, WorkspaceObject, PresetParameters } from './types';
+import { Section, CameraKeyframe, LetterboxKeyframe, CameraShake, LogEntry, AnimationType, PresetKeyframe, TextKeyframe, EnvironmentKeyframe, ProjectSettings, WorkspaceObject, PresetParameters, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
 import { saveProject, loadProject, isDatabaseAvailable, initializeDatabase } from './lib/database';
 import { serializeProjectState, deserializeProjectState } from './lib/projectState';
 
@@ -328,6 +328,13 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
   const [showWorkspaceGrid, setShowWorkspaceGrid] = useState(true);
   const [showWorkspaceAxes, setShowWorkspaceAxes] = useState(true);
   const [workspaceMode, setWorkspaceMode] = useState(false); // Toggle between animation and workspace mode
+
+  // Camera FX state
+  const [cameraFXClips, setCameraFXClips] = useState<CameraFXClip[]>([]);
+  const [selectedFXClipId, setSelectedFXClipId] = useState<string | null>(null);
+  const [cameraFXKeyframes, setCameraFXKeyframes] = useState<CameraFXKeyframe[]>([]);
+  const [cameraFXAudioModulations, setCameraFXAudioModulations] = useState<CameraFXAudioModulation[]>([]);
+  const [showFXOverlays, setShowFXOverlays] = useState(true);
 
   // PHASE 2: Log project initialization
   useEffect(() => {
@@ -682,6 +689,89 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       kf.id === id ? { ...kf, type: type as any, intensity, color } : kf
     ));
     addLog('Updated environment keyframe', 'success');
+  };
+
+  // Camera FX handlers
+  const addCameraFXClip = (type: 'grid' | 'kaleidoscope' | 'pip', startTime: number) => {
+    const newClip: CameraFXClip = {
+      id: `fx-${Date.now()}`,
+      name: `${type} FX`,
+      type,
+      startTime: parseFloat(startTime.toFixed(2)),
+      endTime: parseFloat((startTime + 5).toFixed(2)),
+      enabled: true,
+      // Default parameters based on type
+      ...(type === 'grid' && { gridRows: 2, gridColumns: 2 }),
+      ...(type === 'kaleidoscope' && { kaleidoscopeSegments: 6, kaleidoscopeRotation: 0 }),
+      ...(type === 'pip' && { pipScale: 0.25, pipPositionX: 0.65, pipPositionY: 0.65, pipBorderWidth: 2, pipBorderColor: '#ffffff' })
+    };
+    setCameraFXClips([...cameraFXClips, newClip].sort((a, b) => a.startTime - b.startTime));
+    setSelectedFXClipId(newClip.id);
+    addLog(`Added ${type} FX clip at ${formatTime(startTime)}`, 'success');
+  };
+
+  const updateCameraFXClip = (id: string, updates: Partial<CameraFXClip>) => {
+    setCameraFXClips(cameraFXClips.map(clip => 
+      clip.id === id ? { ...clip, ...updates } : clip
+    ));
+    addLog('Updated Camera FX clip', 'success');
+  };
+
+  const deleteCameraFXClip = (id: string) => {
+    setCameraFXClips(cameraFXClips.filter(clip => clip.id !== id));
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.clipId !== id));
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.clipId !== id));
+    if (selectedFXClipId === id) setSelectedFXClipId(null);
+    addLog('Deleted Camera FX clip', 'info');
+  };
+
+  const addCameraFXKeyframe = (clipId: string, time: number, parameter: string, value: number) => {
+    const newKeyframe: CameraFXKeyframe = {
+      id: `kf-${Date.now()}`,
+      clipId,
+      time: parseFloat(time.toFixed(2)),
+      parameter,
+      value,
+      easing: 'linear'
+    };
+    setCameraFXKeyframes([...cameraFXKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added keyframe for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXKeyframe = (id: string, updates: Partial<CameraFXKeyframe>) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf => 
+      kf.id === id ? { ...kf, ...updates } : kf
+    ));
+    addLog('Updated Camera FX keyframe', 'success');
+  };
+
+  const deleteCameraFXKeyframe = (id: string) => {
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted Camera FX keyframe', 'info');
+  };
+
+  const addCameraFXAudioModulation = (clipId: string, parameter: string, audioTrack: 'bass' | 'mids' | 'highs', amount: number) => {
+    const newModulation: CameraFXAudioModulation = {
+      id: `mod-${Date.now()}`,
+      clipId,
+      parameter,
+      audioTrack,
+      amount
+    };
+    setCameraFXAudioModulations([...cameraFXAudioModulations, newModulation]);
+    addLog(`Added audio modulation for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXAudioModulation = (id: string, updates: Partial<CameraFXAudioModulation>) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.map(mod => 
+      mod.id === id ? { ...mod, ...updates } : mod
+    ));
+    addLog('Updated audio modulation', 'success');
+  };
+
+  const deleteCameraFXAudioModulation = (id: string) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.id !== id));
+    addLog('Deleted audio modulation', 'info');
   };
 
   const formatTime = (s: number) => 
