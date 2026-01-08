@@ -366,7 +366,7 @@ export default function RightPanel({
             Select a layer to view properties
           </div>
         )
-      ) : (
+      ) : activeTab === 'canvas' ? (
         /* Canvas Tab */
         <div className="p-4 space-y-4">
           {/* Background & Border */}
