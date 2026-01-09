@@ -2128,9 +2128,56 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
     };
 
+    // Shape requirements for each preset type
+    // These define the MINIMUM number of shapes needed for each preset to render correctly
+    // Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
+    const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number }> = {
+      orbit: { cubes: 8, octas: 30, tetras: 30 },          // 8 planets, limited octas/tetras for performance
+      explosion: { cubes: 8, octas: 30, tetras: 30 },      // Performance-limited, visually sufficient
+      tunnel: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+      wave: { cubes: 8, octas: 30, tetras: 30 },           // 30 octas for wave segments, limited cubes/tetras
+      spiral: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+      chill: { cubes: 100, octas: 100, tetras: 100 },      // All shapes actively used
+      pulse: { cubes: 16, octas: 16, tetras: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
+      vortex: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+      seiryu: { cubes: 40, octas: 50, tetras: 46 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
+      hammerhead: { cubes: 8, octas: 5, tetras: 4 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
+      empty: { cubes: 0, octas: 0, tetras: 0 }             // No shapes needed for empty preset
+    };
+
+    // Calculate maximum shapes needed across all preset keyframes
+    const calculateRequiredShapes = (): { cubes: number; octas: number; tetras: number } => {
+      let maxCubes = 0;
+      let maxOctas = 0;
+      let maxTetras = 0;
+      
+      presetKeyframes.forEach(kf => {
+        const req = PRESET_SHAPE_REQUIREMENTS[kf.preset] || { cubes: 100, octas: 100, tetras: 100 };
+        maxCubes = Math.max(maxCubes, req.cubes);
+        maxOctas = Math.max(maxOctas, req.octas);
+        maxTetras = Math.max(maxTetras, req.tetras);
+      });
+      
+      // Add 15 extra octas for environment system
+      maxOctas += 15;
+      
+      // Ensure at least 8/30/30 for default preset if no keyframes
+      if (presetKeyframes.length === 0) {
+        maxCubes = Math.max(maxCubes, 8);
+        maxOctas = Math.max(maxOctas, 30 + 15);
+        maxTetras = Math.max(maxTetras, 30);
+      }
+      
+      return { cubes: maxCubes, octas: maxOctas, tetras: maxTetras };
+    };
+
+    // Calculate required shapes based on preset keyframes
+    const requiredShapes = calculateRequiredShapes();
+    addLog(`Optimized shape allocation: ${requiredShapes.cubes} cubes, ${requiredShapes.octas} octas, ${requiredShapes.tetras} tetras`, 'info');
+
     const cubes: THREE.Mesh[] = [];
-    // Create 100 cubes - no shape limits for maximum preset flexibility
-    for (let i=0; i<100; i++) {
+    // Create only the required number of cubes based on preset needs
+    for (let i=0; i<requiredShapes.cubes; i++) {
       const cubeMaterial = createMaterial(
         cubeMaterialType,
         cubeColor,
@@ -2140,7 +2187,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         cubeRoughness
       );
       const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), cubeMaterial);
-      const a = (i/100)*Math.PI*2;
+      const a = (i/requiredShapes.cubes)*Math.PI*2;
       c.position.x = Math.cos(a)*8;
       c.position.z = Math.sin(a)*8;
       scene.add(c);
@@ -2148,8 +2195,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     const octas: THREE.Mesh[] = [];
-    // Create 100 octahedrons - no shape limits for maximum preset flexibility
-    for (let i=0; i<100; i++) {
+    // Create only the required number of octahedrons (includes 15 for environment system)
+    for (let i=0; i<requiredShapes.octas; i++) {
       const octaMaterial = createMaterial(
         octahedronMaterialType,
         octahedronColor,
@@ -2159,36 +2206,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         octahedronRoughness
       );
       const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
-      const a = (i/100)*Math.PI*2;
-      const rad = 5 + (i % 3) * 2;
-      o.position.x = Math.cos(a)*rad;
-      o.position.y = Math.sin(a)*rad;
-      o.position.z = -(i % 5)*2;
+      
+      // Environment octas start at index (requiredShapes.octas - 15)
+      const isEnvOcta = i >= (requiredShapes.octas - 15);
+      if (isEnvOcta) {
+        o.position.set(0, -1000, 0); // Start off-screen for environment
+        o.scale.set(0.001, 0.001, 0.001);
+      } else {
+        const a = (i / Math.max(requiredShapes.octas - 15, 1))*Math.PI*2;
+        const rad = 5 + (i % 3) * 2;
+        o.position.x = Math.cos(a)*rad;
+        o.position.y = Math.sin(a)*rad;
+        o.position.z = -(i % 5)*2;
+      }
       scene.add(o);
       octas.push(o);
     }
-    
-    // Add 15 additional octahedrons for Environment System (indices 100-114)
-    for (let i = 0; i < 15; i++) {
-      const envOctaMaterial = createMaterial(
-        octahedronMaterialType,
-        octahedronColor,
-        octahedronWireframe,
-        octahedronOpacity,
-        octahedronMetalness,
-        octahedronRoughness
-      );
-      const envOcta = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), envOctaMaterial);
-      // Position off-screen initially (will be positioned by environment system)
-      envOcta.position.set(0, -1000, 0);
-      envOcta.scale.set(0.001, 0.001, 0.001);
-      scene.add(envOcta);
-      octas.push(envOcta);
-    }
 
     const tetras: THREE.Mesh[] = [];
-    // Create 100 tetrahedrons - no shape limits for maximum preset flexibility
-    for (let i=0; i<100; i++) {
+    // Create only the required number of tetrahedrons
+    for (let i=0; i<requiredShapes.tetras; i++) {
       const tetraMaterial = createMaterial(
         tetrahedronMaterialType,
         tetrahedronColor,

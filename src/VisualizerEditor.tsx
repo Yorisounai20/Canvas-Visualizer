@@ -52,6 +52,41 @@ function getDefaultParameters(presetType: string): PresetParameters {
   return DEFAULT_PRESET_PARAMETERS[presetType] || DEFAULT_PRESET_PARAMETERS.orbit;
 }
 
+// Shape requirements for each preset type
+// These define the MINIMUM number of shapes needed for each preset to render correctly
+// Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
+const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number }> = {
+  orbit: { cubes: 8, octas: 30, tetras: 30 },          // 8 planets, limited octas/tetras for performance
+  explosion: { cubes: 8, octas: 30, tetras: 30 },      // Performance-limited, visually sufficient
+  tunnel: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+  wave: { cubes: 8, octas: 30, tetras: 30 },           // 30 octas for wave segments, limited cubes/tetras
+  spiral: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+  chill: { cubes: 100, octas: 100, tetras: 100 },      // All shapes actively used
+  pulse: { cubes: 16, octas: 16, tetras: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
+  vortex: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+  seiryu: { cubes: 40, octas: 50, tetras: 46 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
+  hammerhead: { cubes: 8, octas: 5, tetras: 4 }        // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
+};
+
+// Calculate maximum shapes needed across all sections
+function calculateRequiredShapes(sections: Section[]): { cubes: number; octas: number; tetras: number } {
+  let maxCubes = 0;
+  let maxOctas = 0;
+  let maxTetras = 0;
+  
+  sections.forEach(section => {
+    const req = PRESET_SHAPE_REQUIREMENTS[section.animation] || { cubes: 100, octas: 100, tetras: 100 };
+    maxCubes = Math.max(maxCubes, req.cubes);
+    maxOctas = Math.max(maxOctas, req.octas);
+    maxTetras = Math.max(maxTetras, req.tetras);
+  });
+  
+  // Add 15 extra octas for environment system
+  maxOctas += 15;
+  
+  return { cubes: maxCubes, octas: maxOctas, tetras: maxTetras };
+}
+
 // NEW REQUIREMENT: Helper function to create workspace objects from a preset
 // This makes presets actually CREATE their geometry as editable workspace objects
 function createPresetObjects(presetType: string, params: PresetParameters): WorkspaceObject[] {
@@ -2805,15 +2840,20 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
       return;
     }
 
-    // PHASE 1: Create 3D objects (geometry created once, animated by render loop)
+    // PHASE 1: Create 3D objects (geometry created dynamically based on preset needs)
+    // Calculate required shapes based on all sections in timeline
+    const requiredShapes = calculateRequiredShapes(sections);
+    addLog(`Optimized shape allocation based on timeline presets:`, 'info');
+    addLog(`  Cubes: ${requiredShapes.cubes}, Octas: ${requiredShapes.octas}, Tetras: ${requiredShapes.tetras}`, 'info');
+    
     const cubes: THREE.Mesh[] = [];
-    // Create 100 cubes - no shape limits for maximum preset flexibility
-    for (let i = 0; i < 100; i++) {
+    // Create only the required number of cubes for current timeline presets
+    for (let i = 0; i < requiredShapes.cubes; i++) {
       const c = new THREE.Mesh(
         new THREE.BoxGeometry(1, 1, 1),
         new THREE.MeshBasicMaterial({ color: 0x8a2be2, wireframe: true, transparent: true, opacity: 0.6 })
       );
-      const a = (i / 100) * Math.PI * 2;
+      const a = (i / Math.max(requiredShapes.cubes, 1)) * Math.PI * 2;
       c.position.x = Math.cos(a) * 8;
       c.position.z = Math.sin(a) * 8;
       scene.add(c);
@@ -2821,37 +2861,32 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
     }
 
     const octas: THREE.Mesh[] = [];
-    // Create 100 octahedrons - no shape limits for maximum preset flexibility
-    for (let i = 0; i < 100; i++) {
+    // Create only the required number of octahedrons (includes 15 for environment system)
+    for (let i = 0; i < requiredShapes.octas; i++) {
       const o = new THREE.Mesh(
         new THREE.OctahedronGeometry(0.5),
         new THREE.MeshBasicMaterial({ color: 0x40e0d0, wireframe: true, transparent: true, opacity: 0.5 })
       );
-      const a = (i / 100) * Math.PI * 2;
-      const rad = 5 + (i % 3) * 2;
-      o.position.x = Math.cos(a) * rad;
-      o.position.y = Math.sin(a) * rad;
-      o.position.z = -(i % 5) * 2;
+      
+      // Environment octas start at index (requiredShapes.octas - 15)
+      const isEnvOcta = i >= (requiredShapes.octas - 15);
+      if (isEnvOcta) {
+        o.position.set(0, -1000, 0); // Start off-screen for environment
+        o.scale.set(0.001, 0.001, 0.001);
+      } else {
+        const a = (i / Math.max(requiredShapes.octas - 15, 1)) * Math.PI * 2;
+        const rad = 5 + (i % 3) * 2;
+        o.position.x = Math.cos(a) * rad;
+        o.position.y = Math.sin(a) * rad;
+        o.position.z = -(i % 5) * 2;
+      }
       scene.add(o);
       octas.push(o);
     }
-    
-    // Add 15 additional octahedrons for Environment System (indices 100-114)
-    // Positioned off-screen initially, they will be positioned by the environment rendering code
-    for (let i = 0; i < 15; i++) {
-      const envOcta = new THREE.Mesh(
-        new THREE.OctahedronGeometry(0.5),
-        new THREE.MeshBasicMaterial({ color: 0x40e0d0, wireframe: true, transparent: true, opacity: 0.5 })
-      );
-      envOcta.position.set(0, -1000, 0); // Start off-screen
-      envOcta.scale.set(0.001, 0.001, 0.001);
-      scene.add(envOcta);
-      octas.push(envOcta);
-    }
 
     const tetras: THREE.Mesh[] = [];
-    // Create 100 tetrahedrons - no shape limits for maximum preset flexibility
-    for (let i = 0; i < 100; i++) {
+    // Create only the required number of tetrahedrons
+    for (let i = 0; i < requiredShapes.tetras; i++) {
       const t = new THREE.Mesh(
         new THREE.TetrahedronGeometry(0.3),
         new THREE.MeshBasicMaterial({ color: 0xc8b4ff, transparent: true, opacity: 0.7 })
