@@ -54,15 +54,16 @@ function getDefaultParameters(presetType: string): PresetParameters {
 
 // Shape requirements for each preset type
 // These define the MINIMUM number of shapes needed for each preset to render correctly
+// Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
 const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number }> = {
-  orbit: { cubes: 8, octas: 76, tetras: 100 },         // Up to 8 planets, 24 moons + 52 rogues (76 total octas), all tetras for asteroid belt
-  explosion: { cubes: 100, octas: 100, tetras: 100 },  // All shapes actively used
-  tunnel: { cubes: 100, octas: 100, tetras: 100 },     // All shapes actively used  
-  wave: { cubes: 100, octas: 30, tetras: 0 },          // All cubes for vectorscope, 30 octas for wave, no tetras
-  spiral: { cubes: 100, octas: 100, tetras: 0 },       // All cubes and octas, no tetras mentioned
+  orbit: { cubes: 8, octas: 30, tetras: 30 },          // 8 planets, limited octas/tetras for performance
+  explosion: { cubes: 8, octas: 30, tetras: 30 },      // Performance-limited, visually sufficient
+  tunnel: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
+  wave: { cubes: 8, octas: 30, tetras: 30 },           // 30 octas for wave segments, limited cubes/tetras
+  spiral: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
   chill: { cubes: 100, octas: 100, tetras: 100 },      // All shapes actively used
   pulse: { cubes: 16, octas: 16, tetras: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
-  vortex: { cubes: 100, octas: 100, tetras: 0 },       // All cubes and octas, no tetras mentioned
+  vortex: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
   seiryu: { cubes: 40, octas: 50, tetras: 46 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
   hammerhead: { cubes: 8, octas: 5, tetras: 4 }        // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
 };
