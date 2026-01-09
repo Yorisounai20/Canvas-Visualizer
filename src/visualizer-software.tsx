@@ -65,6 +65,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     cubes: THREE.Mesh[];
     octas: THREE.Mesh[];
     tetras: THREE.Mesh[];
+    toruses: THREE.Mesh[];
+    planes: THREE.Mesh[];
     sphere: THREE.Mesh;
   } | null>(null);
   
@@ -2131,31 +2133,36 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     // Shape requirements for each preset type
     // These define the MINIMUM number of shapes needed for each preset to render correctly
     // Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
-    const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number }> = {
-      orbit: { cubes: 8, octas: 30, tetras: 30 },          // 8 planets, limited octas/tetras for performance
-      explosion: { cubes: 8, octas: 30, tetras: 30 },      // Performance-limited, visually sufficient
-      tunnel: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
-      wave: { cubes: 8, octas: 30, tetras: 30 },           // 30 octas for wave segments, limited cubes/tetras
-      spiral: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
-      chill: { cubes: 100, octas: 100, tetras: 100 },      // All shapes actively used
-      pulse: { cubes: 16, octas: 16, tetras: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
-      vortex: { cubes: 8, octas: 30, tetras: 30 },         // Performance-limited, visually sufficient
-      seiryu: { cubes: 40, octas: 50, tetras: 46 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
-      hammerhead: { cubes: 8, octas: 5, tetras: 4 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
-      empty: { cubes: 0, octas: 0, tetras: 0 }             // No shapes needed for empty preset
+    const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number; toruses: number; planes: number }> = {
+      orbit: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },          // 8 planets, limited octas/tetras for performance
+      explosion: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },      // Performance-limited, visually sufficient
+      tunnel: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+      wave: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },           // 30 octas for wave segments, limited cubes/tetras
+      spiral: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+      chill: { cubes: 100, octas: 100, tetras: 100, toruses: 0, planes: 0 },      // All shapes actively used
+      pulse: { cubes: 16, octas: 16, tetras: 0, toruses: 0, planes: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
+      vortex: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+      seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
+      hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
+      cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
+      empty: { cubes: 0, octas: 0, tetras: 0, toruses: 0, planes: 0 }             // No shapes needed for empty preset
     };
 
     // Calculate maximum shapes needed across all preset keyframes
-    const calculateRequiredShapes = (): { cubes: number; octas: number; tetras: number } => {
+    const calculateRequiredShapes = (): { cubes: number; octas: number; tetras: number; toruses: number; planes: number } => {
       let maxCubes = 0;
       let maxOctas = 0;
       let maxTetras = 0;
+      let maxToruses = 0;
+      let maxPlanes = 0;
       
       presetKeyframes.forEach(kf => {
-        const req = PRESET_SHAPE_REQUIREMENTS[kf.preset] || { cubes: 100, octas: 100, tetras: 100 };
+        const req = PRESET_SHAPE_REQUIREMENTS[kf.preset] || { cubes: 100, octas: 100, tetras: 100, toruses: 0, planes: 0 };
         maxCubes = Math.max(maxCubes, req.cubes);
         maxOctas = Math.max(maxOctas, req.octas);
         maxTetras = Math.max(maxTetras, req.tetras);
+        maxToruses = Math.max(maxToruses, req.toruses);
+        maxPlanes = Math.max(maxPlanes, req.planes);
       });
       
       // Add 15 extra octas for environment system
@@ -2168,12 +2175,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         maxTetras = Math.max(maxTetras, 30);
       }
       
-      return { cubes: maxCubes, octas: maxOctas, tetras: maxTetras };
+      return { cubes: maxCubes, octas: maxOctas, tetras: maxTetras, toruses: maxToruses, planes: maxPlanes };
     };
 
     // Calculate required shapes based on preset keyframes
     const requiredShapes = calculateRequiredShapes();
-    addLog(`Optimized shape allocation: ${requiredShapes.cubes} cubes, ${requiredShapes.octas} octas, ${requiredShapes.tetras} tetras`, 'info');
+    addLog(`Optimized shape allocation: ${requiredShapes.cubes} cubes, ${requiredShapes.octas} octas, ${requiredShapes.tetras} tetras, ${requiredShapes.toruses} toruses, ${requiredShapes.planes} planes`, 'info');
 
     const cubes: THREE.Mesh[] = [];
     // Create only the required number of cubes based on preset needs
@@ -2238,6 +2245,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       t.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
       scene.add(t);
       tetras.push(t);
+    }
+
+    const toruses: THREE.Mesh[] = [];
+    // Create only the required number of toruses
+    for (let i=0; i<requiredShapes.toruses; i++) {
+      const torusMaterial = createMaterial(
+        cubeMaterialType,
+        cubeColor,
+        cubeWireframe,
+        cubeOpacity,
+        cubeMetalness,
+        cubeRoughness
+      );
+      const torus = new THREE.Mesh(new THREE.TorusGeometry(1, 0.4, 16, 100), torusMaterial);
+      const a = (i / Math.max(requiredShapes.toruses, 1))*Math.PI*2;
+      torus.position.x = Math.cos(a)*10;
+      torus.position.z = Math.sin(a)*10;
+      scene.add(torus);
+      toruses.push(torus);
+    }
+
+    const planes: THREE.Mesh[] = [];
+    // Create only the required number of planes
+    for (let i=0; i<requiredShapes.planes; i++) {
+      const planeMaterial = createMaterial(
+        octahedronMaterialType,
+        octahedronColor,
+        octahedronWireframe,
+        octahedronOpacity,
+        octahedronMetalness,
+        octahedronRoughness
+      );
+      planeMaterial.side = THREE.DoubleSide;
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), planeMaterial);
+      plane.position.set((Math.random()-0.5)*15, (Math.random()-0.5)*15, (Math.random()-0.5)*15);
+      scene.add(plane);
+      planes.push(plane);
     }
 
     const sphereMaterial = createMaterial(
@@ -2323,8 +2367,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     orbitControls.enabled = !isPlaying; // Disable when playing (keyframes/auto-rotate take over)
     orbitControlsRef.current = orbitControls;
     
-    objectsRef.current = { cubes, octas, tetras, sphere };
-    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras`, 'info');
+    objectsRef.current = { cubes, octas, tetras, toruses, planes, sphere };
+    addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras, ${toruses.length} toruses, ${planes.length} planes`, 'info');
 
     return () => {
       // Cleanup on unmount only
@@ -5006,6 +5050,168 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
+      } else if (type === 'cosmic') {
+        // Cosmic Rings - Orbital toruses with solar panel planes creating a space station aesthetic
+        // GEOMETRY ALLOCATION:
+        // Cubes 0-7: Planet cores orbiting in a spherical formation
+        // Toruses 0-19: Orbital rings rotating around planets and central axis
+        // Planes 0-9: Solar panels rotating and tilting
+        // Octas 0-29: Distant stars twinkling
+        // Tetras 0-29: Energy particles zipping around
+        
+        const cosmicTime = elScaled * 0.8;
+        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
+        
+        // Camera orbits around the cosmic structure
+        const camAngle = rotationSpeed + activeCameraRotation;
+        cam.position.set(
+          Math.sin(camAngle) * activeCameraDistance * 1.2 + shakeX,
+          5 + activeCameraHeight + Math.sin(cosmicTime * 0.3) * 2 + shakeY,
+          Math.cos(camAngle) * activeCameraDistance * 1.2 + shakeZ
+        );
+        cam.lookAt(0, 0, 0);
+        
+        // === PLANET CORES ===
+        // 8 cubes arranged in a spherical pattern, pulsing with bass
+        obj.cubes.forEach((cube, i) => {
+          const orbitAngle = (i / 8) * Math.PI * 2 + cosmicTime * 0.3;
+          const orbitRadius = 12 + Math.sin(cosmicTime + i) * 2;
+          const elevation = Math.sin((i / 8) * Math.PI * 2 + cosmicTime * 0.2) * 8;
+          
+          cube.position.x = Math.cos(orbitAngle) * orbitRadius;
+          cube.position.y = elevation;
+          cube.position.z = Math.sin(orbitAngle) * orbitRadius;
+          
+          const scale = (1.2 + f.bass * 0.5) * blend;
+          cube.scale.set(scale, scale, scale);
+          cube.rotation.x = cosmicTime + i;
+          cube.rotation.y = cosmicTime * 0.7 + i * 0.5;
+          
+          cube.material.color.setStyle(cubeColor);
+          cube.material.opacity = (0.6 + f.bass * 0.3) * blend;
+        });
+        
+        // === ORBITAL RINGS (TORUSES) ===
+        // 20 toruses creating orbital paths and ring systems
+        obj.toruses.forEach((torus, i) => {
+          if (i < 8) {
+            // First 8: rings orbit around each planet
+            const planetIndex = i;
+            const planetAngle = (planetIndex / 8) * Math.PI * 2 + cosmicTime * 0.3;
+            const orbitRadius = 12 + Math.sin(cosmicTime + planetIndex) * 2;
+            const elevation = Math.sin((planetIndex / 8) * Math.PI * 2 + cosmicTime * 0.2) * 8;
+            
+            const ringOrbitAngle = cosmicTime * 2 + i * Math.PI / 4;
+            const ringRadius = 2.5;
+            
+            torus.position.x = Math.cos(planetAngle) * orbitRadius + Math.cos(ringOrbitAngle) * ringRadius;
+            torus.position.y = elevation + Math.sin(ringOrbitAngle) * ringRadius;
+            torus.position.z = Math.sin(planetAngle) * orbitRadius;
+            
+            torus.rotation.x = cosmicTime * 1.5 + i;
+            torus.rotation.y = cosmicTime + i * 0.3;
+            
+            const scale = (0.6 + f.mids * 0.3) * blend;
+            torus.scale.set(scale, scale, scale);
+            
+            torus.material.color.setStyle(cubeColor);
+            torus.material.opacity = (0.5 + f.mids * 0.4) * blend;
+          } else {
+            // Remaining 12: large rings rotating around central axis
+            const ringAngle = (i - 8) / 12 * Math.PI * 2 + cosmicTime * 0.5;
+            const radius = 18 + (i % 3) * 4;
+            
+            torus.position.x = Math.cos(ringAngle) * radius;
+            torus.position.y = Math.sin(ringAngle * 2 + cosmicTime) * 3;
+            torus.position.z = Math.sin(ringAngle) * radius;
+            
+            torus.rotation.x = cosmicTime * 0.5 + i;
+            torus.rotation.z = ringAngle;
+            
+            const scale = (1.5 + f.bass * 0.4) * blend;
+            torus.scale.set(scale, scale, scale);
+            
+            torus.material.color.setStyle(octahedronColor);
+            torus.material.opacity = (0.4 + f.bass * 0.3) * blend;
+          }
+        });
+        
+        // === SOLAR PANELS (PLANES) ===
+        // 10 planes acting as solar panels, rotating and catching light
+        obj.planes.forEach((plane, i) => {
+          const panelAngle = (i / 10) * Math.PI * 2 + cosmicTime * 0.4;
+          const radius = 20 + (i % 2) * 5;
+          
+          plane.position.x = Math.cos(panelAngle) * radius;
+          plane.position.y = Math.sin(cosmicTime + i * 0.5) * 6;
+          plane.position.z = Math.sin(panelAngle) * radius;
+          
+          // Panels slowly rotate and tilt
+          plane.rotation.x = cosmicTime * 0.3 + i;
+          plane.rotation.y = panelAngle;
+          plane.rotation.z = Math.sin(cosmicTime + i) * 0.3;
+          
+          const scale = (1.2 + f.highs * 0.5) * blend;
+          plane.scale.set(scale, scale, 1);
+          
+          plane.material.color.setStyle(tetrahedronColor);
+          plane.material.opacity = (0.6 + f.mids * 0.3) * blend;
+        });
+        
+        // === STARS (OCTAHEDRONS) ===
+        // 30 octas as distant twinkling stars
+        obj.octas.forEach((octa, i) => {
+          if (i >= 30) return; // Skip environment octas
+          
+          const angle = (i / 30) * Math.PI * 2;
+          const radius = 30 + (i % 5) * 8;
+          const yPos = (i % 7 - 3) * 10;
+          
+          octa.position.x = Math.cos(angle + cosmicTime * 0.1) * radius;
+          octa.position.y = yPos + Math.sin(cosmicTime + i) * 2;
+          octa.position.z = Math.sin(angle + cosmicTime * 0.1) * radius;
+          
+          const twinkle = 0.3 + Math.sin(cosmicTime * 3 + i) * 0.2 + f.highs * 0.3;
+          const scale = (0.5 + twinkle * 0.5) * blend;
+          octa.scale.set(scale, scale, scale);
+          
+          octa.rotation.x += 0.02;
+          octa.rotation.y += 0.03;
+          
+          octa.material.color.setStyle(tetrahedronColor);
+          octa.material.opacity = twinkle * blend;
+        });
+        
+        // === ENERGY PARTICLES (TETRAHEDRONS) ===
+        // 30 tetras zipping around as energy particles
+        obj.tetras.forEach((tetra, i) => {
+          const pathAngle = (i / 30) * Math.PI * 2;
+          const speed = 0.5 + (i % 3) * 0.3;
+          const radius = 15 + (i % 4) * 5;
+          
+          const x = Math.cos(pathAngle + cosmicTime * speed) * radius;
+          const y = Math.sin(cosmicTime * speed * 1.5 + i) * 8;
+          const z = Math.sin(pathAngle + cosmicTime * speed) * radius;
+          
+          tetra.position.set(x, y, z);
+          
+          tetra.rotation.x = cosmicTime * 2 + i;
+          tetra.rotation.y = cosmicTime * 1.5 + i;
+          
+          const scale = (0.4 + f.highs * 0.4) * blend;
+          tetra.scale.set(scale, scale, scale);
+          
+          tetra.material.color.setStyle(octahedronColor);
+          tetra.material.opacity = (0.7 + f.highs * 0.3) * blend;
+        });
+        
+        // Sphere as central power core
+        obj.sphere.position.set(0, 0, 0);
+        const sphereScale = (2 + f.bass * 0.8) * blend;
+        obj.sphere.scale.set(sphereScale, sphereScale, sphereScale);
+        obj.sphere.rotation.y = cosmicTime * 0.5;
+        obj.sphere.material.color.setStyle(cubeColor);
+        obj.sphere.material.opacity = (0.4 + f.bass * 0.3) * blend;
       }
 
       // ENVIRONMENT RENDERING - Independent from presets

@@ -25,7 +25,8 @@ export const animationTypes = [
   { value: 'ribbon', label: 'Ribbon Dance', icon: '🎀' },
   { value: 'hourglass', label: 'Hourglass', icon: '⏳' },
   { value: 'snowflake', label: 'Snowflake', icon: '❄️' },
-  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' }
+  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' },
+  { value: 'cosmic', label: 'Cosmic Rings', icon: '🪐' }
 ];
 
 export const environmentTypes = [
