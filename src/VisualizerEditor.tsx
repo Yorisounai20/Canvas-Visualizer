@@ -31,7 +31,23 @@ const ANIMATION_TYPES: AnimationType[] = [
   { value: 'vortex', label: 'Vortex Storm', icon: '🌪️' },
   { value: 'seiryu', label: 'Azure Dragon', icon: '🐉' },
   { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' },
-  { value: 'cosmic', label: 'Cosmic Rings', icon: '🪐' }
+  { value: 'cosmic', label: 'Cosmic Rings', icon: '🪐' },
+  { value: 'cityscape', label: 'Cityscape', icon: '🏙️' },
+  { value: 'oceanwaves', label: 'Ocean Waves', icon: '🌊' },
+  { value: 'forest', label: 'Forest Scene', icon: '🌲' },
+  { value: 'portals', label: 'Portal Network', icon: '🌀' },
+  { value: 'discoball', label: 'Disco Ball', icon: '🪩' },
+  { value: 'windturbines', label: 'Wind Turbines', icon: '💨' },
+  { value: 'clockwork', label: 'Clock Mechanism', icon: '⏰' },
+  { value: 'neontunnel', label: 'Neon Tunnel', icon: '🎆' },
+  { value: 'atommodel', label: 'Atom Model', icon: '⚛️' },
+  { value: 'carousel', label: 'Carousel', icon: '🎠' },
+  { value: 'solarsystem', label: 'Solar System', icon: '☀️' },
+  { value: 'datastream', label: 'Data Stream', icon: '💾' },
+  { value: 'ferriswheel', label: 'Ferris Wheel', icon: '🎡' },
+  { value: 'tornadovortex', label: 'Tornado Vortex', icon: '🌪️' },
+  { value: 'stadium', label: 'Stadium', icon: '🏟️' },
+  { value: 'kaleidoscope2', label: 'Kaleidoscope Plus', icon: '🔮' }
 ];
 
 // PHASE 4: Default preset parameters for each animation type
@@ -46,7 +62,23 @@ const DEFAULT_PRESET_PARAMETERS: Record<string, PresetParameters> = {
   vortex: { density: 50, speed: 2.5, intensity: 1.5, spread: 25 },
   seiryu: { density: 35, speed: 1.2, intensity: 1.0, spread: 18 },
   hammerhead: { density: 30, speed: 1.0, intensity: 1.2, spread: 15 },
-  cosmic: { density: 30, speed: 1.0, intensity: 1.2, spread: 20 }
+  cosmic: { density: 30, speed: 1.0, intensity: 1.2, spread: 20 },
+  cityscape: { density: 30, speed: 0.8, intensity: 1.0, spread: 18 },
+  oceanwaves: { density: 35, speed: 1.2, intensity: 1.3, spread: 15 },
+  forest: { density: 25, speed: 0.6, intensity: 0.9, spread: 20 },
+  portals: { density: 30, speed: 1.5, intensity: 1.4, spread: 18 },
+  discoball: { density: 40, speed: 1.8, intensity: 1.5, spread: 12 },
+  windturbines: { density: 20, speed: 0.7, intensity: 1.0, spread: 22 },
+  clockwork: { density: 25, speed: 0.9, intensity: 1.1, spread: 10 },
+  neontunnel: { density: 35, speed: 2.0, intensity: 1.6, spread: 8 },
+  atommodel: { density: 30, speed: 1.3, intensity: 1.2, spread: 12 },
+  carousel: { density: 28, speed: 0.8, intensity: 1.0, spread: 14 },
+  solarsystem: { density: 32, speed: 0.5, intensity: 1.0, spread: 25 },
+  datastream: { density: 38, speed: 1.7, intensity: 1.4, spread: 16 },
+  ferriswheel: { density: 26, speed: 0.6, intensity: 0.9, spread: 15 },
+  tornadovortex: { density: 40, speed: 2.2, intensity: 1.5, spread: 20 },
+  stadium: { density: 32, speed: 1.0, intensity: 1.2, spread: 20 },
+  kaleidoscope2: { density: 35, speed: 1.4, intensity: 1.3, spread: 15 }
 };
 
 // PHASE 4: Helper to get default parameters for a preset
@@ -68,7 +100,23 @@ const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; 
   vortex: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
   seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
   hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
-  cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 }        // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
+  cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
+  cityscape: { cubes: 12, octas: 30, tetras: 15, toruses: 8, planes: 20 },    // 12 buildings, 30 lights, 15 vehicles, 8 traffic rings, 20 windows
+  oceanwaves: { cubes: 8, octas: 40, tetras: 20, toruses: 15, planes: 25 },   // 8 rocks, 40 foam, 20 fish, 15 bubbles/vortex, 25 wave surfaces
+  forest: { cubes: 10, octas: 25, tetras: 15, toruses: 12, planes: 30 },      // 10 trunks, 25 fireflies, 15 birds, 12 mushroom rings, 30 leaves
+  portals: { cubes: 8, octas: 35, tetras: 20, toruses: 20, planes: 10 },      // 8 frames, 35 particles, 20 warps, 20 portal rings, 10 portal surfaces
+  discoball: { cubes: 6, octas: 30, tetras: 25, toruses: 12, planes: 40 },    // 6 structure, 30 beams, 25 sparkles, 12 light rings, 40 mirror panels
+  windturbines: { cubes: 8, octas: 30, tetras: 15, toruses: 8, planes: 24 },  // 8 towers, 30 wind particles, 15 energy, 8 rotation rings, 24 blades
+  clockwork: { cubes: 10, octas: 12, tetras: 8, toruses: 15, planes: 5 },     // 10 mechanism, 12 markers, 8 weights, 15 gears, 5 clock faces
+  neontunnel: { cubes: 6, octas: 35, tetras: 20, toruses: 25, planes: 15 },   // 6 support, 35 glow, 20 speed lines, 25 rings, 15 neon signs
+  atommodel: { cubes: 3, octas: 15, tetras: 20, toruses: 12, planes: 6 },     // 3 nucleus, 15 electrons, 20 energy, 12 orbits, 6 orbital planes
+  carousel: { cubes: 10, octas: 25, tetras: 20, toruses: 8, planes: 16 },     // 10 platform/horses, 25 lights, 20 confetti, 8 rings, 16 panels
+  solarsystem: { cubes: 8, octas: 40, tetras: 12, toruses: 16, planes: 8 },   // 8 planets, 40 stars, 12 comets, 16 orbits, 8 asteroid belt
+  datastream: { cubes: 8, octas: 40, tetras: 25, toruses: 15, planes: 20 },   // 8 servers, 40 bits, 25 packets, 15 rings, 20 data panels
+  ferriswheel: { cubes: 12, octas: 30, tetras: 15, toruses: 10, planes: 12 }, // 12 gondolas, 30 lights, 15 sparkles, 10 wheel, 12 seats
+  tornadovortex: { cubes: 8, octas: 40, tetras: 25, toruses: 20, planes: 15 },// 8 ground, 40 dust, 25 debris, 20 vortex rings, 15 panels
+  stadium: { cubes: 12, octas: 35, tetras: 20, toruses: 10, planes: 24 },     // 12 pillars, 35 crowd lights, 20 fireworks, 10 lighting rigs, 24 sections
+  kaleidoscope2: { cubes: 6, octas: 35, tetras: 25, toruses: 15, planes: 30 } // 6 center, 35 colors, 25 fractals, 15 rotation rings, 30 mirrors
 };
 
 // Calculate maximum shapes needed across all sections
@@ -2348,6 +2396,209 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
           parseInt(activeBassColor.replace('#', ''), 16)
         );
         (obj.sphere.material as THREE.MeshBasicMaterial).opacity = 0.4 + reactiveF.bass * 0.3;
+      } else if (type === 'cityscape') {
+        // Cityscape - Buildings with windows and traffic rings
+        const cityTime = el * speed * 0.5;
+        cam.position.set(Math.sin(el * 0.1) * activeCameraDistance, 8 + activeCameraHeight, Math.cos(el * 0.1) * activeCameraDistance);
+        cam.lookAt(0, 0, 0);
+        
+        // Buildings (cubes)
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / 12) * Math.PI * 2;
+          const radius = 12 + (i % 3) * 3;
+          cube.position.set(Math.cos(angle) * radius, (i % 4) * 3, Math.sin(angle) * radius);
+          const height = 2 + (i % 3) * 1.5 + reactiveF.bass * 0.5;
+          cube.scale.set(1.5, height, 1.5);
+          (cube.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16));
+          (cube.material as THREE.MeshBasicMaterial).opacity = 0.7 + reactiveF.bass * 0.2;
+        });
+        
+        // Windows (planes)
+        obj.planes.forEach((plane, i) => {
+          const buildingIdx = i % 12;
+          const angle = (buildingIdx / 12) * Math.PI * 2;
+          const radius = 12 + (buildingIdx % 3) * 3;
+          const floor = Math.floor(i / 12);
+          plane.position.set(Math.cos(angle) * radius, floor * 2, Math.sin(angle) * radius);
+          plane.rotation.y = angle;
+          plane.scale.set(0.8, 0.8, 1);
+          (plane.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16));
+          (plane.material as THREE.MeshBasicMaterial).opacity = 0.5 + reactiveF.highs * 0.4;
+        });
+        
+        // Traffic rings (toruses)
+        obj.toruses.forEach((torus, i) => {
+          const y = -2 + (i % 4) * 0.5;
+          const radius = 8 + (i % 4) * 4;
+          const angle = cityTime + i;
+          torus.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+          torus.rotation.x = Math.PI / 2;
+          torus.scale.set(0.5 + reactiveF.mids * 0.3, 0.5 + reactiveF.mids * 0.3, 0.5 + reactiveF.mids * 0.3);
+          (torus.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16));
+          (torus.material as THREE.MeshBasicMaterial).opacity = 0.6 + reactiveF.mids * 0.3;
+        });
+        
+        obj.octas.forEach((octa, i) => { if (i >= 30) return; octa.position.set((Math.random() - 0.5) * 30, (Math.random() * 10), (Math.random() - 0.5) * 30); octa.scale.set(0.3 + reactiveF.highs * 0.3, 0.3 + reactiveF.highs * 0.3, 0.3 + reactiveF.highs * 0.3); (octa.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16)); (octa.material as THREE.MeshBasicMaterial).opacity = 0.6; });
+        obj.tetras.forEach((tetra, i) => { const angle = cityTime * 2 + i; tetra.position.set(Math.cos(angle) * 15, 5 + Math.sin(cityTime + i) * 3, Math.sin(angle) * 15); tetra.scale.set(0.4, 0.4, 0.4); (tetra.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16)); (tetra.material as THREE.MeshBasicMaterial).opacity = 0.7; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'oceanwaves') {
+        // Ocean Waves - Undulating water surfaces with bubbles
+        const oceanTime = el * speed * 1.2;
+        cam.position.set(Math.sin(oceanTime * 0.2) * activeCameraDistance, 6 + activeCameraHeight, Math.cos(oceanTime * 0.2) * activeCameraDistance);
+        cam.lookAt(0, 0, 0);
+        
+        // Wave surfaces (planes)
+        obj.planes.forEach((plane, i) => {
+          const x = ((i % 5) - 2) * 6;
+          const z = (Math.floor(i / 5) - 2) * 6;
+          const waveHeight = Math.sin(oceanTime + i * 0.3 + x * 0.1) * 2 * (1 + reactiveF.bass);
+          plane.position.set(x, waveHeight, z);
+          plane.rotation.x = Math.sin(oceanTime + i) * 0.2;
+          plane.rotation.z = Math.cos(oceanTime + i) * 0.2;
+          plane.scale.set(2, 2, 1);
+          (plane.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16));
+          (plane.material as THREE.MeshBasicMaterial).opacity = 0.5 + reactiveF.mids * 0.3;
+        });
+        
+        // Bubble rings (toruses)
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / 15) * Math.PI * 2 + oceanTime;
+          const radius = 8 + Math.sin(oceanTime + i) * 3;
+          torus.position.set(Math.cos(angle) * radius, Math.sin(oceanTime * 2 + i) * 4 - 2, Math.sin(angle) * radius);
+          torus.scale.set(0.6 + reactiveF.mids * 0.4, 0.6 + reactiveF.mids * 0.4, 0.6 + reactiveF.mids * 0.4);
+          (torus.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16));
+          (torus.material as THREE.MeshBasicMaterial).opacity = 0.4 + reactiveF.highs * 0.3;
+        });
+        
+        obj.cubes.forEach((cube, i) => { cube.position.set((Math.random() - 0.5) * 20, -4, (Math.random() - 0.5) * 20); cube.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); (cube.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16)); (cube.material as THREE.MeshBasicMaterial).opacity = 0.6; });
+        obj.octas.forEach((octa, i) => { if (i >= 40) return; const angle = oceanTime + i; octa.position.set(Math.cos(angle) * 15, Math.sin(oceanTime * 3 + i) * 3, Math.sin(angle) * 15); octa.scale.set(0.3 + reactiveF.highs * 0.3, 0.3 + reactiveF.highs * 0.3, 0.3 + reactiveF.highs * 0.3); (octa.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16)); (octa.material as THREE.MeshBasicMaterial).opacity = 0.5; });
+        obj.tetras.forEach((tetra, i) => { const angle = oceanTime * 1.5 + i; tetra.position.set(Math.cos(angle) * 12, Math.sin(oceanTime + i) * 3, Math.sin(angle) * 12); tetra.rotation.x = oceanTime + i; tetra.scale.set(0.5, 0.5, 0.5); (tetra.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16)); (tetra.material as THREE.MeshBasicMaterial).opacity = 0.7; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'forest') {
+        // Forest Scene - Trees with leaves and mushroom rings
+        const forestTime = el * speed * 0.6;
+        cam.position.set(Math.sin(forestTime * 0.15) * activeCameraDistance, 5 + activeCameraHeight, Math.cos(forestTime * 0.15) * activeCameraDistance);
+        cam.lookAt(0, 0, 0);
+        
+        // Tree trunks (cubes)
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / 10) * Math.PI * 2;
+          const radius = 8 + (i % 3) * 4;
+          cube.position.set(Math.cos(angle) * radius, 2, Math.sin(angle) * radius);
+          cube.scale.set(0.8, 4 + reactiveF.bass, 0.8);
+          cube.rotation.y = angle;
+          (cube.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16));
+          (cube.material as THREE.MeshBasicMaterial).opacity = 0.7;
+        });
+        
+        // Leaves (planes)
+        obj.planes.forEach((plane, i) => {
+          const treeIdx = i % 10;
+          const angle = (treeIdx / 10) * Math.PI * 2;
+          const radius = 8 + (treeIdx % 3) * 4;
+          const leafAngle = (i / 3) * Math.PI * 2;
+          plane.position.set(Math.cos(angle) * radius + Math.cos(leafAngle) * 2, 4 + Math.sin(forestTime + i) * 0.5, Math.sin(angle) * radius + Math.sin(leafAngle) * 2);
+          plane.rotation.x = Math.sin(forestTime + i) * 0.3;
+          plane.rotation.y = leafAngle;
+          plane.scale.set(1 + reactiveF.mids * 0.3, 1 + reactiveF.mids * 0.3, 1);
+          (plane.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16));
+          (plane.material as THREE.MeshBasicMaterial).opacity = 0.6 + reactiveF.mids * 0.2;
+        });
+        
+        // Mushroom rings (toruses)
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / 12) * Math.PI * 2;
+          const radius = 5 + (i % 3) * 3;
+          torus.position.set(Math.cos(angle) * radius, 0.2 + Math.sin(forestTime + i) * 0.1, Math.sin(angle) * radius);
+          torus.rotation.x = Math.PI / 2;
+          torus.scale.set(0.6 + reactiveF.bass * 0.3, 0.6 + reactiveF.bass * 0.3, 0.3);
+          (torus.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16));
+          (torus.material as THREE.MeshBasicMaterial).opacity = 0.7;
+        });
+        
+        obj.octas.forEach((octa, i) => { if (i >= 25) return; octa.position.set((Math.random() - 0.5) * 25, 1 + Math.sin(forestTime * 2 + i) * 3, (Math.random() - 0.5) * 25); octa.scale.set(0.2 + reactiveF.highs * 0.3, 0.2 + reactiveF.highs * 0.3, 0.2 + reactiveF.highs * 0.3); (octa.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16)); (octa.material as THREE.MeshBasicMaterial).opacity = 0.7 + reactiveF.highs * 0.3; });
+        obj.tetras.forEach((tetra, i) => { const angle = forestTime + i; tetra.position.set(Math.cos(angle) * 15, 3 + Math.sin(forestTime * 2 + i) * 2, Math.sin(angle) * 15); tetra.rotation.x = forestTime + i; tetra.scale.set(0.4, 0.4, 0.4); (tetra.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16)); (tetra.material as THREE.MeshBasicMaterial).opacity = 0.6; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'portals' || type === 'discoball' || type === 'windturbines' || type === 'clockwork' || type === 'neontunnel' || type === 'atommodel' || type === 'carousel' || type === 'solarsystem' || type === 'datastream' || type === 'ferriswheel' || type === 'tornadovortex' || type === 'stadium' || type === 'kaleidoscope2') {
+        // Compact implementations for remaining presets - all utilize toruses and planes
+        const t = el * speed;
+        const camAngle = cameraAutoRotate ? t * 0.2 : 0;
+        cam.position.set(Math.sin(camAngle + activeCameraRotation) * activeCameraDistance, 5 + activeCameraHeight, Math.cos(camAngle + activeCameraRotation) * activeCameraDistance);
+        cam.lookAt(0, 0, 0);
+        
+        // Core shapes animation - cubes
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / obj.cubes.length) * Math.PI * 2 + t * 0.5;
+          const radius = 10 + Math.sin(t + i) * 2;
+          cube.position.set(Math.cos(angle) * radius, Math.sin(t + i) * 3, Math.sin(angle) * radius);
+          cube.scale.set(1 + reactiveF.bass * 0.5, 1 + reactiveF.bass * 0.5, 1 + reactiveF.bass * 0.5);
+          cube.rotation.x = t + i;
+          cube.rotation.y = t * 0.7 + i;
+          (cube.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16));
+          (cube.material as THREE.MeshBasicMaterial).opacity = 0.7 + reactiveF.bass * 0.2;
+        });
+        
+        // Toruses - rings/portals/wheels
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / obj.toruses.length) * Math.PI * 2 + t * 0.8;
+          const radius = 12 + (i % 3) * 4;
+          torus.position.set(Math.cos(angle) * radius, Math.sin(t * 1.5 + i) * 4, Math.sin(angle) * radius);
+          torus.rotation.x = t + i * 0.5;
+          torus.rotation.y = t * 0.6 + i;
+          const scale = 0.8 + reactiveF.mids * 0.4;
+          torus.scale.set(scale, scale, scale);
+          (torus.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16));
+          (torus.material as THREE.MeshBasicMaterial).opacity = 0.6 + reactiveF.mids * 0.3;
+        });
+        
+        // Planes - panels/surfaces/screens
+        obj.planes.forEach((plane, i) => {
+          const angle = (i / obj.planes.length) * Math.PI * 2 + t * 0.3;
+          const radius = 15 + (i % 4) * 3;
+          plane.position.set(Math.cos(angle) * radius, (i % 5 - 2) * 2.5, Math.sin(angle) * radius);
+          plane.rotation.x = Math.sin(t + i) * 0.4;
+          plane.rotation.y = angle;
+          plane.rotation.z = Math.cos(t + i) * 0.3;
+          const scale = 1.2 + reactiveF.highs * 0.5;
+          plane.scale.set(scale, scale, 1);
+          (plane.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16));
+          (plane.material as THREE.MeshBasicMaterial).opacity = 0.5 + reactiveF.highs * 0.4;
+        });
+        
+        // Octahedrons - particles/stars/lights
+        obj.octas.forEach((octa, i) => {
+          if (i >= obj.octas.length - 15) return; // Skip environment octas
+          const angle = (i / 30) * Math.PI * 2;
+          const radius = 20 + (i % 6) * 5;
+          octa.position.set(Math.cos(angle + t * 0.4) * radius, Math.sin(t * 2 + i) * 6, Math.sin(angle + t * 0.4) * radius);
+          const scale = 0.4 + reactiveF.highs * 0.4;
+          octa.scale.set(scale, scale, scale);
+          octa.rotation.x += 0.03;
+          octa.rotation.y += 0.04;
+          (octa.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeHighsColor.replace('#', ''), 16));
+          (octa.material as THREE.MeshBasicMaterial).opacity = 0.6 + reactiveF.highs * 0.3;
+        });
+        
+        // Tetrahedrons - accents/effects
+        obj.tetras.forEach((tetra, i) => {
+          const angle = (i / obj.tetras.length) * Math.PI * 2 + t;
+          const radius = 8 + (i % 5) * 3;
+          tetra.position.set(Math.cos(angle) * radius, Math.sin(t * 1.8 + i) * 5, Math.sin(angle) * radius);
+          tetra.rotation.x = t * 2 + i;
+          tetra.rotation.y = t * 1.5 + i;
+          const scale = 0.5 + reactiveF.mids * 0.4;
+          tetra.scale.set(scale, scale, scale);
+          (tetra.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeMidsColor.replace('#', ''), 16));
+          (tetra.material as THREE.MeshBasicMaterial).opacity = 0.7 + reactiveF.mids * 0.2;
+        });
+        
+        // Central sphere
+        obj.sphere.position.set(0, Math.sin(t) * 2, 0);
+        const sScale = 1.5 + reactiveF.bass * 0.6;
+        obj.sphere.scale.set(sScale, sScale, sScale);
+        obj.sphere.rotation.y = t * 0.5;
+        (obj.sphere.material as THREE.MeshBasicMaterial).color.setHex(parseInt(activeBassColor.replace('#', ''), 16));
+        (obj.sphere.material as THREE.MeshBasicMaterial).opacity = 0.5 + reactiveF.bass * 0.3;
       }
 
       // ENVIRONMENT RENDERING - Independent from presets

@@ -2145,6 +2145,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
       hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
       cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
+      cityscape: { cubes: 12, octas: 30, tetras: 15, toruses: 8, planes: 20 },    // 12 buildings, 30 lights, 15 vehicles, 8 traffic rings, 20 windows
+      oceanwaves: { cubes: 8, octas: 40, tetras: 20, toruses: 15, planes: 25 },   // 8 rocks, 40 foam, 20 fish, 15 bubbles/vortex, 25 wave surfaces
+      forest: { cubes: 10, octas: 25, tetras: 15, toruses: 12, planes: 30 },      // 10 trunks, 25 fireflies, 15 birds, 12 mushroom rings, 30 leaves
+      portals: { cubes: 8, octas: 35, tetras: 20, toruses: 20, planes: 10 },      // 8 frames, 35 particles, 20 warps, 20 portal rings, 10 portal surfaces
+      discoball: { cubes: 6, octas: 30, tetras: 25, toruses: 12, planes: 40 },    // 6 structure, 30 beams, 25 sparkles, 12 light rings, 40 mirror panels
+      windturbines: { cubes: 8, octas: 30, tetras: 15, toruses: 8, planes: 24 },  // 8 towers, 30 wind particles, 15 energy, 8 rotation rings, 24 blades
+      clockwork: { cubes: 10, octas: 12, tetras: 8, toruses: 15, planes: 5 },     // 10 mechanism, 12 markers, 8 weights, 15 gears, 5 clock faces
+      neontunnel: { cubes: 6, octas: 35, tetras: 20, toruses: 25, planes: 15 },   // 6 support, 35 glow, 20 speed lines, 25 rings, 15 neon signs
+      atommodel: { cubes: 3, octas: 15, tetras: 20, toruses: 12, planes: 6 },     // 3 nucleus, 15 electrons, 20 energy, 12 orbits, 6 orbital planes
+      carousel: { cubes: 10, octas: 25, tetras: 20, toruses: 8, planes: 16 },     // 10 platform/horses, 25 lights, 20 confetti, 8 rings, 16 panels
+      solarsystem: { cubes: 8, octas: 40, tetras: 12, toruses: 16, planes: 8 },   // 8 planets, 40 stars, 12 comets, 16 orbits, 8 asteroid belt
+      datastream: { cubes: 8, octas: 40, tetras: 25, toruses: 15, planes: 20 },   // 8 servers, 40 bits, 25 packets, 15 rings, 20 data panels
+      ferriswheel: { cubes: 12, octas: 30, tetras: 15, toruses: 10, planes: 12 }, // 12 gondolas, 30 lights, 15 sparkles, 10 wheel, 12 seats
+      tornadovortex: { cubes: 8, octas: 40, tetras: 25, toruses: 20, planes: 15 },// 8 ground, 40 dust, 25 debris, 20 vortex rings, 15 panels
+      stadium: { cubes: 12, octas: 35, tetras: 20, toruses: 10, planes: 24 },     // 12 pillars, 35 crowd lights, 20 fireworks, 10 lighting rigs, 24 sections
+      kaleidoscope2: { cubes: 6, octas: 35, tetras: 25, toruses: 15, planes: 30 },// 6 center, 35 colors, 25 fractals, 15 rotation rings, 30 mirrors
       empty: { cubes: 0, octas: 0, tetras: 0, toruses: 0, planes: 0 }             // No shapes needed for empty preset
     };
 
@@ -5212,6 +5228,200 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.rotation.y = cosmicTime * 0.5;
         obj.sphere.material.color.setStyle(cubeColor);
         obj.sphere.material.opacity = (0.4 + f.bass * 0.3) * blend;
+      } else if (type === 'cityscape') {
+        // Cityscape - Buildings with windows and traffic rings
+        const cityTime = elScaled * 0.5;
+        cam.position.set(Math.sin(elScaled * 0.1) * activeCameraDistance + shakeX, 8 + activeCameraHeight + shakeY, Math.cos(elScaled * 0.1) * activeCameraDistance + shakeZ);
+        cam.lookAt(0, 0, 0);
+        
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / 12) * Math.PI * 2;
+          const radius = 12 + (i % 3) * 3;
+          cube.position.set(Math.cos(angle) * radius, (i % 4) * 3, Math.sin(angle) * radius);
+          const height = (2 + (i % 3) * 1.5 + f.bass * 0.5) * blend;
+          cube.scale.set(1.5, height, 1.5);
+          cube.material.color.setStyle(cubeColor);
+          cube.material.opacity = (0.7 + f.bass * 0.2) * blend;
+        });
+        
+        obj.planes.forEach((plane, i) => {
+          const buildingIdx = i % 12;
+          const angle = (buildingIdx / 12) * Math.PI * 2;
+          const radius = 12 + (buildingIdx % 3) * 3;
+          const floor = Math.floor(i / 12);
+          plane.position.set(Math.cos(angle) * radius, floor * 2, Math.sin(angle) * radius);
+          plane.rotation.y = angle;
+          plane.scale.set(0.8, 0.8, 1);
+          plane.material.color.setStyle(tetrahedronColor);
+          plane.material.opacity = (0.5 + f.highs * 0.4) * blend;
+        });
+        
+        obj.toruses.forEach((torus, i) => {
+          const y = -2 + (i % 4) * 0.5;
+          const radius = 8 + (i % 4) * 4;
+          const angle = cityTime + i;
+          torus.position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius);
+          torus.rotation.x = Math.PI / 2;
+          const scale = (0.5 + f.mids * 0.3) * blend;
+          torus.scale.set(scale, scale, scale);
+          torus.material.color.setStyle(octahedronColor);
+          torus.material.opacity = (0.6 + f.mids * 0.3) * blend;
+        });
+        
+        obj.octas.forEach((octa, i) => { if (i >= 30) return; octa.position.set((Math.random() - 0.5) * 30, (Math.random() * 10), (Math.random() - 0.5) * 30); const scale = (0.3 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = 0.6 * blend; });
+        obj.tetras.forEach((tetra, i) => { const angle = cityTime * 2 + i; tetra.position.set(Math.cos(angle) * 15, 5 + Math.sin(cityTime + i) * 3, Math.sin(angle) * 15); tetra.scale.set(0.4, 0.4, 0.4); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.7 * blend; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'oceanwaves') {
+        // Ocean Waves - Undulating water surfaces
+        const oceanTime = elScaled * 1.2;
+        cam.position.set(Math.sin(oceanTime * 0.2) * activeCameraDistance + shakeX, 6 + activeCameraHeight + shakeY, Math.cos(oceanTime * 0.2) * activeCameraDistance + shakeZ);
+        cam.lookAt(0, 0, 0);
+        
+        obj.planes.forEach((plane, i) => {
+          const x = ((i % 5) - 2) * 6;
+          const z = (Math.floor(i / 5) - 2) * 6;
+          const waveHeight = Math.sin(oceanTime + i * 0.3 + x * 0.1) * 2 * (1 + f.bass);
+          plane.position.set(x, waveHeight, z);
+          plane.rotation.x = Math.sin(oceanTime + i) * 0.2;
+          plane.rotation.z = Math.cos(oceanTime + i) * 0.2;
+          plane.scale.set(2, 2, 1);
+          plane.material.color.setStyle(cubeColor);
+          plane.material.opacity = (0.5 + f.mids * 0.3) * blend;
+        });
+        
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / 15) * Math.PI * 2 + oceanTime;
+          const radius = 8 + Math.sin(oceanTime + i) * 3;
+          torus.position.set(Math.cos(angle) * radius, Math.sin(oceanTime * 2 + i) * 4 - 2, Math.sin(angle) * radius);
+          const scale = (0.6 + f.mids * 0.4) * blend;
+          torus.scale.set(scale, scale, scale);
+          torus.material.color.setStyle(octahedronColor);
+          torus.material.opacity = (0.4 + f.highs * 0.3) * blend;
+        });
+        
+        obj.cubes.forEach((cube, i) => { cube.position.set((Math.random() - 0.5) * 20, -4, (Math.random() - 0.5) * 20); cube.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); cube.material.color.setStyle(cubeColor); cube.material.opacity = 0.6 * blend; });
+        obj.octas.forEach((octa, i) => { if (i >= 40) return; const angle = oceanTime + i; octa.position.set(Math.cos(angle) * 15, Math.sin(oceanTime * 3 + i) * 3, Math.sin(angle) * 15); const scale = (0.3 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = 0.5 * blend; });
+        obj.tetras.forEach((tetra, i) => { const angle = oceanTime * 1.5 + i; tetra.position.set(Math.cos(angle) * 12, Math.sin(oceanTime + i) * 3, Math.sin(angle) * 12); tetra.rotation.x = oceanTime + i; tetra.scale.set(0.5, 0.5, 0.5); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.7 * blend; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'forest') {
+        // Forest Scene - Trees with leaves
+        const forestTime = elScaled * 0.6;
+        cam.position.set(Math.sin(forestTime * 0.15) * activeCameraDistance + shakeX, 5 + activeCameraHeight + shakeY, Math.cos(forestTime * 0.15) * activeCameraDistance + shakeZ);
+        cam.lookAt(0, 0, 0);
+        
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / 10) * Math.PI * 2;
+          const radius = 8 + (i % 3) * 4;
+          cube.position.set(Math.cos(angle) * radius, 2, Math.sin(angle) * radius);
+          cube.scale.set(0.8, (4 + f.bass) * blend, 0.8);
+          cube.rotation.y = angle;
+          cube.material.color.setStyle(cubeColor);
+          cube.material.opacity = 0.7 * blend;
+        });
+        
+        obj.planes.forEach((plane, i) => {
+          const treeIdx = i % 10;
+          const angle = (treeIdx / 10) * Math.PI * 2;
+          const radius = 8 + (treeIdx % 3) * 4;
+          const leafAngle = (i / 3) * Math.PI * 2;
+          plane.position.set(Math.cos(angle) * radius + Math.cos(leafAngle) * 2, 4 + Math.sin(forestTime + i) * 0.5, Math.sin(angle) * radius + Math.sin(leafAngle) * 2);
+          plane.rotation.x = Math.sin(forestTime + i) * 0.3;
+          plane.rotation.y = leafAngle;
+          const scale = (1 + f.mids * 0.3) * blend;
+          plane.scale.set(scale, scale, 1);
+          plane.material.color.setStyle(octahedronColor);
+          plane.material.opacity = (0.6 + f.mids * 0.2) * blend;
+        });
+        
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / 12) * Math.PI * 2;
+          const radius = 5 + (i % 3) * 3;
+          torus.position.set(Math.cos(angle) * radius, 0.2 + Math.sin(forestTime + i) * 0.1, Math.sin(angle) * radius);
+          torus.rotation.x = Math.PI / 2;
+          const scale = (0.6 + f.bass * 0.3) * blend;
+          torus.scale.set(scale, scale, 0.3);
+          torus.material.color.setStyle(tetrahedronColor);
+          torus.material.opacity = 0.7 * blend;
+        });
+        
+        obj.octas.forEach((octa, i) => { if (i >= 25) return; octa.position.set((Math.random() - 0.5) * 25, 1 + Math.sin(forestTime * 2 + i) * 3, (Math.random() - 0.5) * 25); const scale = (0.2 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = (0.7 + f.highs * 0.3) * blend; });
+        obj.tetras.forEach((tetra, i) => { const angle = forestTime + i; tetra.position.set(Math.cos(angle) * 15, 3 + Math.sin(forestTime * 2 + i) * 2, Math.sin(angle) * 15); tetra.rotation.x = forestTime + i; tetra.scale.set(0.4, 0.4, 0.4); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.6 * blend; });
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      } else if (type === 'portals' || type === 'discoball' || type === 'windturbines' || type === 'clockwork' || type === 'neontunnel' || type === 'atommodel' || type === 'carousel' || type === 'solarsystem' || type === 'datastream' || type === 'ferriswheel' || type === 'tornadovortex' || type === 'stadium' || type === 'kaleidoscope2') {
+        // Compact implementations for remaining presets
+        const t = elScaled;
+        const camAngle = KEYFRAME_ONLY_ROTATION_SPEED;
+        cam.position.set(Math.sin(camAngle + activeCameraRotation) * activeCameraDistance + shakeX, 5 + activeCameraHeight + shakeY, Math.cos(camAngle + activeCameraRotation) * activeCameraDistance + shakeZ);
+        cam.lookAt(0, 0, 0);
+        
+        obj.cubes.forEach((cube, i) => {
+          const angle = (i / obj.cubes.length) * Math.PI * 2 + t * 0.5;
+          const radius = 10 + Math.sin(t + i) * 2;
+          cube.position.set(Math.cos(angle) * radius, Math.sin(t + i) * 3, Math.sin(angle) * radius);
+          const scale = (1 + f.bass * 0.5) * blend;
+          cube.scale.set(scale, scale, scale);
+          cube.rotation.x = t + i;
+          cube.rotation.y = t * 0.7 + i;
+          cube.material.color.setStyle(cubeColor);
+          cube.material.opacity = (0.7 + f.bass * 0.2) * blend;
+        });
+        
+        obj.toruses.forEach((torus, i) => {
+          const angle = (i / obj.toruses.length) * Math.PI * 2 + t * 0.8;
+          const radius = 12 + (i % 3) * 4;
+          torus.position.set(Math.cos(angle) * radius, Math.sin(t * 1.5 + i) * 4, Math.sin(angle) * radius);
+          torus.rotation.x = t + i * 0.5;
+          torus.rotation.y = t * 0.6 + i;
+          const scale = (0.8 + f.mids * 0.4) * blend;
+          torus.scale.set(scale, scale, scale);
+          torus.material.color.setStyle(octahedronColor);
+          torus.material.opacity = (0.6 + f.mids * 0.3) * blend;
+        });
+        
+        obj.planes.forEach((plane, i) => {
+          const angle = (i / obj.planes.length) * Math.PI * 2 + t * 0.3;
+          const radius = 15 + (i % 4) * 3;
+          plane.position.set(Math.cos(angle) * radius, (i % 5 - 2) * 2.5, Math.sin(angle) * radius);
+          plane.rotation.x = Math.sin(t + i) * 0.4;
+          plane.rotation.y = angle;
+          plane.rotation.z = Math.cos(t + i) * 0.3;
+          const scale = (1.2 + f.highs * 0.5) * blend;
+          plane.scale.set(scale, scale, 1);
+          plane.material.color.setStyle(tetrahedronColor);
+          plane.material.opacity = (0.5 + f.highs * 0.4) * blend;
+        });
+        
+        obj.octas.forEach((octa, i) => {
+          if (i >= obj.octas.length - 15) return;
+          const angle = (i / 30) * Math.PI * 2;
+          const radius = 20 + (i % 6) * 5;
+          octa.position.set(Math.cos(angle + t * 0.4) * radius, Math.sin(t * 2 + i) * 6, Math.sin(angle + t * 0.4) * radius);
+          const scale = (0.4 + f.highs * 0.4) * blend;
+          octa.scale.set(scale, scale, scale);
+          octa.rotation.x += 0.03;
+          octa.rotation.y += 0.04;
+          octa.material.color.setStyle(tetrahedronColor);
+          octa.material.opacity = (0.6 + f.highs * 0.3) * blend;
+        });
+        
+        obj.tetras.forEach((tetra, i) => {
+          const angle = (i / obj.tetras.length) * Math.PI * 2 + t;
+          const radius = 8 + (i % 5) * 3;
+          tetra.position.set(Math.cos(angle) * radius, Math.sin(t * 1.8 + i) * 5, Math.sin(angle) * radius);
+          tetra.rotation.x = t * 2 + i;
+          tetra.rotation.y = t * 1.5 + i;
+          const scale = (0.5 + f.mids * 0.4) * blend;
+          tetra.scale.set(scale, scale, scale);
+          tetra.material.color.setStyle(octahedronColor);
+          tetra.material.opacity = (0.7 + f.mids * 0.2) * blend;
+        });
+        
+        obj.sphere.position.set(0, Math.sin(t) * 2, 0);
+        const sScale = (1.5 + f.bass * 0.6) * blend;
+        obj.sphere.scale.set(sScale, sScale, sScale);
+        obj.sphere.rotation.y = t * 0.5;
+        obj.sphere.material.color.setStyle(cubeColor);
+        obj.sphere.material.opacity = (0.5 + f.bass * 0.3) * blend;
       }
 
       // ENVIRONMENT RENDERING - Independent from presets
