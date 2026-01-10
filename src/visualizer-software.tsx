@@ -2047,6 +2047,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     );
   };
 
+  // Shape requirements for each preset type
+  // These define the MINIMUM number of shapes needed for each preset to render correctly
+  // Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
+  const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number; toruses: number; planes: number }> = {
+    orbit: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },          // 8 planets, limited octas/tetras for performance
+    explosion: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },      // Performance-limited, visually sufficient
+    tunnel: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+    wave: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },           // 30 octas for wave segments, limited cubes/tetras
+    spiral: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+    chill: { cubes: 100, octas: 100, tetras: 100, toruses: 0, planes: 0 },      // All shapes actively used
+    pulse: { cubes: 16, octas: 16, tetras: 0, toruses: 0, planes: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
+    vortex: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
+    seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
+    hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
+    cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
+    cityscape: { cubes: 12, octas: 30, tetras: 15, toruses: 8, planes: 20 },    // 12 buildings, 30 lights, 15 vehicles, 8 traffic rings, 20 windows
+    oceanwaves: { cubes: 8, octas: 40, tetras: 20, toruses: 15, planes: 25 },   // 8 rocks, 40 foam, 20 fish, 15 bubbles/vortex, 25 wave surfaces
+    forest: { cubes: 10, octas: 25, tetras: 15, toruses: 12, planes: 30 },      // 10 trunks, 25 fireflies, 15 birds, 12 mushroom rings, 30 leaves
+    portals: { cubes: 8, octas: 35, tetras: 20, toruses: 20, planes: 10 },      // 8 frames, 35 particles, 20 warps, 20 portal rings, 10 portal surfaces
+    discoball: { cubes: 6, octas: 30, tetras: 25, toruses: 12, planes: 40 },    // 6 structure, 30 beams, 25 sparkles, 12 light rings, 40 mirror panels
+    windturbines: { cubes: 8, octas: 30, tetras: 15, toruses: 8, planes: 24 },  // 8 towers, 30 wind particles, 15 energy, 8 rotation rings, 24 blades
+    clockwork: { cubes: 10, octas: 12, tetras: 8, toruses: 15, planes: 5 },     // 10 mechanism, 12 markers, 8 weights, 15 gears, 5 clock faces
+    neontunnel: { cubes: 6, octas: 35, tetras: 20, toruses: 25, planes: 15 },   // 6 support, 35 glow, 20 speed lines, 25 rings, 15 neon signs
+    atommodel: { cubes: 3, octas: 15, tetras: 20, toruses: 12, planes: 6 },     // 3 nucleus, 15 electrons, 20 energy, 12 orbits, 6 orbital planes
+    carousel: { cubes: 10, octas: 25, tetras: 20, toruses: 8, planes: 16 },     // 10 platform/horses, 25 lights, 20 confetti, 8 rings, 16 panels
+    solarsystem: { cubes: 8, octas: 40, tetras: 12, toruses: 16, planes: 8 },   // 8 planets, 40 stars, 12 comets, 16 orbits, 8 asteroid belt
+    datastream: { cubes: 8, octas: 40, tetras: 25, toruses: 15, planes: 20 },   // 8 servers, 40 bits, 25 packets, 15 rings, 20 data panels
+    ferriswheel: { cubes: 12, octas: 30, tetras: 15, toruses: 10, planes: 12 }, // 12 gondolas, 30 lights, 15 sparkles, 10 wheel, 12 seats
+    tornadovortex: { cubes: 8, octas: 40, tetras: 25, toruses: 20, planes: 15 },// 8 ground, 40 dust, 25 debris, 20 vortex rings, 15 panels
+    stadium: { cubes: 12, octas: 35, tetras: 20, toruses: 10, planes: 24 },     // 12 pillars, 35 crowd lights, 20 fireworks, 10 lighting rigs, 24 sections
+    kaleidoscope2: { cubes: 6, octas: 35, tetras: 25, toruses: 15, planes: 30 },// 6 center, 35 colors, 25 fractals, 15 rotation rings, 30 mirrors
+    empty: { cubes: 0, octas: 0, tetras: 0, toruses: 0, planes: 0 }             // No shapes needed for empty preset
+  };
+
   // Scene initialization - runs once on mount
   useEffect(() => {
     if (!containerRef.current) return;
@@ -2128,40 +2162,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         default:
           return new THREE.MeshBasicMaterial(commonProps);
       }
-    };
-
-    // Shape requirements for each preset type
-    // These define the MINIMUM number of shapes needed for each preset to render correctly
-    // Performance-optimized: limiting shapes to what's visually necessary (typically 8 cubes, 30 octas, 30 tetras)
-    const PRESET_SHAPE_REQUIREMENTS: Record<string, { cubes: number; octas: number; tetras: number; toruses: number; planes: number }> = {
-      orbit: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },          // 8 planets, limited octas/tetras for performance
-      explosion: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },      // Performance-limited, visually sufficient
-      tunnel: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
-      wave: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },           // 30 octas for wave segments, limited cubes/tetras
-      spiral: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
-      chill: { cubes: 100, octas: 100, tetras: 100, toruses: 0, planes: 0 },      // All shapes actively used
-      pulse: { cubes: 16, octas: 16, tetras: 0, toruses: 0, planes: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
-      vortex: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
-      seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
-      hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
-      cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
-      cityscape: { cubes: 12, octas: 30, tetras: 15, toruses: 8, planes: 20 },    // 12 buildings, 30 lights, 15 vehicles, 8 traffic rings, 20 windows
-      oceanwaves: { cubes: 8, octas: 40, tetras: 20, toruses: 15, planes: 25 },   // 8 rocks, 40 foam, 20 fish, 15 bubbles/vortex, 25 wave surfaces
-      forest: { cubes: 10, octas: 25, tetras: 15, toruses: 12, planes: 30 },      // 10 trunks, 25 fireflies, 15 birds, 12 mushroom rings, 30 leaves
-      portals: { cubes: 8, octas: 35, tetras: 20, toruses: 20, planes: 10 },      // 8 frames, 35 particles, 20 warps, 20 portal rings, 10 portal surfaces
-      discoball: { cubes: 6, octas: 30, tetras: 25, toruses: 12, planes: 40 },    // 6 structure, 30 beams, 25 sparkles, 12 light rings, 40 mirror panels
-      windturbines: { cubes: 8, octas: 30, tetras: 15, toruses: 8, planes: 24 },  // 8 towers, 30 wind particles, 15 energy, 8 rotation rings, 24 blades
-      clockwork: { cubes: 10, octas: 12, tetras: 8, toruses: 15, planes: 5 },     // 10 mechanism, 12 markers, 8 weights, 15 gears, 5 clock faces
-      neontunnel: { cubes: 6, octas: 35, tetras: 20, toruses: 25, planes: 15 },   // 6 support, 35 glow, 20 speed lines, 25 rings, 15 neon signs
-      atommodel: { cubes: 3, octas: 15, tetras: 20, toruses: 12, planes: 6 },     // 3 nucleus, 15 electrons, 20 energy, 12 orbits, 6 orbital planes
-      carousel: { cubes: 10, octas: 25, tetras: 20, toruses: 8, planes: 16 },     // 10 platform/horses, 25 lights, 20 confetti, 8 rings, 16 panels
-      solarsystem: { cubes: 8, octas: 40, tetras: 12, toruses: 16, planes: 8 },   // 8 planets, 40 stars, 12 comets, 16 orbits, 8 asteroid belt
-      datastream: { cubes: 8, octas: 40, tetras: 25, toruses: 15, planes: 20 },   // 8 servers, 40 bits, 25 packets, 15 rings, 20 data panels
-      ferriswheel: { cubes: 12, octas: 30, tetras: 15, toruses: 10, planes: 12 }, // 12 gondolas, 30 lights, 15 sparkles, 10 wheel, 12 seats
-      tornadovortex: { cubes: 8, octas: 40, tetras: 25, toruses: 20, planes: 15 },// 8 ground, 40 dust, 25 debris, 20 vortex rings, 15 panels
-      stadium: { cubes: 12, octas: 35, tetras: 20, toruses: 10, planes: 24 },     // 12 pillars, 35 crowd lights, 20 fireworks, 10 lighting rigs, 24 sections
-      kaleidoscope2: { cubes: 6, octas: 35, tetras: 25, toruses: 15, planes: 30 },// 6 center, 35 colors, 25 fractals, 15 rotation rings, 30 mirrors
-      empty: { cubes: 0, octas: 0, tetras: 0, toruses: 0, planes: 0 }             // No shapes needed for empty preset
     };
 
     // Calculate maximum shapes needed across all preset keyframes
