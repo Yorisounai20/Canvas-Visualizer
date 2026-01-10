@@ -25,7 +25,24 @@ export const animationTypes = [
   { value: 'ribbon', label: 'Ribbon Dance', icon: '🎀' },
   { value: 'hourglass', label: 'Hourglass', icon: '⏳' },
   { value: 'snowflake', label: 'Snowflake', icon: '❄️' },
-  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' }
+  { value: 'hammerhead', label: 'Hammerhead Shark', icon: '🦈' },
+  { value: 'cosmic', label: 'Cosmic Rings', icon: '🪐' },
+  { value: 'cityscape', label: 'Cityscape', icon: '🏙️' },
+  { value: 'oceanwaves', label: 'Ocean Waves', icon: '🌊' },
+  { value: 'forest', label: 'Forest Scene', icon: '🌲' },
+  { value: 'portals', label: 'Portal Network', icon: '🌀' },
+  { value: 'discoball', label: 'Disco Ball', icon: '🪩' },
+  { value: 'windturbines', label: 'Wind Turbines', icon: '💨' },
+  { value: 'clockwork', label: 'Clock Mechanism', icon: '⏰' },
+  { value: 'neontunnel', label: 'Neon Tunnel', icon: '🎆' },
+  { value: 'atommodel', label: 'Atom Model', icon: '⚛️' },
+  { value: 'carousel', label: 'Carousel', icon: '🎠' },
+  { value: 'solarsystem', label: 'Solar System', icon: '☀️' },
+  { value: 'datastream', label: 'Data Stream', icon: '💾' },
+  { value: 'ferriswheel', label: 'Ferris Wheel', icon: '🎡' },
+  { value: 'tornadovortex', label: 'Tornado Vortex', icon: '🌪️' },
+  { value: 'stadium', label: 'Stadium', icon: '🏟️' },
+  { value: 'kaleidoscope2', label: 'Kaleidoscope Plus', icon: '🔮' }
 ];
 
 export const environmentTypes = [
