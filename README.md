@@ -2,6 +2,10 @@
 
 A web-based 3D music video creation tool that creates audio-reactive visualizations synchronized to your music.
 
+## 🚀 Try It Now
+
+**[Launch Canvas Visualizer](https://canvas-visualizer.vercel.app)** - Start creating music videos instantly, no installation required!
+
 ## Features
 
 **Two Workflow Modes:**
@@ -18,7 +22,9 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 - Video export (WebM/MP4 at 720p-1080p)
 - Project save/load with Neon PostgreSQL
 
-## Quick Start
+## Quick Start (For Developers)
+
+Want to run locally or contribute? Here's how:
 
 1. **Install dependencies:**
    ```bash
