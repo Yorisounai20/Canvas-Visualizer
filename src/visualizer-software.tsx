@@ -2184,12 +2184,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Add 15 extra octas for environment system
       maxOctas += 15;
       
-      // Ensure at least 8/30/30 for default preset if no keyframes
-      if (presetKeyframes.length === 0) {
-        maxCubes = Math.max(maxCubes, 8);
-        maxOctas = Math.max(maxOctas, 30 + 15);
-        maxTetras = Math.max(maxTetras, 30);
-      }
+      // Ensure minimum allocations to support manual preset switching
+      // Users can manually select presets not in the timeline, so we need reasonable defaults
+      maxCubes = Math.max(maxCubes, 12);        // Support presets with up to 12 cubes (cityscape, stadium, ferriswheel)
+      maxOctas = Math.max(maxOctas, 45);        // 30 base + 15 environment
+      maxTetras = Math.max(maxTetras, 30);      // Support most presets with tetras
+      maxToruses = Math.max(maxToruses, 25);    // Support presets with toruses (neontunnel uses 25)
+      maxPlanes = Math.max(maxPlanes, 40);      // Support presets with planes (discoball uses 40)
       
       return { cubes: maxCubes, octas: maxOctas, tetras: maxTetras, toruses: maxToruses, planes: maxPlanes };
     };
