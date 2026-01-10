@@ -13,7 +13,7 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 - **⚡ Software Mode** - Streamlined interface for quick visualizations
 
 **Core Capabilities:**
-- 25 animation presets (Orbital Dance, Explosion, Tunnel Rush, Wave Motion, and more)
+- 43 animation presets (Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, and many more)
 - Real-time audio frequency analysis (bass, mids, highs)
 - Timeline-based animation with smooth transitions
 - Camera rig system with 7 rig types and cinematic shot presets
@@ -89,8 +89,8 @@ Canvas Visualizer can save projects to a Neon PostgreSQL database. This is **opt
 
 ## Key Features Detail
 
-**25 Animation Presets:**
-Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Chill Vibes, Pulse Grid, Vortex Storm, Azure Dragon, Kaleidoscope, Meteor Shower, DNA Helix, Fireworks, Matrix Rain, Ripple Wave, Constellation, Pendulum, Blooming Flower, Tornado, Hypercube, Fractal Tree, Binary Stars, Ribbon Dance, Hourglass, Snowflake
+**43 Animation Presets:**
+Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Chill Vibes, Pulse Grid, Vortex Storm, Azure Dragon, Kaleidoscope, Meteor Shower, DNA Helix, Fireworks, Matrix Rain, Ripple Wave, Constellation, Pendulum, Blooming Flower, Tornado, Hypercube, Fractal Tree, Binary Stars, Ribbon Dance, Hourglass, Snowflake, Hammerhead Shark, Cosmic Rings, Cityscape, Ocean Waves, Forest Scene, Portal Network, Disco Ball, Wind Turbines, Clock Mechanism, Neon Tunnel, Atom Model, Carousel, Solar System, Data Stream, Ferris Wheel, Tornado Vortex, Stadium, Kaleidoscope Plus
 
 **Camera Rig System:**
 - 7 rig types: Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom
