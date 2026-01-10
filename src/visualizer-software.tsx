@@ -3344,6 +3344,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           asteroid.material.opacity = (0.5 + f.highs * 0.4) * blend;
           asteroid.material.wireframe = true;
         });
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'explosion') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance - f.bass*10 + shakeZ);
         cam.lookAt(0,0,0);
@@ -3396,6 +3404,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           tr.material.color.setStyle(tetrahedronColor);
           tr.material.wireframe = true;
         });
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'chill') {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
@@ -3443,6 +3459,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.2+f.bass*0.2) * blend;
         obj.sphere.material.wireframe = false;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'wave') {
         const pathProgress = elScaled * 2;
         cam.position.set(Math.sin(pathProgress * 0.3) * 3 + shakeX, Math.cos(pathProgress * 0.4) * 2 + 2 + activeCameraHeight + shakeY, activeCameraDistance - 5 + shakeZ);
@@ -3517,6 +3541,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'spiral') {
         const a = activeCameraRotation;
         cam.position.set(Math.cos(a)*activeCameraDistance + shakeX, Math.sin(el*0.2)*5 + activeCameraHeight + shakeY, Math.sin(a)*activeCameraDistance + shakeZ);
@@ -3545,6 +3577,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           o.material.opacity = (0.4 + f.mids * 0.4) * blend;
           o.material.color.setStyle(octahedronColor);
         });
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'pulse') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
@@ -3572,6 +3612,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           o.material.opacity = (0.4 + f.mids * 0.5) * blend;
           o.material.color.setStyle(octahedronColor);
         });
+        
+        // Hide unused toruses, tetras, planes, and sphere
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.tetras.length; i++) {
+          obj.tetras[i].position.set(0, -1000, 0); obj.tetras[i].scale.set(0.001, 0.001, 0.001); obj.tetras[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.001, 0.001, 0.001); obj.sphere.material.opacity = 0;
       } else if (type === 'vortex') {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0,0,0);
@@ -3599,6 +3651,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           o.material.opacity = (0.5 + f.mids * 0.4) * blend;
           o.material.color.setStyle(octahedronColor);
         });
+        
+        // Hide unused toruses, tetras, planes, and sphere
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.tetras.length; i++) {
+          obj.tetras[i].position.set(0, -1000, 0); obj.tetras[i].scale.set(0.001, 0.001, 0.001); obj.tetras[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
+        obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.001, 0.001, 0.001); obj.sphere.material.opacity = 0;
       } else if (type === 'seiryu') {
         // Seiryu (Azure Dragon / 青龍) - Traditional Eastern dragon with very long serpentine body
         // Features: Extended sinuous body using 40 cubes for performance, deer-like antlers, whiskers, mane, scales, and a magical pearl
@@ -3825,6 +3889,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'hammerhead') {
         // Hammerhead Shark - Distinctive T-shaped head with smooth predatory swimming
         // GEOMETRY ALLOCATION:
@@ -4059,6 +4131,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'kaleidoscope') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -4658,6 +4738,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'flower') {
         cam.position.set(0 + shakeX, 12 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
