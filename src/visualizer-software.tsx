@@ -5348,14 +5348,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.tetras.forEach((tetra, i) => { const angle = forestTime + i; tetra.position.set(Math.cos(angle) * 15, 3 + Math.sin(forestTime * 2 + i) * 2, Math.sin(angle) * 15); tetra.rotation.x = forestTime + i; tetra.scale.set(0.4, 0.4, 0.4); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.6 * blend; });
         obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
       } else if (type === 'portals' || type === 'discoball' || type === 'windturbines' || type === 'clockwork' || type === 'neontunnel' || type === 'atommodel' || type === 'carousel' || type === 'solarsystem' || type === 'datastream' || type === 'ferriswheel' || type === 'tornadovortex' || type === 'stadium' || type === 'kaleidoscope2') {
-        // Compact implementations for remaining presets
+        // These presets use a fallback generic animation
+        // Each uses their allocated shapes but with similar movement patterns
         const t = elScaled;
         const camAngle = KEYFRAME_ONLY_ROTATION_SPEED;
         cam.position.set(Math.sin(camAngle + activeCameraRotation) * activeCameraDistance + shakeX, 5 + activeCameraHeight + shakeY, Math.cos(camAngle + activeCameraRotation) * activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
         
-        obj.cubes.forEach((cube, i) => {
-          const angle = (i / obj.cubes.length) * Math.PI * 2 + t * 0.5;
+        // Get requirements for current preset to determine which shapes to show
+        const req = PRESET_SHAPE_REQUIREMENTS[type] || { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 };
+        
+        // Animate only allocated cubes
+        for (let i = 0; i < req.cubes && i < obj.cubes.length; i++) {
+          const cube = obj.cubes[i];
+          const angle = (i / req.cubes) * Math.PI * 2 + t * 0.5;
           const radius = 10 + Math.sin(t + i) * 2;
           cube.position.set(Math.cos(angle) * radius, Math.sin(t + i) * 3, Math.sin(angle) * radius);
           const scale = (1 + f.bass * 0.5) * blend;
@@ -5364,10 +5370,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           cube.rotation.y = t * 0.7 + i;
           cube.material.color.setStyle(cubeColor);
           cube.material.opacity = (0.7 + f.bass * 0.2) * blend;
-        });
+        }
+        // Hide unused cubes
+        for (let i = req.cubes; i < obj.cubes.length; i++) {
+          obj.cubes[i].position.set(0, -1000, 0);
+          obj.cubes[i].scale.set(0.001, 0.001, 0.001);
+          obj.cubes[i].material.opacity = 0;
+        }
         
-        obj.toruses.forEach((torus, i) => {
-          const angle = (i / obj.toruses.length) * Math.PI * 2 + t * 0.8;
+        // Animate only allocated toruses
+        for (let i = 0; i < req.toruses && i < obj.toruses.length; i++) {
+          const torus = obj.toruses[i];
+          const angle = (i / req.toruses) * Math.PI * 2 + t * 0.8;
           const radius = 12 + (i % 3) * 4;
           torus.position.set(Math.cos(angle) * radius, Math.sin(t * 1.5 + i) * 4, Math.sin(angle) * radius);
           torus.rotation.x = t + i * 0.5;
@@ -5376,10 +5390,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           torus.scale.set(scale, scale, scale);
           torus.material.color.setStyle(octahedronColor);
           torus.material.opacity = (0.6 + f.mids * 0.3) * blend;
-        });
+        }
+        // Hide unused toruses
+        for (let i = req.toruses; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0);
+          obj.toruses[i].scale.set(0.001, 0.001, 0.001);
+          obj.toruses[i].material.opacity = 0;
+        }
         
-        obj.planes.forEach((plane, i) => {
-          const angle = (i / obj.planes.length) * Math.PI * 2 + t * 0.3;
+        // Animate only allocated planes
+        for (let i = 0; i < req.planes && i < obj.planes.length; i++) {
+          const plane = obj.planes[i];
+          const angle = (i / req.planes) * Math.PI * 2 + t * 0.3;
           const radius = 15 + (i % 4) * 3;
           plane.position.set(Math.cos(angle) * radius, (i % 5 - 2) * 2.5, Math.sin(angle) * radius);
           plane.rotation.x = Math.sin(t + i) * 0.4;
@@ -5389,11 +5411,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           plane.scale.set(scale, scale, 1);
           plane.material.color.setStyle(tetrahedronColor);
           plane.material.opacity = (0.5 + f.highs * 0.4) * blend;
-        });
+        }
+        // Hide unused planes
+        for (let i = req.planes; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0);
+          obj.planes[i].scale.set(0.001, 0.001, 0.001);
+          obj.planes[i].material.opacity = 0;
+        }
         
-        obj.octas.forEach((octa, i) => {
-          if (i >= obj.octas.length - 15) return;
-          const angle = (i / 30) * Math.PI * 2;
+        // Animate only allocated octas (excluding environment octas at end)
+        const maxOctas = Math.min(req.octas, obj.octas.length - 15);
+        for (let i = 0; i < maxOctas; i++) {
+          const octa = obj.octas[i];
+          const angle = (i / maxOctas) * Math.PI * 2;
           const radius = 20 + (i % 6) * 5;
           octa.position.set(Math.cos(angle + t * 0.4) * radius, Math.sin(t * 2 + i) * 6, Math.sin(angle + t * 0.4) * radius);
           const scale = (0.4 + f.highs * 0.4) * blend;
@@ -5402,10 +5432,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           octa.rotation.y += 0.04;
           octa.material.color.setStyle(tetrahedronColor);
           octa.material.opacity = (0.6 + f.highs * 0.3) * blend;
-        });
+        }
+        // Hide unused octas (but keep environment octas)
+        for (let i = maxOctas; i < obj.octas.length - 15; i++) {
+          obj.octas[i].position.set(0, -1000, 0);
+          obj.octas[i].scale.set(0.001, 0.001, 0.001);
+          obj.octas[i].material.opacity = 0;
+        }
         
-        obj.tetras.forEach((tetra, i) => {
-          const angle = (i / obj.tetras.length) * Math.PI * 2 + t;
+        // Animate only allocated tetras
+        for (let i = 0; i < req.tetras && i < obj.tetras.length; i++) {
+          const tetra = obj.tetras[i];
+          const angle = (i / req.tetras) * Math.PI * 2 + t;
           const radius = 8 + (i % 5) * 3;
           tetra.position.set(Math.cos(angle) * radius, Math.sin(t * 1.8 + i) * 5, Math.sin(angle) * radius);
           tetra.rotation.x = t * 2 + i;
@@ -5414,7 +5452,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           tetra.scale.set(scale, scale, scale);
           tetra.material.color.setStyle(octahedronColor);
           tetra.material.opacity = (0.7 + f.mids * 0.2) * blend;
-        });
+        }
+        // Hide unused tetras
+        for (let i = req.tetras; i < obj.tetras.length; i++) {
+          obj.tetras[i].position.set(0, -1000, 0);
+          obj.tetras[i].scale.set(0.001, 0.001, 0.001);
+          obj.tetras[i].material.opacity = 0;
+        }
         
         obj.sphere.position.set(0, Math.sin(t) * 2, 0);
         const sScale = (1.5 + f.bass * 0.6) * blend;
