@@ -4205,6 +4205,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'meteor') {
         const pathAngle = activeCameraRotation;
         cam.position.set(Math.cos(pathAngle) * activeCameraDistance + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(pathAngle) * activeCameraDistance + shakeZ);
@@ -4267,6 +4275,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'dna') {
         const helixRotation = activeCameraRotation;
         cam.position.set(Math.cos(helixRotation) * activeCameraDistance + shakeX, activeCameraHeight + shakeY, Math.sin(helixRotation) * activeCameraDistance + shakeZ);
@@ -4336,6 +4352,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.2 + f.mids * 0.1) * blend;
         obj.sphere.material.wireframe = true;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'fireworks') {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 5, 0);
@@ -4420,6 +4444,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'matrix') {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + 10 + shakeZ);
         cam.lookAt(0, 0, -10);
@@ -4481,6 +4513,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'ripple') {
         cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -4545,6 +4585,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.4) * blend;
         obj.sphere.material.wireframe = true;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'constellation') {
         const orbitAngle = activeCameraRotation;
         cam.position.set(Math.cos(orbitAngle) * activeCameraDistance + shakeX, activeCameraHeight + shakeY, Math.sin(orbitAngle) * activeCameraDistance + shakeZ);
@@ -4604,6 +4652,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'pendulum') {
         cam.position.set(0 + shakeX, 10 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -4674,6 +4730,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'tunnel') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, 5 + shakeZ);
         cam.lookAt(0, 0, -20);
@@ -4806,6 +4870,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.8 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = false;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'tornado') {
         const spiralRotation = activeCameraRotation;
         cam.position.set(Math.cos(spiralRotation) * activeCameraDistance + shakeX, 15 + activeCameraHeight + shakeY, Math.sin(spiralRotation) * activeCameraDistance + shakeZ);
@@ -4864,6 +4936,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'cube3d') {
         cam.position.set(Math.sin(elScaled * 0.2) * 5 + shakeX, Math.cos(elScaled * 0.15) * 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -4940,6 +5020,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.3 + f.bass * 0.2) * blend;
         obj.sphere.material.wireframe = true;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'fractal') {
         cam.position.set(0 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + 5 + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -5096,6 +5184,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'ribbon') {
         cam.position.set(Math.sin(elScaled * 0.1) * 8 + shakeX, 5 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -5159,6 +5255,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.position.set(0, -1000, 0);
         obj.sphere.scale.set(0.001, 0.001, 0.001);
         obj.sphere.material.opacity = 0;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'hourglass') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -5232,6 +5336,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.5 + f.bass * 0.3) * blend;
         obj.sphere.material.wireframe = true;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'snowflake') {
         cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + 10 + shakeZ);
         cam.lookAt(0, 0, 0);
@@ -5295,6 +5407,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         obj.sphere.material.color.setStyle(sphereColor);
         obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
         obj.sphere.material.wireframe = false;
+        
+        // Hide unused toruses and planes
+        for (let i = 0; i < obj.toruses.length; i++) {
+          obj.toruses[i].position.set(0, -1000, 0); obj.toruses[i].scale.set(0.001, 0.001, 0.001); obj.toruses[i].material.opacity = 0;
+        }
+        for (let i = 0; i < obj.planes.length; i++) {
+          obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+        }
       } else if (type === 'cosmic') {
         // Cosmic Rings - Orbital toruses with solar panel planes creating a space station aesthetic
         // GEOMETRY ALLOCATION:
