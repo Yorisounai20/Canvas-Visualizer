@@ -15,14 +15,19 @@ When deploying this React Single Page Application (SPA) to Vercel, users encount
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets|favicon).*)",
       "destination": "/index.html"
     }
   ]
 }
 ```
 
-This tells Vercel to serve `index.html` for **all routes**, allowing React Router to handle navigation on the client side.
+This tells Vercel to serve `index.html` for **all routes except static assets**, allowing React Router to handle navigation on the client side while properly serving static files from `/assets` and `/favicon` directories.
+
+### Why This Pattern?
+- `(?!assets|favicon)` - Negative lookahead that excludes paths starting with "assets" or "favicon"
+- `.*` - Matches any remaining characters in the path
+- This ensures static assets like JS, CSS, images, and favicons are served directly without being rewritten to index.html
 
 ---
 
@@ -391,11 +396,32 @@ After deploying with `vercel.json`, verify:
 
 **The Issue:** Vercel returned 404 for React Router routes like `/editor` and `/software`
 
-**The Fix:** Created `vercel.json` with catch-all rewrite to serve `index.html` for all routes
+**The Fix:** Created `vercel.json` with catch-all rewrite to serve `index.html` for all routes (except static assets in `/assets` and `/favicon` directories)
 
-**The Lesson:** SPAs need server configuration to handle client-side routing
+**The Lesson:** SPAs need server configuration to handle client-side routing while properly serving static assets
 
-**Key Takeaway:** When building SPAs, always configure your hosting platform to serve the main HTML file for all routes, allowing your client-side router to take over.
+**Key Takeaway:** When building SPAs, always configure your hosting platform to serve the main HTML file for all routes (excluding static assets), allowing your client-side router to take over.
+
+---
+
+## 🐛 Bug Fix Update (January 2026)
+
+**Issue Recurrence:** After adding the "create new project" button functionality, the 404 error reappeared.
+
+**Root Cause:** The original regex pattern `/((?!assets/|favicon/).)*` had a subtle bug:
+- The pattern used `.)*` instead of `.*)`
+- The trailing slashes in `assets/` and `favicon/` were unnecessary and could cause matching issues
+- The incorrect quantifier placement caused the negative lookahead to not work properly in all cases
+
+**The Fix:** Updated to `/((?!assets|favicon).*)`
+- Removed trailing slashes from the negative lookahead
+- Fixed the quantifier to properly match any remaining characters after the lookahead check
+- More concise and follows standard regex patterns for this use case
+
+**Testing:** All test cases pass:
+- ✅ Routes like `/`, `/editor`, `/software` are rewritten to index.html
+- ✅ Static assets like `/assets/index.js` are served directly
+- ✅ Favicon files like `/favicon/favicon.ico` are served directly
 
 ---
 
