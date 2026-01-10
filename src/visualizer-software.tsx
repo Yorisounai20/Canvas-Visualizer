@@ -35,6 +35,7 @@ import {
 } from './components/VisualizerSoftware/utils';
 import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
 import { VideoExportModal } from './components/VisualizerSoftware/components';
+import { ParticleEmitter, ParticleSystemManager } from './lib/particleSystem';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -270,6 +271,47 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // PHASE 4: Track active automated events
   const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
+  
+  // Particle system state - using only for template/defaults when creating new keyframes
+  const [particleEmissionRate, setParticleEmissionRate] = useState(50);
+  const [particleLifetime, setParticleLifetime] = useState(2.0);
+  const [particleMaxCount, setParticleMaxCount] = useState(300); // Reduced from 500 for better performance
+  const [particleSpawnX, setParticleSpawnX] = useState(0);
+  const [particleSpawnY, setParticleSpawnY] = useState(0);
+  const [particleSpawnZ, setParticleSpawnZ] = useState(0);
+  const [particleSpawnRadius, setParticleSpawnRadius] = useState(2);
+  const [particleStartColor, setParticleStartColor] = useState('#00ffff');
+  const [particleEndColor, setParticleEndColor] = useState('#0000ff');
+  const [particleStartSize, setParticleStartSize] = useState(0.5);
+  const [particleEndSize, setParticleEndSize] = useState(0.1);
+  const [particleAudioTrack, setParticleAudioTrack] = useState<'bass'|'mids'|'highs'|'all'>('highs');
+  const [particleAudioAffects, setParticleAudioAffects] = useState(['size']);
+  const [particleShape, setParticleShape] = useState<'sphere'|'cube'|'tetrahedron'|'octahedron'>('sphere');
+
+  const particleManagerRef = useRef<ParticleSystemManager | null>(null);
+  
+  // Multi-emitter timeline system
+  const [particleEmitterKeyframes, setParticleEmitterKeyframes] = useState<Array<{
+    id: number;
+    time: number; // start time in seconds
+    duration: number; // how long emitter stays active
+    emissionRate: number;
+    lifetime: number;
+    maxParticles: number;
+    spawnX: number;
+    spawnY: number;
+    spawnZ: number;
+    spawnRadius: number;
+    startColor: string;
+    endColor: string;
+    startSize: number;
+    endSize: number;
+    audioTrack: 'bass' | 'mids' | 'highs' | 'all';
+    shape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
+    enabled: boolean;
+  }>>([]);
+  const nextParticleEmitterKeyframeId = useRef(1);
+  const activeEmitterIds = useRef<Set<number>>(new Set()); // Track which emitters are currently active
   
   // NEW: Global camera keyframes (independent from presets)
   const [cameraKeyframes, setCameraKeyframes] = useState([
@@ -918,6 +960,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const updateCameraShake = (index, field, value) => {
     setCameraShakes(cameraShakes.map((shake, i) => 
       i === index ? { ...shake, [field]: value } : shake
+    ));
+  };
+
+  // Particle emitter keyframe management
+  const addParticleEmitterKeyframe = () => {
+    const newKeyframe = {
+      id: nextParticleEmitterKeyframeId.current++,
+      time: currentTime > 0 ? currentTime : 0,
+      duration: 5.0, // 5 second default duration
+      emissionRate: particleEmissionRate,
+      lifetime: particleLifetime,
+      maxParticles: particleMaxCount,
+      spawnX: particleSpawnX,
+      spawnY: particleSpawnY,
+      spawnZ: particleSpawnZ,
+      spawnRadius: particleSpawnRadius,
+      startColor: particleStartColor,
+      endColor: particleEndColor,
+      startSize: particleStartSize,
+      endSize: particleEndSize,
+      audioTrack: particleAudioTrack,
+      shape: particleShape,
+      enabled: true
+    };
+    setParticleEmitterKeyframes([...particleEmitterKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteParticleEmitterKeyframe = (id: number) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.filter(kf => kf.id !== id));
+  };
+
+  const updateParticleEmitterKeyframe = (id: number, field: string, value: any) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.map(kf => 
+      kf.id === id ? { ...kf, [field]: value } : kf
     ));
   };
 
@@ -2387,6 +2463,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     objectsRef.current = { cubes, octas, tetras, toruses, planes, sphere };
     addLog(`Added ${cubes.length} cubes, ${octas.length} octas, ${tetras.length} tetras, ${toruses.length} toruses, ${planes.length} planes`, 'info');
 
+    // Initialize particle system manager
+    const particleManager = new ParticleSystemManager();
+    particleManagerRef.current = particleManager;
+
     return () => {
       // Cleanup on unmount only
       if (idleAnimationRef.current) {
@@ -2413,6 +2493,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       cameraRef.current = null;
       composerRef.current = null;
       postFXPassRef.current = null;
+      if (particleManagerRef.current) {
+        particleManagerRef.current.dispose();
+      }
     };
   }, []); // Empty dependency array - only run once on mount
 
@@ -3074,6 +3157,63 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       activeBackgroundFlashRef.current = bgFlash;
       activeVignettePulseRef.current = vignetteFlash;
       activeSaturationBurstRef.current = saturationFlash;
+
+      // Manage timeline-based particle emitters
+      if (particleManagerRef.current && sceneRef.current) {
+        particleEmitterKeyframes.forEach(kf => {
+          const isInTimeRange = t >= kf.time && t < (kf.time + kf.duration);
+          const isActive = activeEmitterIds.current.has(kf.id);
+          
+          if (isInTimeRange && !isActive && kf.enabled) {
+            // Spawn this emitter
+            const emitter = new ParticleEmitter({
+              id: `timeline-emitter-${kf.id}`,
+              name: `Timeline Emitter ${kf.id}`,
+              enabled: true,
+              emissionRate: kf.emissionRate,
+              maxParticles: kf.maxParticles,
+              lifetime: kf.lifetime,
+              lifetimeVariance: 0.2,
+              spawnPosition: new THREE.Vector3(kf.spawnX, kf.spawnY, kf.spawnZ),
+              spawnRadius: kf.spawnRadius,
+              spawnVelocity: new THREE.Vector3(0, 2, 0),
+              velocityVariance: 1,
+              startSize: kf.startSize,
+              endSize: kf.endSize,
+              startColor: new THREE.Color(kf.startColor),
+              endColor: new THREE.Color(kf.endColor),
+              startOpacity: 1,
+              endOpacity: 0,
+              gravity: new THREE.Vector3(0, -1, 0),
+              drag: 0.1,
+              audioReactive: true,
+              audioTrack: kf.audioTrack,
+              audioAffects: ['size'] as any,
+              audioIntensity: 0.5,
+              particleShape: kf.shape,
+              wireframe: true,
+              rotationSpeed: new THREE.Vector3(1, 1, 0)
+            }, sceneRef.current);
+            
+            particleManagerRef.current.addEmitter(emitter);
+            activeEmitterIds.current.add(kf.id);
+          } else if (!isInTimeRange && isActive) {
+            // Remove this emitter
+            particleManagerRef.current.removeEmitter(`timeline-emitter-${kf.id}`);
+            activeEmitterIds.current.delete(kf.id);
+          }
+        });
+      }
+
+      // Update particle system
+      if (particleManagerRef.current && analyser) {
+        const deltaTime = elapsed / 1000; // Convert to seconds
+        particleManagerRef.current.update(deltaTime, {
+          bass: f.bass,
+          mids: f.mids,
+          highs: f.highs
+        });
+      }
 
       // Handle preset transitions with blend effect
       if (prevAnimRef.current === null) {
@@ -9594,6 +9734,277 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     </div>
                   )}
                 </>
+              )}
+            </div>
+
+            {/* Particle Emitter Timeline */}
+            <div className="bg-gray-700 rounded-lg p-3 mt-3">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-cyan-400">🎯 Particle Emitter Timeline</h3>
+                <button
+                  onClick={addParticleEmitterKeyframe}
+                  disabled={!audioReady}
+                  className={`px-2 py-1 rounded text-xs ${audioReady ? 'bg-cyan-600 hover:bg-cyan-700' : 'bg-gray-600 cursor-not-allowed'}`}
+                >
+                  + Add at {formatTime(currentTime)}
+                </button>
+              </div>
+              
+              <p className="text-xs text-gray-400 mb-3">
+                Add particle emitters at specific times in your song (perfect for drop sections!)
+              </p>
+              
+              {/* Default Settings for New Emitters */}
+              <details className="mb-3">
+                <summary className="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300 mb-2">
+                  ⚙️ Default Settings (Template for New Emitters)
+                </summary>
+                <div className="space-y-2 bg-gray-800 rounded p-2 mt-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Emission Rate</label>
+                      <input
+                        type="number"
+                        min="10"
+                        max="200"
+                        value={particleEmissionRate}
+                        onChange={(e) => setParticleEmissionRate(Number(e.target.value))}
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Lifetime (s)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.5"
+                        max="5"
+                        value={particleLifetime}
+                        onChange={(e) => setParticleLifetime(Number(e.target.value))}
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Start Color</label>
+                      <input
+                        type="color"
+                        value={particleStartColor}
+                        onChange={(e) => setParticleStartColor(e.target.value)}
+                        className="w-full h-8 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">End Color</label>
+                      <input
+                        type="color"
+                        value={particleEndColor}
+                        onChange={(e) => setParticleEndColor(e.target.value)}
+                        className="w-full h-8 rounded cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Audio Track</label>
+                      <select
+                        value={particleAudioTrack}
+                        onChange={(e) => setParticleAudioTrack(e.target.value as any)}
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                      >
+                        <option value="bass">Bass</option>
+                        <option value="mids">Mids</option>
+                        <option value="highs">Highs</option>
+                        <option value="all">All</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Shape</label>
+                      <select
+                        value={particleShape}
+                        onChange={(e) => setParticleShape(e.target.value as any)}
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                      >
+                        <option value="sphere">Sphere</option>
+                        <option value="cube">Cube</option>
+                        <option value="tetrahedron">Tetrahedron</option>
+                        <option value="octahedron">Octahedron</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </details>
+              
+              {particleEmitterKeyframes.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">
+                  No timeline emitters. Click "+ Add at [time]" to create emitters at specific moments!
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {particleEmitterKeyframes.map((kf) => (
+                    <div key={kf.id} className="bg-gray-800 rounded p-3 border-l-4 border-cyan-500">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-semibold text-sm">
+                            {formatTime(kf.time)} → {formatTime(kf.time + kf.duration)}
+                          </span>
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={kf.enabled}
+                              onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'enabled', e.target.checked)}
+                              className="mr-1"
+                            />
+                            <span className="text-xs text-gray-400">On</span>
+                          </label>
+                        </div>
+                        <button
+                          onClick={() => deleteParticleEmitterKeyframe(kf.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Start Time (s)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={kf.time}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'time', Number(e.target.value))}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Duration (s)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            value={kf.duration}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'duration', Number(e.target.value))}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Emission Rate</label>
+                          <input
+                            type="number"
+                            min="10"
+                            max="200"
+                            value={kf.emissionRate}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'emissionRate', Number(e.target.value))}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Lifetime (s)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.5"
+                            max="5"
+                            value={kf.lifetime}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'lifetime', Number(e.target.value))}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">X: {kf.spawnX}</label>
+                          <input
+                            type="range"
+                            min="-20"
+                            max="20"
+                            value={kf.spawnX}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'spawnX', Number(e.target.value))}
+                            className="w-full h-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Y: {kf.spawnY}</label>
+                          <input
+                            type="range"
+                            min="-10"
+                            max="20"
+                            value={kf.spawnY}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'spawnY', Number(e.target.value))}
+                            className="w-full h-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Z: {kf.spawnZ}</label>
+                          <input
+                            type="range"
+                            min="-20"
+                            max="20"
+                            value={kf.spawnZ}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'spawnZ', Number(e.target.value))}
+                            className="w-full h-1"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Start Color</label>
+                          <input
+                            type="color"
+                            value={kf.startColor}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'startColor', e.target.value)}
+                            className="w-full h-8 rounded cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">End Color</label>
+                          <input
+                            type="color"
+                            value={kf.endColor}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'endColor', e.target.value)}
+                            className="w-full h-8 rounded cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Audio Track</label>
+                          <select
+                            value={kf.audioTrack}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'audioTrack', e.target.value)}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="bass">Bass</option>
+                            <option value="mids">Mids</option>
+                            <option value="highs">Highs</option>
+                            <option value="all">All</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-400 block mb-1">Shape</label>
+                          <select
+                            value={kf.shape}
+                            onChange={(e) => updateParticleEmitterKeyframe(kf.id, 'shape', e.target.value)}
+                            className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                          >
+                            <option value="sphere">Sphere</option>
+                            <option value="cube">Cube</option>
+                            <option value="tetrahedron">Tetrahedron</option>
+                            <option value="octahedron">Octahedron</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
