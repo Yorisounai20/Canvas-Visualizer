@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle, Save, FolderOpen } from 'lucide-react';
+import { Play, Square, Video, Undo2, Redo2, Upload, HelpCircle, Save, FolderOpen, Home } from 'lucide-react';
 
 interface TopBarProps {
   isPlaying: boolean;
@@ -21,6 +21,7 @@ interface TopBarProps {
   onSave?: () => void; // Save project to database
   onLoad?: () => void; // Open saved projects
   isSaving?: boolean; // Saving state indicator
+  onBackToDashboard?: () => void; // Navigate back to dashboard
 }
 
 /**
@@ -48,7 +49,8 @@ export default function TopBar({
   onShowKeyboardShortcuts,
   onSave,
   onLoad,
-  isSaving = false
+  isSaving = false,
+  onBackToDashboard
 }: TopBarProps) {
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
@@ -120,6 +122,21 @@ export default function TopBar({
 
       {/* Right: Undo/Redo, Keyboard Shortcuts, and Export */}
       <div className="flex items-center gap-2">
+        {/* Home Button - Back to Dashboard */}
+        {onBackToDashboard && (
+          <>
+            <button
+              onClick={onBackToDashboard}
+              className="p-2 rounded hover:bg-gray-700 text-gray-300 transition-colors"
+              title="Back to Dashboard"
+            >
+              <Home size={18} />
+            </button>
+            {/* Divider */}
+            <div className="w-px h-6 bg-gray-700 mx-2" />
+          </>
+        )}
+
         {/* Undo/Redo Buttons */}
         <button
           onClick={onUndo}

@@ -251,6 +251,7 @@ const DEFAULT_CAMERA_AUTO_ROTATE = true;
 interface VisualizerEditorProps {
   projectSettings: ProjectSettings;
   initialAudioFile?: File;
+  onBackToDashboard?: () => void;
 }
 
 /**
@@ -277,7 +278,7 @@ interface VisualizerEditorProps {
  * 
  * Coordinates all panels and manages the 3D visualization state
  */
-export default function VisualizerEditor({ projectSettings, initialAudioFile }: VisualizerEditorProps) {
+export default function VisualizerEditor({ projectSettings, initialAudioFile, onBackToDashboard }: VisualizerEditorProps) {
   // Get authenticated user
   // PHASE 1: Core Three.js refs (stable across component lifetime)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -3689,6 +3690,7 @@ export default function VisualizerEditor({ projectSettings, initialAudioFile }: 
         onSave={handleSaveProject} // Save project handler
         onLoad={() => setShowProjectsModal(true)} // Load project handler
         isSaving={isSaving} // Saving state
+        onBackToDashboard={onBackToDashboard} // Navigate back to dashboard
       />
 
       {/* Main Content Area - Calculate height based on available space minus timeline */}

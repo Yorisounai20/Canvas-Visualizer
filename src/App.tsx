@@ -29,12 +29,19 @@ function LoadingScreen() {
  * Editor Mode Component - handles the project modal and editor flow
  */
 function EditorMode() {
+  const navigate = useNavigate();
   const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
   const [initialAudioFile, setInitialAudioFile] = useState<File | undefined>(undefined);
 
   const handleCreateProject = (settings: ProjectSettings, audioFile?: File) => {
     setProjectSettings(settings);
     setInitialAudioFile(audioFile);
+  };
+
+  const handleBackToDashboard = () => {
+    // Clear the persisted mode when going back to dashboard
+    localStorage.removeItem(MODE_STORAGE_KEY);
+    navigate('/');
   };
 
   // Show project modal first if no project settings
@@ -48,6 +55,7 @@ function EditorMode() {
       <VisualizerEditor 
         projectSettings={projectSettings}
         initialAudioFile={initialAudioFile}
+        onBackToDashboard={handleBackToDashboard}
       />
     </Suspense>
   );
