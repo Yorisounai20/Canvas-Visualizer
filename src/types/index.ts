@@ -69,12 +69,38 @@ export interface Section {
   parameters?: PresetParameters; // PHASE 4: Editable preset parameters
 }
 
+// Easing function types - comprehensive list of standard easing functions
+export type EasingFunction = 
+  | 'linear'
+  // Legacy cubic (backwards compatible)
+  | 'easeIn' | 'easeOut' | 'easeInOut'
+  // Sine - smooth and gentle
+  | 'sineIn' | 'sineOut' | 'sineInOut'
+  // Quadratic - subtle acceleration
+  | 'quadIn' | 'quadOut' | 'quadInOut'
+  // Cubic - moderate acceleration
+  | 'cubicIn' | 'cubicOut' | 'cubicInOut'
+  // Quartic - strong acceleration
+  | 'quartIn' | 'quartOut' | 'quartInOut'
+  // Quintic - very strong acceleration
+  | 'quintIn' | 'quintOut' | 'quintInOut'
+  // Exponential - dramatic acceleration
+  | 'expoIn' | 'expoOut' | 'expoInOut'
+  // Circular - smooth circular motion
+  | 'circIn' | 'circOut' | 'circInOut'
+  // Back - overshoot and return
+  | 'backIn' | 'backOut' | 'backInOut'
+  // Elastic - spring-like oscillation
+  | 'elasticIn' | 'elasticOut' | 'elasticInOut'
+  // Bounce - bouncing ball effect
+  | 'bounceIn' | 'bounceOut' | 'bounceInOut';
+
 export interface CameraKeyframe {
   time: number;
   distance: number;
   height: number;
   rotation: number;
-  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  easing: EasingFunction;
   cameraId?: string; // Optional: ID of the camera object to use, if not specified uses main camera
 }
 
@@ -169,7 +195,7 @@ export interface MaskRevealKeyframe {
   maskId: string;
   animation: 'wipe-left' | 'wipe-right' | 'wipe-up' | 'wipe-down' | 'expand-circle' | 'shrink-circle' | 'none';
   duration: number;
-  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  easing: EasingFunction;
   // Target values for animation
   targetCenter?: { x: number; y: number };
   targetRadius?: number;
@@ -220,7 +246,7 @@ export interface CameraRigKeyframe {
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
   duration: number;
-  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  easing: EasingFunction;
   // Optional preset application
   preset?: 'orbit' | 'dolly' | 'crane';
 }
@@ -278,7 +304,7 @@ export interface CameraFXKeyframe {
   time: number;
   parameter: string; // e.g., 'gridRows', 'kaleidoscopeRotation', 'pipScale'
   value: number;
-  easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  easing: EasingFunction;
 }
 
 export interface CameraFXAudioModulation {

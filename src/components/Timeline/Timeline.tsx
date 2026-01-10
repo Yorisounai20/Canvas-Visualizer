@@ -3,6 +3,7 @@ import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
+import { EASING_FUNCTIONS, EASING_BY_CATEGORY, EASING_CATEGORY_ORDER } from '../../lib/easingFunctions';
 
 interface TimelineProps {
   sections: Section[];
@@ -345,7 +346,7 @@ export default function Timeline({
       const deltaTime = (deltaX / rect.width) * duration;
 
       const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
-      if (!clip) return;
+      if (!clip || !fxDragState.clipId) return;
 
       let newStart = fxDragState.initialStart;
       let newEnd = fxDragState.initialEnd;
@@ -1224,11 +1225,23 @@ export default function Timeline({
                 })}
                 className="w-full bg-gray-700 text-white px-3 py-2 rounded border border-gray-600"
               >
-                <option value="linear">Linear</option>
-                <option value="easeIn">Ease In</option>
-                <option value="easeOut">Ease Out</option>
-                <option value="easeInOut">Ease In Out</option>
+                {EASING_CATEGORY_ORDER.map(category => {
+                  const options = EASING_BY_CATEGORY[category];
+                  if (!options) return null;
+                  return (
+                    <optgroup key={category} label={category}>
+                      {options.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {EASING_FUNCTIONS.find(opt => opt.value === editingKeyframe.data.easing)?.description || 'Select easing function'}
+              </p>
             </div>
             <div className="flex gap-3 justify-end">
               <button
