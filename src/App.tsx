@@ -5,8 +5,8 @@ import Home from './pages/Home';
 import { ProjectSettings } from './types';
 
 // Lazy load the large visualizer components for code splitting
-const VisualizerEditor = lazy(() => import('./VisualizerEditor'));
-const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
+const VisualizerEditor = lazy(() => import('./archived/VisualizerEditor'));
+const ThreeDVisualizer = lazy(() => import('./archived/visualizer-software'));
 
 // LocalStorage key for mode persistence
 const MODE_STORAGE_KEY = 'canvas-visualizer-selected-mode';

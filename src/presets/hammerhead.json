@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "name": "Hammerhead Shark",
+    "author": "Canvas Visualizer Team",
+    "version": "1.0.0",
+    "description": "A shark-like creature swimming forward with a sinuous tail motion and particle effects"
+  },
+  "duration": 30,
+  "camera": {
+    "distance": 15,
+    "height": 2,
+    "rotation": 0,
+    "fov": 75
+  },
+  "automations": [
+    {
+      "target": "camera.rotation",
+      "keyframes": [
+        { "time": 0, "value": 0, "easing": "linear" },
+        { "time": 30, "value": 360, "easing": "linear" }
+      ]
+    },
+    {
+      "target": "shapes.tailWave.amplitude",
+      "keyframes": [
+        { "time": 0, "value": 0.5, "easing": "linear" },
+        { "time": 15, "value": 1.0, "easing": "easeInOut" },
+        { "time": 30, "value": 0.5, "easing": "easeInOut" }
+      ]
+    },
+    {
+      "target": "shapes.tailWave.frequency",
+      "keyframes": [
+        { "time": 0, "value": 2.0, "easing": "linear" },
+        { "time": 30, "value": 2.0, "easing": "linear" }
+      ]
+    },
+    {
+      "target": "shapes.forward.speed",
+      "keyframes": [
+        { "time": 0, "value": 0.5, "easing": "linear" },
+        { "time": 10, "value": 1.5, "easing": "easeIn" },
+        { "time": 20, "value": 0.8, "easing": "easeOut" },
+        { "time": 30, "value": 0.5, "easing": "linear" }
+      ]
+    }
+  ],
+  "audioReactive": [
+    {
+      "target": "shapes.tailWave.amplitude",
+      "band": "bass",
+      "amount": 0.3,
+      "mode": "add"
+    },
+    {
+      "target": "shapes.headScale",
+      "band": "mids",
+      "amount": 0.2,
+      "mode": "multiply"
+    },
+    {
+      "target": "particles.emissionRate",
+      "band": "highs",
+      "amount": 0.5,
+      "mode": "multiply"
+    }
+  ],
+  "events": [
+    {
+      "time": 5.0,
+      "action": "particleBurst",
+      "args": {
+        "count": 50,
+        "color": "#00ffff"
+      }
+    },
+    {
+      "time": 10.0,
+      "action": "particleBurst",
+      "args": {
+        "count": 75,
+        "color": "#ff00ff"
+      }
+    },
+    {
+      "time": 15.0,
+      "action": "particleBurst",
+      "args": {
+        "count": 100,
+        "color": "#ffff00"
+      }
+    },
+    {
+      "time": 20.0,
+      "action": "particleBurst",
+      "args": {
+        "count": 75,
+        "color": "#ff00ff"
+      }
+    },
+    {
+      "time": 25.0,
+      "action": "particleBurst",
+      "args": {
+        "count": 50,
+        "color": "#00ffff"
+      }
+    }
+  ],
+  "params": {
+    "shapes.tailSegments": 30,
+    "shapes.headShape": "octahedron",
+    "colors.primary": "#00aaff",
+    "colors.secondary": "#0066cc",
+    "colors.accent": "#00ffff"
+  }
+}
