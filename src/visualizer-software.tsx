@@ -1301,8 +1301,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     const ctx = audioContextRef.current;
     const startOffset = pauseTimeRef.current;
     
-    // Track which sources have ended
-    let endedCount = 0;
+    // Track which sources have ended using a Set to avoid race conditions
+    const endedSources = new Set<AudioBufferSourceNode>();
     const totalTracks = tracks.filter(t => t.buffer).length;
     
     // Start all tracks synchronized
@@ -1332,11 +1332,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Set gain based on mute state
       track.gainNode.gain.value = track.muted ? 0 : track.volume;
       
-      // Add onended handler - stop playback when the longest track finishes
+      // Add onended handler - stop playback when all tracks finish
       source.onended = () => {
-        endedCount++;
+        endedSources.add(source);
         // When all tracks have ended, stop playback
-        if (endedCount >= totalTracks) {
+        if (endedSources.size >= totalTracks) {
           pauseTimeRef.current = 0; // Reset to beginning
           setCurrentTime(0);
           setIsPlaying(false);
@@ -1664,6 +1664,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setIsRecording(true);
       addLog('Recording started', 'success');
 
+      // Track progress
+      const AUDIO_END_THRESHOLD = 0.1;
+      const FINAL_FRAME_DELAY = 500;
+      
       // Auto-play the audio using Web Audio API
       const src = audioContextRef.current.createBufferSource();
       src.buffer = audioBufferRef.current;
@@ -1680,17 +1684,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           if (bufferSourceRef.current === src) {
             bufferSourceRef.current = null;
           }
-        }, 500);
+        }, FINAL_FRAME_DELAY);
       };
       
       src.start(0, 0);
       bufferSourceRef.current = src;
       startTimeRef.current = Date.now();
       setIsPlaying(true);
-
-      // Track progress
-      const AUDIO_END_THRESHOLD = 0.1;
-      const FINAL_FRAME_DELAY = 500;
       
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
