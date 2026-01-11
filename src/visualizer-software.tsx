@@ -334,6 +334,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   ]);
   const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
   const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
+  const [presetKeyframesExpanded, setPresetKeyframesExpanded] = useState(true); // Collapsible preset keyframes list
+  const [speedKeyframesExpanded, setSpeedKeyframesExpanded] = useState(true); // Collapsible speed keyframes list
+  
+  // NEW: Speed keyframes for dynamic speed changes within presets
+  const [presetSpeedKeyframes, setPresetSpeedKeyframes] = useState<Array<{
+    id: number;
+    time: number; // time in seconds
+    speed: number; // speed multiplier (0.1 to 3.0)
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  }>>([
+    { id: 1, time: 0, speed: 1.0, easing: 'linear' }
+  ]);
+  const nextSpeedKeyframeId = useRef(2); // Counter for generating unique IDs
   
   // Legacy sections system (kept for backward compatibility with existing code)
   const [sections, setSections] = useState([
@@ -821,18 +834,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     return sorted[sorted.length - 1]?.preset || 'orbit';
   };
   
-  // Get current preset speed multiplier
+  // Get current preset speed multiplier with keyframe interpolation
   const getCurrentPresetSpeed = () => {
-    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
-    for (let i = 0; i < sorted.length; i++) {
-      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
-        return sorted[i].speed || 1.0;
+    // Sort speed keyframes by time
+    const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
+    
+    // If no keyframes or before first keyframe, return first keyframe speed or default
+    if (sorted.length === 0) return 1.0;
+    if (currentTime <= sorted[0].time) return sorted[0].speed;
+    
+    // If after last keyframe, return last keyframe speed
+    if (currentTime >= sorted[sorted.length - 1].time) {
+      return sorted[sorted.length - 1].speed;
+    }
+    
+    // Find the two keyframes we're between
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const kf1 = sorted[i];
+      const kf2 = sorted[i + 1];
+      
+      if (currentTime >= kf1.time && currentTime < kf2.time) {
+        // Interpolate between the two keyframes
+        const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
+        const easedT = applyEasing(t, kf1.easing);
+        return kf1.speed + (kf2.speed - kf1.speed) * easedT;
       }
     }
-    if (currentTime < sorted[0]?.time) {
-      return sorted[0]?.speed || 1.0;
-    }
-    return sorted[sorted.length - 1]?.speed || 1.0;
+    
+    // Fallback to last keyframe speed
+    return sorted[sorted.length - 1].speed;
   };
 
   const addSection = () => {
@@ -886,6 +916,63 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           updated.endTime = updated.time + 1;
         }
         return updated;
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time)); // Re-sort after time update
+  };
+  
+  // Speed keyframe handlers
+  const handleAddSpeedKeyframe = () => {
+    // Calculate current speed from existing keyframes to use as default
+    const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
+    let defaultSpeed = 1.0;
+    
+    if (sorted.length > 0) {
+      if (currentTime <= sorted[0].time) {
+        defaultSpeed = sorted[0].speed;
+      } else if (currentTime >= sorted[sorted.length - 1].time) {
+        defaultSpeed = sorted[sorted.length - 1].speed;
+      } else {
+        // Find interpolated speed at current time
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const kf1 = sorted[i];
+          const kf2 = sorted[i + 1];
+          if (currentTime >= kf1.time && currentTime < kf2.time) {
+            const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
+            const easedT = applyEasing(t, kf1.easing);
+            defaultSpeed = kf1.speed + (kf2.speed - kf1.speed) * easedT;
+            break;
+          }
+        }
+      }
+    }
+    
+    const newKeyframe = {
+      id: nextSpeedKeyframeId.current++,
+      time: currentTime,
+      speed: defaultSpeed,
+      easing: 'linear' as const
+    };
+    setPresetSpeedKeyframes([...presetSpeedKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeleteSpeedKeyframe = (id: number) => {
+    // Keep at least one keyframe
+    if (presetSpeedKeyframes.length > 1) {
+      setPresetSpeedKeyframes(presetSpeedKeyframes.filter(kf => kf.id !== id));
+    }
+  };
+  
+  const handleUpdateSpeedKeyframe = (id: number, field: 'time' | 'speed' | 'easing', value: number | string) => {
+    setPresetSpeedKeyframes(presetSpeedKeyframes.map(kf => {
+      if (kf.id === id) {
+        // Validate speed values to ensure they stay within valid range
+        if (field === 'speed') {
+          const speedValue = typeof value === 'number' ? value : parseFloat(value);
+          const clampedSpeed = Math.max(0.1, Math.min(3.0, isNaN(speedValue) ? kf.speed : speedValue));
+          return { ...kf, [field]: clampedSpeed };
+        }
+        return { ...kf, [field]: value };
       }
       return kf;
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
@@ -10430,146 +10517,329 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 </button>
               </div>
               
-              {/* Timeline bar visualization with segments */}
-              <div className="relative bg-gray-800 rounded h-12 mb-3 overflow-hidden">
-                {/* Preset segments */}
-                {presetKeyframes.map(kf => {
-                  const startPos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
-                  const endPos = duration > 0 ? Math.min((kf.endTime / duration) * 100, 100) : 0;
-                  const width = Math.max(endPos - startPos, 0.5); // Minimum visible width
-                  const animType = animationTypes.find(a => a.value === kf.preset);
-                  
-                  // Color coding by preset type
-                  const colors: Record<string, string> = {
-                    orbit: 'bg-blue-500',
-                    explosion: 'bg-orange-500',
-                    tunnel: 'bg-green-500',
-                    wave: 'bg-cyan-500',
-                    spiral: 'bg-purple-500',
-                    chill: 'bg-pink-500',
-                    pulse: 'bg-yellow-500',
-                    vortex: 'bg-red-500',
-                    dragon: 'bg-indigo-500',
-                    hammerhead: 'bg-teal-500'
-                  };
-                  const colorClass = colors[kf.preset] || 'bg-gray-500';
-                  
-                  return (
-                    <div
-                      key={kf.id}
-                      className={`absolute top-0 bottom-0 ${colorClass} opacity-70 hover:opacity-90 transition-opacity cursor-pointer border-r-2 border-white`}
-                      style={{ left: `${startPos}%`, width: `${width}%` }}
-                      title={`${animType?.label || kf.preset}: ${formatTime(kf.time)} - ${formatTime(kf.endTime)} (${kf.speed}x speed)`}
-                    >
-                      <div className="absolute top-1 left-1 text-xs text-white font-semibold truncate px-1">
-                        {animType?.icon}
-                      </div>
-                    </div>
-                  );
-                })}
+              {/* Timeline bar visualization with segments and speed keyframes */}
+              <div className="space-y-2">
+                {/* Preset segments timeline */}
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Preset Segments</div>
+                  <div className="relative bg-gray-800 rounded h-12 mb-1 overflow-hidden">
+                    {/* Preset segments */}
+                    {presetKeyframes.map(kf => {
+                      const startPos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                      const endPos = duration > 0 ? Math.min((kf.endTime / duration) * 100, 100) : 0;
+                      const width = Math.max(endPos - startPos, 0.5); // Minimum visible width
+                      const animType = animationTypes.find(a => a.value === kf.preset);
+                      
+                      // Color coding by preset type
+                      const colors: Record<string, string> = {
+                        orbit: 'bg-blue-500',
+                        explosion: 'bg-orange-500',
+                        tunnel: 'bg-green-500',
+                        wave: 'bg-cyan-500',
+                        spiral: 'bg-purple-500',
+                        chill: 'bg-pink-500',
+                        pulse: 'bg-yellow-500',
+                        vortex: 'bg-red-500',
+                        dragon: 'bg-indigo-500',
+                        hammerhead: 'bg-teal-500'
+                      };
+                      const colorClass = colors[kf.preset] || 'bg-gray-500';
+                      
+                      return (
+                        <div
+                          key={kf.id}
+                          className={`absolute top-0 bottom-0 ${colorClass} opacity-70 hover:opacity-90 transition-opacity cursor-pointer border-r-2 border-white`}
+                          style={{ left: `${startPos}%`, width: `${width}%` }}
+                          title={`${animType?.label || kf.preset}: ${formatTime(kf.time)} - ${formatTime(kf.endTime)}`}
+                        >
+                          <div className="absolute top-1 left-1 text-xs text-white font-semibold truncate px-1">
+                            {animType?.icon}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Current time indicator */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                      style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
                 
-                {/* Current time indicator */}
-                <div 
-                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
-                  style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-                />
+                {/* Speed keyframes timeline */}
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Speed Keyframes</div>
+                  <div className="relative bg-gray-800 rounded h-12 overflow-hidden">
+                    {/* Speed visualization as a gradient/line showing speed changes */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[1]">
+                      <defs>
+                        <linearGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                          {presetSpeedKeyframes.map((kf, idx) => {
+                            const pos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                            // Map speed (0.1-3.0) to color intensity (darker = slower, brighter = faster)
+                            // Color channel multipliers: R=1.0 (full), G=0.5 (medium), B=0.8 (high) for purple-ish gradient
+                            const SPEED_MAX = 3.0;
+                            const GREEN_MULTIPLIER = 0.5;
+                            const BLUE_MULTIPLIER = 0.8;
+                            const intensity = Math.min(255, Math.floor((kf.speed / SPEED_MAX) * 255));
+                            const color = `rgb(${intensity}, ${Math.floor(intensity * GREEN_MULTIPLIER)}, ${Math.floor(intensity * BLUE_MULTIPLIER)})`;
+                            return <stop key={idx} offset={`${pos}%`} stopColor={color} />;
+                          })}
+                        </linearGradient>
+                      </defs>
+                      <rect x="0" y="0" width="100%" height="100%" fill="url(#speedGradient)" opacity="0.3" />
+                    </svg>
+                    
+                    {/* Speed keyframe markers */}
+                    {presetSpeedKeyframes.map((kf, idx) => {
+                      const pos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
+                      return (
+                        <div
+                          key={kf.id}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group z-[2]"
+                          style={{ left: `${pos}%` }}
+                          title={`${formatTime(kf.time)}: ${kf.speed.toFixed(1)}x speed (${kf.easing})`}
+                        >
+                          <div className="w-3 h-8 bg-yellow-400 hover:bg-yellow-300 transition-colors rounded flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+                          </div>
+                          <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-700 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                            {formatTime(kf.time)}: {kf.speed.toFixed(1)}x
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Current time indicator */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 pointer-events-none z-10"
+                      style={{ left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                    />
+                    
+                    {/* Current speed display */}
+                    <div className="absolute bottom-1 right-2 text-xs text-yellow-300 font-semibold bg-gray-900 px-2 py-1 rounded z-[3]">
+                      {getCurrentPresetSpeed().toFixed(1)}x
+                    </div>
+                  </div>
+                </div>
               </div>
               
-              {/* Quick add button */}
-              <button
-                onClick={handleAddPresetKeyframe}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
-              >
-                <Plus size={14} />
-                Add at {formatTime(currentTime)}
-              </button>
+              {/* Quick add buttons */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleAddPresetKeyframe}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+                >
+                  <Plus size={14} />
+                  Add Preset
+                </button>
+                <button
+                  onClick={handleAddSpeedKeyframe}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white text-sm px-3 py-2 rounded flex items-center justify-center gap-2"
+                >
+                  <Plus size={14} />
+                  Add Speed
+                </button>
+              </div>
             </div>
             
-            {/* Collapsible keyframe settings */}
+            {/* Preset Keyframes Section */}
             {presetSettingsExpanded && (
-              <div className="space-y-3">
-                {presetKeyframes.map((kf, index) => {
-                  const animType = animationTypes.find(a => a.value === kf.preset);
-                  const duration = kf.endTime - kf.time;
-                  return (
-                    <div key={kf.id} className="bg-gray-700 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-purple-400 font-mono text-sm">
-                          #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
-                        </span>
-                        <button
-                          onClick={() => handleDeletePresetKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={presetKeyframes.length <= 1}
-                          title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
-                          aria-disabled={presetKeyframes.length <= 1}
-                          aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 mb-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Start Time</label>
-                          <input
-                            type="text"
-                            id={`preset-kf-time-${kf.id}`}
-                            name={`preset-kf-time-${kf.id}`}
-                            value={formatTime(kf.time)}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
+              <div className="bg-gray-700 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-purple-400">🎬 Preset Keyframes</h3>
+                  <button
+                    onClick={() => setPresetKeyframesExpanded(!presetKeyframesExpanded)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title={presetKeyframesExpanded ? "Collapse preset keyframes" : "Expand preset keyframes"}
+                  >
+                    <ChevronDown 
+                      size={20} 
+                      className={`transition-transform ${presetKeyframesExpanded ? '' : '-rotate-90'}`}
+                    />
+                  </button>
+                </div>
+                
+                {presetKeyframesExpanded && (
+                  <div className="space-y-3">
+                    {presetKeyframes.map((kf, index) => {
+                      const animType = animationTypes.find(a => a.value === kf.preset);
+                      const duration = kf.endTime - kf.time;
+                      return (
+                        <div key={kf.id} className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-purple-400 font-mono text-sm">
+                              #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
+                            </span>
+                            <button
+                              onClick={() => handleDeletePresetKeyframe(kf.id)}
+                              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={presetKeyframes.length <= 1}
+                              title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
+                              aria-disabled={presetKeyframes.length <= 1}
+                              aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-2">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Start Time</label>
+                              <input
+                                type="text"
+                                id={`preset-kf-time-${kf.id}`}
+                                name={`preset-kf-time-${kf.id}`}
+                                value={formatTime(kf.time)}
+                                onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">End Time</label>
+                              <input
+                                type="text"
+                                id={`preset-kf-endtime-${kf.id}`}
+                                name={`preset-kf-endtime-${kf.id}`}
+                                value={formatTime(kf.endTime)}
+                                onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Preset</label>
+                            <select
+                              value={kf.preset}
+                              onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                              className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                            >
+                              {animationTypes.map(t => (
+                                <option key={t.value} value={t.value}>
+                                  {t.icon} {t.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          {/* Preview of current preset */}
+                          <div className="mt-2 px-2 py-1 bg-gray-900 rounded text-xs text-gray-300">
+                            {animType?.icon} {animType?.label || kf.preset} • {duration.toFixed(1)}s duration
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">End Time</label>
-                          <input
-                            type="text"
-                            id={`preset-kf-endtime-${kf.id}`}
-                            name={`preset-kf-endtime-${kf.id}`}
-                            value={formatTime(kf.endTime)}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Speed Keyframes Management Panel */}
+            {presetSettingsExpanded && (
+              <div className="bg-gray-700 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-yellow-400">⚡ Speed Keyframes</h3>
+                  <button
+                    onClick={() => setSpeedKeyframesExpanded(!speedKeyframesExpanded)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title={speedKeyframesExpanded ? "Collapse speed keyframes" : "Expand speed keyframes"}
+                  >
+                    <ChevronDown 
+                      size={20} 
+                      className={`transition-transform ${speedKeyframesExpanded ? '' : '-rotate-90'}`}
+                    />
+                  </button>
+                </div>
+                
+                {speedKeyframesExpanded && (
+                  <>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Control animation speed over time with keyframes. Speed is interpolated smoothly between keyframes.
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {presetSpeedKeyframes.map((kf, index) => (
+                        <div key={kf.id} className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-yellow-400 font-mono text-sm">
+                              #{index + 1} - {formatTime(kf.time)} • {kf.speed.toFixed(1)}x
+                            </span>
+                            <button
+                              onClick={() => handleDeleteSpeedKeyframe(kf.id)}
+                              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={presetSpeedKeyframes.length <= 1}
+                              title={presetSpeedKeyframes.length <= 1 ? "Cannot delete last speed keyframe" : "Delete speed keyframe"}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Time</label>
+                              <input
+                                type="text"
+                                id={`speed-kf-time-${kf.id}`}
+                                name={`speed-kf-time-${kf.id}`}
+                                value={formatTime(kf.time)}
+                                onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Speed (0.1-3.0)</label>
+                              <input
+                                type="number"
+                                id={`speed-kf-speed-${kf.id}`}
+                                name={`speed-kf-speed-${kf.id}`}
+                                min="0.1"
+                                max="3.0"
+                                step="0.1"
+                                value={kf.speed}
+                                onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'speed', e.target.value)}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Easing</label>
+                              <select
+                                value={kf.easing}
+                                onChange={(e) => {
+                                  const easingValue = e.target.value;
+                                  // Validate easing value
+                                  if (easingValue === 'linear' || easingValue === 'easeIn' || easingValue === 'easeOut' || easingValue === 'easeInOut') {
+                                    handleUpdateSpeedKeyframe(kf.id, 'easing', easingValue);
+                                  }
+                                }}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              >
+                                <option value="linear">Linear</option>
+                                <option value="easeIn">Ease In</option>
+                                <option value="easeOut">Ease Out</option>
+                                <option value="easeInOut">Ease In-Out</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          {/* Visual speed indicator */}
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="flex-1 bg-gray-900 rounded h-2 overflow-hidden">
+                              <div 
+                                className="h-full bg-yellow-400 transition-all duration-300"
+                                style={{ width: `${Math.min((kf.speed / 3.0) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-400 font-mono min-w-[60px] text-right">
+                              {kf.speed < 1 ? 'Slow' : kf.speed === 1 ? 'Normal' : 'Fast'}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
-                          <input
-                            type="number"
-                            id={`preset-kf-speed-${kf.id}`}
-                            name={`preset-kf-speed-${kf.id}`}
-                            min="0.1"
-                            max="3.0"
-                            step="0.1"
-                            value={kf.speed}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'speed', parseFloat(e.target.value) || 1.0)}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Preset</label>
-                        <select
-                          value={kf.preset}
-                          onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
-                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        >
-                          {animationTypes.map(t => (
-                            <option key={t.value} value={t.value}>
-                              {t.icon} {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Preview of current preset */}
-                      <div className="mt-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">
-                        {animType?.icon} {animType?.label || kf.preset} • {kf.speed}x speed • {duration.toFixed(1)}s duration
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </>
+                )}
               </div>
             )}
           </div>
