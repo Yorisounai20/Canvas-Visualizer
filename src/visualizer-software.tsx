@@ -1117,6 +1117,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     src.buffer = audioBufferRef.current;
     src.connect(analyserRef.current);
     analyserRef.current.connect(audioContextRef.current.destination);
+    
+    // Add onended handler to stop playback when audio finishes
+    src.onended = () => {
+      if (bufferSourceRef.current === src) {
+        bufferSourceRef.current = null;
+        pauseTimeRef.current = 0; // Reset to beginning
+        setCurrentTime(0);
+        setIsPlaying(false);
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      }
+    };
+    
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
     startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
@@ -1286,6 +1301,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     const ctx = audioContextRef.current;
     const startOffset = pauseTimeRef.current;
     
+    // Track which sources have ended using a Set to avoid race conditions
+    const endedSources = new Set<AudioBufferSourceNode>();
+    const totalTracks = tracks.filter(t => t.buffer).length;
+    
     // Start all tracks synchronized
     tracks.forEach(track => {
       if (!track.buffer) return;
@@ -1312,6 +1331,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       // Set gain based on mute state
       track.gainNode.gain.value = track.muted ? 0 : track.volume;
+      
+      // Add onended handler - stop playback when all tracks finish
+      source.onended = () => {
+        endedSources.add(source);
+        // When all tracks have ended, stop playback
+        if (endedSources.size >= totalTracks) {
+          pauseTimeRef.current = 0; // Reset to beginning
+          setCurrentTime(0);
+          setIsPlaying(false);
+          if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+          }
+        }
+      };
       
       // Start playback
       source.start(0, startOffset);
@@ -1630,19 +1664,33 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setIsRecording(true);
       addLog('Recording started', 'success');
 
+      // Track progress
+      const AUDIO_END_THRESHOLD = 0.1;
+      const FINAL_FRAME_DELAY = 500;
+      
       // Auto-play the audio using Web Audio API
       const src = audioContextRef.current.createBufferSource();
       src.buffer = audioBufferRef.current;
       src.connect(analyserRef.current);
       analyserRef.current.connect(audioContextRef.current.destination);
+      
+      // Add onended handler as backup to ensure recording stops
+      src.onended = () => {
+        // Give a small delay to capture final frames
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          if (bufferSourceRef.current === src) {
+            bufferSourceRef.current = null;
+          }
+        }, FINAL_FRAME_DELAY);
+      };
+      
       src.start(0, 0);
       bufferSourceRef.current = src;
       startTimeRef.current = Date.now();
       setIsPlaying(true);
-
-      // Track progress
-      const AUDIO_END_THRESHOLD = 0.1;
-      const FINAL_FRAME_DELAY = 500;
       
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
