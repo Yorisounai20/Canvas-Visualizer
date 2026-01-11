@@ -961,7 +961,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
   
-  const handleUpdateSpeedKeyframe = (id: number, field: 'time' | 'speed' | 'easing', value: any) => {
+  const handleUpdateSpeedKeyframe = (id: number, field: 'time' | 'speed' | 'easing', value: number | string) => {
     setPresetSpeedKeyframes(presetSpeedKeyframes.map(kf => {
       if (kf.id === id) {
         // Validate speed values to ensure they stay within valid range
@@ -10785,7 +10785,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <label className="text-xs text-gray-400 block mb-1">Easing</label>
                           <select
                             value={kf.easing}
-                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'easing', e.target.value as 'linear' | 'easeIn' | 'easeOut' | 'easeInOut')}
+                            onChange={(e) => {
+                              const easingValue = e.target.value;
+                              // Validate easing value
+                              if (easingValue === 'linear' || easingValue === 'easeIn' || easingValue === 'easeOut' || easingValue === 'easeInOut') {
+                                handleUpdateSpeedKeyframe(kf.id, 'easing', easingValue);
+                              }
+                            }}
                             className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
                           >
                             <option value="linear">Linear</option>
