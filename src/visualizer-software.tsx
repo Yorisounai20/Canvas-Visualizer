@@ -334,6 +334,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   ]);
   const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
   const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
+  const [presetKeyframesExpanded, setPresetKeyframesExpanded] = useState(true); // Collapsible preset keyframes list
+  const [speedKeyframesExpanded, setSpeedKeyframesExpanded] = useState(true); // Collapsible speed keyframes list
   
   // NEW: Speed keyframes for dynamic speed changes within presets
   const [presetSpeedKeyframes, setPresetSpeedKeyframes] = useState<Array<{
@@ -10642,181 +10644,202 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
               </div>
             </div>
             
-            {/* Collapsible keyframe settings */}
+            {/* Preset Keyframes Section */}
             {presetSettingsExpanded && (
-              <div className="space-y-3">
-                {presetKeyframes.map((kf, index) => {
-                  const animType = animationTypes.find(a => a.value === kf.preset);
-                  const duration = kf.endTime - kf.time;
-                  return (
-                    <div key={kf.id} className="bg-gray-700 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-purple-400 font-mono text-sm">
-                          #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
-                        </span>
-                        <button
-                          onClick={() => handleDeletePresetKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={presetKeyframes.length <= 1}
-                          title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
-                          aria-disabled={presetKeyframes.length <= 1}
-                          aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 mb-2">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Start Time</label>
-                          <input
-                            type="text"
-                            id={`preset-kf-time-${kf.id}`}
-                            name={`preset-kf-time-${kf.id}`}
-                            value={formatTime(kf.time)}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
+              <div className="bg-gray-700 rounded-lg p-3 mb-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-purple-400">🎬 Preset Keyframes</h3>
+                  <button
+                    onClick={() => setPresetKeyframesExpanded(!presetKeyframesExpanded)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title={presetKeyframesExpanded ? "Collapse preset keyframes" : "Expand preset keyframes"}
+                  >
+                    <ChevronDown 
+                      size={20} 
+                      className={`transition-transform ${presetKeyframesExpanded ? '' : '-rotate-90'}`}
+                    />
+                  </button>
+                </div>
+                
+                {presetKeyframesExpanded && (
+                  <div className="space-y-3">
+                    {presetKeyframes.map((kf, index) => {
+                      const animType = animationTypes.find(a => a.value === kf.preset);
+                      const duration = kf.endTime - kf.time;
+                      return (
+                        <div key={kf.id} className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-purple-400 font-mono text-sm">
+                              #{index + 1} - {formatTime(kf.time)} → {formatTime(kf.endTime)} ({duration.toFixed(1)}s)
+                            </span>
+                            <button
+                              onClick={() => handleDeletePresetKeyframe(kf.id)}
+                              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={presetKeyframes.length <= 1}
+                              title={presetKeyframes.length <= 1 ? "Cannot delete last keyframe" : "Delete keyframe"}
+                              aria-disabled={presetKeyframes.length <= 1}
+                              aria-label={presetKeyframes.length <= 1 ? "Cannot delete last preset keyframe" : "Delete preset keyframe"}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 mb-2">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Start Time</label>
+                              <input
+                                type="text"
+                                id={`preset-kf-time-${kf.id}`}
+                                name={`preset-kf-time-${kf.id}`}
+                                value={formatTime(kf.time)}
+                                onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">End Time</label>
+                              <input
+                                type="text"
+                                id={`preset-kf-endtime-${kf.id}`}
+                                name={`preset-kf-endtime-${kf.id}`}
+                                value={formatTime(kf.endTime)}
+                                onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs text-gray-400 block mb-1">Preset</label>
+                            <select
+                              value={kf.preset}
+                              onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
+                              className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                            >
+                              {animationTypes.map(t => (
+                                <option key={t.value} value={t.value}>
+                                  {t.icon} {t.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          
+                          {/* Preview of current preset */}
+                          <div className="mt-2 px-2 py-1 bg-gray-900 rounded text-xs text-gray-300">
+                            {animType?.icon} {animType?.label || kf.preset} • {duration.toFixed(1)}s duration
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">End Time</label>
-                          <input
-                            type="text"
-                            id={`preset-kf-endtime-${kf.id}`}
-                            name={`preset-kf-endtime-${kf.id}`}
-                            value={formatTime(kf.endTime)}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'endTime', parseTime(e.target.value))}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Speed</label>
-                          <input
-                            type="number"
-                            id={`preset-kf-speed-${kf.id}`}
-                            name={`preset-kf-speed-${kf.id}`}
-                            min="0.1"
-                            max="3.0"
-                            step="0.1"
-                            value={kf.speed}
-                            onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'speed', parseFloat(e.target.value) || 1.0)}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs text-gray-400 block mb-1">Preset</label>
-                        <select
-                          value={kf.preset}
-                          onChange={(e) => handleUpdatePresetKeyframe(kf.id, 'preset', e.target.value)}
-                          className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                        >
-                          {animationTypes.map(t => (
-                            <option key={t.value} value={t.value}>
-                              {t.icon} {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      
-                      {/* Preview of current preset */}
-                      <div className="mt-2 px-2 py-1 bg-gray-800 rounded text-xs text-gray-300">
-                        {animType?.icon} {animType?.label || kf.preset} • {kf.speed}x speed • {duration.toFixed(1)}s duration
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
             
             {/* Speed Keyframes Management Panel */}
             {presetSettingsExpanded && (
-              <div className="mt-4 bg-gray-700 rounded-lg p-3">
-                <h3 className="text-sm font-semibold text-yellow-400 mb-3">⚡ Speed Keyframes</h3>
-                <p className="text-xs text-gray-400 mb-3">
-                  Control animation speed over time with keyframes. Speed is interpolated smoothly between keyframes.
-                </p>
-                
-                <div className="space-y-3">
-                  {presetSpeedKeyframes.map((kf, index) => (
-                    <div key={kf.id} className="bg-gray-800 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-yellow-400 font-mono text-sm">
-                          #{index + 1} - {formatTime(kf.time)} • {kf.speed.toFixed(1)}x
-                        </span>
-                        <button
-                          onClick={() => handleDeleteSpeedKeyframe(kf.id)}
-                          className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={presetSpeedKeyframes.length <= 1}
-                          title={presetSpeedKeyframes.length <= 1 ? "Cannot delete last speed keyframe" : "Delete speed keyframe"}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Time</label>
-                          <input
-                            type="text"
-                            id={`speed-kf-time-${kf.id}`}
-                            name={`speed-kf-time-${kf.id}`}
-                            value={formatTime(kf.time)}
-                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'time', parseTime(e.target.value))}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Speed (0.1-3.0)</label>
-                          <input
-                            type="number"
-                            id={`speed-kf-speed-${kf.id}`}
-                            name={`speed-kf-speed-${kf.id}`}
-                            min="0.1"
-                            max="3.0"
-                            step="0.1"
-                            value={kf.speed}
-                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'speed', e.target.value)}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400 block mb-1">Easing</label>
-                          <select
-                            value={kf.easing}
-                            onChange={(e) => {
-                              const easingValue = e.target.value;
-                              // Validate easing value
-                              if (easingValue === 'linear' || easingValue === 'easeIn' || easingValue === 'easeOut' || easingValue === 'easeInOut') {
-                                handleUpdateSpeedKeyframe(kf.id, 'easing', easingValue);
-                              }
-                            }}
-                            className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
-                          >
-                            <option value="linear">Linear</option>
-                            <option value="easeIn">Ease In</option>
-                            <option value="easeOut">Ease Out</option>
-                            <option value="easeInOut">Ease In-Out</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      {/* Visual speed indicator */}
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 bg-gray-900 rounded h-2 overflow-hidden">
-                          <div 
-                            className="h-full bg-yellow-400 transition-all duration-300"
-                            style={{ width: `${Math.min((kf.speed / 3.0) * 100, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-400 font-mono min-w-[60px] text-right">
-                          {kf.speed < 1 ? 'Slow' : kf.speed === 1 ? 'Normal' : 'Fast'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+              <div className="bg-gray-700 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-yellow-400">⚡ Speed Keyframes</h3>
+                  <button
+                    onClick={() => setSpeedKeyframesExpanded(!speedKeyframesExpanded)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title={speedKeyframesExpanded ? "Collapse speed keyframes" : "Expand speed keyframes"}
+                  >
+                    <ChevronDown 
+                      size={20} 
+                      className={`transition-transform ${speedKeyframesExpanded ? '' : '-rotate-90'}`}
+                    />
+                  </button>
                 </div>
+                
+                {speedKeyframesExpanded && (
+                  <>
+                    <p className="text-xs text-gray-400 mb-3">
+                      Control animation speed over time with keyframes. Speed is interpolated smoothly between keyframes.
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {presetSpeedKeyframes.map((kf, index) => (
+                        <div key={kf.id} className="bg-gray-800 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-yellow-400 font-mono text-sm">
+                              #{index + 1} - {formatTime(kf.time)} • {kf.speed.toFixed(1)}x
+                            </span>
+                            <button
+                              onClick={() => handleDeleteSpeedKeyframe(kf.id)}
+                              className="text-red-400 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={presetSpeedKeyframes.length <= 1}
+                              title={presetSpeedKeyframes.length <= 1 ? "Cannot delete last speed keyframe" : "Delete speed keyframe"}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Time</label>
+                              <input
+                                type="text"
+                                id={`speed-kf-time-${kf.id}`}
+                                name={`speed-kf-time-${kf.id}`}
+                                value={formatTime(kf.time)}
+                                onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'time', parseTime(e.target.value))}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Speed (0.1-3.0)</label>
+                              <input
+                                type="number"
+                                id={`speed-kf-speed-${kf.id}`}
+                                name={`speed-kf-speed-${kf.id}`}
+                                min="0.1"
+                                max="3.0"
+                                step="0.1"
+                                value={kf.speed}
+                                onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'speed', e.target.value)}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Easing</label>
+                              <select
+                                value={kf.easing}
+                                onChange={(e) => {
+                                  const easingValue = e.target.value;
+                                  // Validate easing value
+                                  if (easingValue === 'linear' || easingValue === 'easeIn' || easingValue === 'easeOut' || easingValue === 'easeInOut') {
+                                    handleUpdateSpeedKeyframe(kf.id, 'easing', easingValue);
+                                  }
+                                }}
+                                className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
+                              >
+                                <option value="linear">Linear</option>
+                                <option value="easeIn">Ease In</option>
+                                <option value="easeOut">Ease Out</option>
+                                <option value="easeInOut">Ease In-Out</option>
+                              </select>
+                            </div>
+                          </div>
+                          
+                          {/* Visual speed indicator */}
+                          <div className="mt-2 flex items-center gap-2">
+                            <div className="flex-1 bg-gray-900 rounded h-2 overflow-hidden">
+                              <div 
+                                className="h-full bg-yellow-400 transition-all duration-300"
+                                style={{ width: `${Math.min((kf.speed / 3.0) * 100, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-400 font-mono min-w-[60px] text-right">
+                              {kf.speed < 1 ? 'Slow' : kf.speed === 1 ? 'Normal' : 'Fast'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
