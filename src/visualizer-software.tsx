@@ -937,9 +937,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
   
-  const handleUpdateSpeedKeyframe = (id: number, field: string, value: any) => {
+  const handleUpdateSpeedKeyframe = (id: number, field: 'time' | 'speed' | 'easing', value: any) => {
     setPresetSpeedKeyframes(presetSpeedKeyframes.map(kf => {
       if (kf.id === id) {
+        // Validate speed values to ensure they stay within valid range
+        if (field === 'speed') {
+          const speedValue = typeof value === 'number' ? value : parseFloat(value);
+          const clampedSpeed = Math.max(0.1, Math.min(3.0, isNaN(speedValue) ? kf.speed : speedValue));
+          return { ...kf, [field]: clampedSpeed };
+        }
         return { ...kf, [field]: value };
       }
       return kf;
@@ -10743,7 +10749,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                             max="3.0"
                             step="0.1"
                             value={kf.speed}
-                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'speed', parseFloat(e.target.value) || 1.0)}
+                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'speed', e.target.value)}
                             className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
                           />
                         </div>
@@ -10751,7 +10757,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                           <label className="text-xs text-gray-400 block mb-1">Easing</label>
                           <select
                             value={kf.easing}
-                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'easing', e.target.value)}
+                            onChange={(e) => handleUpdateSpeedKeyframe(kf.id, 'easing', e.target.value as 'linear' | 'easeIn' | 'easeOut' | 'easeInOut')}
                             className="w-full bg-gray-600 text-white text-sm px-2 py-1 rounded"
                           >
                             <option value="linear">Linear</option>
