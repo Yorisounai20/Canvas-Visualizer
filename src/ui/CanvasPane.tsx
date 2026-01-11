@@ -56,7 +56,7 @@ export default function CanvasPane({ workspaceView, onReady, onFrame }: CanvasPa
         fpsLastTimeRef.current = now;
       }
 
-      // Simple rotation animation for shapes
+      // Simple rotation animation for shapes (not camera - that's controlled by PresetManager)
       if (modulesRoot.cubes) {
         modulesRoot.cubes.forEach((cube, i) => {
           cube.rotation.x = currentTime + i * 0.1;

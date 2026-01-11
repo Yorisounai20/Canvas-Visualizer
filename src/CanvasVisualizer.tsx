@@ -22,6 +22,7 @@ import CanvasPane from './ui/CanvasPane';
 import TimelinePane from './ui/TimelinePane';
 import InspectorPane from './ui/InspectorPane';
 import PresetManager from './presets/PresetManager';
+import hammerheadPreset from './presets/hammerhead.json';
 
 export default function CanvasVisualizer() {
   const [workspaceView, setWorkspaceView] = useState<'author' | 'stage' | 'effects' | 'preview' | 'export'>('author');
@@ -48,8 +49,54 @@ export default function CanvasVisualizer() {
     modulesRootRef.current = modulesRoot;
     if (presetManagerRef.current) {
       presetManagerRef.current.modulesRoot = modulesRoot;
+      
+      // Register camera setters
+      registerCameraSetters(presetManagerRef.current, modulesRoot);
+      
+      // Load the hammerhead preset to demonstrate camera automation
+      presetManagerRef.current.loadPreset(hammerheadPreset as any);
+      console.log('[CanvasVisualizer] Hammerhead preset loaded with camera automation');
     }
     console.log('[CanvasVisualizer] Canvas ready, modulesRoot connected to PresetManager');
+  };
+
+  /**
+   * Register camera control setters that will be called by PresetManager
+   */
+  const registerCameraSetters = (pm: PresetManager, modulesRoot: any) => {
+    const camera = modulesRoot.camera;
+    if (!camera) return;
+
+    // Camera distance setter
+    pm.registerSetter('camera.distance', (value: number) => {
+      const currentAngle = Math.atan2(camera.position.x, camera.position.z);
+      const currentHeight = camera.position.y;
+      camera.position.x = Math.sin(currentAngle) * value;
+      camera.position.z = Math.cos(currentAngle) * value;
+      camera.position.y = currentHeight;
+      camera.lookAt(0, 0, 0);
+    });
+
+    // Camera height setter
+    pm.registerSetter('camera.height', (value: number) => {
+      camera.position.y = value;
+      camera.lookAt(0, 0, 0);
+    });
+
+    // Camera rotation setter (in degrees, rotates around Y axis)
+    pm.registerSetter('camera.rotation', (value: number) => {
+      const angleRadians = (value * Math.PI) / 180;
+      const distance = Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2);
+      camera.position.x = Math.sin(angleRadians) * distance;
+      camera.position.z = Math.cos(angleRadians) * distance;
+      camera.lookAt(0, 0, 0);
+    });
+
+    // Camera FOV setter
+    pm.registerSetter('camera.fov', (value: number) => {
+      camera.fov = value;
+      camera.updateProjectionMatrix();
+    });
   };
 
   /**
