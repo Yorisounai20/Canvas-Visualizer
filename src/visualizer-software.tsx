@@ -921,10 +921,34 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // Speed keyframe handlers
   const handleAddSpeedKeyframe = () => {
+    // Calculate current speed from existing keyframes to use as default
+    const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
+    let defaultSpeed = 1.0;
+    
+    if (sorted.length > 0) {
+      if (currentTime <= sorted[0].time) {
+        defaultSpeed = sorted[0].speed;
+      } else if (currentTime >= sorted[sorted.length - 1].time) {
+        defaultSpeed = sorted[sorted.length - 1].speed;
+      } else {
+        // Find interpolated speed at current time
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const kf1 = sorted[i];
+          const kf2 = sorted[i + 1];
+          if (currentTime >= kf1.time && currentTime < kf2.time) {
+            const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
+            const easedT = applyEasing(t, kf1.easing);
+            defaultSpeed = kf1.speed + (kf2.speed - kf1.speed) * easedT;
+            break;
+          }
+        }
+      }
+    }
+    
     const newKeyframe = {
       id: nextSpeedKeyframeId.current++,
       time: currentTime,
-      speed: getCurrentPresetSpeed(), // Use current speed as default
+      speed: defaultSpeed,
       easing: 'linear' as const
     };
     setPresetSpeedKeyframes([...presetSpeedKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
@@ -10546,14 +10570,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   <div className="text-xs text-gray-400 mb-1">Speed Keyframes</div>
                   <div className="relative bg-gray-800 rounded h-12 overflow-hidden">
                     {/* Speed visualization as a gradient/line showing speed changes */}
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none z-[1]">
                       <defs>
                         <linearGradient id="speedGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                           {presetSpeedKeyframes.map((kf, idx) => {
                             const pos = duration > 0 ? Math.min((kf.time / duration) * 100, 100) : 0;
                             // Map speed (0.1-3.0) to color intensity (darker = slower, brighter = faster)
-                            const intensity = Math.min(255, Math.floor((kf.speed / 3.0) * 255));
-                            const color = `rgb(${intensity}, ${Math.floor(intensity * 0.5)}, ${Math.floor(intensity * 0.8)})`;
+                            // Color channel multipliers: R=1.0 (full), G=0.5 (medium), B=0.8 (high) for purple-ish gradient
+                            const SPEED_MAX = 3.0;
+                            const GREEN_MULTIPLIER = 0.5;
+                            const BLUE_MULTIPLIER = 0.8;
+                            const intensity = Math.min(255, Math.floor((kf.speed / SPEED_MAX) * 255));
+                            const color = `rgb(${intensity}, ${Math.floor(intensity * GREEN_MULTIPLIER)}, ${Math.floor(intensity * BLUE_MULTIPLIER)})`;
                             return <stop key={idx} offset={`${pos}%`} stopColor={color} />;
                           })}
                         </linearGradient>
@@ -10567,8 +10595,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                       return (
                         <div
                           key={kf.id}
-                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group"
-                          style={{ left: `${pos}%`, zIndex: 2 }}
+                          className="absolute top-1/2 -translate-y-1/2 cursor-pointer group z-[2]"
+                          style={{ left: `${pos}%` }}
                           title={`${formatTime(kf.time)}: ${kf.speed.toFixed(1)}x speed (${kf.easing})`}
                         >
                           <div className="w-3 h-8 bg-yellow-400 hover:bg-yellow-300 transition-colors rounded flex items-center justify-center">
@@ -10588,7 +10616,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     />
                     
                     {/* Current speed display */}
-                    <div className="absolute bottom-1 right-2 text-xs text-yellow-300 font-semibold bg-gray-900 px-2 py-1 rounded" style={{ zIndex: 3 }}>
+                    <div className="absolute bottom-1 right-2 text-xs text-yellow-300 font-semibold bg-gray-900 px-2 py-1 rounded z-[3]">
                       {getCurrentPresetSpeed().toFixed(1)}x
                     </div>
                   </div>
