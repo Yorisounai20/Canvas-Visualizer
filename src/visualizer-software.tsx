@@ -8187,7 +8187,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const canvasAreaJSX = (
     <div className="flex items-start justify-start w-full h-full bg-gray-950" style={{paddingLeft: '120px', paddingTop: '20px'}}>
       <div className="relative">
-        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
+        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'480px',height:'270px',borderColor:borderColor}} />
         {showLetterbox && (() => {
           // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
           // We need to map this to actual bar heights using the configurable maxLetterboxHeight
