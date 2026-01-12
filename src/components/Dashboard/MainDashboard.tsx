@@ -2,7 +2,7 @@ import React from 'react';
 import { Sparkles, Zap, Play } from 'lucide-react';
 
 interface MainDashboardProps {
-  onSelectMode: (mode: 'editor' | 'software') => void;
+  onSelectMode: () => void;
 }
 
 /**
@@ -28,32 +28,28 @@ export default function MainDashboard({ onSelectMode }: MainDashboardProps) {
 
         {/* Streamlined Mode Selection */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {/* Editor Mode - Compact Card */}
-          <button
-            onClick={() => onSelectMode('editor')}
-            className="group bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-6 border-2 border-purple-500 hover:border-purple-400 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 text-left"
-          >
+          {/* Editor Mode - Archived Notice (Not Clickable) */}
+          <div className="bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-6 border-2 border-gray-600 text-left opacity-60">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 bg-gray-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-6 h-6 text-gray-400" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Editor Mode</h2>
-                <p className="text-sm text-purple-300">Professional</p>
+                <h2 className="text-xl font-bold text-gray-400">Editor Mode</h2>
+                <p className="text-sm text-gray-500">Archived</p>
               </div>
             </div>
-            <p className="text-sm text-gray-300 mb-3">
-              After Effects-style interface with timeline, layers, workspace mode, and advanced keyframe controls
+            <p className="text-sm text-gray-400 mb-3">
+              After Effects-style interface has been archived. Use Software Mode for all visualization needs.
             </p>
-            <div className="flex items-center gap-2 text-purple-400 text-sm font-medium">
-              <Play className="w-4 h-4" />
-              <span>Launch Editor</span>
+            <div className="flex items-center gap-2 text-gray-500 text-sm font-medium">
+              <span>📦 Archived</span>
             </div>
-          </button>
+          </div>
 
-          {/* Software Mode - Compact Card */}
+          {/* Software Mode - Primary Card (Clickable) */}
           <button
-            onClick={() => onSelectMode('software')}
+            onClick={onSelectMode}
             className="group bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-6 border-2 border-cyan-500 hover:border-cyan-400 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-cyan-500/30 text-left"
           >
             <div className="flex items-center gap-3 mb-3">
@@ -62,7 +58,7 @@ export default function MainDashboard({ onSelectMode }: MainDashboardProps) {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-white">Software Mode</h2>
-                <p className="text-sm text-cyan-300">Quick & Simple</p>
+                <p className="text-sm text-cyan-300">Primary Mode</p>
               </div>
             </div>
             <p className="text-sm text-gray-300 mb-3">
@@ -96,7 +92,7 @@ export default function MainDashboard({ onSelectMode }: MainDashboardProps) {
         {/* Help Text */}
         <div className="mt-6 text-center">
           <p className="text-gray-500 text-xs">
-            Your mode preference will be remembered for next time
+            Software Mode will be remembered for next time. Editor Mode has been archived.
           </p>
         </div>
       </div>

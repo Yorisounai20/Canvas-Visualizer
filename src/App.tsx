@@ -1,11 +1,8 @@
-import { useState, lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import NewProjectModal from './components/Modals/NewProjectModal';
 import Home from './pages/Home';
-import { ProjectSettings } from './types';
 
-// Lazy load the large visualizer components for code splitting
-const VisualizerEditor = lazy(() => import('./VisualizerEditor'));
+// Lazy load the visualizer component for code splitting
 const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
 
 // LocalStorage key for mode persistence
@@ -22,42 +19,6 @@ function LoadingScreen() {
         <p>Loading...</p>
       </div>
     </div>
-  );
-}
-
-/**
- * Editor Mode Component - handles the project modal and editor flow
- */
-function EditorMode() {
-  const navigate = useNavigate();
-  const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
-  const [initialAudioFile, setInitialAudioFile] = useState<File | undefined>(undefined);
-
-  const handleCreateProject = (settings: ProjectSettings, audioFile?: File) => {
-    setProjectSettings(settings);
-    setInitialAudioFile(audioFile);
-  };
-
-  const handleBackToDashboard = () => {
-    // Clear the persisted mode when going back to dashboard
-    localStorage.removeItem(MODE_STORAGE_KEY);
-    navigate('/');
-  };
-
-  // Show project modal first if no project settings
-  if (!projectSettings) {
-    return <NewProjectModal onCreateProject={handleCreateProject} />;
-  }
-
-  // Show the editor with project settings
-  return (
-    <Suspense fallback={<LoadingScreen />}>
-      <VisualizerEditor 
-        projectSettings={projectSettings}
-        initialAudioFile={initialAudioFile}
-        onBackToDashboard={handleBackToDashboard}
-      />
-    </Suspense>
   );
 }
 
@@ -87,13 +48,14 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // On initial load, check if there's a persisted mode and redirect to it
+  // On initial load, check if there's a persisted mode and redirect to software
   useEffect(() => {
     // Only redirect from root path
     if (location.pathname === '/') {
       const persistedMode = localStorage.getItem(MODE_STORAGE_KEY);
-      if (persistedMode === 'editor' || persistedMode === 'software') {
-        navigate(`/${persistedMode}`, { replace: true });
+      // Always redirect to software if mode is persisted
+      if (persistedMode === 'software') {
+        navigate('/software', { replace: true });
       }
     }
   }, [location.pathname, navigate]);
@@ -103,9 +65,11 @@ function App() {
       {/* Home/Dashboard route */}
       <Route path="/" element={<Home />} />
 
-      {/* Mode routes - no authentication required */}
-      <Route path="/editor" element={<EditorMode />} />
+      {/* Software Mode - the only available mode */}
       <Route path="/software" element={<SoftwareMode />} />
+
+      {/* Redirect /editor to /software (archived) */}
+      <Route path="/editor" element={<Navigate to="/software" replace />} />
 
       {/* Catch-all redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />
