@@ -12,36 +12,36 @@ type LayoutShellProps = {
 
 export default function LayoutShell({ left, inspector, timeline, top, children }: LayoutShellProps) {
   return (
-    <div className="cv-layout flex flex-col min-h-screen w-full bg-gray-900">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
+    <div className="cv-layout flex flex-col h-screen w-full bg-gray-900 overflow-hidden">
+      {/* Top bar - fixed height */}
+      <header className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         {top ?? <TopBarPlaceholder />}
       </header>
 
-      {/* Main content area with flexible layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar - collapsible */}
-        <aside className="w-72 border-r border-gray-800 overflow-y-auto bg-gray-900/50">
+      {/* Main content area - takes remaining height */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Left sidebar - with internal scroll */}
+        <aside className="w-64 flex-shrink-0 border-r border-gray-800 bg-gray-900/50 flex flex-col">
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Center content - main canvas and controls */}
-        <main className="flex-1 overflow-y-auto">
+        {/* Center content - main canvas (no scroll, canvas is fixed) */}
+        <main className="flex-1 overflow-hidden flex flex-col">
           {children}
         </main>
 
-        {/* Right sidebar - inspector */}
-        <aside className="w-80 border-l border-gray-800 overflow-y-auto bg-gray-900/50">
+        {/* Right sidebar - with internal scroll */}
+        <aside className="w-80 flex-shrink-0 border-l border-gray-800 bg-gray-900/50 flex flex-col">
           <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
             {inspector}
           </PanelContainer>
         </aside>
       </div>
 
-      {/* Bottom timeline - sticky */}
-      <footer className="sticky bottom-0 z-40 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800">
+      {/* Bottom timeline - fixed height with internal scroll */}
+      <footer className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-64">
         <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
           {timeline}
         </PanelContainer>
