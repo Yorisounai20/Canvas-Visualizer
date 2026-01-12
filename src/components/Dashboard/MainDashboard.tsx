@@ -1,8 +1,8 @@
 import React from 'react';
-import { Sparkles, Zap, Play } from 'lucide-react';
+import { Zap, Play } from 'lucide-react';
 
 interface MainDashboardProps {
-  onSelectMode: (mode: 'editor' | 'software') => void;
+  onSelectMode: () => void;
 }
 
 /**
@@ -22,55 +22,30 @@ export default function MainDashboard({ onSelectMode }: MainDashboardProps) {
             3D Music Video Creator
           </p>
           <p className="text-sm text-gray-400">
-            Select a mode to start creating audio-reactive visuals
+            Start creating audio-reactive visuals
           </p>
         </div>
 
-        {/* Streamlined Mode Selection */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {/* Editor Mode - Compact Card */}
+        {/* Launch Button */}
+        <div className="flex justify-center mb-6">
           <button
-            onClick={() => onSelectMode('editor')}
-            className="group bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-6 border-2 border-purple-500 hover:border-purple-400 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-purple-500/30 text-left"
+            onClick={onSelectMode}
+            className="group bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-8 border-2 border-cyan-500 hover:border-cyan-400 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-cyan-500/30 text-center max-w-md w-full"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-white" />
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 bg-cyan-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Zap className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Editor Mode</h2>
-                <p className="text-sm text-purple-300">Professional</p>
+                <h2 className="text-2xl font-bold text-white mb-2">Canvas Visualizer</h2>
+                <p className="text-sm text-gray-300 mb-4">
+                  Create stunning audio-reactive 3D visualizations with direct controls and instant preview
+                </p>
               </div>
-            </div>
-            <p className="text-sm text-gray-300 mb-3">
-              After Effects-style interface with timeline, layers, workspace mode, and advanced keyframe controls
-            </p>
-            <div className="flex items-center gap-2 text-purple-400 text-sm font-medium">
-              <Play className="w-4 h-4" />
-              <span>Launch Editor</span>
-            </div>
-          </button>
-
-          {/* Software Mode - Compact Card */}
-          <button
-            onClick={() => onSelectMode('software')}
-            className="group bg-gray-800 bg-opacity-50 backdrop-blur-sm rounded-xl p-6 border-2 border-cyan-500 hover:border-cyan-400 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-cyan-500/30 text-left"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-cyan-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Zap className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 text-cyan-400 text-base font-medium">
+                <Play className="w-5 h-5" />
+                <span>Launch Canvas</span>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-white">Software Mode</h2>
-                <p className="text-sm text-cyan-300">Quick & Simple</p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-300 mb-3">
-              Streamlined interface with direct controls, instant preview, and easy-to-use tools for fast visualizations
-            </p>
-            <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium">
-              <Play className="w-4 h-4" />
-              <span>Launch Software</span>
             </div>
           </button>
         </div>
@@ -96,7 +71,7 @@ export default function MainDashboard({ onSelectMode }: MainDashboardProps) {
         {/* Help Text */}
         <div className="mt-6 text-center">
           <p className="text-gray-500 text-xs">
-            Your mode preference will be remembered for next time
+            Your session will be remembered for next time
           </p>
         </div>
       </div>

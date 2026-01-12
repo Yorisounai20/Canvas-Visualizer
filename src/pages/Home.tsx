@@ -13,11 +13,11 @@ const MODE_STORAGE_KEY = 'canvas-visualizer-selected-mode';
 export function Home() {
   const navigate = useNavigate();
 
-  const handleSelectMode = (mode: 'editor' | 'software') => {
-    // Persist the selected mode to localStorage
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
-    // Navigate to the selected mode
-    navigate(`/${mode}`);
+  const handleSelectMode = () => {
+    // Persist 'software' as the selected mode to localStorage
+    localStorage.setItem(MODE_STORAGE_KEY, 'software');
+    // Navigate to software mode
+    navigate('/software');
   };
 
   return (
