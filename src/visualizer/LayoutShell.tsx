@@ -12,39 +12,37 @@ type LayoutShellProps = {
 
 export default function LayoutShell({ left, inspector, timeline, top, children }: LayoutShellProps) {
   return (
-    <div className="cv-layout h-screen w-full grid" style={{
-      gridTemplateRows: 'auto 1fr auto',
-      gridTemplateColumns: '260px 1fr 360px',
-      gap: '12px',
-      height: '100vh',
-    }}>
-      {/* Top bar spans all columns */}
-      <div style={{ gridColumn: '1 / -1', padding: 8 }}>
+    <div className="cv-layout flex flex-col min-h-screen w-full bg-gray-900">
+      {/* Top bar */}
+      <header className="sticky top-0 z-50 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800">
         {top ?? <TopBarPlaceholder />}
+      </header>
+
+      {/* Main content area with flexible layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left sidebar - collapsible */}
+        <aside className="w-72 border-r border-gray-800 overflow-y-auto bg-gray-900/50">
+          <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
+            {left}
+          </PanelContainer>
+        </aside>
+
+        {/* Center content - main canvas and controls */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+
+        {/* Right sidebar - inspector */}
+        <aside className="w-80 border-l border-gray-800 overflow-y-auto bg-gray-900/50">
+          <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
+            {inspector}
+          </PanelContainer>
+        </aside>
       </div>
 
-      {/* Left toolbox */}
-      <aside style={{ gridRow: 2, gridColumn: 1, overflow: 'auto', padding: 8 }}>
-        <PanelContainer name="Left Toolbox" defaultCollapsed={false}>
-          {left}
-        </PanelContainer>
-      </aside>
-
-      {/* Center canvas area */}
-      <main style={{ gridRow: 2, gridColumn: 2, overflow: 'hidden', position: 'relative' }}>
-        {children}
-      </main>
-
-      {/* Right inspector */}
-      <aside style={{ gridRow: 2, gridColumn: 3, overflow: 'auto', padding: 8 }}>
-        <PanelContainer name="Inspector" defaultCollapsed={true}>
-          {inspector}
-        </PanelContainer>
-      </aside>
-
-      {/* Bottom timeline spans all columns */}
-      <footer style={{ gridRow: 3, gridColumn: '1 / -1', padding: 8 }}>
-        <PanelContainer name="Timeline" defaultCollapsed={false}>
+      {/* Bottom timeline - sticky */}
+      <footer className="sticky bottom-0 z-40 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800">
+        <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
           {timeline}
         </PanelContainer>
       </footer>
