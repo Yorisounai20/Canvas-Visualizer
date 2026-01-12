@@ -8,4 +8,10 @@
  */
 
 export { default } from '../visualizer-software';
-export { CanvasView, type ModulesRoot, type CanvasViewProps } from './CanvasView';
+export { 
+  CanvasView, 
+  type ModulesRoot, 
+  type CanvasViewProps,
+  type MaterialConfig,
+  type ShapeRequirements
+} from './CanvasView';
