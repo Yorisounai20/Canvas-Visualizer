@@ -36,6 +36,7 @@ import {
 import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
 import { VideoExportModal } from './components/VisualizerSoftware/components';
 import { ParticleEmitter, ParticleSystemManager } from './lib/particleSystem';
+import { createMaterial, createShapePools } from './visualizer/shapeFactory';
 import hammerheadPreset from './presets/hammerhead';
 import orbitPreset from './presets/orbit';
 import explosionPreset from './presets/explosion';
@@ -2366,43 +2367,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return;
     }
 
-    // Helper function to create materials
-    const createMaterial = (
-      type: 'basic' | 'standard' | 'phong' | 'lambert',
-      color: string,
-      wireframe: boolean,
-      opacity: number,
-      metalness: number = 0.5,
-      roughness: number = 0.5
-    ): THREE.Material => {
-      const baseColor = new THREE.Color(color);
-      const commonProps = {
-        color: baseColor,
-        wireframe,
-        transparent: true,
-        opacity
-      };
-
-      switch (type) {
-        case 'standard':
-          return new THREE.MeshStandardMaterial({
-            ...commonProps,
-            metalness,
-            roughness
-          });
-        case 'phong':
-          return new THREE.MeshPhongMaterial({
-            ...commonProps,
-            shininess: 30
-          });
-        case 'lambert':
-          return new THREE.MeshLambertMaterial(commonProps);
-        case 'basic':
-        default:
-          return new THREE.MeshBasicMaterial(commonProps);
-      }
-    };
-
     // Calculate maximum shapes needed across all preset keyframes
     const calculateRequiredShapes = (): { cubes: number; octas: number; tetras: number; toruses: number; planes: number } => {
       let maxCubes = 0;
@@ -2438,108 +2402,37 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     const requiredShapes = calculateRequiredShapes();
     addLog(`Optimized shape allocation: ${requiredShapes.cubes} cubes, ${requiredShapes.octas} octas, ${requiredShapes.tetras} tetras, ${requiredShapes.toruses} toruses, ${requiredShapes.planes} planes`, 'info');
 
-    const cubes: THREE.Mesh[] = [];
-    // Create only the required number of cubes based on preset needs
-    for (let i=0; i<requiredShapes.cubes; i++) {
-      const cubeMaterial = createMaterial(
-        cubeMaterialType,
-        cubeColor,
-        cubeWireframe,
-        cubeOpacity,
-        cubeMetalness,
-        cubeRoughness
-      );
-      const c = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), cubeMaterial);
-      const a = (i/requiredShapes.cubes)*Math.PI*2;
-      c.position.x = Math.cos(a)*8;
-      c.position.z = Math.sin(a)*8;
-      scene.add(c);
-      cubes.push(c);
-    }
+    // Use shapeFactory to create all shape pools
+    const { cubes, octas, tetras, toruses, planes } = createShapePools(
+      scene,
+      {
+        type: cubeMaterialType,
+        color: cubeColor,
+        wireframe: cubeWireframe,
+        opacity: cubeOpacity,
+        metalness: cubeMetalness,
+        roughness: cubeRoughness
+      },
+      {
+        type: octahedronMaterialType,
+        color: octahedronColor,
+        wireframe: octahedronWireframe,
+        opacity: octahedronOpacity,
+        metalness: octahedronMetalness,
+        roughness: octahedronRoughness
+      },
+      {
+        type: tetrahedronMaterialType,
+        color: tetrahedronColor,
+        wireframe: tetrahedronWireframe,
+        opacity: tetrahedronOpacity,
+        metalness: tetrahedronMetalness,
+        roughness: tetrahedronRoughness
+      },
+      requiredShapes
+    );
 
-    const octas: THREE.Mesh[] = [];
-    // Create only the required number of octahedrons (includes 15 for environment system)
-    for (let i=0; i<requiredShapes.octas; i++) {
-      const octaMaterial = createMaterial(
-        octahedronMaterialType,
-        octahedronColor,
-        octahedronWireframe,
-        octahedronOpacity,
-        octahedronMetalness,
-        octahedronRoughness
-      );
-      const o = new THREE.Mesh(new THREE.OctahedronGeometry(0.5), octaMaterial);
-      
-      // Environment octas start at index (requiredShapes.octas - 15)
-      const isEnvOcta = i >= (requiredShapes.octas - 15);
-      if (isEnvOcta) {
-        o.position.set(0, -1000, 0); // Start off-screen for environment
-        o.scale.set(0.001, 0.001, 0.001);
-      } else {
-        const a = (i / Math.max(requiredShapes.octas - 15, 1))*Math.PI*2;
-        const rad = 5 + (i % 3) * 2;
-        o.position.x = Math.cos(a)*rad;
-        o.position.y = Math.sin(a)*rad;
-        o.position.z = -(i % 5)*2;
-      }
-      scene.add(o);
-      octas.push(o);
-    }
-
-    const tetras: THREE.Mesh[] = [];
-    // Create only the required number of tetrahedrons
-    for (let i=0; i<requiredShapes.tetras; i++) {
-      const tetraMaterial = createMaterial(
-        tetrahedronMaterialType,
-        tetrahedronColor,
-        tetrahedronWireframe,
-        tetrahedronOpacity,
-        tetrahedronMetalness,
-        tetrahedronRoughness
-      );
-      const t = new THREE.Mesh(new THREE.TetrahedronGeometry(0.3), tetraMaterial);
-      t.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10);
-      scene.add(t);
-      tetras.push(t);
-    }
-
-    const toruses: THREE.Mesh[] = [];
-    // Create only the required number of toruses
-    for (let i=0; i<requiredShapes.toruses; i++) {
-      const torusMaterial = createMaterial(
-        cubeMaterialType,
-        cubeColor,
-        cubeWireframe,
-        cubeOpacity,
-        cubeMetalness,
-        cubeRoughness
-      );
-      const torus = new THREE.Mesh(new THREE.TorusGeometry(1, 0.4, 16, 100), torusMaterial);
-      const a = (i / Math.max(requiredShapes.toruses, 1))*Math.PI*2;
-      torus.position.x = Math.cos(a)*10;
-      torus.position.z = Math.sin(a)*10;
-      scene.add(torus);
-      toruses.push(torus);
-    }
-
-    const planes: THREE.Mesh[] = [];
-    // Create only the required number of planes
-    for (let i=0; i<requiredShapes.planes; i++) {
-      const planeMaterial = createMaterial(
-        octahedronMaterialType,
-        octahedronColor,
-        octahedronWireframe,
-        octahedronOpacity,
-        octahedronMetalness,
-        octahedronRoughness
-      );
-      planeMaterial.side = THREE.DoubleSide;
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), planeMaterial);
-      plane.position.set((Math.random()-0.5)*15, (Math.random()-0.5)*15, (Math.random()-0.5)*15);
-      scene.add(plane);
-      planes.push(plane);
-    }
-
+    // Create sphere separately (not part of shapePools)
     const sphereMaterial = createMaterial(
       sphereMaterialType,
       sphereColor,

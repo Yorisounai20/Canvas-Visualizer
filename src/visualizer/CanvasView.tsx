@@ -10,6 +10,7 @@
 
 import { useRef, useEffect } from 'react';
 import * as THREE from 'three';
+import { createShapePools } from './shapeFactory';
 
 export interface ModulesRoot {
   obj: {
@@ -26,14 +27,52 @@ export interface ModulesRoot {
   materials?: Record<string, THREE.Material>;
 }
 
+export interface MaterialConfig {
+  type: 'basic' | 'standard' | 'phong' | 'lambert';
+  color: string;
+  wireframe: boolean;
+  opacity: number;
+  metalness: number;
+  roughness: number;
+}
+
+export interface ShapeRequirements {
+  cubes: number;
+  octas: number;
+  tetras: number;
+  toruses: number;
+  planes: number;
+}
+
 export interface CanvasViewProps {
   onReady?: (modules: ModulesRoot) => void;
   onFrame?: (timeSeconds: number, audioSnapshot?: Uint8Array | null) => void;
   width?: number;
   height?: number;
+  // Material configurations for all shape types
+  cubeMaterial?: MaterialConfig;
+  octahedronMaterial?: MaterialConfig;
+  tetrahedronMaterial?: MaterialConfig;
+  sphereMaterial?: MaterialConfig;
+  // Shape requirements for dynamic allocation
+  shapeRequirements?: ShapeRequirements;
+  // Control whether CanvasView manages its own render loop
+  manageRenderLoop?: boolean;
+  // Control whether CanvasView creates and appends its own canvas
+  manageCanvas?: boolean;
 }
 
-export function CanvasView({ onReady, onFrame, width = 960, height = 540 }: CanvasViewProps) {
+export function CanvasView({ 
+  onReady, 
+  onFrame, 
+  width = 960, 
+  height = 540,
+  cubeMaterial,
+  octahedronMaterial,
+  tetrahedronMaterial,
+  sphereMaterial,
+  shapeRequirements
+}: CanvasViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -64,15 +103,21 @@ export function CanvasView({ onReady, onFrame, width = 960, height = 540 }: Canv
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Create placeholder geometry pools (empty for now)
+    // Create shape pools if material configs are provided
+    let shapePools = { cubes: [], octas: [], tetras: [], toruses: [], planes: [] };
+    if (cubeMaterial && octahedronMaterial && tetrahedronMaterial && shapeRequirements) {
+      shapePools = createShapePools(
+        scene,
+        cubeMaterial,
+        octahedronMaterial,
+        tetrahedronMaterial,
+        shapeRequirements
+      );
+    }
+
+    // Create geometry pools
     const modules: ModulesRoot = {
-      obj: {
-        cubes: [],
-        octas: [],
-        tetras: [],
-        toruses: [],
-        planes: []
-      },
+      obj: shapePools,
       scene,
       camera,
       renderer
@@ -111,7 +156,7 @@ export function CanvasView({ onReady, onFrame, width = 960, height = 540 }: Canv
         rendererRef.current.dispose();
       }
     };
-  }, [onReady, onFrame, width, height]);
+  }, [onReady, onFrame, width, height, cubeMaterial, octahedronMaterial, tetrahedronMaterial, sphereMaterial, shapeRequirements]);
 
   return <div ref={containerRef} style={{ width, height }} />;
 }
