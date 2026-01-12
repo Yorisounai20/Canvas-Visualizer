@@ -8226,6 +8226,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const inspectorJSX = (
     <div className="space-y-4">
+      {/* Active Tab Display */}
+      <div className="p-4 rounded-lg bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-700/50">
+        <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+          <span>✨</span>
+          Active Tab
+        </h4>
+        <p className="text-white text-lg font-semibold flex items-center gap-3">
+          <span className="text-3xl">
+            {activeTab === 'waveforms' && '🎵'}
+            {activeTab === 'presets' && '⏱️'}
+            {activeTab === 'controls' && '🎨'}
+            {activeTab === 'camera' && '📷'}
+            {activeTab === 'cameraRig' && '🎥'}
+            {activeTab === 'camerafx' && '🎬'}
+            {activeTab === 'effects' && '✨'}
+            {activeTab === 'environments' && '🌍'}
+            {activeTab === 'postfx' && '🎭'}
+            {activeTab === 'textAnimator' && '📝'}
+          </span>
+          <span>
+            {activeTab === 'waveforms' && 'Waveforms'}
+            {activeTab === 'presets' && 'Presets'}
+            {activeTab === 'controls' && 'Controls'}
+            {activeTab === 'camera' && 'Camera'}
+            {activeTab === 'cameraRig' && 'Camera Rig'}
+            {activeTab === 'camerafx' && 'Camera FX'}
+            {activeTab === 'effects' && 'Effects'}
+            {activeTab === 'environments' && 'Environments'}
+            {activeTab === 'postfx' && 'Post-FX'}
+            {activeTab === 'textAnimator' && 'Text Animator'}
+          </span>
+        </p>
+        <p className="text-purple-200 text-xs mt-2">
+          Tab properties will display here when implementation is complete
+        </p>
+      </div>
+
       {/* Debug Console */}
       <div>
         <div className="flex items-center justify-between mb-3">
