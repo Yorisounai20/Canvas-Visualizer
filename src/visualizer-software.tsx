@@ -36,6 +36,7 @@ import {
 import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
 import { VideoExportModal } from './components/VisualizerSoftware/components';
 import { ParticleEmitter, ParticleSystemManager } from './lib/particleSystem';
+import hammerheadPreset from './presets/hammerhead';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -2271,7 +2272,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     pulse: { cubes: 16, octas: 16, tetras: 0, toruses: 0, planes: 0 },          // 4x4 grid = 16 cubes, 4x4 = 16 octas used, no tetras
     vortex: { cubes: 8, octas: 30, tetras: 30, toruses: 0, planes: 0 },         // Performance-limited, visually sufficient
     seiryu: { cubes: 40, octas: 50, tetras: 46, toruses: 0, planes: 0 },        // 40 body cubes, 50 scale octas, 46 tetras (2 antlers + 4 whiskers + 20 mane + 20 clouds)
-    hammerhead: { cubes: 8, octas: 5, tetras: 4, toruses: 0, planes: 0 },       // 8 cubes (3 head + 4 body + 1 tail), 5 bubble octas, 4 tetras (1 dorsal + 2 pectoral + 1 tail fin)
+    hammerhead: hammerheadPreset,                                                // Imported from src/presets/hammerhead.ts
     cosmic: { cubes: 8, octas: 30, tetras: 30, toruses: 20, planes: 10 },       // 8 planet cores, 30 stars, 30 accents, 20 orbital rings, 10 solar panels
     cityscape: { cubes: 12, octas: 30, tetras: 15, toruses: 8, planes: 20 },    // 12 buildings, 30 lights, 15 vehicles, 8 traffic rings, 20 windows
     oceanwaves: { cubes: 8, octas: 40, tetras: 20, toruses: 15, planes: 25 },   // 8 rocks, 40 foam, 20 fish, 15 bubbles/vortex, 25 wave surfaces
