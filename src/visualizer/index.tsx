@@ -15,3 +15,4 @@ export {
   type MaterialConfig,
   type ShapeRequirements
 } from './CanvasView';
+export { createMaterial, createShapePools, type ShapePools } from './shapeFactory';
