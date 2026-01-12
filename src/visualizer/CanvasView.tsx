@@ -43,9 +43,9 @@ export function CanvasView({ onReady, onFrame, width = 960, height = 540 }: Canv
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Initialize Three.js scene (placeholder for now)
+    // Initialize Three.js scene (matches production settings)
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x000000, 10, 50);
+    scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
     sceneRef.current = scene;
 
     // Initialize camera
@@ -53,10 +53,14 @@ export function CanvasView({ onReady, onFrame, width = 960, height = 540 }: Canv
     camera.position.z = 15;
     cameraRef.current = camera;
 
-    // Initialize renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // Initialize renderer (matches production settings)
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      alpha: false, 
+      preserveDrawingBuffer: true 
+    });
     renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 1);
+    renderer.setClearColor(0x0a0a14);
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
