@@ -33,7 +33,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
         </aside>
 
         {/* Right sidebar - collapsed by default, expands as overlay when opened */}
-        <aside className="absolute right-0 top-0 bottom-0 w-80 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        <aside className="absolute right-0 top-0 bottom-0 w-64 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
           <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
             {inspector}
           </PanelContainer>
@@ -41,7 +41,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
       </div>
 
       {/* Bottom timeline - visible by default (keyframe manager) */}
-      <footer className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-64 z-20 shadow-2xl">
+      <footer className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-48 z-20 shadow-2xl">
         <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
           {timeline}
         </PanelContainer>
