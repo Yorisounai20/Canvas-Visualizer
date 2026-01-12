@@ -65,6 +65,11 @@ import tornadovortexPreset from './presets/tornadovortex';
 import stadiumPreset from './presets/stadium';
 import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
+import LayoutShell from './visualizer/LayoutShell';
+import LeftToolboxPlaceholder from './visualizer/LeftToolboxPlaceholder';
+import InspectorPlaceholder from './visualizer/InspectorPlaceholder';
+import TimelinePlaceholder from './visualizer/TimelinePlaceholder';
+import TopBarPlaceholder from './visualizer/TopBarPlaceholder';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -7975,190 +7980,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   }, [showFileMenu]);
 
-  return (
-    <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
-      <div className="flex flex-col items-center">
-        <div className="mb-4 text-center relative" style={{width: '960px'}}>
-          <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
-          <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
-          
-          {/* Left Side - Back to Dashboard and File Menu */}
-          <div className="absolute top-0 left-0 flex items-center gap-2">
-            {/* Back to Dashboard Button */}
-            {onBackToDashboard && (
-              <button
-                onClick={onBackToDashboard}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                title="Back to Dashboard"
-              >
-                <Home size={18} />
-                <span className="text-sm font-semibold">Dashboard</span>
-              </button>
-            )}
-            
-            {/* File Menu Dropdown */}
-            <div className="relative file-menu-container">
-              <button
-                onClick={() => setShowFileMenu(!showFileMenu)}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                title="File Menu"
-              >
-                <Menu size={18} />
-                <span className="text-sm font-semibold">File</span>
-                <ChevronDown size={16} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {/* Dropdown Menu */}
-              {showFileMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
-                  <button
-                    onClick={() => {
-                      handleNewProject();
-                      setShowFileMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-t-lg transition-colors"
-                  >
-                    <FilePlus size={16} />
-                    <span className="text-sm">New Project</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+N</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleSaveProject();
-                      setShowFileMenu(false);
-                    }}
-                    disabled={isSaving}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Save size={16} />
-                    <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowProjectsModal(true);
-                      setShowFileMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
-                  >
-                    <FolderOpen size={16} />
-                    <span className="text-sm">Open Project</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Right Side - Keyboard Shortcuts and Export */}
-          <div className="absolute top-0 right-0 flex items-center gap-2">
-            {/* Keyboard Shortcuts Button */}
-            <button
-              onClick={() => setShowKeyboardShortcuts(true)}
-              className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
-              title="Keyboard Shortcuts (?)"
-            >
-              <BadgeHelp size={18} />
-            </button>
-            
-            {/* Export Button */}
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              title="Video Export"
-            >
-              <Video size={18} />
-              <span className="text-sm font-semibold">Export</span>
-            </button>
-          </div>
-        </div>
 
-        <div className="relative">
-          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-          {showLetterbox && (() => {
-            // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
-            // We need to map this to actual bar heights using the configurable maxLetterboxHeight
-            // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
-            const actualBarHeight = activeLetterboxInvert 
-              ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
-              : letterboxSize;
-            return (
-              <>
-                <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-                <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-              </>
-            );
-          })()}
-          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-        </div>
-      </div>
-
-      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-4">
-          {/* Time Display and Preset Info - No Audio Upload */}
-          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
-            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && (() => {
-              const currentPreset = getCurrentPreset();
-              const animType = animationTypes.find(a => a.value === currentPreset);
-              return animType && (
-                <p className="text-cyan-400 text-xs mt-1">
-                  {animType.icon} {animType.label}
-                </p>
-              );
-            })()}
-            
-            {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
-          </div>
-          
-          {/* Combined Waveform from all tracks */}
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && audioTracks.length > 0 ? (
-                <canvas 
-                  ref={waveformCanvasRef} 
-                  width={800} 
-                  height={120}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
-                </div>
-              )}
-            </div>
-            
-            {/* Timeline Slider - Always visible when audio is ready */}
-            {audioReady && duration > 0 && (
-              <div className="flex items-center gap-3">
-                <input 
-                  type="range" id="currentTime" name="currentTime" 
-                  min="0" 
-                  max={duration} 
-                  step="0.1" 
-                  value={currentTime} 
-                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
-                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
-                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
-                />
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <input 
-                    type="checkbox" 
-                    id="waveformMode" 
-                    checked={waveformMode === 'static'} 
-                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
-                    className="w-3 h-3 cursor-pointer"
-                    aria-label="Toggle between scrolling and static waveform modes"
-                  />
-                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+  // --- Extracted panel DOM constants ---
+  const leftPanelJSX = (
+    <>
 
       {/* Tab Navigation */}
       <div className="bg-gray-800 rounded-lg p-4">
@@ -11802,6 +11627,208 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
       </div>
+    </>
+  );
+
+  const timelinePanelJSX = (
+    <>
+      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-4">
+          {/* Time Display and Preset Info - No Audio Upload */}
+          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
+            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
+            {showPresetDisplay && (() => {
+              const currentPreset = getCurrentPreset();
+              const animType = animationTypes.find(a => a.value === currentPreset);
+              return animType && (
+                <p className="text-cyan-400 text-xs mt-1">
+                  {animType.icon} {animType.label}
+                </p>
+              );
+            })()}
+            
+            {/* Play/Stop Button */}
+            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+          </div>
+          
+          {/* Combined Waveform from all tracks */}
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
+              {audioReady && audioTracks.length > 0 ? (
+                <canvas 
+                  ref={waveformCanvasRef} 
+                  width={800} 
+                  height={120}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
+                </div>
+              )}
+            </div>
+            
+            {/* Timeline Slider - Always visible when audio is ready */}
+            {audioReady && duration > 0 && (
+              <div className="flex items-center gap-3">
+                <input 
+                  type="range" id="currentTime" name="currentTime" 
+                  min="0" 
+                  max={duration} 
+                  step="0.1" 
+                  value={currentTime} 
+                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
+                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
+                />
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <input 
+                    type="checkbox" 
+                    id="waveformMode" 
+                    checked={waveformMode === 'static'} 
+                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
+                    className="w-3 h-3 cursor-pointer"
+                    aria-label="Toggle between scrolling and static waveform modes"
+                  />
+                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  const canvasAreaJSX = (
+        <div className="flex flex-col items-center">
+        <div className="mb-4 text-center relative" style={{width: '960px'}}>
+          <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
+          <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
+          
+          {/* Left Side - Back to Dashboard and File Menu */}
+          <div className="absolute top-0 left-0 flex items-center gap-2">
+            {/* Back to Dashboard Button */}
+            {onBackToDashboard && (
+              <button
+                onClick={onBackToDashboard}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="Back to Dashboard"
+              >
+                <Home size={18} />
+                <span className="text-sm font-semibold">Dashboard</span>
+              </button>
+            )}
+            
+            {/* File Menu Dropdown */}
+            <div className="relative file-menu-container">
+              <button
+                onClick={() => setShowFileMenu(!showFileMenu)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                title="File Menu"
+              >
+                <Menu size={18} />
+                <span className="text-sm font-semibold">File</span>
+                <ChevronDown size={16} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showFileMenu && (
+                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
+                  <button
+                    onClick={() => {
+                      handleNewProject();
+                      setShowFileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-t-lg transition-colors"
+                  >
+                    <FilePlus size={16} />
+                    <span className="text-sm">New Project</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+N</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleSaveProject();
+                      setShowFileMenu(false);
+                    }}
+                    disabled={isSaving}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Save size={16} />
+                    <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowProjectsModal(true);
+                      setShowFileMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
+                  >
+                    <FolderOpen size={16} />
+                    <span className="text-sm">Open Project</span>
+                    <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Side - Keyboard Shortcuts and Export */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            {/* Keyboard Shortcuts Button */}
+            <button
+              onClick={() => setShowKeyboardShortcuts(true)}
+              className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
+              title="Keyboard Shortcuts (?)"
+            >
+              <BadgeHelp size={18} />
+            </button>
+            
+            {/* Export Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
+              title="Video Export"
+            >
+              <Video size={18} />
+              <span className="text-sm font-semibold">Export</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="relative">
+          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
+          {showLetterbox && (() => {
+            // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
+            // We need to map this to actual bar heights using the configurable maxLetterboxHeight
+            // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
+            const actualBarHeight = activeLetterboxInvert 
+              ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
+              : letterboxSize;
+            return (
+              <>
+                <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+                <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+              </>
+            );
+          })()}
+          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        </div>
+      </div>
+  );
+  // --- End constants ---
+
+  return (
+    <LayoutShell
+      left={leftPanelJSX}
+      inspector={null}
+      timeline={timelinePanelJSX}
+      top={null}
+    >
+      {canvasAreaJSX}
+
 
       {/* Debugger - Always visible at bottom */}
       <div className="bg-gray-800 rounded-lg p-4">
@@ -12379,6 +12406,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           currentProjectId={currentProjectId}
         />
       )}
-    </div>
+    </LayoutShell>
   );
 }
