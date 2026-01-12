@@ -33,7 +33,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
         </main>
 
         {/* Right sidebar - Always open by default, collapsible, with internal scroll */}
-        <aside className="w-80 flex-shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col">
+        <aside className="w-64 flex-shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col">
           <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
             {inspector}
           </PanelContainer>
