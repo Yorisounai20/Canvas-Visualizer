@@ -13,7 +13,7 @@ export default function PanelContainer({ name, defaultCollapsed = false, childre
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   return (
-    <div className="panel-container h-full flex flex-col">
+    <div className={`panel-container h-full flex flex-col ${collapsed ? 'w-auto' : 'w-full'}`}>
       {/* Panel header - clickable to expand/collapse */}
       <div 
         className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-gray-800/80 to-gray-800/40 border-b border-gray-700/50 cursor-pointer hover:bg-gray-800/60 transition-colors flex-shrink-0"
@@ -40,7 +40,7 @@ export default function PanelContainer({ name, defaultCollapsed = false, childre
         </button>
       </div>
 
-      {/* Panel content - shown when expanded */}
+      {/* Panel content - only shown when expanded */}
       {!collapsed && (
         <div className="flex-1 overflow-y-auto p-4">
           {children}

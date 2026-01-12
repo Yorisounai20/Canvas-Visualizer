@@ -14,35 +14,35 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
   return (
     <div className="cv-layout flex flex-col h-screen w-full bg-gray-900 overflow-hidden">
       {/* Top bar - fixed height */}
-      <header className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-30">
+      <header className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-800 z-20 relative">
         {top ?? <TopBarPlaceholder />}
       </header>
 
-      {/* Main content area - takes remaining height */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left sidebar - Always open by default, collapsible, with internal scroll */}
-        <aside className="w-64 flex-shrink-0 border-r border-gray-800 bg-gray-900 flex flex-col">
-          <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
+      {/* Main content area - full width, panels as thin collapsed tabs by default */}
+      <div className="flex-1 relative overflow-hidden min-h-0">
+        {/* Center content - main canvas takes full space */}
+        <main className="absolute inset-0 overflow-hidden flex flex-col">
+          {children}
+        </main>
+
+        {/* Left sidebar - narrow icon bar, collapsed by default */}
+        <aside className="absolute left-0 top-0 bottom-0 w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+          <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Center content - Canvas area, fully visible */}
-        <main className="flex-1 overflow-hidden flex flex-col bg-gray-950">
-          {children}
-        </main>
-
-        {/* Right sidebar - Always open by default, collapsible, with internal scroll */}
-        <aside className="w-64 flex-shrink-0 border-l border-gray-800 bg-gray-900 flex flex-col">
-          <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
+        {/* Right sidebar - collapsed by default, expands as overlay when opened */}
+        <aside className="absolute right-0 top-0 bottom-0 w-80 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+          <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
             {inspector}
           </PanelContainer>
         </aside>
       </div>
 
-      {/* Bottom timeline - Larger for keyframes, scrollable horizontally and vertically */}
-      <footer className="flex-shrink-0 bg-gray-900 border-t border-gray-800 h-64">
-        <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
+      {/* Bottom timeline - collapsed by default, expands as overlay when opened */}
+      <footer className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-64 z-20 shadow-2xl">
+        <PanelContainer name="⏱️ Timeline" defaultCollapsed={true} icon="⏱️">
           {timeline}
         </PanelContainer>
       </footer>
