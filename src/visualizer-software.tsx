@@ -8185,7 +8185,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-    <div className="flex items-center w-full h-full bg-gray-950" style={{paddingLeft: '120px'}}>
+    <div className="flex items-start w-full h-full bg-gray-950" style={{paddingLeft: '80px', paddingTop: '40px'}}>
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
