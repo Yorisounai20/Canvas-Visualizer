@@ -65,6 +65,11 @@ import tornadovortexPreset from './presets/tornadovortex';
 import stadiumPreset from './presets/stadium';
 import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
+import LayoutShell from './visualizer/LayoutShell';
+import LeftToolboxPlaceholder from './visualizer/LeftToolboxPlaceholder';
+import InspectorPlaceholder from './visualizer/InspectorPlaceholder';
+import TimelinePlaceholder from './visualizer/TimelinePlaceholder';
+import TopBarPlaceholder from './visualizer/TopBarPlaceholder';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -7976,8 +7981,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   }, [showFileMenu]);
 
   return (
-    <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
-      <div className="flex flex-col items-center">
+    <LayoutShell
+      left={<LeftToolboxPlaceholder />}
+      inspector={<InspectorPlaceholder />}
+      timeline={<TimelinePlaceholder />}
+      top={<TopBarPlaceholder />}
+    >
+      <div className="flex flex-col gap-4 min-h-screen bg-gray-900 p-4">
+        <div className="flex flex-col items-center">
         <div className="mb-4 text-center relative" style={{width: '960px'}}>
           <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
           <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
@@ -12380,5 +12391,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         />
       )}
     </div>
+    </LayoutShell>
   );
 }
