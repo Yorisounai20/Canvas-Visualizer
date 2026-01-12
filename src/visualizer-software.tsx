@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, Video, X, BadgeHelp, ChevronDown, Save, FolderOpen, Home, Menu, FilePlus } from 'lucide-react';
+import { Trash2, Plus, Play, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
@@ -66,10 +66,7 @@ import stadiumPreset from './presets/stadium';
 import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
 import LayoutShell from './visualizer/LayoutShell';
-import LeftToolboxPlaceholder from './visualizer/LeftToolboxPlaceholder';
-import InspectorPlaceholder from './visualizer/InspectorPlaceholder';
-import TimelinePlaceholder from './visualizer/TimelinePlaceholder';
-import TopBarPlaceholder from './visualizer/TopBarPlaceholder';
+import TopBar from './visualizer/TopBar';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -11702,153 +11699,91 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-        <div className="flex flex-col items-center">
-        <div className="mb-4 text-center relative" style={{width: '960px'}}>
-          <h1 className="text-3xl font-bold text-purple-400 mb-2">3D Timeline Visualizer</h1>
-          <p className="text-cyan-300 text-sm">Upload audio and watch the magic!</p>
-          
-          {/* Left Side - Back to Dashboard and File Menu */}
-          <div className="absolute top-0 left-0 flex items-center gap-2">
-            {/* Back to Dashboard Button */}
-            {onBackToDashboard && (
-              <button
-                onClick={onBackToDashboard}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                title="Back to Dashboard"
-              >
-                <Home size={18} />
-                <span className="text-sm font-semibold">Dashboard</span>
-              </button>
-            )}
-            
-            {/* File Menu Dropdown */}
-            <div className="relative file-menu-container">
-              <button
-                onClick={() => setShowFileMenu(!showFileMenu)}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                title="File Menu"
-              >
-                <Menu size={18} />
-                <span className="text-sm font-semibold">File</span>
-                <ChevronDown size={16} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
-              </button>
-              
-              {/* Dropdown Menu */}
-              {showFileMenu && (
-                <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
-                  <button
-                    onClick={() => {
-                      handleNewProject();
-                      setShowFileMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-t-lg transition-colors"
-                  >
-                    <FilePlus size={16} />
-                    <span className="text-sm">New Project</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+N</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleSaveProject();
-                      setShowFileMenu(false);
-                    }}
-                    disabled={isSaving}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <Save size={16} />
-                    <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowProjectsModal(true);
-                      setShowFileMenu(false);
-                    }}
-                    className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
-                  >
-                    <FolderOpen size={16} />
-                    <span className="text-sm">Open Project</span>
-                    <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Right Side - Keyboard Shortcuts and Export */}
-          <div className="absolute top-0 right-0 flex items-center gap-2">
-            {/* Keyboard Shortcuts Button */}
-            <button
-              onClick={() => setShowKeyboardShortcuts(true)}
-              className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
-              title="Keyboard Shortcuts (?)"
-            >
-              <BadgeHelp size={18} />
-            </button>
-            
-            {/* Export Button */}
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition-colors"
-              title="Video Export"
-            >
-              <Video size={18} />
-              <span className="text-sm font-semibold">Export</span>
-            </button>
-          </div>
-        </div>
+    <div className="flex items-center justify-center w-full h-full bg-gray-950">
+      <div className="relative">
+        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
+        {showLetterbox && (() => {
+          // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
+          // We need to map this to actual bar heights using the configurable maxLetterboxHeight
+          // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
+          const actualBarHeight = activeLetterboxInvert 
+            ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
+            : letterboxSize;
+          return (
+            <>
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+            </>
+          );
+        })()}
+        {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+      </div>
+    </div>
+  );
 
-        <div className="relative">
-          <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-          {showLetterbox && (() => {
-            // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
-            // We need to map this to actual bar heights using the configurable maxLetterboxHeight
-            // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
-            const actualBarHeight = activeLetterboxInvert 
-              ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
-              : letterboxSize;
-            return (
-              <>
-                <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-                <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-              </>
-            );
-          })()}
-          {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+  const topBarJSX = (
+    <TopBar
+      onBackToDashboard={onBackToDashboard}
+      showFileMenu={showFileMenu}
+      setShowFileMenu={setShowFileMenu}
+      handleNewProject={handleNewProject}
+      handleSaveProject={handleSaveProject}
+      setShowProjectsModal={setShowProjectsModal}
+      setShowKeyboardShortcuts={setShowKeyboardShortcuts}
+      setShowExportModal={setShowExportModal}
+      isSaving={isSaving}
+      currentTime={currentTime}
+      duration={duration}
+      formatTime={formatTime}
+    />
+  );
+
+  const inspectorJSX = (
+    <div className="space-y-4">
+      {/* Debug Console */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <h4 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h4>
+            {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
+          </div>
+          <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
+        </div>
+        <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
+          {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
+            <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
+              <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* Current Preset Info */}
+      {showPresetDisplay && (() => {
+        const currentPreset = getCurrentPreset();
+        const animType = animationTypes.find(a => a.value === currentPreset);
+        return animType && (
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Preset</h4>
+            <p className="text-cyan-400 text-sm flex items-center gap-2">
+              <span className="text-lg">{animType.icon}</span>
+              <span>{animType.label}</span>
+            </p>
+          </div>
+        );
+      })()}
+    </div>
   );
   // --- End constants ---
 
   return (
     <LayoutShell
       left={leftPanelJSX}
-      inspector={null}
+      inspector={inspectorJSX}
       timeline={timelinePanelJSX}
-      top={null}
+      top={topBarJSX}
     >
       {canvasAreaJSX}
-
-
-      {/* Debugger - Always visible at bottom */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="bg-gray-700 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h3>
-              {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
-            </div>
-            <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
-          </div>
-          <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
-            {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
-              <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
-                <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Export Modal */}
       <VideoExportModal
