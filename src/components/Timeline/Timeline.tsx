@@ -36,6 +36,9 @@ interface TimelineProps {
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
+  onMovePresetKeyframe?: (id: number, newTime: number) => void;
+  onMoveTextKeyframe?: (id: number, newTime: number) => void;
+  onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
   onSelectFXClip?: (id: string) => void;
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onDeleteCameraFXClip?: (id: string) => void;
@@ -80,6 +83,9 @@ export default function Timeline({
   onUpdateCameraKeyframe,
   onUpdateTextKeyframe,
   onUpdateEnvironmentKeyframe,
+  onMovePresetKeyframe,
+  onMoveTextKeyframe,
+  onMoveEnvironmentKeyframe,
   onSelectFXClip,
   onUpdateCameraFXClip,
   onDeleteCameraFXClip,
@@ -121,9 +127,18 @@ export default function Timeline({
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const PIXELS_PER_SECOND = 40; // Scaling factor
+  const [zoomLevel, setZoomLevel] = useState(1.0); // 1.0 = normal, 2.0 = zoomed in 2x
+  const PIXELS_PER_SECOND = 40 * zoomLevel; // Scaling factor with zoom
   const TIMELINE_HEIGHT = 60; // Height of each layer bar
   const timelineWidth = Math.max(duration * PIXELS_PER_SECOND, 1000); // CRITICAL FIX: Moved before useEffect
+
+  // Keyframe dragging state
+  const [keyframeDragState, setKeyframeDragState] = useState<{
+    type: 'preset' | 'text' | 'environment' | null;
+    keyframeId: number | null;
+    startX: number;
+    initialTime: number;
+  }>({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
 
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
@@ -393,6 +408,46 @@ export default function Timeline({
     }
   }, [fxDragState, cameraFXClips, duration, onUpdateCameraFXClip]);
 
+  // Handle keyframe dragging
+  useEffect(() => {
+    if (!keyframeDragState.type || keyframeDragState.keyframeId === null) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!timelineRef.current || keyframeDragState.keyframeId === null) return;
+      
+      const deltaX = e.clientX - keyframeDragState.startX;
+      const deltaTime = pixelsToTime(deltaX);
+      const newTime = Math.max(0, Math.min(duration, keyframeDragState.initialTime + deltaTime));
+
+      // Update keyframe position based on type
+      if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
+        onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'text' && onMoveTextKeyframe) {
+        onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'environment' && onMoveEnvironmentKeyframe) {
+        onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setKeyframeDragState({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [keyframeDragState, duration, onMovePresetKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe, pixelsToTime]);
+
   // Handle scroll wheel for horizontal scrolling - CRITICAL FIX: Updated dependencies
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
@@ -425,14 +480,43 @@ export default function Timeline({
             {formatTime(currentTime)} / {formatTime(duration)}
           </p>
         </div>
-        <button
-          onClick={onAddSection}
-          className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
-          title="Add new section"
-        >
-          <Plus size={14} />
-          <span>Add Section</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 mr-2">
+            <button
+              onClick={() => setZoomLevel(prev => Math.max(0.25, prev - 0.25))}
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span className="text-xs text-gray-400 min-w-[50px] text-center">
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              onClick={() => setZoomLevel(prev => Math.min(4.0, prev + 0.25))}
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
+              title="Zoom in"
+            >
+              +
+            </button>
+            <button
+              onClick={() => setZoomLevel(1.0)}
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors ml-1"
+              title="Reset zoom"
+            >
+              Reset
+            </button>
+          </div>
+          <button
+            onClick={onAddSection}
+            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
+            title="Add new section"
+          >
+            <Plus size={14} />
+            <span>Add Section</span>
+          </button>
+        </div>
       </div>
 
       {/* Timeline Tabs */}
@@ -630,11 +714,20 @@ export default function Timeline({
               {presetKeyframes.map((kf) => (
                 <div
                   key={kf.id}
-                  className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-pointer group"
+                  className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-grab active:cursor-grabbing group"
                   style={{ left: `${timeToPixels(kf.time)}px` }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onSeek(kf.time);
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setKeyframeDragState({
+                      type: 'preset',
+                      keyframeId: kf.id,
+                      startX: e.clientX,
+                      initialTime: kf.time
+                    });
                   }}
                   onContextMenu={(e) => handleKeyframeContextMenu(e, 'preset', kf.id)}
                 >
@@ -791,11 +884,20 @@ export default function Timeline({
               {textKeyframes.map((kf) => (
                 <div
                   key={kf.id}
-                  className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-pointer group`}
+                  className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-grab active:cursor-grabbing group`}
                   style={{ left: `${timeToPixels(kf.time)}px` }}
                   onClick={(e) => {
                     e.stopPropagation();
                     onSeek(kf.time);
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setKeyframeDragState({
+                      type: 'text',
+                      keyframeId: kf.id,
+                      startX: e.clientX,
+                      initialTime: kf.time
+                    });
                   }}
                   onContextMenu={(e) => handleKeyframeContextMenu(e, 'text', kf.id)}
                 >
@@ -866,11 +968,20 @@ export default function Timeline({
               {environmentKeyframes.map(kf => (
                 <div
                   key={kf.id}
-                  className="absolute top-1 w-4 h-4 bg-green-500 rounded-full cursor-pointer hover:scale-125 transition-transform flex items-center justify-center group"
+                  className="absolute top-1 w-4 h-4 bg-green-500 rounded-full cursor-grab active:cursor-grabbing hover:scale-125 transition-transform flex items-center justify-center group"
                   style={{ left: `calc(${(kf.time / (duration || 60)) * 100}% - 8px)` }}
                   onClick={(e) => {
                     e.stopPropagation();
                     setEditingKeyframe({ type: 'environment', data: kf });
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setKeyframeDragState({
+                      type: 'environment',
+                      keyframeId: kf.id,
+                      startX: e.clientX,
+                      initialTime: kf.time
+                    });
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
