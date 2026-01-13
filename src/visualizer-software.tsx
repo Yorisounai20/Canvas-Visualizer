@@ -68,9 +68,12 @@ import emptyPreset from './presets/empty';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
 import { 
+  AudioTab,
   ControlsTab, 
   CameraTab, 
   PresetsTab, 
+  EffectsTab,
+  PostFXTab,
   EnvironmentsTab, 
   CameraFXTab, 
   CameraRigTab 
