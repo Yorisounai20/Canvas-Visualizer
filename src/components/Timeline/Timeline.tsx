@@ -722,7 +722,7 @@ export default function Timeline({
               {presetKeyframes.map((kf) => (
                 <div
                   key={kf.id}
-                  className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-grab active:cursor-grabbing group"
+                  className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors group"
                   style={{ left: `${timeToPixels(kf.time)}px` }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -892,7 +892,7 @@ export default function Timeline({
               {textKeyframes.map((kf) => (
                 <div
                   key={kf.id}
-                  className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-grab active:cursor-grabbing group`}
+                  className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors group`}
                   style={{ left: `${timeToPixels(kf.time)}px` }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -976,7 +976,7 @@ export default function Timeline({
               {environmentKeyframes.map(kf => (
                 <div
                   key={kf.id}
-                  className="absolute top-1 w-4 h-4 bg-green-500 rounded-full cursor-grab active:cursor-grabbing hover:scale-125 transition-transform flex items-center justify-center group"
+                  className="absolute top-1 w-4 h-4 bg-green-500 rounded-full hover:scale-125 transition-transform flex items-center justify-center group"
                   style={{ left: `calc(${(kf.time / (duration || 60)) * 100}% - 8px)` }}
                   onClick={(e) => {
                     e.stopPropagation();
