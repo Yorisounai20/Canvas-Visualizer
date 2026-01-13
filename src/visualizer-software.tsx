@@ -951,6 +951,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return kf;
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
+
+  const handleMovePresetKeyframe = (id: number, newTime: number) => {
+    setPresetKeyframes(presetKeyframes.map(kf => {
+      if (kf.id === id) {
+        const duration = kf.endTime - kf.time;
+        return { 
+          ...kf, 
+          time: newTime,
+          endTime: newTime + duration
+        };
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time));
+  };
   
   // Speed keyframe handlers
   const handleAddSpeedKeyframe = () => {
@@ -1488,6 +1502,46 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
     ));
     addLog('Updated environment keyframe', 'success');
+  };
+
+  const handleMoveEnvironmentKeyframe = (id: number, newTime: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+
+  // Text keyframe handlers (stub - to be implemented)
+  const [textKeyframes, setTextKeyframes] = useState<Array<{
+    id: number;
+    time: number;
+    show: boolean;
+    text?: string;
+  }>>([]);
+  const nextTextKeyframeId = useRef(1);
+
+  const handleAddTextKeyframe = (time: number) => {
+    const newKeyframe = {
+      id: nextTextKeyframeId.current++,
+      time,
+      show: true
+    };
+    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+
+  const handleDeleteTextKeyframe = (id: number) => {
+    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
+  };
+
+  const handleUpdateTextKeyframe = (id: number, show: boolean, text?: string) => {
+    setTextKeyframes(textKeyframes.map(kf => 
+      kf.id === id ? { ...kf, show, text } : kf
+    ));
+  };
+
+  const handleMoveTextKeyframe = (id: number, newTime: number) => {
+    setTextKeyframes(textKeyframes.map(kf => 
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
   };
 
   // Camera FX handlers
