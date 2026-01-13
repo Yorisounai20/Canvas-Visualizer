@@ -8267,68 +8267,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         </p>
         
         {activeTab === 'waveforms' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3">
-              <label className="text-xs text-gray-400 block mb-2">Waveform Mode</label>
-              <select
-                value={waveformMode}
-                onChange={(e) => setWaveformMode(e.target.value as 'scrolling' | 'static')}
-                className="w-full bg-gray-800 text-white px-3 py-2 rounded"
-              >
-                <option value="scrolling">Scrolling</option>
-                <option value="static">Static</option>
-              </select>
-            </div>
-            
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Audio Gains</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Bass Gain: {bassGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={bassGain}
-                  onChange={(e) => setBassGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Mids Gain: {midsGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={midsGain}
-                  onChange={(e) => setMidsGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Highs Gain: {highsGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={highsGain}
-                  onChange={(e) => setHighsGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <AudioTab
+            audioTracks={audioTracks}
+            bassGain={bassGain}
+            midsGain={midsGain}
+            highsGain={highsGain}
+            addAudioTrack={addAudioTrack}
+            removeAudioTrack={removeAudioTrack}
+            setActiveTrack={setActiveTrack}
+            setBassGain={setBassGain}
+            setMidsGain={setMidsGain}
+            setHighsGain={setHighsGain}
+          />
         )}
         
         {activeTab === 'presets' && (
@@ -8463,56 +8413,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Particle Effects</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Emission Rate: {particleEmissionRate}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="200"
-                  step="10"
-                  value={particleEmissionRate}
-                  onChange={(e) => setParticleEmissionRate(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Particle Size: {particleStartSize.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="2"
-                  step="0.1"
-                  value={particleStartSize}
-                  onChange={(e) => setParticleStartSize(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Lifetime: {particleLifetime.toFixed(1)}s
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="10"
-                  step="0.5"
-                  value={particleLifetime}
-                  onChange={(e) => setParticleLifetime(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <EffectsTab
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            skyboxGradientTop={skyboxGradientTop}
+            skyboxGradientBottom={skyboxGradientBottom}
+            skyboxImageUrl={skyboxImageUrl}
+            starCount={starCount}
+            galaxyColor={galaxyColor}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setSkyboxGradientTop={setSkyboxGradientTop}
+            setSkyboxGradientBottom={setSkyboxGradientBottom}
+            setSkyboxImageUrl={setSkyboxImageUrl}
+            setStarCount={setStarCount}
+            setGalaxyColor={setGalaxyColor}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setBorderColor={setBorderColor}
+          />
         )}
         
         {activeTab === 'environments' && (
@@ -8546,71 +8468,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'postfx' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Post-Processing</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Vignette Strength: {vignetteStrength.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={vignetteStrength}
-                  onChange={(e) => setVignetteStrength(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Saturation: {colorSaturation.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={colorSaturation}
-                  onChange={(e) => setColorSaturation(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Contrast: {colorContrast.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={colorContrast}
-                  onChange={(e) => setColorContrast(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Gamma: {colorGamma.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  value={colorGamma}
-                  onChange={(e) => setColorGamma(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <PostFXTab
+            blendMode={blendMode}
+            vignetteStrength={vignetteStrength}
+            vignetteSoftness={vignetteSoftness}
+            colorSaturation={colorSaturation}
+            colorContrast={colorContrast}
+            colorGamma={colorGamma}
+            colorTintR={colorTintR}
+            colorTintG={colorTintG}
+            colorTintB={colorTintB}
+            setBlendMode={setBlendMode}
+            setVignetteStrength={setVignetteStrength}
+            setVignetteSoftness={setVignetteSoftness}
+            setColorSaturation={setColorSaturation}
+            setColorContrast={setColorContrast}
+            setColorGamma={setColorGamma}
+            setColorTintR={setColorTintR}
+            setColorTintG={setColorTintG}
+            setColorTintB={setColorTintB}
+          />
         )}
         
         {activeTab === 'textAnimator' && (
