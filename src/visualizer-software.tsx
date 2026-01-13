@@ -8270,45 +8270,192 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const inspectorJSX = (
     <div className="space-y-4">
-      {/* Active Tab Display */}
-      <div className="p-4 rounded-lg bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-700/50">
-        <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-          <span>✨</span>
-          Active Tab
-        </h4>
-        <p className="text-white text-lg font-semibold flex items-center gap-3">
-          <span className="text-3xl">
-            {activeTab === 'waveforms' && '🎵'}
-            {activeTab === 'presets' && '⏱️'}
-            {activeTab === 'controls' && '🎨'}
-            {activeTab === 'camera' && '📷'}
-            {activeTab === 'cameraRig' && '🎥'}
-            {activeTab === 'camerafx' && '🎬'}
-            {activeTab === 'effects' && '✨'}
-            {activeTab === 'environments' && '🌍'}
-            {activeTab === 'postfx' && '🎭'}
-            {activeTab === 'textAnimator' && '📝'}
-          </span>
-          <span>
-            {activeTab === 'waveforms' && 'Waveforms'}
-            {activeTab === 'presets' && 'Presets'}
-            {activeTab === 'controls' && 'Controls'}
-            {activeTab === 'camera' && 'Camera'}
-            {activeTab === 'cameraRig' && 'Camera Rig'}
-            {activeTab === 'camerafx' && 'Camera FX'}
-            {activeTab === 'effects' && 'Effects'}
-            {activeTab === 'environments' && 'Environments'}
-            {activeTab === 'postfx' && 'Post-FX'}
-            {activeTab === 'textAnimator' && 'Text Animator'}
-          </span>
-        </p>
-        <p className="text-purple-200 text-xs mt-2">
-          Tab properties will display here when implementation is complete
-        </p>
-      </div>
+      {/* Tab-Specific Controls */}
+      
+      {/* Presets Tab */}
+      {activeTab === 'presets' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>⏱️</span> Preset Keyframes
+          </h4>
+          <button
+            onClick={handleAddPresetKeyframe}
+            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={14} />
+            Add Preset Keyframe at {formatTime(currentTime)}
+          </button>
+          <p className="text-xs text-gray-400">
+            Adds a new animation preset keyframe to the timeline. Switch to the Presets tab in the timeline to view and edit.
+          </p>
+        </div>
+      )}
 
-      {/* Debug Console */}
-      <div>
+      {/* Camera Tab */}
+      {activeTab === 'camera' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>📷</span> Camera Keyframes
+          </h4>
+          <div className="space-y-2">
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Distance: {cameraDistance.toFixed(1)}</label>
+              <input type="range" min="5" max="50" step="0.5" value={cameraDistance} onChange={(e) => setCameraDistance(parseFloat(e.target.value))} className="w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Height: {cameraHeight.toFixed(1)}</label>
+              <input type="range" min="-10" max="10" step="0.5" value={cameraHeight} onChange={(e) => setCameraHeight(parseFloat(e.target.value))} className="w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Rotation: {cameraRotation.toFixed(0)}°</label>
+              <input type="range" min="0" max="360" step="1" value={cameraRotation} onChange={(e) => setCameraRotation(parseFloat(e.target.value))} className="w-full" />
+            </div>
+          </div>
+          <button
+            onClick={() => addCameraKeyframe(currentTime)}
+            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={14} />
+            Add Camera Keyframe
+          </button>
+          <p className="text-xs text-gray-400">
+            Captures current camera position and adds it to the timeline. View in the Camera tab.
+          </p>
+        </div>
+      )}
+
+      {/* Text Tab */}
+      {activeTab === 'textAnimator' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>📝</span> Text Keyframes
+          </h4>
+          <button
+            onClick={() => handleAddTextKeyframe(currentTime)}
+            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={14} />
+            Add Text Visibility Keyframe
+          </button>
+          <p className="text-xs text-gray-400">
+            Toggle text visibility at this point in time. View in the Text tab of the timeline.
+          </p>
+        </div>
+      )}
+
+      {/* Environment Tab */}
+      {activeTab === 'environments' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🌍</span> Environment Keyframes
+          </h4>
+          <button
+            onClick={handleAddEnvironmentKeyframe}
+            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={14} />
+            Add Environment Keyframe
+          </button>
+          <p className="text-xs text-gray-400">
+            Add environment effect at {formatTime(currentTime)}. View in the Environment tab of the timeline.
+          </p>
+        </div>
+      )}
+
+      {/* Camera FX Tab */}
+      {activeTab === 'camerafx' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🎬</span> Camera FX Clips
+          </h4>
+          <div className="space-y-2">
+            <button
+              onClick={() => addCameraFXClip('grid')}
+              className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition-colors"
+            >
+              Add Grid FX
+            </button>
+            <button
+              onClick={() => addCameraFXClip('kaleidoscope')}
+              className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
+            >
+              Add Kaleidoscope FX
+            </button>
+            <button
+              onClick={() => addCameraFXClip('pip')}
+              className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold transition-colors"
+            >
+              Add Picture-in-Picture
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            Add camera effects clips to the timeline at {formatTime(currentTime)}.
+          </p>
+        </div>
+      )}
+
+      {/* Controls Tab */}
+      {activeTab === 'controls' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🎨</span> Animation Controls
+          </h4>
+          <p className="text-xs text-gray-400">
+            Use the Sections and Presets tabs in the timeline to control animations. Create sections to define time ranges and add preset keyframes to change animations.
+          </p>
+        </div>
+      )}
+
+      {/* Waveforms Tab */}
+      {activeTab === 'waveforms' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🎵</span> Audio Tracks
+          </h4>
+          <p className="text-xs text-gray-400">
+            Audio tracks are managed in the main interface. The timeline displays waveforms automatically when audio is loaded.
+          </p>
+        </div>
+      )}
+
+      {/* Camera Rig Tab */}
+      {activeTab === 'cameraRig' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🎥</span> Camera Rigs
+          </h4>
+          <p className="text-xs text-gray-400">
+            Camera rigs are complex multi-point camera paths. Use the Camera tab for simple keyframe-based camera animation.
+          </p>
+        </div>
+      )}
+
+      {/* Effects Tab */}
+      {activeTab === 'effects' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>✨</span> Visual Effects
+          </h4>
+          <p className="text-xs text-gray-400">
+            Visual effects are controlled through parameter events. Use the timeline to add and manage effect triggers.
+          </p>
+        </div>
+      )}
+
+      {/* Post-FX Tab */}
+      {activeTab === 'postfx' && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+            <span>🎭</span> Post Processing
+          </h4>
+          <p className="text-xs text-gray-400">
+            Post-processing effects like vignette, color grading, and contrast are applied globally and can be animated through the timeline.
+          </p>
+        </div>
+      )}
+
+      {/* Debug Console - Always visible at bottom */}
+      <div className="border-t border-gray-700 pt-4 mt-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <h4 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h4>
@@ -8316,7 +8463,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
           <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
         </div>
-        <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
+        <div className="bg-black rounded p-3 h-32 overflow-y-auto font-mono text-xs">
           {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
             <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
               <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
@@ -8324,21 +8471,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           ))}
         </div>
       </div>
-
-      {/* Current Preset Info */}
-      {showPresetDisplay && (() => {
-        const currentPreset = getCurrentPreset();
-        const animType = animationTypes.find(a => a.value === currentPreset);
-        return animType && (
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Preset</h4>
-            <p className="text-cyan-400 text-sm flex items-center gap-2">
-              <span className="text-lg">{animType.icon}</span>
-              <span>{animType.label}</span>
-            </p>
-          </div>
-        );
-      })()}
     </div>
   );
   // --- End constants ---
