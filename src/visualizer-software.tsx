@@ -8597,7 +8597,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 <label className="text-xs text-gray-400 block mb-1">Skybox Type</label>
                 <select
                   value={skyboxType}
-                  onChange={(e) => setSkyboxType(e.target.value as any)}
+                  onChange={(e) => setSkyboxType(e.target.value as 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula')}
                   className="w-full bg-gray-800 text-white px-3 py-2 rounded"
                 >
                   <option value="color">Solid Color</option>
@@ -8700,7 +8700,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   disabled={!fontLoaded}
                   className="w-4 h-4 cursor-pointer"
                 />
-                <label htmlFor="showSongName" className={`text-sm cursor-pointer ${fontLoaded ? 'text-white' : 'text-gray-500'}`}>
+                <label 
+                  htmlFor="showSongName" 
+                  className={fontLoaded ? 'text-sm cursor-pointer text-white' : 'text-sm cursor-pointer text-gray-500'}
+                >
                   Show 3D Text
                 </label>
               </div>
