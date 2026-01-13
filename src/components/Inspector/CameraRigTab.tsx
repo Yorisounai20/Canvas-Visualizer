@@ -124,6 +124,10 @@ export default function CameraRigTab(props: CameraRigTabProps) {
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-gray-500 text-center italic">
+        Camera rigs automate camera movement along predefined paths. Advanced controls provide professional cinematic tools.
+      </p>
+      
       {/* Add Camera Rig Type Selector */}
       <div className="bg-gray-700 rounded-lg p-3 space-y-3">
         <h4 className="text-sm font-semibold text-cyan-400">🎥 Camera Rig Types</h4>
@@ -587,10 +591,6 @@ export default function CameraRigTab(props: CameraRigTabProps) {
           </button>
         </div>
       </div>
-      
-      <p className="text-xs text-gray-500 text-center italic">
-        Camera rigs automate camera movement along predefined paths. Advanced controls provide professional cinematic tools.
-      </p>
     </div>
   );
 }
