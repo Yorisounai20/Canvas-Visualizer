@@ -8226,14 +8226,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const inspectorJSX = (
     <div className="space-y-4">
-      {/* Active Tab Display */}
-      <div className="p-4 rounded-lg bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-700/50">
-        <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-          <span>✨</span>
-          Active Tab
-        </h4>
-        <p className="text-white text-lg font-semibold flex items-center gap-3">
-          <span className="text-3xl">
+      {/* Tab-Specific Controls */}
+      <div className="space-y-4">
+        <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold flex items-center gap-2">
+          <span className="text-2xl">
             {activeTab === 'waveforms' && '🎵'}
             {activeTab === 'presets' && '⏱️'}
             {activeTab === 'controls' && '🎨'}
@@ -8258,9 +8254,507 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {activeTab === 'textAnimator' && 'Text Animator'}
           </span>
         </p>
-        <p className="text-purple-200 text-xs mt-2">
-          Tab properties will display here when implementation is complete
-        </p>
+        
+        {activeTab === 'waveforms' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3">
+              <label className="text-xs text-gray-400 block mb-2">Waveform Mode</label>
+              <select
+                value={waveformMode}
+                onChange={(e) => setWaveformMode(e.target.value as 'scrolling' | 'static')}
+                className="w-full bg-gray-800 text-white px-3 py-2 rounded"
+              >
+                <option value="scrolling">Scrolling</option>
+                <option value="static">Static</option>
+              </select>
+            </div>
+            
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Audio Gains</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Bass Gain: {bassGain.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={bassGain}
+                  onChange={(e) => setBassGain(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Mids Gain: {midsGain.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={midsGain}
+                  onChange={(e) => setMidsGain(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Highs Gain: {highsGain.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={highsGain}
+                  onChange={(e) => setHighsGain(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'presets' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3">
+              <label className="text-xs text-gray-400 block mb-2">Select Preset</label>
+              <select
+                value={getCurrentPreset()}
+                onChange={(e) => {
+                  const preset = e.target.value;
+                  if (sections.length > 0) {
+                    updateSection(sections[0].id, 'animation', preset);
+                  }
+                }}
+                className="w-full bg-gray-800 text-white px-3 py-2 rounded"
+              >
+                {animationTypes.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.icon} {type.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <button
+              onClick={addSection}
+              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+            >
+              Add Preset Keyframe
+            </button>
+          </div>
+        )}
+        
+        {activeTab === 'controls' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Global Colors</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Bass Color</label>
+                <input
+                  type="color"
+                  value={bassColor}
+                  onChange={(e) => setBassColor(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Mids Color</label>
+                <input
+                  type="color"
+                  value={midsColor}
+                  onChange={(e) => setMidsColor(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Highs Color</label>
+                <input
+                  type="color"
+                  value={highsColor}
+                  onChange={(e) => setHighsColor(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'camera' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Camera Position</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Distance: {cameraDistance.toFixed(1)}
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="50"
+                  step="0.5"
+                  value={cameraDistance}
+                  onChange={(e) => setCameraDistance(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Height: {cameraHeight.toFixed(1)}
+                </label>
+                <input
+                  type="range"
+                  min="-10"
+                  max="10"
+                  step="0.5"
+                  value={cameraHeight}
+                  onChange={(e) => setCameraHeight(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Rotation: {cameraRotation.toFixed(1)}°
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="360"
+                  step="1"
+                  value={cameraRotation}
+                  onChange={(e) => setCameraRotation(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+            
+            <button
+              onClick={addKeyframe}
+              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+            >
+              Add Camera Keyframe
+            </button>
+          </div>
+        )}
+        
+        {activeTab === 'cameraRig' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Camera Automation</h4>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="autoRotate"
+                  checked={cameraAutoRotate}
+                  onChange={(e) => setCameraAutoRotate(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">
+                  Auto-Rotate Camera
+                </label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showRigHints"
+                  checked={showRigHints}
+                  onChange={(e) => setShowRigHints(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showRigHints" className="text-sm text-white cursor-pointer">
+                  Show Rig Hints
+                </label>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showRigPaths"
+                  checked={showRigPaths}
+                  onChange={(e) => setShowRigPaths(e.target.checked)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showRigPaths" className="text-sm text-white cursor-pointer">
+                  Show Camera Paths
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'camerafx' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-2">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold mb-2">Add Camera Effects</h4>
+              
+              <button
+                onClick={() => addCameraFXClip('grid')}
+                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+              >
+                🔲 Add Grid FX
+              </button>
+              
+              <button
+                onClick={() => addCameraFXClip('kaleidoscope')}
+                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+              >
+                🔮 Add Kaleidoscope FX
+              </button>
+              
+              <button
+                onClick={() => addCameraFXClip('pip')}
+                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+              >
+                📺 Add Picture-in-Picture
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'effects' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Particle Effects</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Emission Rate: {particleEmissionRate}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="200"
+                  step="10"
+                  value={particleEmissionRate}
+                  onChange={(e) => setParticleEmissionRate(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Particle Size: {particleStartSize.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2"
+                  step="0.1"
+                  value={particleStartSize}
+                  onChange={(e) => setParticleStartSize(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Lifetime: {particleLifetime.toFixed(1)}s
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="10"
+                  step="0.5"
+                  value={particleLifetime}
+                  onChange={(e) => setParticleLifetime(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'environments' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Environment Settings</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Skybox Type</label>
+                <select
+                  value={skyboxType}
+                  onChange={(e) => setSkyboxType(e.target.value as any)}
+                  className="w-full bg-gray-800 text-white px-3 py-2 rounded"
+                >
+                  <option value="color">Solid Color</option>
+                  <option value="gradient">Gradient</option>
+                  <option value="stars">Stars</option>
+                  <option value="galaxy">Galaxy</option>
+                  <option value="nebula">Nebula</option>
+                </select>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleAddEnvironmentKeyframe}
+              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
+            >
+              Add Environment Keyframe
+            </button>
+          </div>
+        )}
+        
+        {activeTab === 'postfx' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">Post-Processing</h4>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Vignette Strength: {vignetteStrength.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={vignetteStrength}
+                  onChange={(e) => setVignetteStrength(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Saturation: {colorSaturation.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={colorSaturation}
+                  onChange={(e) => setColorSaturation(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Contrast: {colorContrast.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={colorContrast}
+                  onChange={(e) => setColorContrast(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">
+                  Gamma: {colorGamma.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={colorGamma}
+                  onChange={(e) => setColorGamma(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {activeTab === 'textAnimator' && (
+          <div className="space-y-3">
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <h4 className="text-xs text-gray-400 uppercase font-semibold">3D Text Settings</h4>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSongName"
+                  checked={showSongName}
+                  onChange={(e) => setShowSongName(e.target.checked)}
+                  disabled={!fontLoaded}
+                  className="w-4 h-4 cursor-pointer"
+                />
+                <label htmlFor="showSongName" className={`text-sm cursor-pointer ${fontLoaded ? 'text-white' : 'text-gray-500'}`}>
+                  Show 3D Text
+                </label>
+              </div>
+              
+              {!fontLoaded && (
+                <p className="text-xs text-yellow-400">Loading font...</p>
+              )}
+              
+              {fontLoaded && (
+                <>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Custom Text</label>
+                    <input
+                      type="text"
+                      value={customSongName}
+                      onChange={(e) => setCustomSongName(e.target.value)}
+                      placeholder="Enter text"
+                      className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">Text Color</label>
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => setTextColor(e.target.value)}
+                      className="w-full h-10 rounded cursor-pointer"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">
+                      Opacity: {textOpacity.toFixed(2)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={textOpacity}
+                      onChange={(e) => setTextOpacity(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <p className="text-xs text-gray-500 italic">
+              Note: Text keyframes are managed in the timeline
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Debug Console */}
