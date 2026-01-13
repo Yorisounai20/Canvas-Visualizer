@@ -41,7 +41,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
       </div>
 
       {/* Bottom timeline - visible by default (keyframe manager) */}
-      <footer className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-48 z-20 shadow-2xl">
+      <footer className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 max-h-32 z-20 shadow-2xl">
         <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
           {timeline}
         </PanelContainer>
