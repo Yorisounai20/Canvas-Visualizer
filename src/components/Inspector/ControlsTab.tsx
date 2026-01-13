@@ -75,18 +75,46 @@ interface ControlsTabProps {
   setSphereMaterialType: (type: MaterialType) => void;
   setSphereMetalness: (metalness: number) => void;
   setSphereRoughness: (roughness: number) => void;
+  
+  // Plane Materials
+  planeWireframe: boolean;
+  planeOpacity: number;
+  planeColor: string;
+  planeMaterialType: MaterialType;
+  planeMetalness: number;
+  planeRoughness: number;
+  setPlaneWireframe: (wireframe: boolean) => void;
+  setPlaneOpacity: (opacity: number) => void;
+  setPlaneColor: (color: string) => void;
+  setPlaneMaterialType: (type: MaterialType) => void;
+  setPlaneMetalness: (metalness: number) => void;
+  setPlaneRoughness: (roughness: number) => void;
+  
+  // Torus Materials
+  torusWireframe: boolean;
+  torusOpacity: number;
+  torusColor: string;
+  torusMaterialType: MaterialType;
+  torusMetalness: number;
+  torusRoughness: number;
+  setTorusWireframe: (wireframe: boolean) => void;
+  setTorusOpacity: (opacity: number) => void;
+  setTorusColor: (color: string) => void;
+  setTorusMaterialType: (type: MaterialType) => void;
+  setTorusMetalness: (metalness: number) => void;
+  setTorusRoughness: (roughness: number) => void;
 }
 
 /**
- * Controls Tab Component - Shape Materials and Global Colors
+ * Controls Tab Component - Shape Materials and Background Controls
  * 
  * Features:
- * - Shape Material controls for Cubes, Octahedrons, Tetrahedrons, Sphere
+ * - Background controls (Type, Color, Border)
+ * - Shape Material controls for Cubes, Octahedrons, Tetrahedrons, Sphere, Planes, Toruses
  * - Material Type selection (Basic, Standard, Phong, Lambert)
  * - Color, Opacity, Wireframe controls
  * - PBR properties (Metalness, Roughness) for Standard materials
  * - Reset button to restore defaults
- * - Global color controls (Bass, Mids, Highs)
  */
 export default function ControlsTab(props: ControlsTabProps) {
   const resetToDefaults = () => {
@@ -121,6 +149,22 @@ export default function ControlsTab(props: ControlsTabProps) {
     props.setSphereMaterialType('basic');
     props.setSphereMetalness(0.5);
     props.setSphereRoughness(0.5);
+    
+    // Plane
+    props.setPlaneWireframe(false);
+    props.setPlaneOpacity(0.7);
+    props.setPlaneColor('#ff6b6b');
+    props.setPlaneMaterialType('basic');
+    props.setPlaneMetalness(0.5);
+    props.setPlaneRoughness(0.5);
+    
+    // Torus
+    props.setTorusWireframe(true);
+    props.setTorusOpacity(0.5);
+    props.setTorusColor('#4ecdc4');
+    props.setTorusMaterialType('basic');
+    props.setTorusMetalness(0.5);
+    props.setTorusRoughness(0.5);
   };
 
   const renderMaterialControls = (
@@ -397,6 +441,40 @@ export default function ControlsTab(props: ControlsTabProps) {
         props.setSphereMaterialType,
         props.setSphereMetalness,
         props.setSphereRoughness
+      )}
+      
+      {/* Planes */}
+      {renderMaterialControls(
+        '📐 Planes',
+        props.planeWireframe,
+        props.planeOpacity,
+        props.planeColor,
+        props.planeMaterialType,
+        props.planeMetalness,
+        props.planeRoughness,
+        props.setPlaneWireframe,
+        props.setPlaneOpacity,
+        props.setPlaneColor,
+        props.setPlaneMaterialType,
+        props.setPlaneMetalness,
+        props.setPlaneRoughness
+      )}
+      
+      {/* Toruses */}
+      {renderMaterialControls(
+        '🍩 Toruses',
+        props.torusWireframe,
+        props.torusOpacity,
+        props.torusColor,
+        props.torusMaterialType,
+        props.torusMetalness,
+        props.torusRoughness,
+        props.setTorusWireframe,
+        props.setTorusOpacity,
+        props.setTorusColor,
+        props.setTorusMaterialType,
+        props.setTorusMetalness,
+        props.setTorusRoughness
       )}
     </div>
   );

@@ -227,6 +227,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [sphereMetalness, setSphereMetalness] = useState(0.5);
   const [sphereRoughness, setSphereRoughness] = useState(0.5);
   
+  // Plane Materials
+  const [planeWireframe, setPlaneWireframe] = useState(false);
+  const [planeOpacity, setPlaneOpacity] = useState(0.7);
+  const [planeColor, setPlaneColor] = useState('#ff6b6b');
+  const [planeMaterialType, setPlaneMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [planeMetalness, setPlaneMetalness] = useState(0.5);
+  const [planeRoughness, setPlaneRoughness] = useState(0.5);
+  
+  // Torus Materials
+  const [torusWireframe, setTorusWireframe] = useState(true);
+  const [torusOpacity, setTorusOpacity] = useState(0.5);
+  const [torusColor, setTorusColor] = useState('#4ecdc4');
+  const [torusMaterialType, setTorusMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [torusMetalness, setTorusMetalness] = useState(0.5);
+  const [torusRoughness, setTorusRoughness] = useState(0.5);
+  
   // NEW: Post-FX controls
   const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
   const [vignetteStrength, setVignetteStrength] = useState(0);
@@ -8372,6 +8388,30 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setSphereMaterialType={setSphereMaterialType}
             setSphereMetalness={setSphereMetalness}
             setSphereRoughness={setSphereRoughness}
+            planeWireframe={planeWireframe}
+            planeOpacity={planeOpacity}
+            planeColor={planeColor}
+            planeMaterialType={planeMaterialType}
+            planeMetalness={planeMetalness}
+            planeRoughness={planeRoughness}
+            setPlaneWireframe={setPlaneWireframe}
+            setPlaneOpacity={setPlaneOpacity}
+            setPlaneColor={setPlaneColor}
+            setPlaneMaterialType={setPlaneMaterialType}
+            setPlaneMetalness={setPlaneMetalness}
+            setPlaneRoughness={setPlaneRoughness}
+            torusWireframe={torusWireframe}
+            torusOpacity={torusOpacity}
+            torusColor={torusColor}
+            torusMaterialType={torusMaterialType}
+            torusMetalness={torusMetalness}
+            torusRoughness={torusRoughness}
+            setTorusWireframe={setTorusWireframe}
+            setTorusOpacity={setTorusOpacity}
+            setTorusColor={setTorusColor}
+            setTorusMaterialType={setTorusMaterialType}
+            setTorusMetalness={setTorusMetalness}
+            setTorusRoughness={setTorusRoughness}
           />
         )}
         
