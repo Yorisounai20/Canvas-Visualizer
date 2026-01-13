@@ -80,6 +80,15 @@ import {
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
 
+// Export video quality constants
+const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
+const EXPORT_BITRATE_HD = 12000000;     // 12 Mbps for 1280x720
+const EXPORT_BITRATE_FULLHD = 20000000; // 20 Mbps for 1920x1080
+const EXPORT_PIXELS_HD = 1280 * 720;
+const EXPORT_PIXELS_FULLHD = 1920 * 1080;
+const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
+const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
+
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
 }
@@ -1690,13 +1699,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       
       // Calculate bitrate based on resolution for better quality
-      // 960x540: 8Mbps, 1280x720: 12Mbps, 1920x1080: 20Mbps
       const pixelCount = exportWidth * exportHeight;
-      let videoBitrate = 8000000; // Default 8Mbps for 960x540
-      if (pixelCount >= 1920 * 1080) {
-        videoBitrate = 20000000; // 20Mbps for 1080p
-      } else if (pixelCount >= 1280 * 720) {
-        videoBitrate = 12000000; // 12Mbps for 720p
+      let videoBitrate = EXPORT_BITRATE_SD; // Default 8Mbps for 960x540
+      if (pixelCount >= EXPORT_PIXELS_FULLHD) {
+        videoBitrate = EXPORT_BITRATE_FULLHD; // 20Mbps for 1080p
+      } else if (pixelCount >= EXPORT_PIXELS_HD) {
+        videoBitrate = EXPORT_BITRATE_HD; // 12Mbps for 720p
       }
       
       const recorder = new MediaRecorder(combinedStream, {
@@ -1741,7 +1749,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       // Start recording with timeslice to capture data periodically
       // This helps prevent memory issues and ensures consistent capture
-      recorder.start(1000); // Request data every 1 second
+      recorder.start(EXPORT_TIMESLICE_MS);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       addLog('Recording started', 'success');
@@ -1783,7 +1791,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             console.warn('Failed to request data from recorder:', e);
           }
         }
-      }, 2000);
+      }, EXPORT_DATA_REQUEST_INTERVAL_MS);
       
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
