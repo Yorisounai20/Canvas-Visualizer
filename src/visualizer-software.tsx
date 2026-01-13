@@ -78,6 +78,7 @@ import {
   CameraFXTab, 
   CameraRigTab 
 } from './components/Inspector';
+import DebugConsole from './components/Debug/DebugConsole';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
