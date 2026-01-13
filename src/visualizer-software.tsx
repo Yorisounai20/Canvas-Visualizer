@@ -434,19 +434,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [rigTransitionDuration, setRigTransitionDuration] = useState(1.0); // seconds
   const [rigTransitionEasing, setRigTransitionEasing] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
   const [enableRigTransitions, setEnableRigTransitions] = useState(true);
+  const [enableSmoothTransitions, setEnableSmoothTransitions] = useState(true); // Alias for enableRigTransitions
+  
+  // Path Visualization
+  const [showPaths, setShowPaths] = useState(false);
+  const [showKeyframeMarkers, setShowKeyframeMarkers] = useState(false);
   
   // Framing Controls
   const [lookAtOffsetX, setLookAtOffsetX] = useState(0); // -10 to 10
   const [lookAtOffsetY, setLookAtOffsetY] = useState(0); // -10 to 10
   const [enableFramingLock, setEnableFramingLock] = useState(false);
   const [enableRuleOfThirds, setEnableRuleOfThirds] = useState(false);
+  const [ruleOfThirdsBias, setRuleOfThirdsBias] = useState(0.3); // 0-1, how strongly to follow rule of thirds
   
   // Camera FX Layer (existing camera shake)
   const [cameraShakeIntensity, setCameraShakeIntensity] = useState(1.0); // multiplier for existing shake
+  const [shakeIntensity, setShakeIntensity] = useState(1.0); // Alias for cameraShakeIntensity
   const [cameraShakeFrequency, setCameraShakeFrequency] = useState(50); // Hz
+  const [shakeFrequency, setShakeFrequency] = useState(50); // Alias for cameraShakeFrequency
   const [enableHandheldDrift, setEnableHandheldDrift] = useState(false);
   const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
   const [enableFovRamping, setEnableFovRamping] = useState(false);
+  const [fovRamping, setFovRamping] = useState(false); // Alias for enableFovRamping
   const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
   
   // Camera FX System (Grid Tiling, Kaleidoscope, PIP)
@@ -8397,12 +8406,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setCameraRigs={setCameraRigs}
             cameraRigKeyframes={cameraRigKeyframes}
             setCameraRigKeyframes={setCameraRigKeyframes}
+            // Issue #5: Advanced Camera Rig Controls
+            showPaths={showPaths}
+            setShowPaths={setShowPaths}
+            showKeyframeMarkers={showKeyframeMarkers}
+            setShowKeyframeMarkers={setShowKeyframeMarkers}
+            enableSmoothTransitions={enableSmoothTransitions}
+            setEnableSmoothTransitions={setEnableSmoothTransitions}
+            rigTransitionDuration={rigTransitionDuration}
+            setRigTransitionDuration={setRigTransitionDuration}
+            rigTransitionEasing={rigTransitionEasing}
+            setRigTransitionEasing={setRigTransitionEasing}
+            lookAtOffsetX={lookAtOffsetX}
+            setLookAtOffsetX={setLookAtOffsetX}
+            lookAtOffsetY={lookAtOffsetY}
+            setLookAtOffsetY={setLookAtOffsetY}
+            enableFramingLock={enableFramingLock}
+            setEnableFramingLock={setEnableFramingLock}
+            ruleOfThirdsBias={ruleOfThirdsBias}
+            setRuleOfThirdsBias={setRuleOfThirdsBias}
+            shakeIntensity={shakeIntensity}
+            setShakeIntensity={setShakeIntensity}
+            shakeFrequency={shakeFrequency}
+            setShakeFrequency={setShakeFrequency}
+            handheldDriftIntensity={handheldDriftIntensity}
+            setHandheldDriftIntensity={setHandheldDriftIntensity}
+            fovRamping={fovRamping}
+            setFovRamping={setFovRamping}
           />
         )}
         
         {activeTab === 'camerafx' && (
           <CameraFXTab
             currentTime={currentTime}
+            duration={duration}
             cameraFXClips={cameraFXClips}
             selectedFXClipId={selectedFXClipId}
             setSelectedFXClipId={setSelectedFXClipId}
@@ -8417,6 +8454,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             addCameraFXAudioModulation={addCameraFXAudioModulation}
             updateCameraFXAudioModulation={updateCameraFXAudioModulation}
             deleteCameraFXAudioModulation={deleteCameraFXAudioModulation}
+            // Issue #4: Parameter Events
+            parameterEvents={parameterEvents}
+            audioTracks={audioTracks}
+            addParameterEvent={addParameterEvent}
+            updateParameterEvent={updateParameterEvent}
+            deleteParameterEvent={deleteParameterEvent}
           />
         )}
         

@@ -24,6 +24,41 @@ interface CameraRigTabProps {
   // Camera Rig Keyframes
   cameraRigKeyframes: any[];
   setCameraRigKeyframes: (keyframes: any[]) => void;
+  
+  // Issue #5: Advanced Camera Rig Controls
+  // Path Visualization
+  showPaths?: boolean;
+  setShowPaths?: (show: boolean) => void;
+  showKeyframeMarkers?: boolean;
+  setShowKeyframeMarkers?: (show: boolean) => void;
+  
+  // Rig Transitions
+  enableSmoothTransitions?: boolean;
+  setEnableSmoothTransitions?: (enable: boolean) => void;
+  rigTransitionDuration?: number;
+  setRigTransitionDuration?: (duration: number) => void;
+  rigTransitionEasing?: string;
+  setRigTransitionEasing?: (easing: string) => void;
+  
+  // Framing Controls
+  lookAtOffsetX?: number;
+  setLookAtOffsetX?: (offset: number) => void;
+  lookAtOffsetY?: number;
+  setLookAtOffsetY?: (offset: number) => void;
+  enableFramingLock?: boolean;
+  setEnableFramingLock?: (enable: boolean) => void;
+  ruleOfThirdsBias?: number;
+  setRuleOfThirdsBias?: (bias: number) => void;
+  
+  // Camera FX Layer
+  shakeIntensity?: number;
+  setShakeIntensity?: (intensity: number) => void;
+  shakeFrequency?: number;
+  setShakeFrequency?: (frequency: number) => void;
+  handheldDriftIntensity?: number;
+  setHandheldDriftIntensity?: (intensity: number) => void;
+  fovRamping?: boolean;
+  setFovRamping?: (enable: boolean) => void;
 }
 
 /**
@@ -295,8 +330,266 @@ export default function CameraRigTab(props: CameraRigTabProps) {
         </div>
       </div>
       
+      {/* ISSUE #5: Advanced Camera Rig Controls */}
+      {/* Path Visualization */}
+      {props.showPaths !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+          <h4 className="text-sm font-semibold text-cyan-400">📍 Path Visualization</h4>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="show-paths"
+              checked={props.showPaths}
+              onChange={(e) => props.setShowPaths!(e.target.checked)}
+              className="cursor-pointer"
+            />
+            <label htmlFor="show-paths" className="text-xs text-gray-400 cursor-pointer">
+              Show Paths
+            </label>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="show-keyframe-markers"
+              checked={props.showKeyframeMarkers}
+              onChange={(e) => props.setShowKeyframeMarkers!(e.target.checked)}
+              className="cursor-pointer"
+            />
+            <label htmlFor="show-keyframe-markers" className="text-xs text-gray-400 cursor-pointer">
+              Show Keyframe Markers
+            </label>
+          </div>
+          
+          <p className="text-xs text-gray-500 italic">
+            Path Colors: Orbit=Cyan, Dolly=Green, Crane=Magenta, Custom=White
+          </p>
+        </div>
+      )}
+      
+      {/* Rig Transitions */}
+      {props.enableSmoothTransitions !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+          <h4 className="text-sm font-semibold text-cyan-400">🔄 Rig Transitions</h4>
+          
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="enable-smooth-transitions"
+              checked={props.enableSmoothTransitions}
+              onChange={(e) => props.setEnableSmoothTransitions!(e.target.checked)}
+              className="cursor-pointer"
+            />
+            <label htmlFor="enable-smooth-transitions" className="text-xs text-gray-400 cursor-pointer">
+              Enable Smooth Transitions
+            </label>
+          </div>
+          
+          {props.rigTransitionDuration !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">
+                Duration: {props.rigTransitionDuration.toFixed(1)}s
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="5"
+                step="0.1"
+                value={props.rigTransitionDuration}
+                onChange={(e) => props.setRigTransitionDuration!(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+          
+          {props.rigTransitionEasing !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-2">Easing</label>
+              <select
+                value={props.rigTransitionEasing}
+                onChange={(e) => props.setRigTransitionEasing!(e.target.value)}
+                className="w-full px-2 py-1 bg-gray-600 rounded text-white text-xs"
+              >
+                <option value="linear">Linear</option>
+                <option value="easeInOut">Ease In-Out</option>
+                <option value="easeIn">Ease In</option>
+                <option value="easeOut">Ease Out</option>
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Framing Controls */}
+      {props.lookAtOffsetX !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+          <h4 className="text-sm font-semibold text-cyan-400">🎯 Framing Controls</h4>
+          
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Look-At Offset X: {props.lookAtOffsetX.toFixed(1)}
+            </label>
+            <input
+              type="range"
+              min="-10"
+              max="10"
+              step="0.1"
+              value={props.lookAtOffsetX}
+              onChange={(e) => props.setLookAtOffsetX!(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+          
+          {props.lookAtOffsetY !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">
+                Look-At Offset Y: {props.lookAtOffsetY.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="-10"
+                max="10"
+                step="0.1"
+                value={props.lookAtOffsetY}
+                onChange={(e) => props.setLookAtOffsetY!(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+          
+          {props.enableFramingLock !== undefined && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="enable-framing-lock"
+                checked={props.enableFramingLock}
+                onChange={(e) => props.setEnableFramingLock!(e.target.checked)}
+                className="cursor-pointer"
+              />
+              <label htmlFor="enable-framing-lock" className="text-xs text-gray-400 cursor-pointer">
+                Framing Lock (keep subject centered)
+              </label>
+            </div>
+          )}
+          
+          {props.ruleOfThirdsBias !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">
+                Rule of Thirds Bias: {(props.ruleOfThirdsBias * 100).toFixed(0)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={props.ruleOfThirdsBias}
+                onChange={(e) => props.setRuleOfThirdsBias!(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Camera FX Layer */}
+      {props.shakeIntensity !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+          <h4 className="text-sm font-semibold text-cyan-400">✨ Camera FX Layer</h4>
+          
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Shake Intensity: {props.shakeIntensity.toFixed(1)}x
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="5"
+              step="0.1"
+              value={props.shakeIntensity}
+              onChange={(e) => props.setShakeIntensity!(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+          
+          {props.shakeFrequency !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">
+                Shake Frequency: {props.shakeFrequency.toFixed(0)}Hz
+              </label>
+              <input
+                type="range"
+                min="10"
+                max="100"
+                step="5"
+                value={props.shakeFrequency}
+                onChange={(e) => props.setShakeFrequency!(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          )}
+          
+          {props.handheldDriftIntensity !== undefined && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="handheld-drift"
+                checked={props.handheldDriftIntensity > 0}
+                onChange={(e) => props.setHandheldDriftIntensity!(e.target.checked ? 0.2 : 0)}
+                className="cursor-pointer"
+              />
+              <label htmlFor="handheld-drift" className="text-xs text-gray-400 cursor-pointer">
+                Handheld Drift
+              </label>
+            </div>
+          )}
+          
+          {props.fovRamping !== undefined && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="fov-ramping"
+                checked={props.fovRamping}
+                onChange={(e) => props.setFovRamping!(e.target.checked)}
+                className="cursor-pointer"
+              />
+              <label htmlFor="fov-ramping" className="text-xs text-gray-400 cursor-pointer">
+                FOV Ramping (motion blur effect)
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Shot Presets */}
+      <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+        <h4 className="text-sm font-semibold text-cyan-400">📷 Shot Presets</h4>
+        <p className="text-xs text-gray-500 italic">Apply cinematic presets to active rigs</p>
+        
+        <div className="grid grid-cols-2 gap-2">
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Close-Up
+          </button>
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Wide Shot
+          </button>
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Overhead
+          </button>
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Low Angle
+          </button>
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Dutch Angle
+          </button>
+          <button className="px-2 py-2 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded">
+            Tracking
+          </button>
+        </div>
+      </div>
+      
       <p className="text-xs text-gray-500 text-center italic">
-        Camera rigs automate camera movement along predefined paths. Select a rig to edit its timing and parameters.
+        Camera rigs automate camera movement along predefined paths. Advanced controls provide professional cinematic tools.
       </p>
     </div>
   );
