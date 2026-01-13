@@ -8301,6 +8301,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         {activeTab === 'controls' && (
           <ControlsTab
+            // Background controls (moved from Effects tab per user request)
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setBorderColor={setBorderColor}
+            // Global colors (kept for compatibility)
             bassColor={bassColor}
             midsColor={midsColor}
             highsColor={highsColor}

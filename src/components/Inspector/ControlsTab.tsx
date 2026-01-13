@@ -4,7 +4,15 @@ import { RotateCcw } from 'lucide-react';
 type MaterialType = 'basic' | 'standard' | 'phong' | 'lambert';
 
 interface ControlsTabProps {
-  // Global Colors
+  // Background Controls (optional - moved from Effects tab per user request)
+  skyboxType?: 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula';
+  backgroundColor?: string;
+  borderColor?: string;
+  setSkyboxType?: (type: 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula') => void;
+  setBackgroundColor?: (color: string) => void;
+  setBorderColor?: (color: string) => void;
+  
+  // Global Colors (DEPRECATED - keeping for backwards compatibility but hidden from UI)
   bassColor: string;
   midsColor: string;
   highsColor: string;
@@ -233,40 +241,82 @@ export default function ControlsTab(props: ControlsTabProps) {
 
   return (
     <div className="space-y-3">
-      {/* Global Colors */}
-      <div className="bg-gray-700 rounded-lg p-3 space-y-3">
-        <h4 className="text-sm font-semibold text-cyan-400">🎨 Global Colors</h4>
-        
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Bass Color</label>
-          <input
-            type="color"
-            value={props.bassColor}
-            onChange={(e) => props.setBassColor(e.target.value)}
-            className="w-full h-10 rounded cursor-pointer"
-          />
+      {/* Background Controls (moved from Effects tab per user request) */}
+      {props.skyboxType !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3">
+          <h4 className="text-sm font-semibold text-cyan-400">🎨 Background</h4>
+          
+          <div>
+            <label className="text-xs text-gray-400 block mb-2">Background Type</label>
+            <div className="grid grid-cols-3 gap-2 mb-2">
+              <button 
+                onClick={() => props.setSkyboxType!('color')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'color' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                Solid Color
+              </button>
+              <button 
+                onClick={() => props.setSkyboxType!('gradient')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'gradient' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                Gradient
+              </button>
+              <button 
+                onClick={() => props.setSkyboxType!('image')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'image' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                Image
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button 
+                onClick={() => props.setSkyboxType!('stars')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'stars' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                ✨ Stars
+              </button>
+              <button 
+                onClick={() => props.setSkyboxType!('galaxy')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'galaxy' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                🌌 Galaxy
+              </button>
+              <button 
+                onClick={() => props.setSkyboxType!('nebula')}
+                className={`px-2 py-2 rounded text-xs ${props.skyboxType === 'nebula' ? 'bg-cyan-600 text-white' : 'bg-gray-600 text-gray-300 hover:bg-gray-500'}`}
+              >
+                🌠 Nebula
+              </button>
+            </div>
+          </div>
+          
+          {/* Background Color (for solid mode) */}
+          {props.skyboxType === 'color' && props.backgroundColor !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Background Color</label>
+              <input 
+                type="color" 
+                value={props.backgroundColor} 
+                onChange={(e) => props.setBackgroundColor!(e.target.value)} 
+                className="w-full h-10 rounded cursor-pointer" 
+              />
+            </div>
+          )}
+          
+          {/* Border Color */}
+          {props.borderColor !== undefined && (
+            <div>
+              <label className="text-xs text-gray-400 block mb-1">Border Color</label>
+              <input 
+                type="color" 
+                value={props.borderColor} 
+                onChange={(e) => props.setBorderColor!(e.target.value)} 
+                className="w-full h-10 rounded cursor-pointer" 
+              />
+            </div>
+          )}
         </div>
-        
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Mids Color</label>
-          <input
-            type="color"
-            value={props.midsColor}
-            onChange={(e) => props.setMidsColor(e.target.value)}
-            className="w-full h-10 rounded cursor-pointer"
-          />
-        </div>
-        
-        <div>
-          <label className="text-xs text-gray-400 block mb-1">Highs Color</label>
-          <input
-            type="color"
-            value={props.highsColor}
-            onChange={(e) => props.setHighsColor(e.target.value)}
-            className="w-full h-10 rounded cursor-pointer"
-          />
-        </div>
-      </div>
+      )}
       
       {/* Shape Materials Header with Reset */}
       <div className="flex items-center justify-between bg-gray-800 rounded-lg p-3">
