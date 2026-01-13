@@ -3037,27 +3037,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (!isPlaying) return;
       animationRef.current = requestAnimationFrame(anim);
       
-      // FPS calculation
-      fpsFrameCount.current++;
-      const now = performance.now();
-      
-      // Initialize fpsLastTime on first frame
-      if (fpsLastTime.current === 0) {
-        fpsLastTime.current = now;
-      }
-      
-      const elapsed = now - fpsLastTime.current;
-      if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
-        const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
-        setFps(currentFps);
-        fpsFrameCount.current = 0;
-        fpsLastTime.current = now;
-      }
-      
-      // Use default frequency values (no audio response) when analyser is unavailable to maintain visual rendering
-      let f = DEFAULT_FREQUENCY_VALUES;
-      if (analyser) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
+      try {
+        // FPS calculation
+        fpsFrameCount.current++;
+        const now = performance.now();
+        
+        // Initialize fpsLastTime on first frame
+        if (fpsLastTime.current === 0) {
+          fpsLastTime.current = now;
+        }
+        
+        const elapsed = now - fpsLastTime.current;
+        if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
+          const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
+          setFps(currentFps);
+          fpsFrameCount.current = 0;
+          fpsLastTime.current = now;
+        }
+        
+        // Use default frequency values (no audio response) when analyser is unavailable to maintain visual rendering
+        let f = DEFAULT_FREQUENCY_VALUES;
+        if (analyser) {
+          const data = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(data);
         f = getFreq(data);
       }
@@ -7841,6 +7842,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         } else {
           rend.render(scene, cam);
         }
+      }
+      } catch (error) {
+        // Log error but continue animation to prevent export from breaking
+        console.error('Animation loop error:', error);
       }
     };
 
