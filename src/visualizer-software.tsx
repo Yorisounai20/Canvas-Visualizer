@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
-import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, TextKeyframe } from './types';
+import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -67,7 +67,6 @@ import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
-import Timeline from './components/Timeline/Timeline';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -386,7 +385,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     { id: 2, start: 20, end: 40, animation: 'explosion' },
     { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
-  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   // Start with null to prevent canvas disappearing on first preset
   // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
   const prevAnimRef = useRef<string | null>(null);
@@ -953,20 +951,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return kf;
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
-
-  const handleMovePresetKeyframe = (id: number, newTime: number) => {
-    setPresetKeyframes(presetKeyframes.map(kf => {
-      if (kf.id === id) {
-        const duration = kf.endTime - kf.time;
-        return { 
-          ...kf, 
-          time: newTime,
-          endTime: newTime + duration
-        };
-      }
-      return kf;
-    }).sort((a, b) => a.time - b.time));
-  };
   
   // Speed keyframe handlers
   const handleAddSpeedKeyframe = () => {
@@ -1504,63 +1488,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
     ));
     addLog('Updated environment keyframe', 'success');
-  };
-
-  const handleMoveEnvironmentKeyframe = (id: number, newTime: number) => {
-    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
-      kf.id === id ? { ...kf, time: newTime } : kf
-    ).sort((a, b) => a.time - b.time));
-  };
-
-  // Text keyframe handlers (stub - to be implemented)
-  const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
-  const nextTextKeyframeId = useRef(1);
-
-  const handleAddTextKeyframe = (time: number) => {
-    const newKeyframe: TextKeyframe = {
-      id: nextTextKeyframeId.current++,
-      time,
-      show: true
-    };
-    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
-  };
-
-  const handleDeleteTextKeyframe = (id: number) => {
-    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
-  };
-
-  const handleUpdateTextKeyframe = (id: number, show: boolean, text?: string) => {
-    setTextKeyframes(textKeyframes.map(kf => 
-      kf.id === id ? { ...kf, show, text } : kf
-    ));
-  };
-
-  const handleMoveTextKeyframe = (id: number, newTime: number) => {
-    setTextKeyframes(textKeyframes.map(kf => 
-      kf.id === id ? { ...kf, time: newTime } : kf
-    ).sort((a, b) => a.time - b.time));
-  };
-
-  // Camera keyframe handlers
-  const addCameraKeyframe = (time: number) => {
-    const newKeyframe = {
-      time,
-      distance: cameraDistance,
-      height: cameraHeight,
-      rotation: cameraRotation,
-      easing: 'linear' as const
-    };
-    setCameraKeyframes([...cameraKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
-  };
-
-  const deleteCameraKeyframe = (time: number) => {
-    setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
-  };
-
-  const updateCameraKeyframe = (time: number, updates: Partial<any>) => {
-    setCameraKeyframes(cameraKeyframes.map(kf =>
-      kf.time === time ? { ...kf, ...updates } : kf
-    ));
   };
 
   // Camera FX handlers
@@ -8187,45 +8114,74 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const timelinePanelJSX = (
-    <Timeline
-      sections={sections}
-      currentTime={currentTime}
-      duration={duration}
-      animationTypes={animationTypes}
-      selectedSectionId={selectedSectionId}
-      audioBuffer={audioBufferRef.current}
-      showWaveform={true}
-      presetKeyframes={presetKeyframes}
-      cameraKeyframes={cameraKeyframes}
-      textKeyframes={textKeyframes}
-      environmentKeyframes={environmentKeyframes}
-      workspaceObjects={[]}
-      cameraFXClips={cameraFXClips}
-      selectedFXClipId={selectedFXClipId}
-      onSelectSection={setSelectedSectionId}
-      onUpdateSection={updateSection}
-      onAddSection={addSection}
-      onSeek={seekTo}
-      onAddPresetKeyframe={handleAddPresetKeyframe}
-      onAddCameraKeyframe={addCameraKeyframe}
-      onAddTextKeyframe={handleAddTextKeyframe}
-      onAddEnvironmentKeyframe={handleAddEnvironmentKeyframe}
-      onDeletePresetKeyframe={handleDeletePresetKeyframe}
-      onDeleteCameraKeyframe={deleteCameraKeyframe}
-      onDeleteTextKeyframe={handleDeleteTextKeyframe}
-      onDeleteEnvironmentKeyframe={handleDeleteEnvironmentKeyframe}
-      onUpdatePresetKeyframe={handleUpdatePresetKeyframe}
-      onUpdateCameraKeyframe={updateCameraKeyframe}
-      onUpdateTextKeyframe={handleUpdateTextKeyframe}
-      onUpdateEnvironmentKeyframe={handleUpdateEnvironmentKeyframe}
-      onMovePresetKeyframe={handleMovePresetKeyframe}
-      onMoveTextKeyframe={handleMoveTextKeyframe}
-      onMoveEnvironmentKeyframe={handleMoveEnvironmentKeyframe}
-      onSelectFXClip={setSelectedFXClipId}
-      onUpdateCameraFXClip={updateCameraFXClip}
-      onDeleteCameraFXClip={deleteCameraFXClip}
-      onAddCameraFXClip={addCameraFXClip}
-    />
+    <>
+      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
+      <div className="bg-gray-800 rounded-lg p-4">
+        <div className="flex items-center gap-4">
+          {/* Time Display and Preset Info - No Audio Upload */}
+          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
+            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
+            {showPresetDisplay && (() => {
+              const currentPreset = getCurrentPreset();
+              const animType = animationTypes.find(a => a.value === currentPreset);
+              return animType && (
+                <p className="text-cyan-400 text-xs mt-1">
+                  {animType.icon} {animType.label}
+                </p>
+              );
+            })()}
+            
+            {/* Play/Stop Button */}
+            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
+          </div>
+          
+          {/* Combined Waveform from all tracks */}
+          <div className="flex-1 flex flex-col gap-2">
+            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
+              {audioReady && audioTracks.length > 0 ? (
+                <canvas 
+                  ref={waveformCanvasRef} 
+                  width={800} 
+                  height={120}
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
+                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
+                </div>
+              )}
+            </div>
+            
+            {/* Timeline Slider - Always visible when audio is ready */}
+            {audioReady && duration > 0 && (
+              <div className="flex items-center gap-3">
+                <input 
+                  type="range" id="currentTime" name="currentTime" 
+                  min="0" 
+                  max={duration} 
+                  step="0.1" 
+                  value={currentTime} 
+                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
+                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
+                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
+                />
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <input 
+                    type="checkbox" 
+                    id="waveformMode" 
+                    checked={waveformMode === 'static'} 
+                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
+                    className="w-3 h-3 cursor-pointer"
+                    aria-label="Toggle between scrolling and static waveform modes"
+                  />
+                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 
   const canvasAreaJSX = (
@@ -8270,192 +8226,45 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const inspectorJSX = (
     <div className="space-y-4">
-      {/* Tab-Specific Controls */}
-      
-      {/* Presets Tab */}
-      {activeTab === 'presets' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>⏱️</span> Preset Keyframes
-          </h4>
-          <button
-            onClick={handleAddPresetKeyframe}
-            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus size={14} />
-            Add Preset Keyframe at {formatTime(currentTime)}
-          </button>
-          <p className="text-xs text-gray-400">
-            Adds a new animation preset keyframe to the timeline. Switch to the Presets tab in the timeline to view and edit.
-          </p>
-        </div>
-      )}
+      {/* Active Tab Display */}
+      <div className="p-4 rounded-lg bg-gradient-to-br from-purple-900/50 to-blue-900/50 border border-purple-700/50">
+        <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+          <span>✨</span>
+          Active Tab
+        </h4>
+        <p className="text-white text-lg font-semibold flex items-center gap-3">
+          <span className="text-3xl">
+            {activeTab === 'waveforms' && '🎵'}
+            {activeTab === 'presets' && '⏱️'}
+            {activeTab === 'controls' && '🎨'}
+            {activeTab === 'camera' && '📷'}
+            {activeTab === 'cameraRig' && '🎥'}
+            {activeTab === 'camerafx' && '🎬'}
+            {activeTab === 'effects' && '✨'}
+            {activeTab === 'environments' && '🌍'}
+            {activeTab === 'postfx' && '🎭'}
+            {activeTab === 'textAnimator' && '📝'}
+          </span>
+          <span>
+            {activeTab === 'waveforms' && 'Waveforms'}
+            {activeTab === 'presets' && 'Presets'}
+            {activeTab === 'controls' && 'Controls'}
+            {activeTab === 'camera' && 'Camera'}
+            {activeTab === 'cameraRig' && 'Camera Rig'}
+            {activeTab === 'camerafx' && 'Camera FX'}
+            {activeTab === 'effects' && 'Effects'}
+            {activeTab === 'environments' && 'Environments'}
+            {activeTab === 'postfx' && 'Post-FX'}
+            {activeTab === 'textAnimator' && 'Text Animator'}
+          </span>
+        </p>
+        <p className="text-purple-200 text-xs mt-2">
+          Tab properties will display here when implementation is complete
+        </p>
+      </div>
 
-      {/* Camera Tab */}
-      {activeTab === 'camera' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>📷</span> Camera Keyframes
-          </h4>
-          <div className="space-y-2">
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Distance: {cameraDistance.toFixed(1)}</label>
-              <input type="range" min="5" max="50" step="0.5" value={cameraDistance} onChange={(e) => setCameraDistance(parseFloat(e.target.value))} className="w-full" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Height: {cameraHeight.toFixed(1)}</label>
-              <input type="range" min="-10" max="10" step="0.5" value={cameraHeight} onChange={(e) => setCameraHeight(parseFloat(e.target.value))} className="w-full" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Rotation: {cameraRotation.toFixed(0)}°</label>
-              <input type="range" min="0" max="360" step="1" value={cameraRotation} onChange={(e) => setCameraRotation(parseFloat(e.target.value))} className="w-full" />
-            </div>
-          </div>
-          <button
-            onClick={() => addCameraKeyframe(currentTime)}
-            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus size={14} />
-            Add Camera Keyframe
-          </button>
-          <p className="text-xs text-gray-400">
-            Captures current camera position and adds it to the timeline. View in the Camera tab.
-          </p>
-        </div>
-      )}
-
-      {/* Text Tab */}
-      {activeTab === 'textAnimator' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>📝</span> Text Keyframes
-          </h4>
-          <button
-            onClick={() => handleAddTextKeyframe(currentTime)}
-            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus size={14} />
-            Add Text Visibility Keyframe
-          </button>
-          <p className="text-xs text-gray-400">
-            Toggle text visibility at this point in time. View in the Text tab of the timeline.
-          </p>
-        </div>
-      )}
-
-      {/* Environment Tab */}
-      {activeTab === 'environments' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🌍</span> Environment Keyframes
-          </h4>
-          <button
-            onClick={handleAddEnvironmentKeyframe}
-            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus size={14} />
-            Add Environment Keyframe
-          </button>
-          <p className="text-xs text-gray-400">
-            Add environment effect at {formatTime(currentTime)}. View in the Environment tab of the timeline.
-          </p>
-        </div>
-      )}
-
-      {/* Camera FX Tab */}
-      {activeTab === 'camerafx' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🎬</span> Camera FX Clips
-          </h4>
-          <div className="space-y-2">
-            <button
-              onClick={() => addCameraFXClip('grid')}
-              className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-semibold transition-colors"
-            >
-              Add Grid FX
-            </button>
-            <button
-              onClick={() => addCameraFXClip('kaleidoscope')}
-              className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
-            >
-              Add Kaleidoscope FX
-            </button>
-            <button
-              onClick={() => addCameraFXClip('pip')}
-              className="w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-semibold transition-colors"
-            >
-              Add Picture-in-Picture
-            </button>
-          </div>
-          <p className="text-xs text-gray-400">
-            Add camera effects clips to the timeline at {formatTime(currentTime)}.
-          </p>
-        </div>
-      )}
-
-      {/* Controls Tab */}
-      {activeTab === 'controls' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🎨</span> Animation Controls
-          </h4>
-          <p className="text-xs text-gray-400">
-            Use the Sections and Presets tabs in the timeline to control animations. Create sections to define time ranges and add preset keyframes to change animations.
-          </p>
-        </div>
-      )}
-
-      {/* Waveforms Tab */}
-      {activeTab === 'waveforms' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🎵</span> Audio Tracks
-          </h4>
-          <p className="text-xs text-gray-400">
-            Audio tracks are managed in the main interface. The timeline displays waveforms automatically when audio is loaded.
-          </p>
-        </div>
-      )}
-
-      {/* Camera Rig Tab */}
-      {activeTab === 'cameraRig' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🎥</span> Camera Rigs
-          </h4>
-          <p className="text-xs text-gray-400">
-            Camera rigs are complex multi-point camera paths. Use the Camera tab for simple keyframe-based camera animation.
-          </p>
-        </div>
-      )}
-
-      {/* Effects Tab */}
-      {activeTab === 'effects' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>✨</span> Visual Effects
-          </h4>
-          <p className="text-xs text-gray-400">
-            Visual effects are controlled through parameter events. Use the timeline to add and manage effect triggers.
-          </p>
-        </div>
-      )}
-
-      {/* Post-FX Tab */}
-      {activeTab === 'postfx' && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-            <span>🎭</span> Post Processing
-          </h4>
-          <p className="text-xs text-gray-400">
-            Post-processing effects like vignette, color grading, and contrast are applied globally and can be animated through the timeline.
-          </p>
-        </div>
-      )}
-
-      {/* Debug Console - Always visible at bottom */}
-      <div className="border-t border-gray-700 pt-4 mt-4">
+      {/* Debug Console */}
+      <div>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <h4 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h4>
@@ -8463,7 +8272,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
           <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
         </div>
-        <div className="bg-black rounded p-3 h-32 overflow-y-auto font-mono text-xs">
+        <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
           {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
             <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
               <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
@@ -8471,6 +8280,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           ))}
         </div>
       </div>
+
+      {/* Current Preset Info */}
+      {showPresetDisplay && (() => {
+        const currentPreset = getCurrentPreset();
+        const animType = animationTypes.find(a => a.value === currentPreset);
+        return animType && (
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Preset</h4>
+            <p className="text-cyan-400 text-sm flex items-center gap-2">
+              <span className="text-lg">{animType.icon}</span>
+              <span>{animType.label}</span>
+            </p>
+          </div>
+        );
+      })()}
     </div>
   );
   // --- End constants ---
