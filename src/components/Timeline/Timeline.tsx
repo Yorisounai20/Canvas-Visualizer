@@ -134,6 +134,13 @@ export default function Timeline({
   const [scrollOffset, setScrollOffset] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(DEFAULT_ZOOM);
   
+  // Video editor features
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [gridSize, setGridSize] = useState(1.0); // Snap interval in seconds
+  const [inPoint, setInPoint] = useState<number | null>(null);
+  const [outPoint, setOutPoint] = useState<number | null>(null);
+  const [showTimecode, setShowTimecode] = useState(true);
+  
   // Memoize pixel calculations to prevent unnecessary recalculations
   const PIXELS_PER_SECOND = useMemo(() => 40 * zoomLevel, [zoomLevel]);
   const timelineWidth = useMemo(() => Math.max(duration * PIXELS_PER_SECOND, 1000), [duration, PIXELS_PER_SECOND]);
@@ -150,6 +157,22 @@ export default function Timeline({
 
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
+
+  // Video editor timecode format (HH:MM:SS:FF at 30fps)
+  const formatTimecode = (s: number, fps: number = 30) => {
+    const totalFrames = Math.floor(s * fps);
+    const hours = Math.floor(totalFrames / (fps * 3600));
+    const minutes = Math.floor((totalFrames % (fps * 3600)) / (fps * 60));
+    const seconds = Math.floor((totalFrames % (fps * 60)) / fps);
+    const frames = totalFrames % fps;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+  };
+
+  // Snap time to grid if enabled
+  const snapTime = (time: number) => {
+    if (!snapToGrid) return time;
+    return Math.round(time / gridSize) * gridSize;
+  };
 
   // CRITICAL FIX: Add playhead dragging state
   const [isPlayheadDragging, setIsPlayheadDragging] = useState(false);
@@ -258,7 +281,8 @@ export default function Timeline({
     const rect = timelineRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + scrollOffset;
     const time = pixelsToTime(x);
-    onSeek(Math.min(Math.max(0, time), duration));
+    const snappedTime = snapTime(time);
+    onSeek(Math.min(Math.max(0, snappedTime), duration));
     setIsPlayheadDragging(true);
   };
 
@@ -269,7 +293,8 @@ export default function Timeline({
         const rect = timelineRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left + scrollOffset;
         const time = pixelsToTime(x);
-        onSeek(Math.min(Math.max(0, time), duration));
+        const snappedTime = snapTime(time);
+        onSeek(Math.min(Math.max(0, snappedTime), duration));
       }
     };
 
@@ -285,7 +310,7 @@ export default function Timeline({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isPlayheadDragging, scrollOffset, duration, onSeek]);
+  }, [isPlayheadDragging, scrollOffset, duration, onSeek, snapTime]);
 
   // Start dragging a section
   const handleSectionMouseDown = (
@@ -425,7 +450,8 @@ export default function Timeline({
       
       const deltaX = e.clientX - keyframeDragState.startX;
       const deltaTime = pixelsToTime(deltaX);
-      const newTime = Math.max(0, Math.min(duration, keyframeDragState.initialTime + deltaTime));
+      const rawTime = keyframeDragState.initialTime + deltaTime;
+      const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)));
 
       // Update keyframe position based on type
       if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
@@ -454,7 +480,7 @@ export default function Timeline({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [keyframeDragState, duration, onMovePresetKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe, pixelsToTime]);
+  }, [keyframeDragState, duration, onMovePresetKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe, pixelsToTime, snapTime]);
 
   // Handle scroll wheel for horizontal scrolling - CRITICAL FIX: Updated dependencies
   useEffect(() => {
@@ -479,22 +505,93 @@ export default function Timeline({
     <>
     <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
       {/* Timeline Header */}
-      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
-        <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
-            Timeline
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </p>
+      <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+              Timeline
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {showTimecode ? formatTimecode(currentTime) : formatTime(currentTime)} / {showTimecode ? formatTimecode(duration) : formatTime(duration)}
+            </p>
+          </div>
+          
+          {/* Video Editor Controls */}
+          <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+            {/* Snap to Grid */}
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Snap to grid">
+              <input
+                type="checkbox"
+                checked={snapToGrid}
+                onChange={(e) => setSnapToGrid(e.target.checked)}
+                className="w-3 h-3 cursor-pointer"
+              />
+              <span className="text-xs text-gray-400">Snap</span>
+            </label>
+            
+            {/* Grid Size */}
+            {snapToGrid && (
+              <select
+                value={gridSize}
+                onChange={(e) => setGridSize(Number(e.target.value))}
+                className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded border border-gray-600"
+                title="Grid size"
+              >
+                <option value="0.1">0.1s</option>
+                <option value="0.5">0.5s</option>
+                <option value="1.0">1s</option>
+                <option value="5.0">5s</option>
+              </select>
+            )}
+            
+            {/* Timecode Toggle */}
+            <button
+              onClick={() => setShowTimecode(!showTimecode)}
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded transition-colors"
+              title="Toggle timecode display"
+            >
+              {showTimecode ? 'TC' : 'Time'}
+            </button>
+            
+            {/* In/Out Points */}
+            <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+              <button
+                onClick={() => setInPoint(currentTime)}
+                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-green-400 rounded transition-colors"
+                title="Set In Point (I)"
+              >
+                In
+              </button>
+              <button
+                onClick={() => setOutPoint(currentTime)}
+                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-red-400 rounded transition-colors"
+                title="Set Out Point (O)"
+              >
+                Out
+              </button>
+              {(inPoint !== null || outPoint !== null) && (
+                <button
+                  onClick={() => {
+                    setInPoint(null);
+                    setOutPoint(null);
+                  }}
+                  className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-400 rounded transition-colors"
+                  title="Clear In/Out"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+        
         <div className="flex items-center gap-2">
           {/* Zoom Controls */}
           <div className="flex items-center gap-1 mr-2">
             <button
               onClick={() => setZoomLevel(prev => Math.max(MIN_ZOOM, prev - 0.25))}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
-              title="Zoom out"
+              title="Zoom out (-))"
             >
               −
             </button>
@@ -504,14 +601,14 @@ export default function Timeline({
             <button
               onClick={() => setZoomLevel(prev => Math.min(MAX_ZOOM, prev + 0.25))}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
-              title="Zoom in"
+              title="Zoom in (+)"
             >
               +
             </button>
             <button
               onClick={() => setZoomLevel(DEFAULT_ZOOM)}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors ml-1"
-              title="Reset zoom"
+              title="Reset zoom (0)"
             >
               Reset
             </button>
@@ -587,6 +684,19 @@ export default function Timeline({
           style={{ width: `${timelineWidth}px`, minHeight: '100px' }}
           onClick={handleTimelineClick}
         >
+          {/* Grid lines for snap points */}
+          {snapToGrid && (
+            <div className="absolute inset-0 pointer-events-none">
+              {Array.from({ length: Math.ceil(duration / gridSize) + 1 }, (_, i) => i * gridSize).map(time => (
+                <div
+                  key={`grid-${time}`}
+                  className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
+                  style={{ left: `${timeToPixels(time)}px` }}
+                />
+              ))}
+            </div>
+          )}
+          
           {/* Waveform background */}
           {showWaveform && audioBuffer && (
             <WaveformVisualizer
@@ -595,6 +705,40 @@ export default function Timeline({
               width={timelineWidth}
               height={Math.max(sections.length * (TIMELINE_HEIGHT + 4), 100)}
               color="rgba(100, 180, 255, 0.15)"
+            />
+          )}
+
+          {/* In/Out Point Markers */}
+          {inPoint !== null && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-green-500 z-10 pointer-events-none"
+              style={{ left: `${timeToPixels(inPoint)}px` }}
+            >
+              <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-green-500 rounded-sm" />
+              <div className="absolute top-2 left-2 bg-green-500 text-white text-[10px] px-1 rounded">
+                IN
+              </div>
+            </div>
+          )}
+          {outPoint !== null && (
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-red-600 z-10 pointer-events-none"
+              style={{ left: `${timeToPixels(outPoint)}px` }}
+            >
+              <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-600 rounded-sm" />
+              <div className="absolute top-2 left-2 bg-red-600 text-white text-[10px] px-1 rounded">
+                OUT
+              </div>
+            </div>
+          )}
+          {/* Work Area Highlight (between In and Out) */}
+          {inPoint !== null && outPoint !== null && (
+            <div
+              className="absolute top-0 bottom-0 bg-cyan-500 bg-opacity-10 z-0 pointer-events-none border-t-2 border-cyan-500"
+              style={{
+                left: `${timeToPixels(Math.min(inPoint, outPoint))}px`,
+                width: `${timeToPixels(Math.abs(outPoint - inPoint))}px`
+              }}
             />
           )}
 
