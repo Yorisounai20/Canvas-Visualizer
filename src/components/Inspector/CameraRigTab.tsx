@@ -74,6 +74,7 @@ interface CameraRigTabProps {
  * - Camera Rig Keyframes
  */
 export default function CameraRigTab(props: CameraRigTabProps) {
+  const [isGuideExpanded, setIsGuideExpanded] = React.useState(true);
   const sortedRigs = [...props.cameraRigs].sort((a, b) => a.startTime - b.startTime);
   const selectedRig = sortedRigs.find(r => r.id === props.selectedRigId);
   
@@ -124,9 +125,63 @@ export default function CameraRigTab(props: CameraRigTabProps) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-gray-500 text-center italic">
-        Camera rigs automate camera movement along predefined paths. Advanced controls provide professional cinematic tools.
-      </p>
+      {/* Camera Rig Guide - Collapsible */}
+      <div className="bg-gray-800 rounded-lg border border-gray-600">
+        <button
+          onClick={() => setIsGuideExpanded(!isGuideExpanded)}
+          className="w-full flex items-center justify-between p-3 hover:bg-gray-750 rounded-lg transition-colors"
+        >
+          <h5 className="text-xs font-semibold text-cyan-400">ℹ️ Camera Rig Guide</h5>
+          <span className="text-gray-400 text-xs">{isGuideExpanded ? '▼' : '▶'}</span>
+        </button>
+        
+        {isGuideExpanded && (
+          <div className="px-3 pb-3 space-y-2 text-xs text-gray-400">
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">🔄</span>
+              <div>
+                <div className="font-medium text-white">Orbit:</div>
+                <div>Circular movement around the scene center</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">🌀</span>
+              <div>
+                <div className="font-medium text-white">Rotation:</div>
+                <div>Rotate camera view around target point</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">🎥</span>
+              <div>
+                <div className="font-medium text-white">Dolly:</div>
+                <div>Push in or pull back camera movement</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">↔️</span>
+              <div>
+                <div className="font-medium text-white">Pan:</div>
+                <div>Left-right horizontal camera tracking</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">⬆️</span>
+              <div>
+                <div className="font-medium text-white">Crane:</div>
+                <div>Vertical up-down camera movement</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-purple-400">🔍</span>
+              <div>
+                <div className="font-medium text-white">Zoom:</div>
+                <div>Change focal length for zoom effect</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       
       {/* Add Camera Rig Type Selector */}
       <div className="bg-gray-700 rounded-lg p-3 space-y-3">
@@ -285,54 +340,6 @@ export default function CameraRigTab(props: CameraRigTabProps) {
         </div>
       )}
       
-      {/* Info Panel */}
-      <div className="bg-gray-800 rounded-lg p-3 border border-gray-600">
-        <h5 className="text-xs font-semibold text-cyan-400 mb-2">ℹ️ Camera Rig Guide</h5>
-        <div className="space-y-2 text-xs text-gray-400">
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">🔄</span>
-            <div>
-              <div className="font-medium text-white">Orbit:</div>
-              <div>Circular movement around the scene center</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">🌀</span>
-            <div>
-              <div className="font-medium text-white">Rotation:</div>
-              <div>Rotate camera view around target point</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">🎥</span>
-            <div>
-              <div className="font-medium text-white">Dolly:</div>
-              <div>Push in or pull back camera movement</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">↔️</span>
-            <div>
-              <div className="font-medium text-white">Pan:</div>
-              <div>Left-right horizontal camera tracking</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">⬆️</span>
-            <div>
-              <div className="font-medium text-white">Crane:</div>
-              <div>Vertical up-down camera movement</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-purple-400">🔍</span>
-            <div>
-              <div className="font-medium text-white">Zoom:</div>
-              <div>Change focal length for zoom effect</div>
-            </div>
-          </div>
-        </div>
-      </div>
       
       {/* ISSUE #5: Advanced Camera Rig Controls */}
       {/* Path Visualization */}
