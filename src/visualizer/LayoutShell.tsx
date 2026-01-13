@@ -26,7 +26,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
         </main>
 
         {/* Left sidebar - narrow icon bar, collapsed by default */}
-        <aside className="absolute left-0 top-0 bottom-0 w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        <aside className="absolute left-0 top-0 bottom-0 w-20 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
             {left}
           </PanelContainer>
