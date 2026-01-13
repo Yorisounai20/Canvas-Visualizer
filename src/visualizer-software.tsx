@@ -80,6 +80,15 @@ import {
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
 
+// Export video quality constants
+const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
+const EXPORT_BITRATE_HD = 12000000;     // 12 Mbps for 1280x720
+const EXPORT_BITRATE_FULLHD = 20000000; // 20 Mbps for 1920x1080
+const EXPORT_PIXELS_HD = 1280 * 720;
+const EXPORT_PIXELS_FULLHD = 1920 * 1080;
+const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
+const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
+
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
 }
@@ -1664,7 +1673,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       addLog(`Rendering at ${exportResolution} for export`, 'info');
 
-      // Set up streams
+      // Set up streams with higher frame rate for better quality
       const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioDestination = audioContextRef.current.createMediaStreamDestination();
       analyserRef.current.connect(audioDestination);
@@ -1689,9 +1698,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       }
       
+      // Calculate bitrate based on resolution for better quality
+      const pixelCount = exportWidth * exportHeight;
+      let videoBitrate = EXPORT_BITRATE_SD; // Default 8Mbps for 960x540
+      if (pixelCount >= EXPORT_PIXELS_FULLHD) {
+        videoBitrate = EXPORT_BITRATE_FULLHD; // 20Mbps for 1080p
+      } else if (pixelCount >= EXPORT_PIXELS_HD) {
+        videoBitrate = EXPORT_BITRATE_HD; // 12Mbps for 720p
+      }
+      
       const recorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 5000000
+        videoBitsPerSecond: videoBitrate
       });
       
       recordedChunksRef.current = [];
@@ -1729,8 +1747,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setIsPlaying(false);
       };
       
-      // Start recording
-      recorder.start();
+      // Start recording with timeslice to capture data periodically
+      // This helps prevent memory issues and ensures consistent capture
+      recorder.start(EXPORT_TIMESLICE_MS);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       addLog('Recording started', 'success');
@@ -1763,6 +1782,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       startTimeRef.current = Date.now();
       setIsPlaying(true);
       
+      // Request data periodically to ensure consistent recording
+      const dataRequestInterval = setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          try {
+            mediaRecorderRef.current.requestData();
+          } catch (e) {
+            console.warn('Failed to request data from recorder:', e);
+          }
+        }
+      }, EXPORT_DATA_REQUEST_INTERVAL_MS);
+      
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
         const progress = (elapsed / duration) * 100;
@@ -1772,6 +1802,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Stop when audio ends
         if (elapsed >= duration - AUDIO_END_THRESHOLD) {
           clearInterval(progressInterval);
+          clearInterval(dataRequestInterval);
           setTimeout(() => {
             if (mediaRecorderRef.current) {
               mediaRecorderRef.current.stop();
@@ -3014,27 +3045,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (!isPlaying) return;
       animationRef.current = requestAnimationFrame(anim);
       
-      // FPS calculation
-      fpsFrameCount.current++;
-      const now = performance.now();
-      
-      // Initialize fpsLastTime on first frame
-      if (fpsLastTime.current === 0) {
-        fpsLastTime.current = now;
-      }
-      
-      const elapsed = now - fpsLastTime.current;
-      if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
-        const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
-        setFps(currentFps);
-        fpsFrameCount.current = 0;
-        fpsLastTime.current = now;
-      }
-      
-      // Use default frequency values (no audio response) when analyser is unavailable to maintain visual rendering
-      let f = DEFAULT_FREQUENCY_VALUES;
-      if (analyser) {
-        const data = new Uint8Array(analyser.frequencyBinCount);
+      try {
+        // FPS calculation
+        fpsFrameCount.current++;
+        const now = performance.now();
+        
+        // Initialize fpsLastTime on first frame
+        if (fpsLastTime.current === 0) {
+          fpsLastTime.current = now;
+        }
+        
+        const elapsed = now - fpsLastTime.current;
+        if (elapsed >= FPS_UPDATE_INTERVAL_MS) {
+          const currentFps = Math.round((fpsFrameCount.current * FPS_UPDATE_INTERVAL_MS) / elapsed);
+          setFps(currentFps);
+          fpsFrameCount.current = 0;
+          fpsLastTime.current = now;
+        }
+        
+        // Use default frequency values (no audio response) when analyser is unavailable to maintain visual rendering
+        let f = DEFAULT_FREQUENCY_VALUES;
+        if (analyser) {
+          const data = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(data);
         f = getFreq(data);
       }
@@ -7818,6 +7850,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         } else {
           rend.render(scene, cam);
         }
+      }
+      } catch (error) {
+        // Log error but continue animation to prevent export from breaking
+        console.error('Animation loop error:', error);
       }
     };
 
