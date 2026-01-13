@@ -3,7 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { AudioTrack } from '../VisualizerSoftware/types';
 import { generateWaveformData } from '../VisualizerSoftware/utils';
 
-interface WaveformsTabProps {
+interface AudioTabProps {
   audioTracks: AudioTrack[];
   bassGain: number;
   midsGain: number;
@@ -17,10 +17,10 @@ interface WaveformsTabProps {
 }
 
 /**
- * Waveforms Tab Component - Comprehensive audio track management
+ * Audio Tab Component - Comprehensive audio track management
  * Extracted from visualizer-software-COMPREHENSIVE-BACKUP.tsx lines 8336-8445
  */
-export default function WaveformsTab({
+export default function AudioTab({
   audioTracks,
   bassGain,
   midsGain,
@@ -31,7 +31,7 @@ export default function WaveformsTab({
   setBassGain,
   setMidsGain,
   setHighsGain
-}: WaveformsTabProps) {
+}: AudioTabProps) {
   return (
     <div>
       <div className="mb-4 bg-gray-700 rounded-lg p-3">

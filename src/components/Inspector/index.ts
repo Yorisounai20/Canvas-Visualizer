@@ -7,7 +7,7 @@
  * Source: commit f24c3d703ce7ef2a534c53a9a11ce8f6d40afa1a
  */
 
-export { default as WaveformsTab } from './WaveformsTab';
+export { default as AudioTab } from './AudioTab';
 export { default as ControlsTab } from './ControlsTab'; // TODO: Extract from backup lines 8447-8807 (361 lines)
 export { default as CameraTab } from './CameraTab'; // TODO: Extract from backup lines 8809-9168 (360 lines)
 export { default as CameraRigTab } from './CameraRigTab'; // TODO: Extract from backup lines 11114-12295 (1182 lines!)
