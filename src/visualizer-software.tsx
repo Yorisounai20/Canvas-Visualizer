@@ -290,6 +290,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
   
+  // Debug console modal state
+  const [showDebugConsole, setShowDebugConsole] = useState(false);
+  
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
   const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
   
