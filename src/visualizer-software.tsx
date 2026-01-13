@@ -8642,38 +8642,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
       </div>
 
-      {/* Debug Console */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <h4 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h4>
-            {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
-          </div>
-          <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
-        </div>
-        <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
-          {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
-            <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
-              <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Current Preset Info */}
-      {showPresetDisplay && (() => {
-        const currentPreset = getCurrentPreset();
-        const animType = animationTypes.find(a => a.value === currentPreset);
-        return animType && (
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Preset</h4>
-            <p className="text-cyan-400 text-sm flex items-center gap-2">
-              <span className="text-lg">{animType.icon}</span>
-              <span>{animType.label}</span>
-            </p>
-          </div>
-        );
-      })()}
+      {/* Debug Console Modal - Toggled with ` key */}
+      <DebugConsole 
+        logs={errorLog} 
+        isOpen={showDebugConsole} 
+        onToggle={() => setShowDebugConsole(prev => !prev)} 
+      />
     </div>
   );
   // --- End constants ---
