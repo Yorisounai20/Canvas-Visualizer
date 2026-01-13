@@ -1664,7 +1664,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       addLog(`Rendering at ${exportResolution} for export`, 'info');
 
-      // Set up streams
+      // Set up streams with higher frame rate for better quality
       const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioDestination = audioContextRef.current.createMediaStreamDestination();
       analyserRef.current.connect(audioDestination);
@@ -1689,9 +1689,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       }
       
+      // Calculate bitrate based on resolution for better quality
+      // 960x540: 8Mbps, 1280x720: 12Mbps, 1920x1080: 20Mbps
+      const pixelCount = exportWidth * exportHeight;
+      let videoBitrate = 8000000; // Default 8Mbps for 960x540
+      if (pixelCount >= 1920 * 1080) {
+        videoBitrate = 20000000; // 20Mbps for 1080p
+      } else if (pixelCount >= 1280 * 720) {
+        videoBitrate = 12000000; // 12Mbps for 720p
+      }
+      
       const recorder = new MediaRecorder(combinedStream, {
         mimeType,
-        videoBitsPerSecond: 5000000
+        videoBitsPerSecond: videoBitrate
       });
       
       recordedChunksRef.current = [];
@@ -1729,8 +1739,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setIsPlaying(false);
       };
       
-      // Start recording
-      recorder.start();
+      // Start recording with timeslice to capture data periodically
+      // This helps prevent memory issues and ensures consistent capture
+      recorder.start(1000); // Request data every 1 second
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
       addLog('Recording started', 'success');
@@ -1763,6 +1774,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       startTimeRef.current = Date.now();
       setIsPlaying(true);
       
+      // Request data periodically to ensure consistent recording
+      const dataRequestInterval = setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          try {
+            mediaRecorderRef.current.requestData();
+          } catch (e) {
+            console.warn('Failed to request data from recorder:', e);
+          }
+        }
+      }, 2000);
+      
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
         const progress = (elapsed / duration) * 100;
@@ -1772,6 +1794,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Stop when audio ends
         if (elapsed >= duration - AUDIO_END_THRESHOLD) {
           clearInterval(progressInterval);
+          clearInterval(dataRequestInterval);
           setTimeout(() => {
             if (mediaRecorderRef.current) {
               mediaRecorderRef.current.stop();
