@@ -67,6 +67,18 @@ import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
+import { 
+  AudioTab,
+  ControlsTab, 
+  CameraTab, 
+  PresetsTab, 
+  EffectsTab,
+  PostFXTab,
+  EnvironmentsTab, 
+  CameraFXTab, 
+  CameraRigTab 
+} from './components/Inspector';
+import DebugConsole from './components/Debug/DebugConsole';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -216,6 +228,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [sphereMetalness, setSphereMetalness] = useState(0.5);
   const [sphereRoughness, setSphereRoughness] = useState(0.5);
   
+  // Plane Materials
+  const [planeWireframe, setPlaneWireframe] = useState(false);
+  const [planeOpacity, setPlaneOpacity] = useState(0.7);
+  const [planeColor, setPlaneColor] = useState('#ff6b6b');
+  const [planeMaterialType, setPlaneMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [planeMetalness, setPlaneMetalness] = useState(0.5);
+  const [planeRoughness, setPlaneRoughness] = useState(0.5);
+  
+  // Torus Materials
+  const [torusWireframe, setTorusWireframe] = useState(true);
+  const [torusOpacity, setTorusOpacity] = useState(0.5);
+  const [torusColor, setTorusColor] = useState('#4ecdc4');
+  const [torusMaterialType, setTorusMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [torusMetalness, setTorusMetalness] = useState(0.5);
+  const [torusRoughness, setTorusRoughness] = useState(0.5);
+  
   // NEW: Post-FX controls
   const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
   const [vignetteStrength, setVignetteStrength] = useState(0);
@@ -261,6 +289,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
+  
+  // Debug console modal state
+  const [showDebugConsole, setShowDebugConsole] = useState(false);
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
   const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
@@ -423,19 +454,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [rigTransitionDuration, setRigTransitionDuration] = useState(1.0); // seconds
   const [rigTransitionEasing, setRigTransitionEasing] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
   const [enableRigTransitions, setEnableRigTransitions] = useState(true);
+  const [enableSmoothTransitions, setEnableSmoothTransitions] = useState(true); // Alias for enableRigTransitions
+  
+  // Path Visualization
+  const [showPaths, setShowPaths] = useState(false);
+  const [showKeyframeMarkers, setShowKeyframeMarkers] = useState(false);
   
   // Framing Controls
   const [lookAtOffsetX, setLookAtOffsetX] = useState(0); // -10 to 10
   const [lookAtOffsetY, setLookAtOffsetY] = useState(0); // -10 to 10
   const [enableFramingLock, setEnableFramingLock] = useState(false);
   const [enableRuleOfThirds, setEnableRuleOfThirds] = useState(false);
+  const [ruleOfThirdsBias, setRuleOfThirdsBias] = useState(0.3); // 0-1, how strongly to follow rule of thirds
   
   // Camera FX Layer (existing camera shake)
   const [cameraShakeIntensity, setCameraShakeIntensity] = useState(1.0); // multiplier for existing shake
+  const [shakeIntensity, setShakeIntensity] = useState(1.0); // Alias for cameraShakeIntensity
   const [cameraShakeFrequency, setCameraShakeFrequency] = useState(50); // Hz
+  const [shakeFrequency, setShakeFrequency] = useState(50); // Alias for cameraShakeFrequency
   const [enableHandheldDrift, setEnableHandheldDrift] = useState(false);
   const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
   const [enableFovRamping, setEnableFovRamping] = useState(false);
+  const [fovRamping, setFovRamping] = useState(false); // Alias for enableFovRamping
   const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
   
   // Camera FX System (Grid Tiling, Kaleidoscope, PIP)
@@ -8185,7 +8225,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-    <div className="flex items-start justify-start w-full h-full bg-gray-950" style={{paddingLeft: '120px', paddingTop: '10px'}}>
+    <div className="flex items-start justify-center w-full h-full bg-gray-950 pt-8">
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -8256,434 +8296,280 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         </p>
         
         {activeTab === 'waveforms' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3">
-              <label className="text-xs text-gray-400 block mb-2">Waveform Mode</label>
-              <select
-                value={waveformMode}
-                onChange={(e) => setWaveformMode(e.target.value as 'scrolling' | 'static')}
-                className="w-full bg-gray-800 text-white px-3 py-2 rounded"
-              >
-                <option value="scrolling">Scrolling</option>
-                <option value="static">Static</option>
-              </select>
-            </div>
-            
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Audio Gains</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Bass Gain: {bassGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={bassGain}
-                  onChange={(e) => setBassGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Mids Gain: {midsGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={midsGain}
-                  onChange={(e) => setMidsGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Highs Gain: {highsGain.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={highsGain}
-                  onChange={(e) => setHighsGain(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <AudioTab
+            audioTracks={audioTracks}
+            bassGain={bassGain}
+            midsGain={midsGain}
+            highsGain={highsGain}
+            addAudioTrack={addAudioTrack}
+            removeAudioTrack={removeAudioTrack}
+            setActiveTrack={setActiveTrack}
+            setBassGain={setBassGain}
+            setMidsGain={setMidsGain}
+            setHighsGain={setHighsGain}
+          />
         )}
         
         {activeTab === 'presets' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3">
-              <label className="text-xs text-gray-400 block mb-2">Select Preset</label>
-              <select
-                value={getCurrentPreset()}
-                onChange={(e) => {
-                  const preset = e.target.value;
-                  if (sections.length > 0) {
-                    updateSection(sections[0].id, 'animation', preset);
-                  }
-                }}
-                className="w-full bg-gray-800 text-white px-3 py-2 rounded"
-              >
-                {animationTypes.map(type => (
-                  <option key={type.value} value={type.value}>
-                    {type.icon} {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <button
-              onClick={addSection}
-              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-            >
-              Add Preset Keyframe
-            </button>
-          </div>
+          <PresetsTab
+            currentTime={currentTime}
+            duration={duration}
+            presetKeyframes={presetKeyframes}
+            handleAddPresetKeyframe={handleAddPresetKeyframe}
+            handleDeletePresetKeyframe={handleDeletePresetKeyframe}
+            handleUpdatePresetKeyframe={handleUpdatePresetKeyframe}
+            presetSpeedKeyframes={presetSpeedKeyframes}
+            handleAddSpeedKeyframe={handleAddSpeedKeyframe}
+            handleDeleteSpeedKeyframe={handleDeleteSpeedKeyframe}
+            handleUpdateSpeedKeyframe={handleUpdateSpeedKeyframe}
+            animationTypes={animationTypes}
+            getCurrentPreset={getCurrentPreset}
+            getCurrentPresetSpeed={getCurrentPresetSpeed}
+          />
         )}
         
         {activeTab === 'controls' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Global Colors</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Bass Color</label>
-                <input
-                  type="color"
-                  value={bassColor}
-                  onChange={(e) => setBassColor(e.target.value)}
-                  className="w-full h-10 rounded cursor-pointer"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Mids Color</label>
-                <input
-                  type="color"
-                  value={midsColor}
-                  onChange={(e) => setMidsColor(e.target.value)}
-                  className="w-full h-10 rounded cursor-pointer"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Highs Color</label>
-                <input
-                  type="color"
-                  value={highsColor}
-                  onChange={(e) => setHighsColor(e.target.value)}
-                  className="w-full h-10 rounded cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
+          <ControlsTab
+            // Background controls (moved from Effects tab per user request)
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setBorderColor={setBorderColor}
+            // Global colors (kept for compatibility)
+            bassColor={bassColor}
+            midsColor={midsColor}
+            highsColor={highsColor}
+            setBassColor={setBassColor}
+            setMidsColor={setMidsColor}
+            setHighsColor={setHighsColor}
+            cubeWireframe={cubeWireframe}
+            cubeOpacity={cubeOpacity}
+            cubeColor={cubeColor}
+            cubeMaterialType={cubeMaterialType}
+            cubeMetalness={cubeMetalness}
+            cubeRoughness={cubeRoughness}
+            setCubeWireframe={setCubeWireframe}
+            setCubeOpacity={setCubeOpacity}
+            setCubeColor={setCubeColor}
+            setCubeMaterialType={setCubeMaterialType}
+            setCubeMetalness={setCubeMetalness}
+            setCubeRoughness={setCubeRoughness}
+            octahedronWireframe={octahedronWireframe}
+            octahedronOpacity={octahedronOpacity}
+            octahedronColor={octahedronColor}
+            octahedronMaterialType={octahedronMaterialType}
+            octahedronMetalness={octahedronMetalness}
+            octahedronRoughness={octahedronRoughness}
+            setOctahedronWireframe={setOctahedronWireframe}
+            setOctahedronOpacity={setOctahedronOpacity}
+            setOctahedronColor={setOctahedronColor}
+            setOctahedronMaterialType={setOctahedronMaterialType}
+            setOctahedronMetalness={setOctahedronMetalness}
+            setOctahedronRoughness={setOctahedronRoughness}
+            tetrahedronWireframe={tetrahedronWireframe}
+            tetrahedronOpacity={tetrahedronOpacity}
+            tetrahedronColor={tetrahedronColor}
+            tetrahedronMaterialType={tetrahedronMaterialType}
+            tetrahedronMetalness={tetrahedronMetalness}
+            tetrahedronRoughness={tetrahedronRoughness}
+            setTetrahedronWireframe={setTetrahedronWireframe}
+            setTetrahedronOpacity={setTetrahedronOpacity}
+            setTetrahedronColor={setTetrahedronColor}
+            setTetrahedronMaterialType={setTetrahedronMaterialType}
+            setTetrahedronMetalness={setTetrahedronMetalness}
+            setTetrahedronRoughness={setTetrahedronRoughness}
+            sphereWireframe={sphereWireframe}
+            sphereOpacity={sphereOpacity}
+            sphereColor={sphereColor}
+            sphereMaterialType={sphereMaterialType}
+            sphereMetalness={sphereMetalness}
+            sphereRoughness={sphereRoughness}
+            setSphereWireframe={setSphereWireframe}
+            setSphereOpacity={setSphereOpacity}
+            setSphereColor={setSphereColor}
+            setSphereMaterialType={setSphereMaterialType}
+            setSphereMetalness={setSphereMetalness}
+            setSphereRoughness={setSphereRoughness}
+            planeWireframe={planeWireframe}
+            planeOpacity={planeOpacity}
+            planeColor={planeColor}
+            planeMaterialType={planeMaterialType}
+            planeMetalness={planeMetalness}
+            planeRoughness={planeRoughness}
+            setPlaneWireframe={setPlaneWireframe}
+            setPlaneOpacity={setPlaneOpacity}
+            setPlaneColor={setPlaneColor}
+            setPlaneMaterialType={setPlaneMaterialType}
+            setPlaneMetalness={setPlaneMetalness}
+            setPlaneRoughness={setPlaneRoughness}
+            torusWireframe={torusWireframe}
+            torusOpacity={torusOpacity}
+            torusColor={torusColor}
+            torusMaterialType={torusMaterialType}
+            torusMetalness={torusMetalness}
+            torusRoughness={torusRoughness}
+            setTorusWireframe={setTorusWireframe}
+            setTorusOpacity={setTorusOpacity}
+            setTorusColor={setTorusColor}
+            setTorusMaterialType={setTorusMaterialType}
+            setTorusMetalness={setTorusMetalness}
+            setTorusRoughness={setTorusRoughness}
+          />
         )}
         
         {activeTab === 'camera' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Camera Position</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Distance: {cameraDistance.toFixed(1)}
-                </label>
-                <input
-                  type="range"
-                  min="5"
-                  max="50"
-                  step="0.5"
-                  value={cameraDistance}
-                  onChange={(e) => setCameraDistance(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Height: {cameraHeight.toFixed(1)}
-                </label>
-                <input
-                  type="range"
-                  min="-10"
-                  max="10"
-                  step="0.5"
-                  value={cameraHeight}
-                  onChange={(e) => setCameraHeight(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Rotation: {cameraRotation.toFixed(1)}°
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="360"
-                  step="1"
-                  value={cameraRotation}
-                  onChange={(e) => setCameraRotation(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-            
-            <button
-              onClick={addKeyframe}
-              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-            >
-              Add Camera Keyframe
-            </button>
-          </div>
+          <CameraTab
+            cameraDistance={cameraDistance}
+            cameraHeight={cameraHeight}
+            cameraRotation={cameraRotation}
+            cameraAutoRotate={cameraAutoRotate}
+            setCameraDistance={setCameraDistance}
+            setCameraHeight={setCameraHeight}
+            setCameraRotation={setCameraRotation}
+            setCameraAutoRotate={setCameraAutoRotate}
+            showFilename={showFilename}
+            borderColor={borderColor}
+            setShowFilename={setShowFilename}
+            setBorderColor={setBorderColor}
+            showLetterbox={showLetterbox}
+            letterboxSize={letterboxSize}
+            setShowLetterbox={setShowLetterbox}
+            setLetterboxSize={setLetterboxSize}
+            addKeyframe={addKeyframe}
+          />
         )}
         
         {activeTab === 'cameraRig' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Camera Automation</h4>
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="autoRotate"
-                  checked={cameraAutoRotate}
-                  onChange={(e) => setCameraAutoRotate(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <label htmlFor="autoRotate" className="text-sm text-white cursor-pointer">
-                  Auto-Rotate Camera
-                </label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="showRigHints"
-                  checked={showRigHints}
-                  onChange={(e) => setShowRigHints(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <label htmlFor="showRigHints" className="text-sm text-white cursor-pointer">
-                  Show Rig Hints
-                </label>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="showRigPaths"
-                  checked={showRigPaths}
-                  onChange={(e) => setShowRigPaths(e.target.checked)}
-                  className="w-4 h-4 cursor-pointer"
-                />
-                <label htmlFor="showRigPaths" className="text-sm text-white cursor-pointer">
-                  Show Camera Paths
-                </label>
-              </div>
-            </div>
-          </div>
+          <CameraRigTab
+            currentTime={currentTime}
+            cameraRigs={cameraRigs}
+            selectedRigId={selectedRigId}
+            setSelectedRigId={setSelectedRigId}
+            setCameraRigs={setCameraRigs}
+            cameraRigKeyframes={cameraRigKeyframes}
+            setCameraRigKeyframes={setCameraRigKeyframes}
+            // Issue #5: Advanced Camera Rig Controls
+            showPaths={showPaths}
+            setShowPaths={setShowPaths}
+            showKeyframeMarkers={showKeyframeMarkers}
+            setShowKeyframeMarkers={setShowKeyframeMarkers}
+            enableSmoothTransitions={enableSmoothTransitions}
+            setEnableSmoothTransitions={setEnableSmoothTransitions}
+            rigTransitionDuration={rigTransitionDuration}
+            setRigTransitionDuration={setRigTransitionDuration}
+            rigTransitionEasing={rigTransitionEasing}
+            setRigTransitionEasing={setRigTransitionEasing}
+            lookAtOffsetX={lookAtOffsetX}
+            setLookAtOffsetX={setLookAtOffsetX}
+            lookAtOffsetY={lookAtOffsetY}
+            setLookAtOffsetY={setLookAtOffsetY}
+            enableFramingLock={enableFramingLock}
+            setEnableFramingLock={setEnableFramingLock}
+            ruleOfThirdsBias={ruleOfThirdsBias}
+            setRuleOfThirdsBias={setRuleOfThirdsBias}
+            shakeIntensity={shakeIntensity}
+            setShakeIntensity={setShakeIntensity}
+            shakeFrequency={shakeFrequency}
+            setShakeFrequency={setShakeFrequency}
+            handheldDriftIntensity={handheldDriftIntensity}
+            setHandheldDriftIntensity={setHandheldDriftIntensity}
+            fovRamping={fovRamping}
+            setFovRamping={setFovRamping}
+          />
         )}
         
         {activeTab === 'camerafx' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-2">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold mb-2">Add Camera Effects</h4>
-              
-              <button
-                onClick={() => addCameraFXClip('grid')}
-                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-              >
-                🔲 Add Grid FX
-              </button>
-              
-              <button
-                onClick={() => addCameraFXClip('kaleidoscope')}
-                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-              >
-                🔮 Add Kaleidoscope FX
-              </button>
-              
-              <button
-                onClick={() => addCameraFXClip('pip')}
-                className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-              >
-                📺 Add Picture-in-Picture
-              </button>
-            </div>
-          </div>
+          <CameraFXTab
+            currentTime={currentTime}
+            duration={duration}
+            cameraFXClips={cameraFXClips}
+            selectedFXClipId={selectedFXClipId}
+            setSelectedFXClipId={setSelectedFXClipId}
+            addCameraFXClip={addCameraFXClip}
+            updateCameraFXClip={updateCameraFXClip}
+            deleteCameraFXClip={deleteCameraFXClip}
+            cameraFXKeyframes={cameraFXKeyframes}
+            addCameraFXKeyframe={addCameraFXKeyframe}
+            updateCameraFXKeyframe={updateCameraFXKeyframe}
+            deleteCameraFXKeyframe={deleteCameraFXKeyframe}
+            cameraFXAudioModulations={cameraFXAudioModulations}
+            addCameraFXAudioModulation={addCameraFXAudioModulation}
+            updateCameraFXAudioModulation={updateCameraFXAudioModulation}
+            deleteCameraFXAudioModulation={deleteCameraFXAudioModulation}
+            // Issue #4: Parameter Events
+            parameterEvents={parameterEvents}
+            audioTracks={audioTracks}
+            addParameterEvent={addParameterEvent}
+            updateParameterEvent={updateParameterEvent}
+            deleteParameterEvent={deleteParameterEvent}
+          />
         )}
         
         {activeTab === 'effects' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Particle Effects</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Emission Rate: {particleEmissionRate}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="200"
-                  step="10"
-                  value={particleEmissionRate}
-                  onChange={(e) => setParticleEmissionRate(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Particle Size: {particleStartSize.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="2"
-                  step="0.1"
-                  value={particleStartSize}
-                  onChange={(e) => setParticleStartSize(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Lifetime: {particleLifetime.toFixed(1)}s
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="10"
-                  step="0.5"
-                  value={particleLifetime}
-                  onChange={(e) => setParticleLifetime(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
+            </p>
+            <p className="text-xs text-gray-500 italic">
+              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
+            </p>
           </div>
         )}
         
         {activeTab === 'environments' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Environment Settings</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Background Color</label>
-                <input
-                  type="color"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="w-full h-10 rounded cursor-pointer"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Skybox Type</label>
-                <select
-                  value={skyboxType}
-                  onChange={(e) => setSkyboxType(e.target.value as 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula')}
-                  className="w-full bg-gray-800 text-white px-3 py-2 rounded"
-                >
-                  <option value="color">Solid Color</option>
-                  <option value="gradient">Gradient</option>
-                  <option value="stars">Stars</option>
-                  <option value="galaxy">Galaxy</option>
-                  <option value="nebula">Nebula</option>
-                </select>
-              </div>
-            </div>
-            
-            <button
-              onClick={handleAddEnvironmentKeyframe}
-              className="w-full bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded text-white text-sm font-medium"
-            >
-              Add Environment Keyframe
-            </button>
-          </div>
+          <EnvironmentsTab
+            currentTime={currentTime}
+            environmentKeyframes={environmentKeyframes}
+            handleAddEnvironmentKeyframe={handleAddEnvironmentKeyframe}
+            handleDeleteEnvironmentKeyframe={handleDeleteEnvironmentKeyframe}
+            handleUpdateEnvironmentKeyframe={handleUpdateEnvironmentKeyframe}
+            particleEmitterKeyframes={particleEmitterKeyframes}
+            addParticleEmitterKeyframe={addParticleEmitterKeyframe}
+            deleteParticleEmitterKeyframe={deleteParticleEmitterKeyframe}
+            updateParticleEmitterKeyframe={updateParticleEmitterKeyframe}
+            particleEmissionRate={particleEmissionRate}
+            particleLifetime={particleLifetime}
+            particleMaxCount={particleMaxCount}
+            particleStartColor={particleStartColor}
+            particleEndColor={particleEndColor}
+            particleStartSize={particleStartSize}
+            particleEndSize={particleEndSize}
+            particleShape={particleShape}
+            setParticleEmissionRate={setParticleEmissionRate}
+            setParticleLifetime={setParticleLifetime}
+            setParticleMaxCount={setParticleMaxCount}
+            setParticleStartColor={setParticleStartColor}
+            setParticleEndColor={setParticleEndColor}
+            setParticleStartSize={setParticleStartSize}
+            setParticleEndSize={setParticleEndSize}
+            setParticleShape={setParticleShape}
+          />
         )}
         
         {activeTab === 'postfx' && (
-          <div className="space-y-3">
-            <div className="bg-gray-700 rounded p-3 space-y-3">
-              <h4 className="text-xs text-gray-400 uppercase font-semibold">Post-Processing</h4>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Vignette Strength: {vignetteStrength.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={vignetteStrength}
-                  onChange={(e) => setVignetteStrength(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Saturation: {colorSaturation.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={colorSaturation}
-                  onChange={(e) => setColorSaturation(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Contrast: {colorContrast.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={colorContrast}
-                  onChange={(e) => setColorContrast(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">
-                  Gamma: {colorGamma.toFixed(2)}
-                </label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.1"
-                  value={colorGamma}
-                  onChange={(e) => setColorGamma(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          </div>
+          <PostFXTab
+            blendMode={blendMode}
+            vignetteStrength={vignetteStrength}
+            vignetteSoftness={vignetteSoftness}
+            colorSaturation={colorSaturation}
+            colorContrast={colorContrast}
+            colorGamma={colorGamma}
+            colorTintR={colorTintR}
+            colorTintG={colorTintG}
+            colorTintB={colorTintB}
+            setBlendMode={setBlendMode}
+            setVignetteStrength={setVignetteStrength}
+            setVignetteSoftness={setVignetteSoftness}
+            setColorSaturation={setColorSaturation}
+            setColorContrast={setColorContrast}
+            setColorGamma={setColorGamma}
+            setColorTintR={setColorTintR}
+            setColorTintG={setColorTintG}
+            setColorTintB={setColorTintB}
+          />
         )}
         
         {activeTab === 'textAnimator' && (
@@ -8760,38 +8646,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
       </div>
 
-      {/* Debug Console */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <h4 className="text-sm font-semibold text-cyan-400">📋 Debug Console</h4>
-            {isPlaying && <span className="text-xs font-mono px-2 py-1 bg-gray-800 rounded text-green-400">FPS: {fps}</span>}
-          </div>
-          <button onClick={() => setErrorLog([])} className="text-xs bg-gray-600 hover:bg-gray-500 px-2 py-1 rounded text-white">Clear</button>
-        </div>
-        <div className="bg-black rounded p-3 h-40 overflow-y-auto font-mono text-xs">
-          {errorLog.length === 0 ? <div className="text-gray-500">Waiting for events...</div> : errorLog.map((log, i) => (
-            <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-cyan-300'}`}>
-              <span className="text-gray-600">[{log.timestamp}]</span> {log.message}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Current Preset Info */}
-      {showPresetDisplay && (() => {
-        const currentPreset = getCurrentPreset();
-        const animType = animationTypes.find(a => a.value === currentPreset);
-        return animType && (
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Current Preset</h4>
-            <p className="text-cyan-400 text-sm flex items-center gap-2">
-              <span className="text-lg">{animType.icon}</span>
-              <span>{animType.label}</span>
-            </p>
-          </div>
-        );
-      })()}
+      {/* Debug Console Modal - Toggled with ` key */}
+      <DebugConsole 
+        logs={errorLog} 
+        isOpen={showDebugConsole} 
+        onToggle={() => setShowDebugConsole(prev => !prev)} 
+      />
     </div>
   );
   // --- End constants ---
