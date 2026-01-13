@@ -227,7 +227,7 @@ export default function CameraRigTab(props: CameraRigTabProps) {
             <label className="text-xs text-gray-400 block mb-1">Rig Type</label>
             <select
               value={selectedRig.type}
-              onChange={(e) => updateRig(selectedRig.id, { type: e.target.value })}
+              onChange={(e) => updateRig(selectedRig.id, { type: e.target.value as CameraRig['type'] })}
               className="w-full bg-gray-800 text-white px-2 py-1 rounded text-xs"
             >
               {rigTypes.map(type => (
