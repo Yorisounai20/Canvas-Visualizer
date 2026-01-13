@@ -126,10 +126,6 @@ export default function Timeline({
     data: any;
   }>({ type: null, data: null });
 
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const [scrollOffset, setScrollOffset] = useState(0);
-  const [zoomLevel, setZoomLevel] = useState(DEFAULT_ZOOM);
-  
   // Video editor features
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [gridSize, setGridSize] = useState(1.0); // Snap interval in seconds
@@ -1058,14 +1054,16 @@ export default function Timeline({
           )}
         </div>
       </div>
-      {/* Context Menu */}
-      <ContextMenu
-        isOpen={contextMenu.isOpen}
-        x={contextMenu.x}
-        y={contextMenu.y}
-        items={getKeyframeContextMenuItems()}
-        onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, type: null })}
-      />
+    </div>
+
+    {/* Context Menu */}
+    <ContextMenu
+      isOpen={contextMenu.isOpen}
+      x={contextMenu.x}
+      y={contextMenu.y}
+      items={getKeyframeContextMenuItems()}
+      onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, type: null })}
+    />
 
       {/* Edit Keyframe Modals */}
       {editingKeyframe.type === 'preset' && editingKeyframe.data && (
