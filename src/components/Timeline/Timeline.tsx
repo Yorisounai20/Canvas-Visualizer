@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
@@ -46,6 +46,11 @@ interface TimelineProps {
 }
 
 type TimelineTab = 'sections' | 'presets' | 'camera' | 'text' | 'environment' | 'camerafx';
+
+// Zoom level constants
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4.0;
+const DEFAULT_ZOOM = 1.0;
 
 /**
  * Timeline Component - After Effects-style timeline with tabs
@@ -127,10 +132,13 @@ export default function Timeline({
 
   const timelineRef = useRef<HTMLDivElement>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
-  const [zoomLevel, setZoomLevel] = useState(1.0); // 1.0 = normal, 2.0 = zoomed in 2x
-  const PIXELS_PER_SECOND = 40 * zoomLevel; // Scaling factor with zoom
+  const [zoomLevel, setZoomLevel] = useState(DEFAULT_ZOOM);
+  
+  // Memoize pixel calculations to prevent unnecessary recalculations
+  const PIXELS_PER_SECOND = useMemo(() => 40 * zoomLevel, [zoomLevel]);
+  const timelineWidth = useMemo(() => Math.max(duration * PIXELS_PER_SECOND, 1000), [duration, PIXELS_PER_SECOND]);
+  
   const TIMELINE_HEIGHT = 60; // Height of each layer bar
-  const timelineWidth = Math.max(duration * PIXELS_PER_SECOND, 1000); // CRITICAL FIX: Moved before useEffect
 
   // Keyframe dragging state
   const [keyframeDragState, setKeyframeDragState] = useState<{
@@ -484,7 +492,7 @@ export default function Timeline({
           {/* Zoom Controls */}
           <div className="flex items-center gap-1 mr-2">
             <button
-              onClick={() => setZoomLevel(prev => Math.max(0.25, prev - 0.25))}
+              onClick={() => setZoomLevel(prev => Math.max(MIN_ZOOM, prev - 0.25))}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
               title="Zoom out"
             >
@@ -494,14 +502,14 @@ export default function Timeline({
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
-              onClick={() => setZoomLevel(prev => Math.min(4.0, prev + 0.25))}
+              onClick={() => setZoomLevel(prev => Math.min(MAX_ZOOM, prev + 0.25))}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
               title="Zoom in"
             >
               +
             </button>
             <button
-              onClick={() => setZoomLevel(1.0)}
+              onClick={() => setZoomLevel(DEFAULT_ZOOM)}
               className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors ml-1"
               title="Reset zoom"
             >

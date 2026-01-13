@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
-import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
+import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, TextKeyframe } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -1511,16 +1511,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   // Text keyframe handlers (stub - to be implemented)
-  const [textKeyframes, setTextKeyframes] = useState<Array<{
-    id: number;
-    time: number;
-    show: boolean;
-    text?: string;
-  }>>([]);
+  const [textKeyframes, setTextKeyframes] = useState<TextKeyframe[]>([]);
   const nextTextKeyframeId = useRef(1);
 
   const handleAddTextKeyframe = (time: number) => {
-    const newKeyframe = {
+    const newKeyframe: TextKeyframe = {
       id: nextTextKeyframeId.current++,
       time,
       show: true
