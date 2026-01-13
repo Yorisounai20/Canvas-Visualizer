@@ -67,6 +67,7 @@ import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
+import Timeline from './components/Timeline/Timeline';
 
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
@@ -385,6 +386,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     { id: 2, start: 20, end: 40, animation: 'explosion' },
     { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   // Start with null to prevent canvas disappearing on first preset
   // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
   const prevAnimRef = useRef<string | null>(null);
@@ -1537,6 +1539,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setTextKeyframes(textKeyframes.map(kf => 
       kf.id === id ? { ...kf, time: newTime } : kf
     ).sort((a, b) => a.time - b.time));
+  };
+
+  // Camera keyframe handlers
+  const addCameraKeyframe = (time: number) => {
+    const newKeyframe = {
+      time,
+      distance: cameraDistance,
+      height: cameraHeight,
+      rotation: cameraRotation,
+      easing: 'linear' as const
+    };
+    setCameraKeyframes([...cameraKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteCameraKeyframe = (time: number) => {
+    setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
+  };
+
+  const updateCameraKeyframe = (time: number, updates: Partial<any>) => {
+    setCameraKeyframes(cameraKeyframes.map(kf =>
+      kf.time === time ? { ...kf, ...updates } : kf
+    ));
   };
 
   // Camera FX handlers
@@ -8163,74 +8187,45 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const timelinePanelJSX = (
-    <>
-      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-4">
-          {/* Time Display and Preset Info - No Audio Upload */}
-          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
-            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && (() => {
-              const currentPreset = getCurrentPreset();
-              const animType = animationTypes.find(a => a.value === currentPreset);
-              return animType && (
-                <p className="text-cyan-400 text-xs mt-1">
-                  {animType.icon} {animType.label}
-                </p>
-              );
-            })()}
-            
-            {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
-          </div>
-          
-          {/* Combined Waveform from all tracks */}
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && audioTracks.length > 0 ? (
-                <canvas 
-                  ref={waveformCanvasRef} 
-                  width={800} 
-                  height={120}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
-                </div>
-              )}
-            </div>
-            
-            {/* Timeline Slider - Always visible when audio is ready */}
-            {audioReady && duration > 0 && (
-              <div className="flex items-center gap-3">
-                <input 
-                  type="range" id="currentTime" name="currentTime" 
-                  min="0" 
-                  max={duration} 
-                  step="0.1" 
-                  value={currentTime} 
-                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
-                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
-                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
-                />
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <input 
-                    type="checkbox" 
-                    id="waveformMode" 
-                    checked={waveformMode === 'static'} 
-                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
-                    className="w-3 h-3 cursor-pointer"
-                    aria-label="Toggle between scrolling and static waveform modes"
-                  />
-                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
+    <Timeline
+      sections={sections}
+      currentTime={currentTime}
+      duration={duration}
+      animationTypes={animationTypes}
+      selectedSectionId={selectedSectionId}
+      audioBuffer={audioBufferRef.current}
+      showWaveform={true}
+      presetKeyframes={presetKeyframes}
+      cameraKeyframes={cameraKeyframes}
+      textKeyframes={textKeyframes}
+      environmentKeyframes={environmentKeyframes}
+      workspaceObjects={[]}
+      cameraFXClips={cameraFXClips}
+      selectedFXClipId={selectedFXClipId}
+      onSelectSection={setSelectedSectionId}
+      onUpdateSection={updateSection}
+      onAddSection={addSection}
+      onSeek={seekTo}
+      onAddPresetKeyframe={handleAddPresetKeyframe}
+      onAddCameraKeyframe={addCameraKeyframe}
+      onAddTextKeyframe={handleAddTextKeyframe}
+      onAddEnvironmentKeyframe={handleAddEnvironmentKeyframe}
+      onDeletePresetKeyframe={handleDeletePresetKeyframe}
+      onDeleteCameraKeyframe={deleteCameraKeyframe}
+      onDeleteTextKeyframe={handleDeleteTextKeyframe}
+      onDeleteEnvironmentKeyframe={handleDeleteEnvironmentKeyframe}
+      onUpdatePresetKeyframe={handleUpdatePresetKeyframe}
+      onUpdateCameraKeyframe={updateCameraKeyframe}
+      onUpdateTextKeyframe={handleUpdateTextKeyframe}
+      onUpdateEnvironmentKeyframe={handleUpdateEnvironmentKeyframe}
+      onMovePresetKeyframe={handleMovePresetKeyframe}
+      onMoveTextKeyframe={handleMoveTextKeyframe}
+      onMoveEnvironmentKeyframe={handleMoveEnvironmentKeyframe}
+      onSelectFXClip={setSelectedFXClipId}
+      onUpdateCameraFXClip={updateCameraFXClip}
+      onDeleteCameraFXClip={deleteCameraFXClip}
+      onAddCameraFXClip={addCameraFXClip}
+    />
   );
 
   const canvasAreaJSX = (
