@@ -8504,28 +8504,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <EffectsTab
-            skyboxType={skyboxType}
-            backgroundColor={backgroundColor}
-            skyboxGradientTop={skyboxGradientTop}
-            skyboxGradientBottom={skyboxGradientBottom}
-            skyboxImageUrl={skyboxImageUrl}
-            starCount={starCount}
-            galaxyColor={galaxyColor}
-            nebulaColor1={nebulaColor1}
-            nebulaColor2={nebulaColor2}
-            borderColor={borderColor}
-            setSkyboxType={setSkyboxType}
-            setBackgroundColor={setBackgroundColor}
-            setSkyboxGradientTop={setSkyboxGradientTop}
-            setSkyboxGradientBottom={setSkyboxGradientBottom}
-            setSkyboxImageUrl={setSkyboxImageUrl}
-            setStarCount={setStarCount}
-            setGalaxyColor={setGalaxyColor}
-            setNebulaColor1={setNebulaColor1}
-            setNebulaColor2={setNebulaColor2}
-            setBorderColor={setBorderColor}
-          />
+          <div className="bg-gray-700 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
+            </p>
+            <p className="text-xs text-gray-500 italic">
+              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
+            </p>
+          </div>
         )}
         
         {activeTab === 'environments' && (
