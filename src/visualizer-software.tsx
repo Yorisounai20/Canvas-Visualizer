@@ -8227,7 +8227,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const inspectorJSX = (
     <div className="space-y-4">
       {/* Tab-Specific Controls */}
-      <div className="space-y-4">
+      <div>
         <p className="text-xs uppercase tracking-wider text-gray-400 font-semibold flex items-center gap-2">
           <span className="text-2xl">
             {activeTab === 'waveforms' && '🎵'}
