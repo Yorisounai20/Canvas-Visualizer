@@ -27,7 +27,7 @@ export default function WaveformVisualizer({
   debounceMs = 150
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<number | null>(null);
   const [debouncedWidth, setDebouncedWidth] = useState(width);
   const [debouncedHeight, setDebouncedHeight] = useState(height);
 
@@ -38,16 +38,21 @@ export default function WaveformVisualizer({
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      setDebouncedWidth(width);
-      setDebouncedHeight(height);
-    }, debounceMs);
+      // Only update if values actually changed
+      if (width !== debouncedWidth) {
+        setDebouncedWidth(width);
+      }
+      if (height !== debouncedHeight) {
+        setDebouncedHeight(height);
+      }
+    }, debounceMs) as unknown as number;
 
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [width, height, debounceMs]);
+  }, [width, height, debounceMs, debouncedWidth, debouncedHeight]);
 
   // Draw waveform only when debounced dimensions or audioBuffer change
   const drawWaveform = useCallback(() => {
