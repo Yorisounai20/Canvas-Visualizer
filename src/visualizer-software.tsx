@@ -79,6 +79,8 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
+import { useNewTimeline } from './lib/featureFlags';
+import TimelineV2 from './components/Timeline/TimelineV2';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -8193,6 +8195,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
+  // Check if new timeline is enabled via feature flag
+  const isNewTimelineEnabled = useNewTimeline();
+
+  // New TimelineV2 component (behind feature flag)
+  const timelineV2JSX = isNewTimelineEnabled && (
+    <TimelineV2
+      currentTime={currentTime}
+      duration={duration}
+      audioBuffer={audioTracks[0]?.buffer || null}
+      onSeek={seekTo}
+      isPlaying={isPlaying}
+      onPlayPause={audioReady ? (audioTracks.length > 0 ? playMultiTrackAudio : playAudio) : undefined}
+    />
+  );
+
   const timelinePanelJSX = (
     <>
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
@@ -8700,7 +8717,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     <LayoutShell
       left={leftPanelJSX}
       inspector={inspectorJSX}
-      timeline={timelinePanelJSX}
+      timeline={isNewTimelineEnabled ? timelineV2JSX : timelinePanelJSX}
       top={topBarJSX}
     >
       {canvasAreaJSX}
