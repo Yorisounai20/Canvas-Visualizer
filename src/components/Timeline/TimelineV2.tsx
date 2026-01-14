@@ -68,6 +68,8 @@ interface TimelineProps {
 const LEFT_COLUMN_WIDTH = 240; // Fixed width for track labels
 const RULER_HEIGHT = 40; // Height of time ruler
 const TRACK_HEIGHT = 80; // Height of each track row
+const COLLAPSED_TRACK_HEIGHT = 40; // Height of collapsed track row
+const TRACK_NAME_INPUT_WIDTH = 140; // Width of track name input when editing
 const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
 
 export default function TimelineV2({
@@ -753,6 +755,7 @@ export default function TimelineV2({
               <div
                 key={track.id}
                 className="flex items-center px-2 border-b border-gray-700"
+                /* Note: px-2 (8px) instead of px-4 (16px) to make room for collapse button */
                 style={{ height: `${TRACK_HEIGHT}px` }}
               >
                 {/* Collapse/expand button */}
@@ -780,7 +783,7 @@ export default function TimelineV2({
                     }}
                     autoFocus
                     className="text-sm font-medium bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 focus:outline-none"
-                    style={{ width: '140px' }}
+                    style={{ width: `${TRACK_NAME_INPUT_WIDTH}px` }}
                   />
                 ) : (
                   <span
@@ -836,7 +839,7 @@ export default function TimelineV2({
                 <div
                   key={track.id}
                   className="relative border-b border-gray-700 overflow-hidden transition-all"
-                  style={{ height: isCollapsed ? '40px' : `${TRACK_HEIGHT}px` }}
+                  style={{ height: isCollapsed ? `${COLLAPSED_TRACK_HEIGHT}px` : `${TRACK_HEIGHT}px` }}
                 >
                   {/* Only render track content if not collapsed */}
                   {!isCollapsed && (
