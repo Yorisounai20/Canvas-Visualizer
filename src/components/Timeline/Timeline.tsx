@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Play, Pause } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe } from '../../types';
+import { ParameterEvent } from '../../components/VisualizerSoftware/types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 import { EASING_FUNCTIONS, EASING_BY_CATEGORY, EASING_CATEGORY_ORDER } from '../../lib/easingFunctions';
@@ -17,6 +18,9 @@ interface TimelineProps {
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
+  // Bug #10, #11: Add support for missing keyframe types
+  parameterEvents?: ParameterEvent[];
+  letterboxKeyframes?: LetterboxKeyframe[];
   workspaceObjects?: WorkspaceObject[]; // For camera selection in camera keyframes
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -28,17 +32,26 @@ interface TimelineProps {
   onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
   onAddEnvironmentKeyframe?: (time: number) => void;
+  // Bug #10, #11: Add handlers for missing keyframe types
+  onAddParameterEvent?: (time: number) => void;
+  onAddLetterboxKeyframe?: (time: number) => void;
   onDeletePresetKeyframe?: (id: number) => void;
   onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
   onDeleteEnvironmentKeyframe?: (id: number) => void;
+  onDeleteParameterEvent?: (id: string) => void;
+  onDeleteLetterboxKeyframe?: (time: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
+  onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
+  onUpdateLetterboxKeyframe?: (time: number, updates: Partial<LetterboxKeyframe>) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
   onMoveTextKeyframe?: (id: number, newTime: number) => void;
   onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
+  onMoveParameterEvent?: (id: string, newTime: number) => void;
+  onMoveLetterboxKeyframe?: (oldTime: number, newTime: number) => void;
   onSelectFXClip?: (id: string) => void;
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onDeleteCameraFXClip?: (id: string) => void;
@@ -57,6 +70,8 @@ export default function Timeline({
   cameraKeyframes,
   textKeyframes,
   environmentKeyframes,
+  parameterEvents = [],
+  letterboxKeyframes = [],
   workspaceObjects = [],
   cameraFXClips = [],
   selectedFXClipId,
@@ -68,17 +83,25 @@ export default function Timeline({
   onAddCameraKeyframe,
   onAddTextKeyframe,
   onAddEnvironmentKeyframe,
+  onAddParameterEvent,
+  onAddLetterboxKeyframe,
   onDeletePresetKeyframe,
   onDeleteCameraKeyframe,
   onDeleteTextKeyframe,
   onDeleteEnvironmentKeyframe,
+  onDeleteParameterEvent,
+  onDeleteLetterboxKeyframe,
   onUpdatePresetKeyframe,
   onUpdateCameraKeyframe,
   onUpdateTextKeyframe,
   onUpdateEnvironmentKeyframe,
+  onUpdateParameterEvent,
+  onUpdateLetterboxKeyframe,
   onMovePresetKeyframe,
   onMoveTextKeyframe,
   onMoveEnvironmentKeyframe,
+  onMoveParameterEvent,
+  onMoveLetterboxKeyframe,
   onSelectFXClip,
   onUpdateCameraFXClip,
   onDeleteCameraFXClip,
@@ -244,6 +267,17 @@ export default function Timeline({
         label: 'Add Environment Keyframe',
         icon: <Plus size={14} />,
         onClick: () => onAddEnvironmentKeyframe?.(time)
+      });
+      // Bug #10, #11: Add options for missing keyframe types
+      items.push({
+        label: 'Add Parameter Event',
+        icon: <Plus size={14} />,
+        onClick: () => onAddParameterEvent?.(time)
+      });
+      items.push({
+        label: 'Add Letterbox Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => onAddLetterboxKeyframe?.(time)
       });
       return items;
     }
@@ -1367,6 +1401,99 @@ export default function Timeline({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Track: Parameter Events (Bug #10) */}
+          {parameterEvents.length > 0 && (
+            <div className="flex border-b border-gray-700">
+              <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">⚡</span>
+                  <span className="text-xs font-semibold text-gray-300">Parameters</span>
+                </div>
+              </div>
+              <div className="relative" style={{ width: `${timelineWidth}px`, height: '60px' }}>
+                {/* Parameter Event Markers/Bars */}
+                {parameterEvents.map((event) => {
+                  const left = timeToPixels(event.startTime);
+                  const width = timeToPixels(event.endTime - event.startTime);
+                  
+                  return (
+                    <div
+                      key={event.id}
+                      className="absolute top-2 h-10 rounded bg-yellow-600 hover:bg-yellow-500 transition-colors"
+                      style={{
+                        left: `${left}px`,
+                        width: `${Math.max(width, 4)}px`
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(event.startTime);
+                      }}
+                    >
+                      <div className="h-full px-2 py-1 flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white truncate">
+                          {event.mode === 'automated' ? '🔊 Auto' : '⏱️ Manual'}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteParameterEvent?.(event.id);
+                          }}
+                          className="text-white hover:text-red-300 text-xs"
+                          title="Delete event"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Track: Letterbox (Bug #11) */}
+          {letterboxKeyframes.length > 0 && (
+            <div className="flex border-b border-gray-700">
+              <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">📽️</span>
+                  <span className="text-xs font-semibold text-gray-300">Letterbox</span>
+                </div>
+              </div>
+              <div className="relative" style={{ width: `${timelineWidth}px`, height: '60px' }}>
+                {/* Letterbox Keyframe Markers */}
+                {letterboxKeyframes.map((kf, index) => (
+                  <div
+                    key={index}
+                    className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors group"
+                    style={{ left: `${timeToPixels(kf.time)}px` }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSeek(kf.time);
+                    }}
+                  >
+                    <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
+                    <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
+                      {formatTime(kf.time)} - Size: {kf.targetSize}
+                      {kf.invert && ' (Inverted)'}
+                      {onDeleteLetterboxKeyframe && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteLetterboxKeyframe(kf.time);
+                          }}
+                          className="ml-2 text-red-400 hover:text-red-300"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
