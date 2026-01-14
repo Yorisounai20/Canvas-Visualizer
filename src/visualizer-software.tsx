@@ -8194,6 +8194,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Check feature flag for new timeline
   const useNewTimeline = getFeatureFlag('cv_use_scrollable_timeline');
+  
+  // Log timeline mode for debugging
+  useEffect(() => {
+    console.log(`[Timeline] Using ${useNewTimeline ? 'TimelineV2 (new scrollable)' : 'original waveform display'}`);
+    if (useNewTimeline) {
+      console.log('[Timeline] To disable: window.disableNewTimeline()');
+    } else {
+      console.log('[Timeline] To enable: window.enableNewTimeline()');
+    }
+  }, [useNewTimeline]);
 
   const timelinePanelJSX = useNewTimeline ? (
     // New scrollable timeline (PR B+)
