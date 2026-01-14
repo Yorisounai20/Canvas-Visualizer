@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, ZoomIn, ZoomOut } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
@@ -6,8 +6,14 @@ import {
   BASE_PX_PER_SECOND, 
   MIN_ZOOM, 
   MAX_ZOOM, 
+  DEFAULT_FPS,
   formatTime, 
-  getPixelsPerSecond 
+  getPixelsPerSecond,
+  timeToPixels,
+  pixelsToTime,
+  snapTime,
+  clamp,
+  frameToTime
 } from './utils';
 
 interface TimelineV2Props {
@@ -108,14 +114,222 @@ export default function TimelineV2({
 }: TimelineV2Props) {
   // Zoom and scroll state
   const [zoom, setZoom] = useState(1.0);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [gridSize, setGridSize] = useState(0.1); // 100ms grid by default
   const containerRef = useRef<HTMLDivElement>(null);
+  const timelineContentRef = useRef<HTMLDivElement>(null);
   
   // Calculate pixels per second based on zoom
   const pixelsPerSecond = getPixelsPerSecond(zoom);
+  
+  // RAF-throttled drag state (stored in refs to avoid re-renders during drag)
+  const dragStateRef = useRef<{
+    isDragging: boolean;
+    type: 'playhead' | 'keyframe' | null;
+    keyframeId: number | null;
+    startX: number;
+    startTime: number;
+    lastClientX: number;
+    rafId: number | null;
+  }>({
+    isDragging: false,
+    type: null,
+    keyframeId: null,
+    startX: 0,
+    startTime: 0,
+    lastClientX: 0,
+    rafId: null
+  });
+  
+  // Preview position during drag (only updated via RAF)
+  const [previewTime, setPreviewTime] = useState<number | null>(null);
+  
+  // Keyboard navigation
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Only handle keys when timeline is focused or when we're the active panel
+    const isTimelineFocused = containerRef.current?.contains(document.activeElement);
+    
+    // Spacebar: toggle play/pause
+    if (e.code === 'Space' && isTimelineFocused) {
+      e.preventDefault();
+      onTogglePlayPause?.();
+      return;
+    }
+    
+    // Arrow keys and other navigation
+    if (isTimelineFocused) {
+      const frameTime = frameToTime(1, DEFAULT_FPS);
+      let newTime = currentTime;
+      
+      if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Left: -5s
+          newTime = Math.max(0, currentTime - 5);
+        } else if (e.shiftKey) {
+          // Shift+Left: -1s
+          newTime = Math.max(0, currentTime - 1);
+        } else {
+          // Left: -1 frame
+          newTime = Math.max(0, currentTime - frameTime);
+        }
+        onSeek(newTime);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Right: +5s
+          newTime = Math.min(duration, currentTime + 5);
+        } else if (e.shiftKey) {
+          // Shift+Right: +1s
+          newTime = Math.min(duration, currentTime + 1);
+        } else {
+          // Right: +1 frame
+          newTime = Math.min(duration, currentTime + frameTime);
+        }
+        onSeek(newTime);
+      } else if (e.code === 'Home') {
+        e.preventDefault();
+        onSeek(0);
+      } else if (e.code === 'End') {
+        e.preventDefault();
+        onSeek(duration);
+      } else if (e.code === 'PageUp') {
+        e.preventDefault();
+        // Jump back by viewport width (in seconds)
+        const container = timelineContentRef.current;
+        if (container) {
+          const viewportWidthSeconds = pixelsToTime(container.clientWidth, pixelsPerSecond);
+          newTime = Math.max(0, currentTime - viewportWidthSeconds);
+          onSeek(newTime);
+        }
+      } else if (e.code === 'PageDown') {
+        e.preventDefault();
+        // Jump forward by viewport width (in seconds)
+        const container = timelineContentRef.current;
+        if (container) {
+          const viewportWidthSeconds = pixelsToTime(container.clientWidth, pixelsPerSecond);
+          newTime = Math.min(duration, currentTime + viewportWidthSeconds);
+          onSeek(newTime);
+        }
+      }
+    }
+  }, [currentTime, duration, onSeek, onTogglePlayPause, pixelsPerSecond]);
+  
+  // Set up keyboard event listeners
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+  
+  // RAF-throttled playhead drag
+  const handlePlayheadPointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const container = timelineContentRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    const clickX = e.clientX - rect.left + container.scrollLeft;
+    const clickTime = pixelsToTime(clickX, pixelsPerSecond);
+    
+    dragStateRef.current = {
+      isDragging: true,
+      type: 'playhead',
+      keyframeId: null,
+      startX: clickX,
+      startTime: clickTime,
+      lastClientX: e.clientX,
+      rafId: null
+    };
+    
+    // Immediately seek to clicked position
+    onSeek(clamp(clickTime, 0, duration));
+    
+    // Capture pointer
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [duration, onSeek, pixelsPerSecond]);
+  
+  const handlePointerMove = useCallback((e: PointerEvent) => {
+    const dragState = dragStateRef.current;
+    if (!dragState.isDragging) return;
+    
+    dragState.lastClientX = e.clientX;
+    
+    // Throttle updates using RAF
+    if (!dragState.rafId) {
+      dragState.rafId = requestAnimationFrame(() => {
+        dragState.rafId = null;
+        
+        const container = timelineContentRef.current;
+        if (!container) return;
+        
+        const rect = container.getBoundingClientRect();
+        const currentX = dragState.lastClientX - rect.left + container.scrollLeft;
+        const newTime = pixelsToTime(currentX, pixelsPerSecond);
+        const snappedTime = snapTime(newTime, gridSize, snapEnabled);
+        const clampedTime = clamp(snappedTime, 0, duration);
+        
+        // Update preview during drag
+        setPreviewTime(clampedTime);
+      });
+    }
+  }, [duration, gridSize, pixelsPerSecond, snapEnabled]);
+  
+  const handlePointerUp = useCallback((e: PointerEvent) => {
+    const dragState = dragStateRef.current;
+    if (!dragState.isDragging) return;
+    
+    // Cancel any pending RAF
+    if (dragState.rafId) {
+      cancelAnimationFrame(dragState.rafId);
+      dragState.rafId = null;
+    }
+    
+    // Commit final position
+    const container = timelineContentRef.current;
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const finalX = e.clientX - rect.left + container.scrollLeft;
+      const finalTime = pixelsToTime(finalX, pixelsPerSecond);
+      const snappedTime = snapTime(finalTime, gridSize, snapEnabled);
+      const clampedTime = clamp(snappedTime, 0, duration);
+      
+      onSeek(clampedTime);
+    }
+    
+    // Reset drag state
+    dragStateRef.current.isDragging = false;
+    dragStateRef.current.type = null;
+    setPreviewTime(null);
+    
+    // Release pointer capture
+    (e.target as HTMLElement)?.releasePointerCapture((e as any).pointerId);
+  }, [duration, gridSize, onSeek, pixelsPerSecond, snapEnabled]);
+  
+  // Set up document-level pointer event listeners for dragging
+  useEffect(() => {
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [handlePointerMove, handlePointerUp]);
 
-  // Placeholder: Will be implemented in chunks
+  // Calculate playhead position
+  const playheadX = timeToPixels(previewTime ?? currentTime, pixelsPerSecond);
+  const timelineWidth = Math.max(timeToPixels(duration, pixelsPerSecond), 1000);
+
   return (
-    <div className="timeline-v2 flex flex-col h-full bg-gray-900 text-white">
+    <div 
+      ref={containerRef}
+      className="timeline-v2 flex flex-col h-full bg-gray-900 text-white"
+      tabIndex={0}
+    >
       {/* Header */}
       <div className="timeline-header flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center gap-2">
@@ -130,6 +344,30 @@ export default function TimelineV2({
 
         <div className="text-sm font-mono">
           {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 text-xs text-gray-400">
+            <input
+              type="checkbox"
+              checked={snapEnabled}
+              onChange={(e) => setSnapEnabled(e.target.checked)}
+              className="w-3 h-3"
+            />
+            Snap
+          </label>
+          <select
+            value={gridSize}
+            onChange={(e) => setGridSize(parseFloat(e.target.value))}
+            className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
+            title="Grid size"
+          >
+            <option value={1/30}>1 frame</option>
+            <option value={0.1}>100ms</option>
+            <option value={0.25}>250ms</option>
+            <option value={0.5}>500ms</option>
+            <option value={1.0}>1s</option>
+          </select>
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -153,25 +391,77 @@ export default function TimelineV2({
 
       {/* Timeline content */}
       <div
-        ref={containerRef}
-        className="timeline-content flex-1 overflow-auto relative"
+        ref={timelineContentRef}
+        className="timeline-content flex-1 overflow-auto relative bg-gray-950"
       >
-        <div className="timeline-placeholder p-8 text-center text-gray-500">
-          <p className="text-lg font-semibold mb-2">🚧 New Timeline (TimelineV2) - Under Construction</p>
-          <p className="text-sm">This is the new scrollable per-track timeline.</p>
-          <p className="text-sm mt-2">Current time: {formatTime(currentTime)}</p>
-          <p className="text-sm">Duration: {formatTime(duration)}</p>
-          <p className="text-sm">Zoom: {Math.round(zoom * 100)}%</p>
-          <p className="text-sm">Pixels per second: {Math.round(pixelsPerSecond)}</p>
-          <p className="text-xs mt-4 text-gray-600">
-            To disable this new timeline, run in browser console:
-            <br />
-            <code className="bg-gray-800 px-2 py-1 rounded mt-1 inline-block">
-              localStorage.setItem('cv_use_scrollable_timeline', 'false')
-            </code>
-            <br />
-            Then reload the page.
-          </p>
+        {/* Timeline ruler and tracks */}
+        <div 
+          className="timeline-canvas relative"
+          style={{ width: `${timelineWidth}px`, minHeight: '200px' }}
+        >
+          {/* Ruler */}
+          <div className="timeline-ruler h-8 bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
+            <svg width={timelineWidth} height={32}>
+              {/* Draw time markers every second */}
+              {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => {
+                const x = timeToPixels(i, pixelsPerSecond);
+                return (
+                  <g key={i}>
+                    <line
+                      x1={x}
+                      y1={20}
+                      x2={x}
+                      y2={32}
+                      stroke="#4b5563"
+                      strokeWidth={1}
+                    />
+                    <text
+                      x={x + 4}
+                      y={16}
+                      fill="#9ca3af"
+                      fontSize={10}
+                      fontFamily="monospace"
+                    >
+                      {formatTime(i)}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+          
+          {/* Tracks placeholder */}
+          <div className="timeline-tracks p-4">
+            <div className="text-gray-500 text-sm">
+              <p className="font-semibold mb-2">✅ Chunk 2 Complete - RAF-Throttled Interactions</p>
+              <ul className="list-disc list-inside space-y-1 text-xs">
+                <li>Playhead drag with RAF throttling</li>
+                <li>Snap-to-grid: {snapEnabled ? 'ON' : 'OFF'} (Grid: {gridSize}s)</li>
+                <li>Keyboard navigation implemented:</li>
+                <li className="ml-4">• Space: Play/Pause</li>
+                <li className="ml-4">• Left/Right: Frame step (±{(1/DEFAULT_FPS).toFixed(3)}s)</li>
+                <li className="ml-4">• Shift+Left/Right: ±1s</li>
+                <li className="ml-4">• Ctrl/Cmd+Left/Right: ±5s</li>
+                <li className="ml-4">• PageUp/PageDown: Viewport jump</li>
+                <li className="ml-4">• Home/End: Start/End</li>
+              </ul>
+              <p className="mt-3 text-xs text-gray-600">
+                Click timeline ruler to test playhead drag. Focus timeline and use keyboard shortcuts.
+              </p>
+            </div>
+          </div>
+          
+          {/* Playhead */}
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-20 pointer-events-none"
+            style={{ left: `${playheadX}px` }}
+          >
+            <div 
+              className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-cyan-400 cursor-ew-resize pointer-events-auto"
+              style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }}
+              onPointerDown={handlePlayheadPointerDown}
+            />
+          </div>
         </div>
       </div>
     </div>
