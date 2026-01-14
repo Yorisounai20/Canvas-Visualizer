@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Play, Pause } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe } from '../../types';
-import { ParameterEvent } from '../../components/VisualizerSoftware/types';
+import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 import { EASING_FUNCTIONS, EASING_BY_CATEGORY, EASING_CATEGORY_ORDER } from '../../lib/easingFunctions';
@@ -18,9 +17,6 @@ interface TimelineProps {
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
-  // Bug #10, #11: Add support for missing keyframe types
-  parameterEvents?: ParameterEvent[];
-  letterboxKeyframes?: LetterboxKeyframe[];
   workspaceObjects?: WorkspaceObject[]; // For camera selection in camera keyframes
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -32,26 +28,17 @@ interface TimelineProps {
   onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
   onAddEnvironmentKeyframe?: (time: number) => void;
-  // Bug #10, #11: Add handlers for missing keyframe types
-  onAddParameterEvent?: (time: number) => void;
-  onAddLetterboxKeyframe?: (time: number) => void;
   onDeletePresetKeyframe?: (id: number) => void;
   onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
   onDeleteEnvironmentKeyframe?: (id: number) => void;
-  onDeleteParameterEvent?: (id: string) => void;
-  onDeleteLetterboxKeyframe?: (time: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
-  onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
-  onUpdateLetterboxKeyframe?: (time: number, updates: Partial<LetterboxKeyframe>) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
   onMoveTextKeyframe?: (id: number, newTime: number) => void;
   onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
-  onMoveParameterEvent?: (id: string, newTime: number) => void;
-  onMoveLetterboxKeyframe?: (oldTime: number, newTime: number) => void;
   onSelectFXClip?: (id: string) => void;
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onDeleteCameraFXClip?: (id: string) => void;
@@ -70,8 +57,6 @@ export default function Timeline({
   cameraKeyframes,
   textKeyframes,
   environmentKeyframes,
-  parameterEvents = [],
-  letterboxKeyframes = [],
   workspaceObjects = [],
   cameraFXClips = [],
   selectedFXClipId,
@@ -83,25 +68,17 @@ export default function Timeline({
   onAddCameraKeyframe,
   onAddTextKeyframe,
   onAddEnvironmentKeyframe,
-  onAddParameterEvent,
-  onAddLetterboxKeyframe,
   onDeletePresetKeyframe,
   onDeleteCameraKeyframe,
   onDeleteTextKeyframe,
   onDeleteEnvironmentKeyframe,
-  onDeleteParameterEvent,
-  onDeleteLetterboxKeyframe,
   onUpdatePresetKeyframe,
   onUpdateCameraKeyframe,
   onUpdateTextKeyframe,
   onUpdateEnvironmentKeyframe,
-  onUpdateParameterEvent,
-  onUpdateLetterboxKeyframe,
   onMovePresetKeyframe,
   onMoveTextKeyframe,
   onMoveEnvironmentKeyframe,
-  onMoveParameterEvent,
-  onMoveLetterboxKeyframe,
   onSelectFXClip,
   onUpdateCameraFXClip,
   onDeleteCameraFXClip,
@@ -170,22 +147,6 @@ export default function Timeline({
     initialTime: number;
   }>({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
 
-  // Bug #6: Marquee selection and right-click tracking
-  const [marqueeState, setMarqueeState] = useState<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    endX: number;
-    endY: number;
-  }>({ active: false, startX: 0, startY: 0, endX: 0, endY: 0 });
-
-  const [rightClickState, setRightClickState] = useState<{
-    isDown: boolean;
-    startX: number;
-    startY: number;
-    hasMoved: boolean;
-  }>({ isDown: false, startX: 0, startY: 0, hasMoved: false });
-
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
@@ -244,44 +205,7 @@ export default function Timeline({
   // Get context menu items for keyframes
   const getKeyframeContextMenuItems = (): ContextMenuItem[] => {
     const items: ContextMenuItem[] = [];
-
-    // Bug #6: General timeline context menu (when type is null)
-    if (contextMenu.type === null && contextMenu.keyframeTime !== undefined) {
-      const time = contextMenu.keyframeTime;
-      items.push({
-        label: 'Add Preset Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => onAddPresetKeyframe?.(time)
-      });
-      items.push({
-        label: 'Add Camera Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => onAddCameraKeyframe?.(time)
-      });
-      items.push({
-        label: 'Add Text Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => onAddTextKeyframe?.(time)
-      });
-      items.push({
-        label: 'Add Environment Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => onAddEnvironmentKeyframe?.(time)
-      });
-      // Bug #10, #11: Add options for missing keyframe types
-      items.push({
-        label: 'Add Parameter Event',
-        icon: <Plus size={14} />,
-        onClick: () => onAddParameterEvent?.(time)
-      });
-      items.push({
-        label: 'Add Letterbox Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => onAddLetterboxKeyframe?.(time)
-      });
-      return items;
-    }
-
+    
     if (contextMenu.type === 'preset' && contextMenu.keyframeId !== undefined) {
       const keyframe = presetKeyframes.find(kf => kf.id === contextMenu.keyframeId);
       if (keyframe) {
@@ -354,49 +278,30 @@ export default function Timeline({
     setIsPlayheadDragging(true);
   };
 
-  // CRITICAL FIX: Add playhead drag handling with RAF throttling (Bug #5)
+  // CRITICAL FIX: Add playhead drag handling
   useEffect(() => {
-    if (!isPlayheadDragging) return;
-    
-    let rafId: number | null = null;
-    let lastClientX = 0;
-    
     const handleMouseMove = (e: MouseEvent) => {
-      lastClientX = e.clientX;
-      
-      // Bug #5 fix: RAF throttle to prevent lag
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
-          
-          if (timelineRef.current) {
-            const rect = timelineRef.current.getBoundingClientRect();
-            const x = lastClientX - rect.left + scrollOffset;
-            const time = pixelsToTime(x);
-            const snappedTime = snapTime(time);
-            onSeek(Math.min(Math.max(0, snappedTime), duration));
-          }
-        });
+      if (isPlayheadDragging && timelineRef.current) {
+        const rect = timelineRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left + scrollOffset;
+        const time = pixelsToTime(x);
+        const snappedTime = snapTime(time);
+        onSeek(Math.min(Math.max(0, snappedTime), duration));
       }
     };
 
     const handleMouseUp = () => {
       setIsPlayheadDragging(false);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-    };
+    if (isPlayheadDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
   }, [isPlayheadDragging, scrollOffset, duration, onSeek, snapTime]);
 
   // Start dragging a section
@@ -418,181 +323,135 @@ export default function Timeline({
     onSelectSection(section.id);
   };
 
-  // Handle mouse move during drag with RAF throttling (Bug #7 fix)
+  // Handle mouse move during drag
   useEffect(() => {
-    if (!dragState.type || !dragState.sectionId) return;
-
-    let rafId: number | null = null;
-    let lastClientX = 0;
-
     const handleMouseMove = (e: MouseEvent) => {
-      lastClientX = e.clientX;
+      if (!dragState.type || !dragState.sectionId) return;
 
-      // Bug #7 fix: RAF throttle to prevent lag
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
+      const deltaX = e.clientX - dragState.startX;
+      const deltaTime = pixelsToTime(deltaX);
 
-          const deltaX = lastClientX - dragState.startX;
-          const deltaTime = pixelsToTime(deltaX);
+      const section = sections.find(s => s.id === dragState.sectionId);
+      if (!section) return;
 
-          const section = sections.find(s => s.id === dragState.sectionId);
-          if (!section) return;
-
-          if (dragState.type === 'move') {
-            // Move the entire section
-            const newStart = Math.max(0, dragState.initialStart + deltaTime);
-            const duration = dragState.initialEnd - dragState.initialStart;
-            const newEnd = newStart + duration;
-            
-            onUpdateSection(dragState.sectionId, 'start', newStart);
-            onUpdateSection(dragState.sectionId, 'end', newEnd);
-          } else if (dragState.type === 'resize-start') {
-            // Resize from the start
-            const newStart = Math.max(0, Math.min(dragState.initialStart + deltaTime, dragState.initialEnd - 1));
-            onUpdateSection(dragState.sectionId, 'start', newStart);
-          } else if (dragState.type === 'resize-end') {
-            // Resize from the end
-            const newEnd = Math.max(dragState.initialStart + 1, dragState.initialEnd + deltaTime);
-            onUpdateSection(dragState.sectionId, 'end', newEnd);
-          }
-        });
+      if (dragState.type === 'move') {
+        // Move the entire section
+        const newStart = Math.max(0, dragState.initialStart + deltaTime);
+        const duration = dragState.initialEnd - dragState.initialStart;
+        const newEnd = newStart + duration;
+        
+        onUpdateSection(dragState.sectionId, 'start', newStart);
+        onUpdateSection(dragState.sectionId, 'end', newEnd);
+      } else if (dragState.type === 'resize-start') {
+        // Resize from the start
+        const newStart = Math.max(0, Math.min(dragState.initialStart + deltaTime, dragState.initialEnd - 1));
+        onUpdateSection(dragState.sectionId, 'start', newStart);
+      } else if (dragState.type === 'resize-end') {
+        // Resize from the end
+        const newEnd = Math.max(dragState.initialStart + 1, dragState.initialEnd + deltaTime);
+        onUpdateSection(dragState.sectionId, 'end', newEnd);
       }
     };
 
     const handleMouseUp = () => {
       setDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      // Re-enable text selection
       document.body.style.userSelect = '';
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
     };
 
-    // Prevent text selection during drag
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [dragState, sections, onUpdateSection, pixelsToTime]);
+    if (dragState.type) {
+      // Prevent text selection during drag
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      
+      return () => {
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [dragState, sections, onUpdateSection]);
 
-  // Handle FX clip dragging with RAF throttling (Bug #7 fix)
+  // Handle FX clip dragging
   useEffect(() => {
     if (!fxDragState.type || !fxDragState.clipId) return;
 
-    let rafId: number | null = null;
-    let lastMouseEvent: MouseEvent | null = null;
-
     const handleMouseMove = (e: MouseEvent) => {
-      lastMouseEvent = e;
+      if (!timelineRef.current) return;
+      
+      const rect = timelineRef.current.getBoundingClientRect();
+      const currentX = e.clientX - rect.left;
+      const deltaX = currentX - fxDragState.startX;
+      const deltaTime = (deltaX / rect.width) * duration;
 
-      // Bug #7 fix: RAF throttle to prevent lag
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
+      const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
+      if (!clip || !fxDragState.clipId) return;
 
-          if (!timelineRef.current || !lastMouseEvent) return;
-          
-          const rect = timelineRef.current.getBoundingClientRect();
-          const currentX = lastMouseEvent.clientX - rect.left;
-          const deltaX = currentX - fxDragState.startX;
-          const deltaTime = (deltaX / rect.width) * duration;
+      let newStart = fxDragState.initialStart;
+      let newEnd = fxDragState.initialEnd;
 
-          const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
-          if (!clip || !fxDragState.clipId) return;
-
-          let newStart = fxDragState.initialStart;
-          let newEnd = fxDragState.initialEnd;
-
-          if (fxDragState.type === 'move') {
-            newStart = Math.max(0, fxDragState.initialStart + deltaTime);
-            newEnd = Math.min(duration, fxDragState.initialEnd + deltaTime);
-            const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
-            
-            // Keep duration constant when moving
-            if (newStart + clipDuration > duration) {
-              newStart = duration - clipDuration;
-              newEnd = duration;
-            }
-          } else if (fxDragState.type === 'resize-start') {
-            newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
-          } else if (fxDragState.type === 'resize-end') {
-            newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
-          }
-
-          onUpdateCameraFXClip?.(fxDragState.clipId, {
-            startTime: parseFloat(newStart.toFixed(2)),
-            endTime: parseFloat(newEnd.toFixed(2))
-          });
-        });
+      if (fxDragState.type === 'move') {
+        newStart = Math.max(0, fxDragState.initialStart + deltaTime);
+        newEnd = Math.min(duration, fxDragState.initialEnd + deltaTime);
+        const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
+        
+        // Keep duration constant when moving
+        if (newStart + clipDuration > duration) {
+          newStart = duration - clipDuration;
+          newEnd = duration;
+        }
+      } else if (fxDragState.type === 'resize-start') {
+        newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
+      } else if (fxDragState.type === 'resize-end') {
+        newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
       }
+
+      onUpdateCameraFXClip?.(fxDragState.clipId, {
+        startTime: parseFloat(newStart.toFixed(2)),
+        endTime: parseFloat(newEnd.toFixed(2))
+      });
     };
 
     const handleMouseUp = () => {
       setFxDragState({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
     };
 
-    document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-    };
+    if (fxDragState.type) {
+      document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
   }, [fxDragState, cameraFXClips, duration, onUpdateCameraFXClip]);
 
-  // Handle keyframe dragging with RAF throttling (Bug #5 fix)
+  // Handle keyframe dragging
   useEffect(() => {
     if (!keyframeDragState.type || keyframeDragState.keyframeId === null) return;
 
-    let rafId: number | null = null;
-    let lastClientX = 0;
-
     const handleMouseMove = (e: MouseEvent) => {
-      lastClientX = e.clientX;
+      if (!timelineRef.current || keyframeDragState.keyframeId === null) return;
       
-      // Bug #5 fix: RAF throttle to prevent lag
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
-          
-          if (!timelineRef.current || keyframeDragState.keyframeId === null) return;
-          
-          const deltaX = lastClientX - keyframeDragState.startX;
-          const deltaTime = pixelsToTime(deltaX);
-          const rawTime = keyframeDragState.initialTime + deltaTime;
-          const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)));
+      const deltaX = e.clientX - keyframeDragState.startX;
+      const deltaTime = pixelsToTime(deltaX);
+      const rawTime = keyframeDragState.initialTime + deltaTime;
+      const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)));
 
-          // Update keyframe position based on type
-          if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
-            onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
-          } else if (keyframeDragState.type === 'text' && onMoveTextKeyframe) {
-            onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
-          } else if (keyframeDragState.type === 'environment' && onMoveEnvironmentKeyframe) {
-            onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
-          }
-        });
+      // Update keyframe position based on type
+      if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
+        onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'text' && onMoveTextKeyframe) {
+        onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'environment' && onMoveEnvironmentKeyframe) {
+        onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
       }
     };
 
@@ -600,10 +459,6 @@ export default function Timeline({
       setKeyframeDragState({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
     };
 
     document.body.style.cursor = 'grabbing';
@@ -616,9 +471,6 @@ export default function Timeline({
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
     };
   }, [keyframeDragState, duration, onMovePresetKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe, pixelsToTime, snapTime]);
 
@@ -641,221 +493,32 @@ export default function Timeline({
     }
   }, [timelineWidth]); // CRITICAL FIX: Changed from [duration] to [timelineWidth]
 
-  // Bug #6: Handle right-click context menu and marquee selection
-  const handleTimelineContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    // If right-click was a drag (pan or marquee), don't show menu
-    if (rightClickState.hasMoved) {
-      return;
-    }
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!timelineRef.current) return;
-    
-    // Calculate time at cursor position
-    const rect = timelineRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left + scrollOffset;
-    const time = pixelsToTime(x);
-    
-    // Show general timeline context menu at cursor
-    setContextMenu({
-      isOpen: true,
-      x: e.clientX,
-      y: e.clientY,
-      type: null, // General timeline menu
-      keyframeTime: time
-    });
-  };
-
-  // Bug #6: Handle right mouse button down for pan/marquee
-  const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button === 2) { // Right mouse button
-      e.preventDefault();
-      setRightClickState({
-        isDown: true,
-        startX: e.clientX,
-        startY: e.clientY,
-        hasMoved: false
-      });
-    }
-  };
-
-  // Bug #6: Track right-click drag for pan or marquee
-  useEffect(() => {
-    if (!rightClickState.isDown) return;
-
-    let rafId: number | null = null;
-    let lastClientX = 0;
-    let lastClientY = 0;
-    const MOVE_THRESHOLD = 5; // pixels
-
-    const handleMouseMove = (e: MouseEvent) => {
-      lastClientX = e.clientX;
-      lastClientY = e.clientY;
-
-      const deltaX = Math.abs(lastClientX - rightClickState.startX);
-      const deltaY = Math.abs(lastClientY - rightClickState.startY);
-      const hasMoved = deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD;
-
-      if (hasMoved && !rightClickState.hasMoved) {
-        setRightClickState(prev => ({ ...prev, hasMoved: true }));
-      }
-
-      if (rafId === null) {
-        rafId = requestAnimationFrame(() => {
-          rafId = null;
-
-          if (e.shiftKey) {
-            // Bug #6: Shift+right-drag = Marquee selection
-            setMarqueeState({
-              active: true,
-              startX: rightClickState.startX,
-              startY: rightClickState.startY,
-              endX: lastClientX,
-              endY: lastClientY
-            });
-          } else if (hasMoved) {
-            // Right-drag (without shift) = Pan
-            const deltaX = lastClientX - rightClickState.startX;
-            const deltaY = lastClientY - rightClickState.startY;
-            
-            // Update scroll offset for horizontal pan
-            setScrollOffset(prev => Math.max(0, prev - deltaX * 0.5));
-            
-            // Update right-click start position for continuous pan
-            setRightClickState(prev => ({
-              ...prev,
-              startX: lastClientX,
-              startY: lastClientY
-            }));
-          }
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setRightClickState({ isDown: false, startX: 0, startY: 0, hasMoved: false });
-      
-      // If marquee was active, select keyframes in area
-      if (marqueeState.active) {
-        // TODO: Implement keyframe selection based on marquee rectangle
-        // This would require props for selected keyframes state and onSelectKeyframes callback
-        console.log('Marquee selection:', marqueeState);
-      }
-      
-      setMarqueeState({ active: false, startX: 0, startY: 0, endX: 0, endY: 0 });
-      
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-    };
-
-    document.body.style.cursor = marqueeState.active ? 'crosshair' : 'grab';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.body.style.cursor = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [rightClickState, marqueeState, scrollOffset, pixelsToTime]);
-
-  // Bug #8 fix: Keyboard handler for spacebar play/pause and arrow key stepping
-  // Note: onPlayPause prop needs to be added to TimelineProps interface and passed from parent
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle keyboard events when timeline has focus or no input is focused
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        return;
-      }
-
-      // Bug #8: Spacebar toggles play/pause (prevent page scroll)
-      if (e.code === 'Space') {
-        e.preventDefault();
-        // TODO: Add onPlayPause prop to TimelineProps and call it here
-        // For now, document this requirement
-        console.log('Spacebar pressed - play/pause (requires onPlayPause prop)');
-        return;
-      }
-
-      // Arrow key stepping (bonus feature)
-      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
-        e.preventDefault();
-        const step = e.shiftKey ? 1 : (e.ctrlKey || e.metaKey) ? 5 : 1/30; // frame, 1s, or 5s
-        const direction = e.code === 'ArrowLeft' ? -1 : 1;
-        const newTime = Math.max(0, Math.min(duration, currentTime + (step * direction)));
-        onSeek(newTime);
-        return;
-      }
-
-      // Home/End keys
-      if (e.code === 'Home') {
-        e.preventDefault();
-        onSeek(0);
-        return;
-      }
-      if (e.code === 'End') {
-        e.preventDefault();
-        onSeek(duration);
-        return;
-      }
-    };
-
-    // Attach to window to catch events when timeline area has focus
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTime, duration, onSeek]);
-
   return (
     <>
-    <div 
-      className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg"
-      tabIndex={0}
-      role="region"
-      aria-label="Timeline"
-    >
-      {/* Timeline Header - Bug #1 & #9: Compact header with play button */}
-      <div className="px-3 py-1.5 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Bug #9: Play/Pause button in header */}
-          <button
-            onClick={() => {
-              // Note: Requires onPlayPause prop to be passed from parent
-              console.log('Play/Pause clicked - requires onPlayPause prop');
-            }}
-            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs transition-colors flex items-center gap-1"
-            title="Play/Pause (Space)"
-          >
-            <Play size={12} />
-          </button>
-          
+    <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
+      {/* Timeline Header */}
+      <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-4">
           <div>
-            <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
               Timeline
             </h2>
-            <p className="text-[10px] text-gray-500">
+            <p className="text-xs text-gray-500 mt-0.5">
               {showTimecode ? formatTimecode(currentTime) : formatTime(currentTime)} / {showTimecode ? formatTimecode(duration) : formatTime(duration)}
             </p>
           </div>
           
-          {/* Video Editor Controls - Bug #1: More compact spacing */}
-          <div className="flex items-center gap-1.5 border-l border-gray-700 pl-3">
+          {/* Video Editor Controls */}
+          <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
             {/* Snap to Grid */}
-            <label className="flex items-center gap-1 cursor-pointer" title="Snap to grid">
+            <label className="flex items-center gap-1.5 cursor-pointer" title="Snap to grid">
               <input
                 type="checkbox"
                 checked={snapToGrid}
                 onChange={(e) => setSnapToGrid(e.target.checked)}
                 className="w-3 h-3 cursor-pointer"
               />
-              <span className="text-[10px] text-gray-400">Snap</span>
+              <span className="text-xs text-gray-400">Snap</span>
             </label>
             
             {/* Grid Size */}
@@ -863,7 +526,7 @@ export default function Timeline({
               <select
                 value={gridSize}
                 onChange={(e) => setGridSize(Number(e.target.value))}
-                className="bg-gray-700 text-gray-300 text-[10px] px-1.5 py-0.5 rounded border border-gray-600"
+                className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded border border-gray-600"
                 title="Grid size"
               >
                 <option value="0.1">0.1s</option>
@@ -876,24 +539,24 @@ export default function Timeline({
             {/* Timecode Toggle */}
             <button
               onClick={() => setShowTimecode(!showTimecode)}
-              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-gray-300 rounded transition-colors"
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded transition-colors"
               title="Toggle timecode display"
             >
               {showTimecode ? 'TC' : 'Time'}
             </button>
             
             {/* In/Out Points */}
-            <div className="flex items-center gap-0.5 border-l border-gray-700 pl-1.5">
+            <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
               <button
                 onClick={() => setInPoint(currentTime)}
-                className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-green-400 rounded transition-colors"
+                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-green-400 rounded transition-colors"
                 title="Set In Point (I)"
               >
                 In
               </button>
               <button
                 onClick={() => setOutPoint(currentTime)}
-                className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-red-400 rounded transition-colors"
+                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-red-400 rounded transition-colors"
                 title="Set Out Point (O)"
               >
                 Out
@@ -904,7 +567,7 @@ export default function Timeline({
                     setInPoint(null);
                     setOutPoint(null);
                   }}
-                  className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-gray-400 rounded transition-colors"
+                  className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-400 rounded transition-colors"
                   title="Clear In/Out"
                 >
                   Clear
@@ -915,28 +578,28 @@ export default function Timeline({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Zoom Controls - Bug #1: Compact */}
-          <div className="flex items-center gap-0.5">
+          {/* Zoom Controls */}
+          <div className="flex items-center gap-1 mr-2">
             <button
               onClick={() => setZoomLevel(prev => Math.max(MIN_ZOOM, prev - 0.25))}
-              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors"
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
               title="Zoom out (-))"
             >
               −
             </button>
-            <span className="text-[10px] text-gray-400 min-w-[40px] text-center">
+            <span className="text-xs text-gray-400 min-w-[50px] text-center">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
               onClick={() => setZoomLevel(prev => Math.min(MAX_ZOOM, prev + 0.25))}
-              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors"
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
               title="Zoom in (+)"
             >
               +
             </button>
             <button
               onClick={() => setZoomLevel(DEFAULT_ZOOM)}
-              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors ml-0.5"
+              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors ml-1"
               title="Reset zoom (0)"
             >
               Reset
@@ -944,10 +607,10 @@ export default function Timeline({
           </div>
           <button
             onClick={onAddSection}
-            className="flex items-center gap-1.5 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-semibold transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
             title="Add new section"
           >
-            <Plus size={12} />
+            <Plus size={14} />
             <span>Add Section</span>
           </button>
         </div>
@@ -990,8 +653,6 @@ export default function Timeline({
               className="relative cursor-pointer flex-1"
               style={{ width: `${timelineWidth}px`, minHeight: `${Math.max(sections.length * (TIMELINE_HEIGHT + 4), 80)}px` }}
               onClick={handleTimelineClick}
-              onContextMenu={handleTimelineContextMenu}
-              onMouseDown={handleTimelineMouseDown}
             >
               {/* Grid lines */}
               {snapToGrid && (
@@ -1058,19 +719,6 @@ export default function Timeline({
               >
                 <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
               </div>
-
-              {/* Bug #6: Marquee selection rectangle */}
-              {marqueeState.active && (
-                <div
-                  className="absolute border-2 border-cyan-400 bg-cyan-400 bg-opacity-10 z-30 pointer-events-none"
-                  style={{
-                    left: `${Math.min(marqueeState.startX, marqueeState.endX) - timelineRef.current!.getBoundingClientRect().left}px`,
-                    top: `${Math.min(marqueeState.startY, marqueeState.endY) - timelineRef.current!.getBoundingClientRect().top}px`,
-                    width: `${Math.abs(marqueeState.endX - marqueeState.startX)}px`,
-                    height: `${Math.abs(marqueeState.endY - marqueeState.startY)}px`
-                  }}
-                />
-              )}
 
               {/* Section bars */}
               {sections.map((section, index) => {
@@ -1401,99 +1049,6 @@ export default function Timeline({
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* Track: Parameter Events (Bug #10) */}
-          {parameterEvents.length > 0 && (
-            <div className="flex border-b border-gray-700">
-              <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">⚡</span>
-                  <span className="text-xs font-semibold text-gray-300">Parameters</span>
-                </div>
-              </div>
-              <div className="relative" style={{ width: `${timelineWidth}px`, height: '60px' }}>
-                {/* Parameter Event Markers/Bars */}
-                {parameterEvents.map((event) => {
-                  const left = timeToPixels(event.startTime);
-                  const width = timeToPixels(event.endTime - event.startTime);
-                  
-                  return (
-                    <div
-                      key={event.id}
-                      className="absolute top-2 h-10 rounded bg-yellow-600 hover:bg-yellow-500 transition-colors"
-                      style={{
-                        left: `${left}px`,
-                        width: `${Math.max(width, 4)}px`
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(event.startTime);
-                      }}
-                    >
-                      <div className="h-full px-2 py-1 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-white truncate">
-                          {event.mode === 'automated' ? '🔊 Auto' : '⏱️ Manual'}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteParameterEvent?.(event.id);
-                          }}
-                          className="text-white hover:text-red-300 text-xs"
-                          title="Delete event"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Track: Letterbox (Bug #11) */}
-          {letterboxKeyframes.length > 0 && (
-            <div className="flex border-b border-gray-700">
-              <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">📽️</span>
-                  <span className="text-xs font-semibold text-gray-300">Letterbox</span>
-                </div>
-              </div>
-              <div className="relative" style={{ width: `${timelineWidth}px`, height: '60px' }}>
-                {/* Letterbox Keyframe Markers */}
-                {letterboxKeyframes.map((kf, index) => (
-                  <div
-                    key={index}
-                    className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors group"
-                    style={{ left: `${timeToPixels(kf.time)}px` }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSeek(kf.time);
-                    }}
-                  >
-                    <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
-                    <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30">
-                      {formatTime(kf.time)} - Size: {kf.targetSize}
-                      {kf.invert && ' (Inverted)'}
-                      {onDeleteLetterboxKeyframe && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteLetterboxKeyframe(kf.time);
-                          }}
-                          className="ml-2 text-red-400 hover:text-red-300"
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
               </div>
             </div>
           )}
