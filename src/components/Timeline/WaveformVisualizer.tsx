@@ -1,3 +1,4 @@
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface WaveformVisualizerProps {
@@ -9,7 +10,19 @@ interface WaveformVisualizerProps {
   debounceMs?: number; // Debounce time for canvas redraws
 }
 
+// Optimization constants
+const MIN_SAMPLES = 256;
+const MAX_SAMPLES = 4096;
+const DEBOUNCE_DELAY_MS = 100;
+
 /**
+ * WaveformVisualizer Component - Optimized audio waveform display
+ * 
+ * Optimizations:
+ * - Caps sample count (256-4096) to avoid performance issues with large widths
+ * - Debounces redraw on width changes
+ * - Caches downsampled waveform data for reuse
+ * - Supports top-only or mirrored display modes
  * WaveformVisualizer Component - Displays audio waveform in timeline
  * Renders waveform from audio buffer data with optimized canvas handling
  * 
@@ -82,22 +95,29 @@ export default function WaveformVisualizer({
       for (let j = 0; j < blockSize; j++) {
         sum += Math.abs(rawData[blockStart + j]);
       }
-      filteredData.push(sum / blockSize);
+      
+      // Normalize the data
+      const max = Math.max(...filteredData, 0.0001); // Avoid division by zero
+      const normalizedData = filteredData.map(n => n / max);
+      
+      setIsLoading(false);
+      return normalizedData;
+    } catch (error) {
+      console.error('Error generating waveform data:', error);
+      setIsLoading(false);
+      return null;
     }
+  }, [audioBuffer, width]); // Recompute when audioBuffer or width changes significantly
 
-    // Normalize the data
-    const max = Math.max(...filteredData);
-    const normalizedData = filteredData.map(n => n / max);
-
-    // Draw waveform
-    ctx.fillStyle = color;
-    ctx.beginPath();
+  useEffect(() => {
+    if (!waveformData || !canvasRef.current) return;
     
     const middle = debouncedHeight / 2;
     
-    for (let i = 0; i < normalizedData.length; i++) {
-      const x = i;
-      const barHeight = normalizedData[i] * middle;
+    debounceTimerRef.current = window.setTimeout(() => {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return;
       
       // Draw mirrored bars (top and bottom)
       ctx.fillRect(x, middle - barHeight, 1, barHeight * 2);
@@ -115,6 +135,17 @@ export default function WaveformVisualizer({
         className="flex items-center justify-center bg-gray-800 bg-opacity-50"
       >
         <span className="text-xs text-gray-500">No audio loaded</span>
+      </div>
+    );
+  }
+  
+  if (isLoading) {
+    return (
+      <div 
+        style={{ width: `${width}px`, height: `${height}px` }}
+        className="flex items-center justify-center bg-gray-800 bg-opacity-50"
+      >
+        <span className="text-xs text-gray-500">Loading waveform...</span>
       </div>
     );
   }

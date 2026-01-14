@@ -97,6 +97,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Feature flag: check if new scrollable timeline should be used
+  const useNewTimeline = useScrollableTimeline();
+  
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -8191,32 +8194,57 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       </button>
     </div>
   );
-
-  // Check feature flag for new timeline
-  const useNewTimeline = getFeatureFlag('cv_use_scrollable_timeline');
-  
-  // Log timeline mode for debugging
-  useEffect(() => {
-    console.log(`[Timeline] Using ${useNewTimeline ? 'TimelineV2 (new scrollable)' : 'original waveform display'}`);
-    if (useNewTimeline) {
-      console.log('[Timeline] To disable: window.disableNewTimeline()');
-    } else {
-      console.log('[Timeline] To enable: window.enableNewTimeline()');
-    }
-  }, [useNewTimeline]);
-
-  const timelinePanelJSX = useNewTimeline ? (
-    // New scrollable timeline (PR B+)
     <TimelineV2
       sections={sections}
       currentTime={currentTime}
       duration={duration}
       animationTypes={animationTypes}
+      selectedSectionId={selectedSectionId}
       selectedSectionId={null}
       audioBuffer={audioBufferRef.current}
       showWaveform={true}
       presetKeyframes={presetKeyframes}
       cameraKeyframes={cameraKeyframes}
+      textKeyframes={textKeyframes}
+      environmentKeyframes={environmentKeyframes}
+      workspaceObjects={workspaceObjects}
+      cameraFXClips={cameraFXClips}
+      selectedFXClipId={selectedFXClipId}
+      isPlaying={isPlaying}
+      onSelectSection={handleSelectSection}
+      onUpdateSection={handleUpdateSection}
+      onAddSection={handleAddSection}
+      onSeek={seekTo}
+      onTogglePlayPause={() => {
+        if (isPlaying) {
+          if (audioTracks.length > 0) stopMultiTrackAudio();
+          else stopAudio();
+        } else {
+          if (audioTracks.length > 0) playMultiTrackAudio();
+          else playAudio();
+        }
+      }}
+      onAddPresetKeyframe={addPresetKeyframe}
+      onAddCameraKeyframe={addCameraKeyframe}
+      onAddTextKeyframe={addTextKeyframe}
+      onAddEnvironmentKeyframe={addEnvironmentKeyframe}
+      onDeletePresetKeyframe={deletePresetKeyframe}
+      onDeleteCameraKeyframe={deleteCameraKeyframe}
+      onDeleteTextKeyframe={deleteTextKeyframe}
+      onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
+      onUpdatePresetKeyframe={updatePresetKeyframe}
+      onUpdateCameraKeyframe={updateCameraKeyframe}
+      onUpdateTextKeyframe={updateTextKeyframe}
+      onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
+      onMovePresetKeyframe={movePresetKeyframe}
+      onMoveTextKeyframe={moveTextKeyframe}
+      onMoveEnvironmentKeyframe={moveEnvironmentKeyframe}
+      onSelectFXClip={setSelectedFXClipId}
+      onUpdateCameraFXClip={updateCameraFXClip}
+      onDeleteCameraFXClip={deleteCameraFXClip}
+      onAddCameraFXClip={addCameraFXClip}
+    />
+  ) : (
       textKeyframes={textAnimatorKeyframes}
       environmentKeyframes={environmentKeyframes}
       workspaceObjects={[]}
