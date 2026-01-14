@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, ZoomIn, ZoomOut } from 'lucide-react';
+import { Play, Pause, ZoomIn, ZoomOut, Copy, Trash2, Edit2, Plus } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
+import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
 import { 
   BASE_PX_PER_SECOND, 
   MIN_ZOOM, 
@@ -154,6 +155,17 @@ export default function TimelineV2({
   
   // Preview position during drag (only updated via RAF)
   const [previewTime, setPreviewTime] = useState<number | null>(null);
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
+  
+  // Marquee selection state
+  const [marquee, setMarquee] = useState<{ 
+    startX: number; 
+    startY: number; 
+    endX: number; 
+    endY: number;
+  } | null>(null);
   
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -365,7 +377,7 @@ export default function TimelineV2({
     }
   }, [pixelsPerSecond, zoom]);
   
-  // Right-click drag to pan
+  // Right-click drag to pan or marquee (with Shift)
   const handleTimelinePointerDown = useCallback((e: React.PointerEvent) => {
     const container = timelineContentRef.current;
     if (!container) return;
@@ -374,23 +386,50 @@ export default function TimelineV2({
     if (e.button === 2) {
       e.preventDefault();
       
-      dragStateRef.current = {
-        isDragging: true,
-        type: 'pan',
-        keyframeId: null,
-        startX: e.clientX,
-        startY: e.clientY,
-        startTime: 0,
-        lastClientX: e.clientX,
-        lastClientY: e.clientY,
-        startScrollLeft: container.scrollLeft,
-        startScrollTop: container.scrollTop,
-        rafId: null,
-        mouseButton: 2
-      };
-      
-      // Set cursor
-      container.style.cursor = 'grabbing';
+      if (e.shiftKey) {
+        // Shift+right-drag: marquee selection
+        dragStateRef.current = {
+          isDragging: true,
+          type: 'pan', // We'll check for Shift in the move handler
+          keyframeId: null,
+          startX: e.clientX,
+          startY: e.clientY,
+          startTime: 0,
+          lastClientX: e.clientX,
+          lastClientY: e.clientY,
+          startScrollLeft: container.scrollLeft,
+          startScrollTop: container.scrollTop,
+          rafId: null,
+          mouseButton: 2
+        };
+        
+        // Initialize marquee
+        setMarquee({
+          startX: e.clientX,
+          startY: e.clientY,
+          endX: e.clientX,
+          endY: e.clientY
+        });
+      } else {
+        // Regular right-drag: pan
+        dragStateRef.current = {
+          isDragging: true,
+          type: 'pan',
+          keyframeId: null,
+          startX: e.clientX,
+          startY: e.clientY,
+          startTime: 0,
+          lastClientX: e.clientX,
+          lastClientY: e.clientY,
+          startScrollLeft: container.scrollLeft,
+          startScrollTop: container.scrollTop,
+          rafId: null,
+          mouseButton: 2
+        };
+        
+        // Set cursor
+        container.style.cursor = 'grabbing';
+      }
     }
   }, []);
   
@@ -412,11 +451,21 @@ export default function TimelineV2({
           if (!container) return;
           
           if (dragState.type === 'pan') {
-            // Pan: update scroll position
-            const dx = dragState.startX - dragState.lastClientX;
-            const dy = dragState.startY - dragState.lastClientY;
-            container.scrollLeft = dragState.startScrollLeft + dx;
-            container.scrollTop = dragState.startScrollTop + dy;
+            // Check if marquee is active (Shift was held)
+            if (marquee) {
+              // Update marquee rectangle
+              setMarquee(prev => prev ? {
+                ...prev,
+                endX: dragState.lastClientX,
+                endY: dragState.lastClientY
+              } : null);
+            } else {
+              // Pan: update scroll position
+              const dx = dragState.startX - dragState.lastClientX;
+              const dy = dragState.startY - dragState.lastClientY;
+              container.scrollLeft = dragState.startScrollLeft + dx;
+              container.scrollTop = dragState.startScrollTop + dy;
+            }
           } else if (dragState.type === 'playhead') {
             // Playhead: update preview time
             const rect = container.getBoundingClientRect();
@@ -448,8 +497,14 @@ export default function TimelineV2({
         const dy = Math.abs(e.clientY - dragState.startY);
         const wasShortClick = dx < 5 && dy < 5;
         
-        if (wasShortClick && dragState.mouseButton === 2) {
-          // TODO: Show context menu (Chunk 5)
+        if (wasShortClick && dragState.mouseButton === 2 && !marquee) {
+          // Show context menu
+          showContextMenuAt(e.clientX, e.clientY);
+        } else if (marquee) {
+          // Marquee selection complete
+          // TODO: Select keyframes in marquee area (will implement in Chunk 6 with keyframes)
+          console.log('Marquee selection area:', marquee);
+          setMarquee(null);
         }
         
         // Reset cursor
@@ -493,11 +548,99 @@ export default function TimelineV2({
     };
   }, [handleWheel]);
   
-  // Context menu handler (prevent default, will implement menu in Chunk 5)
+  // Context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    // Context menu implementation in Chunk 5
+    // Don't show if we're currently dragging
+    if (dragStateRef.current.isDragging) return;
+    
+    showContextMenuAt(e.clientX, e.clientY);
   }, []);
+  
+  // Show context menu at position
+  const showContextMenuAt = useCallback((x: number, y: number) => {
+    const menuItems: ContextMenuItem[] = [
+      {
+        label: 'Add Preset Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => {
+          const container = timelineContentRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const clickX = x - rect.left + container.scrollLeft;
+            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
+            onAddPresetKeyframe?.(clickTime);
+          }
+        }
+      },
+      {
+        label: 'Add Camera Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => {
+          const container = timelineContentRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const clickX = x - rect.left + container.scrollLeft;
+            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
+            onAddCameraKeyframe?.(clickTime);
+          }
+        }
+      },
+      {
+        label: 'Add Text Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => {
+          const container = timelineContentRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const clickX = x - rect.left + container.scrollLeft;
+            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
+            onAddTextKeyframe?.(clickTime);
+          }
+        }
+      },
+      {
+        label: 'Add Environment Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => {
+          const container = timelineContentRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const clickX = x - rect.left + container.scrollLeft;
+            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
+            onAddEnvironmentKeyframe?.(clickTime);
+          }
+        }
+      },
+      { separator: true } as ContextMenuItem,
+      {
+        label: 'Copy',
+        icon: <Copy size={14} />,
+        onClick: () => {
+          console.log('Copy (not implemented yet)');
+        },
+        disabled: true
+      },
+      {
+        label: 'Delete',
+        icon: <Trash2 size={14} />,
+        onClick: () => {
+          console.log('Delete (not implemented yet)');
+        },
+        disabled: true
+      },
+      {
+        label: 'Rename',
+        icon: <Edit2 size={14} />,
+        onClick: () => {
+          console.log('Rename (not implemented yet)');
+        },
+        disabled: true
+      }
+    ];
+    
+    setContextMenu({ x, y, items: menuItems });
+  }, [onAddPresetKeyframe, onAddCameraKeyframe, onAddTextKeyframe, onAddEnvironmentKeyframe, pixelsPerSecond]);
 
   // Calculate playhead position
   const playheadX = timeToPixels(previewTime ?? currentTime, pixelsPerSecond);
@@ -634,26 +777,30 @@ export default function TimelineV2({
             
             {/* Info panel */}
             <div className="p-4 text-gray-500 text-sm">
-              <p className="font-semibold mb-2">✅ Chunk 4 Complete - Wheel/Zoom/Pan/Scroll</p>
+              <p className="font-semibold mb-2">✅ Chunk 5 Complete - Context Menu & Marquee</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Shift+Wheel: Zoom centered on mouse position</li>
-                <li>Regular wheel: Horizontal scroll (maps deltaY to scrollLeft)</li>
-                <li>Right-click drag: Pan both axes (shows grabbing cursor)</li>
-                <li>Short right-click: Context menu (will show in Chunk 5)</li>
-                <li>Zoom sensitivity: 0.0015 (smooth zooming)</li>
-                <li>Waveform mode: 
-                  <select
-                    value={waveformMode}
-                    onChange={(e) => setWaveformMode(e.target.value as 'mirrored' | 'top')}
-                    className="ml-2 text-xs bg-gray-700 text-white px-2 py-1 rounded"
-                  >
-                    <option value="top">Top only</option>
-                    <option value="mirrored">Mirrored</option>
-                  </select>
-                </li>
+                <li>Right-click: Context menu with Add Keyframe options</li>
+                <li>Shift+right-drag: Marquee selection (green rectangle)</li>
+                <li>Context menu prevented during drag (&gt; 5px movement)</li>
+                <li>Menu items: Add Preset/Camera/Text/Environment Keyframes</li>
+                <li>Placeholder items: Copy, Delete, Rename (for future use)</li>
+                <li>ESC or click outside closes context menu</li>
               </ul>
             </div>
           </div>
+          
+          {/* Marquee selection rectangle */}
+          {marquee && (
+            <div
+              className="absolute border-2 border-green-500 bg-green-500 bg-opacity-10 pointer-events-none z-30"
+              style={{
+                left: `${Math.min(marquee.startX, marquee.endX)}px`,
+                top: `${Math.min(marquee.startY, marquee.endY)}px`,
+                width: `${Math.abs(marquee.endX - marquee.startX)}px`,
+                height: `${Math.abs(marquee.endY - marquee.startY)}px`
+              }}
+            />
+          )}
           
           {/* Playhead */}
           <div
@@ -668,6 +815,17 @@ export default function TimelineV2({
           </div>
         </div>
       </div>
+      
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          isOpen={true}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
