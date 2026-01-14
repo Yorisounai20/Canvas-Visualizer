@@ -214,9 +214,8 @@ export default function TimelineV2({
         setMarqueeEnd(null);
         document.body.style.cursor = '';
         
-        // TODO: Implement actual keyframe selection based on marquee rectangle
-        // For now, just log that marquee selection ended
-        console.log('[Timeline] Marquee selection completed');
+        // TODO: Implement keyframe selection logic based on marquee rectangle
+        // This will be implemented when we add keyframe interaction handlers
       }
     };
 
@@ -377,40 +376,43 @@ export default function TimelineV2({
 
   // Render keyframes for a track
   const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment') => {
-    let keyframes: any[] = [];
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe;
+    let keyframes: KeyframeWithTime[] = [];
     let color = '';
     
     switch (trackType) {
       case 'preset':
-        keyframes = presetKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        keyframes = presetKeyframes;
         color = 'bg-cyan-500';
         break;
       case 'camera':
-        keyframes = cameraKeyframes.map(kf => ({ ...kf, id: `camera-${kf.time}` }));
+        keyframes = cameraKeyframes;
         color = 'bg-purple-500';
         break;
       case 'text':
-        keyframes = textKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        keyframes = textKeyframes;
         color = 'bg-green-500';
         break;
       case 'environment':
-        keyframes = environmentKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        keyframes = environmentKeyframes;
         color = 'bg-orange-500';
         break;
     }
     
-    return keyframes.map((kf) => {
-      const x = timeToPixels(kf.time, pixelsPerSecond);
-      const isSelected = selectedKeyframes.has(`${trackType}-${kf.id}`);
+    return keyframes.map((kf, idx) => {
+      const time = 'time' in kf ? kf.time : 0;
+      const x = timeToPixels(time, pixelsPerSecond);
+      const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
+      const isSelected = selectedKeyframes.has(`${trackType}-${keyId}`);
       
       return (
         <div
-          key={`${trackType}-${kf.id}`}
+          key={`${trackType}-${keyId}`}
           className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
             isSelected ? 'ring-2 ring-white' : ''
           } cursor-pointer hover:scale-125 transition-transform`}
           style={{ left: `${x}px`, marginLeft: '-6px' }}
-          title={`${trackType} keyframe at ${formatTime(kf.time)}`}
+          title={`${trackType} keyframe at ${formatTime(time)}`}
         />
       );
     });
