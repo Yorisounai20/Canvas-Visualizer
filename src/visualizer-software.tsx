@@ -79,6 +79,8 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
+import TimelineV2 from './components/Timeline/TimelineV2';
+import { useScrollableTimeline } from './lib/featureFlags';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -94,6 +96,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Feature flag: check if new scrollable timeline should be used
+  const useNewTimeline = useScrollableTimeline();
+  
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -8189,7 +8194,57 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  const timelinePanelJSX = (
+  const timelinePanelJSX = useNewTimeline ? (
+    <TimelineV2
+      sections={sections}
+      currentTime={currentTime}
+      duration={duration}
+      animationTypes={animationTypes}
+      selectedSectionId={selectedSectionId}
+      audioBuffer={audioBufferRef.current}
+      showWaveform={true}
+      presetKeyframes={presetKeyframes}
+      cameraKeyframes={cameraKeyframes}
+      textKeyframes={textKeyframes}
+      environmentKeyframes={environmentKeyframes}
+      workspaceObjects={workspaceObjects}
+      cameraFXClips={cameraFXClips}
+      selectedFXClipId={selectedFXClipId}
+      isPlaying={isPlaying}
+      onSelectSection={handleSelectSection}
+      onUpdateSection={handleUpdateSection}
+      onAddSection={handleAddSection}
+      onSeek={seekTo}
+      onTogglePlayPause={() => {
+        if (isPlaying) {
+          if (audioTracks.length > 0) stopMultiTrackAudio();
+          else stopAudio();
+        } else {
+          if (audioTracks.length > 0) playMultiTrackAudio();
+          else playAudio();
+        }
+      }}
+      onAddPresetKeyframe={addPresetKeyframe}
+      onAddCameraKeyframe={addCameraKeyframe}
+      onAddTextKeyframe={addTextKeyframe}
+      onAddEnvironmentKeyframe={addEnvironmentKeyframe}
+      onDeletePresetKeyframe={deletePresetKeyframe}
+      onDeleteCameraKeyframe={deleteCameraKeyframe}
+      onDeleteTextKeyframe={deleteTextKeyframe}
+      onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
+      onUpdatePresetKeyframe={updatePresetKeyframe}
+      onUpdateCameraKeyframe={updateCameraKeyframe}
+      onUpdateTextKeyframe={updateTextKeyframe}
+      onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
+      onMovePresetKeyframe={movePresetKeyframe}
+      onMoveTextKeyframe={moveTextKeyframe}
+      onMoveEnvironmentKeyframe={moveEnvironmentKeyframe}
+      onSelectFXClip={setSelectedFXClipId}
+      onUpdateCameraFXClip={updateCameraFXClip}
+      onDeleteCameraFXClip={deleteCameraFXClip}
+      onAddCameraFXClip={addCameraFXClip}
+    />
+  ) : (
     <>
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
       <div className="bg-gray-800 rounded-lg p-4">

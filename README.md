@@ -126,6 +126,32 @@ npm run typecheck    # Run TypeScript checks
 npm run lint         # Run ESLint
 ```
 
+## Feature Flags
+
+Canvas Visualizer supports runtime feature flags for testing new features:
+
+**Scrollable Timeline (TimelineV2):**
+The new scrollable per-track timeline is available behind a feature flag:
+
+```javascript
+// Enable in browser console:
+localStorage.setItem('cv_use_scrollable_timeline', 'true');
+
+// Disable (revert to legacy timeline):
+localStorage.setItem('cv_use_scrollable_timeline', 'false');
+
+// Or set via environment variable:
+REACT_APP_CV_USE_SCROLLABLE_TIMELINE=true
+```
+
+Reload the page after changing the flag. The new timeline includes:
+- Horizontal and vertical scrolling
+- Per-track waveforms
+- Smooth RAF-throttled interactions
+- Snap-to-grid and keyboard navigation
+- Context menu and marquee selection
+- Resizable keyframe bars
+
 ## Keyboard Shortcuts
 
 **Editor Mode:**
