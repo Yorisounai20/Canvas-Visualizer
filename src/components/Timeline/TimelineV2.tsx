@@ -76,11 +76,21 @@ export default function TimelineV2({
   audioBuffer,
   showWaveform = true,
   onSeek,
+  presetKeyframes = [],
+  cameraKeyframes = [],
+  textKeyframes = [],
+  environmentKeyframes = [],
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
+  
+  // Marquee selection state
+  const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
+  const [selectedKeyframes, setSelectedKeyframes] = useState<Set<string>>(new Set());
 
   // Calculate dimensions
   const pixelsPerSecond = useMemo(() => calculatePixelsPerSecond(zoomLevel), [zoomLevel]);
@@ -143,15 +153,30 @@ export default function TimelineV2({
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Right-click (button 2) = pan
-    if (e.button === 2 && scrollContainerRef.current) {
+    if (!scrollContainerRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Shift+right-click = marquee selection
+    if (e.button === 2 && e.shiftKey) {
+      e.preventDefault();
+      setIsMarqueeSelecting(true);
+      const x = e.clientX - rect.left + container.scrollLeft;
+      const y = e.clientY - rect.top + container.scrollTop;
+      setMarqueeStart({ x, y });
+      setMarqueeEnd({ x, y });
+      document.body.style.cursor = 'crosshair';
+    }
+    // Right-click (button 2) without shift = pan
+    else if (e.button === 2) {
       e.preventDefault();
       setIsPanning(true);
       panStartRef.current = {
         x: e.clientX,
         y: e.clientY,
-        scrollLeft: scrollContainerRef.current.scrollLeft,
-        scrollTop: scrollContainerRef.current.scrollTop,
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop,
       };
       document.body.style.cursor = 'grabbing';
     }
@@ -160,12 +185,20 @@ export default function TimelineV2({
   // Handle pan move and end at document level
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isPanning && panStartRef.current && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      
+      if (isPanning && panStartRef.current) {
         const dx = e.clientX - panStartRef.current.x;
         const dy = e.clientY - panStartRef.current.y;
         
-        scrollContainerRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
-        scrollContainerRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+        container.scrollLeft = panStartRef.current.scrollLeft - dx;
+        container.scrollTop = panStartRef.current.scrollTop - dy;
+      } else if (isMarqueeSelecting && marqueeStart) {
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left + container.scrollLeft;
+        const y = e.clientY - rect.top + container.scrollTop;
+        setMarqueeEnd({ x, y });
       }
     };
 
@@ -174,10 +207,20 @@ export default function TimelineV2({
         setIsPanning(false);
         panStartRef.current = null;
         document.body.style.cursor = '';
+      } else if (isMarqueeSelecting) {
+        // Finalize marquee selection
+        setIsMarqueeSelecting(false);
+        setMarqueeStart(null);
+        setMarqueeEnd(null);
+        document.body.style.cursor = '';
+        
+        // TODO: Implement actual keyframe selection based on marquee rectangle
+        // For now, just log that marquee selection ended
+        console.log('[Timeline] Marquee selection completed');
       }
     };
 
-    if (isPanning) {
+    if (isPanning || isMarqueeSelecting) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
@@ -186,7 +229,7 @@ export default function TimelineV2({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isPanning]);
+  }, [isPanning, isMarqueeSelecting, marqueeStart]);
 
   // Attach wheel listener to scroll container
   useEffect(() => {
@@ -332,6 +375,69 @@ export default function TimelineV2({
     return markers;
   };
 
+  // Render keyframes for a track
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment') => {
+    let keyframes: any[] = [];
+    let color = '';
+    
+    switch (trackType) {
+      case 'preset':
+        keyframes = presetKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        color = 'bg-cyan-500';
+        break;
+      case 'camera':
+        keyframes = cameraKeyframes.map(kf => ({ ...kf, id: `camera-${kf.time}` }));
+        color = 'bg-purple-500';
+        break;
+      case 'text':
+        keyframes = textKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        color = 'bg-green-500';
+        break;
+      case 'environment':
+        keyframes = environmentKeyframes.map(kf => ({ ...kf, time: kf.time || 0, id: kf.id }));
+        color = 'bg-orange-500';
+        break;
+    }
+    
+    return keyframes.map((kf) => {
+      const x = timeToPixels(kf.time, pixelsPerSecond);
+      const isSelected = selectedKeyframes.has(`${trackType}-${kf.id}`);
+      
+      return (
+        <div
+          key={`${trackType}-${kf.id}`}
+          className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
+            isSelected ? 'ring-2 ring-white' : ''
+          } cursor-pointer hover:scale-125 transition-transform`}
+          style={{ left: `${x}px`, marginLeft: '-6px' }}
+          title={`${trackType} keyframe at ${formatTime(kf.time)}`}
+        />
+      );
+    });
+  };
+
+  // Render marquee selection rectangle
+  const renderMarquee = () => {
+    if (!isMarqueeSelecting || !marqueeStart || !marqueeEnd) return null;
+    
+    const left = Math.min(marqueeStart.x, marqueeEnd.x);
+    const top = Math.min(marqueeStart.y, marqueeEnd.y);
+    const width = Math.abs(marqueeEnd.x - marqueeStart.x);
+    const height = Math.abs(marqueeEnd.y - marqueeStart.y);
+    
+    return (
+      <div
+        className="absolute border-2 border-cyan-500 bg-cyan-500 bg-opacity-20 pointer-events-none z-30"
+        style={{
+          left: `${left}px`,
+          top: `${top}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+        }}
+      />
+    );
+  };
+
   // Render playhead
   const playheadX = timeToPixels(currentTime, pixelsPerSecond);
 
@@ -358,7 +464,7 @@ export default function TimelineV2({
             Reset
           </button>
           <span className="text-xs text-gray-500 ml-4">
-            💡 Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
+            💡 Shift+Wheel=Zoom, Right-click=Pan, Shift+Right-click=Select, Arrows=Step
           </span>
         </div>
         <div className="text-sm text-gray-400">
@@ -456,7 +562,15 @@ export default function TimelineV2({
                   })}
                 </div>
 
-                {/* TODO: Render keyframes/clips for this track (PR C) */}
+                {/* Render keyframes for this track */}
+                {track.type === 'preset' && renderKeyframes('preset')}
+                {track.type === 'camera' && renderKeyframes('camera')}
+                {track.type === 'text' && renderKeyframes('text')}
+                {track.type === 'environment' && (
+                  <div className="absolute inset-0">
+                    {renderKeyframes('environment')}
+                  </div>
+                )}
               </div>
             ))}
 
@@ -467,6 +581,9 @@ export default function TimelineV2({
             >
               <div className="absolute -top-1 -left-2 w-4 h-4 bg-red-500 rounded-full" />
             </div>
+            
+            {/* Marquee selection rectangle */}
+            {renderMarquee()}
           </div>
         </div>
       </div>
