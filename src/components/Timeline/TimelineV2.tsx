@@ -9,7 +9,7 @@
  * - Wheel zoom and pan (to be implemented in PR C)
  */
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import { 
@@ -20,7 +20,8 @@ import {
   calculateTimelineWidth,
   formatTime,
   timeToPixels,
-  pixelsToTime
+  pixelsToTime,
+  clampZoom
 } from './utils';
 
 // Re-export TimelineProps from original Timeline for compatibility
@@ -78,6 +79,8 @@ export default function TimelineV2({
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(1.0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
 
   // Calculate dimensions
   const pixelsPerSecond = useMemo(() => calculatePixelsPerSecond(zoomLevel), [zoomLevel]);
@@ -95,8 +98,210 @@ export default function TimelineV2({
     { id: 'text', name: 'Text', type: 'text' as const },
   ], []);
 
+  // Handle wheel zoom (shift+wheel) and scroll (wheel)
+  const handleWheel = useCallback((e: WheelEvent) => {
+    if (!scrollContainerRef.current) return;
+
+    // Shift+wheel = zoom centered at mouse position
+    if (e.shiftKey) {
+      e.preventDefault();
+      
+      const container = scrollContainerRef.current;
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left + container.scrollLeft;
+      
+      // Calculate time position under mouse before zoom
+      const timeUnderMouse = pixelsToTime(mouseX, pixelsPerSecond);
+      
+      // Calculate new zoom level
+      const zoomDelta = -e.deltaY * 0.001; // Adjust sensitivity
+      const newZoom = clampZoom(zoomLevel + zoomDelta);
+      
+      if (newZoom !== zoomLevel) {
+        setZoomLevel(newZoom);
+        
+        // After zoom, calculate new pixel position for the same time
+        // and adjust scroll to keep that time under the mouse
+        requestAnimationFrame(() => {
+          const newPixelsPerSecond = calculatePixelsPerSecond(newZoom);
+          const newMouseX = timeToPixels(timeUnderMouse, newPixelsPerSecond);
+          const mouseOffsetInViewport = e.clientX - rect.left;
+          container.scrollLeft = newMouseX - mouseOffsetInViewport;
+        });
+      }
+    } else {
+      // Normal wheel = horizontal scroll
+      // Let browser handle this naturally, but we could customize if needed
+      e.preventDefault();
+      scrollContainerRef.current.scrollLeft += e.deltaY;
+    }
+  }, [zoomLevel, pixelsPerSecond]);
+
+  // Handle right-click pan start
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent context menu
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Right-click (button 2) = pan
+    if (e.button === 2 && scrollContainerRef.current) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: scrollContainerRef.current.scrollLeft,
+        scrollTop: scrollContainerRef.current.scrollTop,
+      };
+      document.body.style.cursor = 'grabbing';
+    }
+  }, []);
+
+  // Handle pan move and end at document level
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isPanning && panStartRef.current && scrollContainerRef.current) {
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        
+        scrollContainerRef.current.scrollLeft = panStartRef.current.scrollLeft - dx;
+        scrollContainerRef.current.scrollTop = panStartRef.current.scrollTop - dy;
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        panStartRef.current = null;
+        document.body.style.cursor = '';
+      }
+    };
+
+    if (isPanning) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isPanning]);
+
+  // Attach wheel listener to scroll container
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Only handle when timeline area has focus
+    if (!scrollContainerRef.current?.contains(document.activeElement)) return;
+
+    const DEFAULT_FPS = 30;
+    const frameTime = 1 / DEFAULT_FPS;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Left = -5 seconds
+          onSeek(Math.max(0, currentTime - 5));
+        } else if (e.shiftKey) {
+          // Shift+Left = -1 second
+          onSeek(Math.max(0, currentTime - 1));
+        } else {
+          // Left = -1 frame
+          onSeek(Math.max(0, currentTime - frameTime));
+        }
+        break;
+
+      case 'ArrowRight':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Right = +5 seconds
+          onSeek(Math.min(duration, currentTime + 5));
+        } else if (e.shiftKey) {
+          // Shift+Right = +1 second
+          onSeek(Math.min(duration, currentTime + 1));
+        } else {
+          // Right = +1 frame
+          onSeek(Math.min(duration, currentTime + frameTime));
+        }
+        break;
+
+      case 'Home':
+        e.preventDefault();
+        onSeek(0);
+        break;
+
+      case 'End':
+        e.preventDefault();
+        onSeek(duration);
+        break;
+
+      case 'PageUp':
+        e.preventDefault();
+        // Jump backward by visible viewport width (in time)
+        if (scrollContainerRef.current) {
+          const viewportWidth = scrollContainerRef.current.clientWidth;
+          const viewportTime = pixelsToTime(viewportWidth, pixelsPerSecond);
+          onSeek(Math.max(0, currentTime - viewportTime));
+        }
+        break;
+
+      case 'PageDown':
+        e.preventDefault();
+        // Jump forward by visible viewport width (in time)
+        if (scrollContainerRef.current) {
+          const viewportWidth = scrollContainerRef.current.clientWidth;
+          const viewportTime = pixelsToTime(viewportWidth, pixelsPerSecond);
+          onSeek(Math.min(duration, currentTime + viewportTime));
+        }
+        break;
+    }
+  }, [currentTime, duration, onSeek, pixelsPerSecond]);
+
+  // Attach keyboard listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleKeyDown]);
+
+  // Auto-scroll to keep playhead visible
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const playheadPixelX = timeToPixels(currentTime, pixelsPerSecond);
+    const scrollLeft = container.scrollLeft;
+    const viewportWidth = container.clientWidth;
+    
+    // If playhead is off-screen to the left
+    if (playheadPixelX < scrollLeft) {
+      container.scrollLeft = playheadPixelX - 50; // 50px padding
+    }
+    // If playhead is off-screen to the right
+    else if (playheadPixelX > scrollLeft + viewportWidth) {
+      container.scrollLeft = playheadPixelX - viewportWidth + 50; // 50px padding
+    }
+  }, [currentTime, pixelsPerSecond]);
+
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't seek if we were panning
+    if (isPanning) return;
+    
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const time = pixelsToTime(x, pixelsPerSecond);
@@ -152,6 +357,9 @@ export default function TimelineV2({
           >
             Reset
           </button>
+          <span className="text-xs text-gray-500 ml-4">
+            💡 Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
+          </span>
         </div>
         <div className="text-sm text-gray-400">
           {formatTime(currentTime)} / {formatTime(duration)}
@@ -186,7 +394,13 @@ export default function TimelineV2({
         {/* Right column - Scrollable timeline content */}
         <div 
           ref={scrollContainerRef}
-          className="flex-1 overflow-auto relative"
+          className="flex-1 overflow-auto relative focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          onContextMenu={handleContextMenu}
+          onMouseDown={handleMouseDown}
+          style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+          tabIndex={0}
+          role="region"
+          aria-label="Timeline content"
         >
           {/* Sticky ruler at top */}
           <div
