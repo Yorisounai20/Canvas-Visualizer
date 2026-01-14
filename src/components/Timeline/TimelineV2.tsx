@@ -101,6 +101,11 @@ export default function TimelineV2({
   // Track collapse state (Chunk 6.1)
   const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(new Set());
   
+  // Track naming state (Chunk 6.2)
+  const [trackNames, setTrackNames] = useState<Map<string, string>>(new Map());
+  const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+  const [editingTrackName, setEditingTrackName] = useState('');
+  
   // Marquee selection state
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
@@ -397,6 +402,29 @@ export default function TimelineV2({
       return newSet;
     });
   }, []);
+  
+  // Handle track rename (Chunk 6.2)
+  const startRenameTrack = useCallback((trackId: string, currentName: string) => {
+    setEditingTrackId(trackId);
+    setEditingTrackName(trackNames.get(trackId) || currentName);
+  }, [trackNames]);
+  
+  const commitTrackRename = useCallback(() => {
+    if (editingTrackId && editingTrackName.trim()) {
+      setTrackNames(prev => {
+        const newMap = new Map(prev);
+        newMap.set(editingTrackId, editingTrackName.trim());
+        return newMap;
+      });
+    }
+    setEditingTrackId(null);
+    setEditingTrackName('');
+  }, [editingTrackId, editingTrackName]);
+  
+  const cancelTrackRename = useCallback(() => {
+    setEditingTrackId(null);
+    setEditingTrackName('');
+  }, []);
 
   // Render time ruler markers
   const renderRulerMarkers = () => {
@@ -651,6 +679,9 @@ export default function TimelineV2({
           {/* Track labels */}
           {tracks.map((track) => {
             const isCollapsed = collapsedTracks.has(track.id);
+            const displayName = trackNames.get(track.id) || track.name;
+            const isEditing = editingTrackId === track.id;
+            
             return (
               <div
                 key={track.id}
@@ -665,7 +696,34 @@ export default function TimelineV2({
                 >
                   {isCollapsed ? '▶' : '▼'}
                 </button>
-                <span className="text-sm font-medium">{track.name}</span>
+                
+                {/* Track name - editable on double-click */}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editingTrackName}
+                    onChange={(e) => setEditingTrackName(e.target.value)}
+                    onBlur={commitTrackRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        commitTrackRename();
+                      } else if (e.key === 'Escape') {
+                        cancelTrackRename();
+                      }
+                    }}
+                    autoFocus
+                    className="text-sm font-medium bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 focus:outline-none"
+                    style={{ width: '140px' }}
+                  />
+                ) : (
+                  <span
+                    className="text-sm font-medium cursor-text hover:text-cyan-400"
+                    onDoubleClick={() => startRenameTrack(track.id, displayName)}
+                    title="Double-click to rename"
+                  >
+                    {displayName}
+                  </span>
+                )}
               </div>
             );
           })}
