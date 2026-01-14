@@ -1,94 +1,97 @@
 /**
- * Feature Flags Utility
+ * Feature Flags System
  * 
- * Manages runtime feature flags for gradual rollout of new features.
- * Flags can be controlled via localStorage and environment variables.
+ * Runtime feature flags for safe rollout and QA fallback.
+ * Flags are stored in localStorage and can be toggled via dev tools.
  */
 
-export interface FeatureFlags {
-  cv_use_scrollable_timeline: boolean;
-}
+export type FeatureFlag = 'cv_use_scrollable_timeline';
+
+const DEFAULT_FLAGS: Record<FeatureFlag, boolean> = {
+  cv_use_scrollable_timeline: false, // New scrollable per-track timeline (PR B+)
+};
 
 /**
  * Get the value of a feature flag
- * @param flagName - Name of the feature flag
- * @returns boolean indicating if the feature is enabled
+ * Checks in order: localStorage → environment variable → default
  */
-export function getFeatureFlag(flagName: keyof FeatureFlags): boolean {
-  // Check environment variable first (takes precedence)
-  const envVarName = `REACT_APP_${flagName.toUpperCase()}`;
-  const envValue = import.meta.env[envVarName];
-  
-  if (envValue !== undefined) {
-    return envValue === 'true' || envValue === '1';
-  }
-  
-  // Check localStorage
+export function getFeatureFlag(flag: FeatureFlag): boolean {
   try {
-    const stored = localStorage.getItem(flagName);
-    if (stored !== null) {
-      return stored === 'true';
+    // 1. Check localStorage first (runtime toggle)
+    const storedValue = localStorage.getItem(flag);
+    if (storedValue !== null) {
+      return storedValue === 'true';
     }
+
+    // 2. Check environment variable (build-time configuration)
+    if (flag === 'cv_use_scrollable_timeline') {
+      const envVar = import.meta.env.VITE_USE_NEW_TIMELINE;
+      if (envVar !== undefined) {
+        return envVar === 'true' || envVar === '1';
+      }
+    }
+
+    // 3. Fall back to default
+    return DEFAULT_FLAGS[flag];
   } catch (error) {
-    console.warn(`Failed to read feature flag ${flagName} from localStorage:`, error);
+    console.warn(`Error reading feature flag ${flag}:`, error);
+    return DEFAULT_FLAGS[flag];
   }
-  
-  // Default to false if not set
-  return false;
 }
 
 /**
  * Set a feature flag value in localStorage
- * @param flagName - Name of the feature flag
- * @param value - Boolean value to set
  */
-export function setFeatureFlag(flagName: keyof FeatureFlags, value: boolean): void {
+export function setFeatureFlag(flag: FeatureFlag, value: boolean): void {
   try {
-    localStorage.setItem(flagName, value.toString());
-    console.log(`Feature flag ${flagName} set to ${value}`);
+    localStorage.setItem(flag, String(value));
+    console.log(`Feature flag ${flag} set to ${value}`);
   } catch (error) {
-    console.error(`Failed to set feature flag ${flagName}:`, error);
+    console.error(`Error setting feature flag ${flag}:`, error);
   }
 }
 
 /**
- * Check if the new scrollable timeline should be used
- * @returns true if TimelineV2 should be used instead of the legacy Timeline
+ * Clear a feature flag from localStorage (revert to default)
  */
-export function useScrollableTimeline(): boolean {
-  return getFeatureFlag('cv_use_scrollable_timeline');
+export function clearFeatureFlag(flag: FeatureFlag): void {
+  try {
+    localStorage.removeItem(flag);
+    console.log(`Feature flag ${flag} cleared (using default: ${DEFAULT_FLAGS[flag]})`);
+  } catch (error) {
+    console.error(`Error clearing feature flag ${flag}:`, error);
+  }
 }
 
 /**
- * Enable the new scrollable timeline
+ * Get all feature flags with their current values
  */
-export function enableScrollableTimeline(): void {
-  setFeatureFlag('cv_use_scrollable_timeline', true);
+export function getAllFeatureFlags(): Record<FeatureFlag, boolean> {
+  const flags: Record<string, boolean> = {};
+  for (const flag of Object.keys(DEFAULT_FLAGS) as FeatureFlag[]) {
+    flags[flag] = getFeatureFlag(flag);
+  }
+  return flags as Record<FeatureFlag, boolean>;
 }
 
 /**
- * Disable the new scrollable timeline (revert to legacy)
+ * Helper for dev console: Enable new scrollable timeline
+ * Usage in browser console: window.enableNewTimeline()
  */
-export function disableScrollableTimeline(): void {
-  setFeatureFlag('cv_use_scrollable_timeline', false);
-}
-
-// Expose feature flag functions globally for developer convenience
-// Usage in browser console: window.enableNewTimeline()
 if (typeof window !== 'undefined') {
   (window as any).enableNewTimeline = () => {
-    enableScrollableTimeline();
+    setFeatureFlag('cv_use_scrollable_timeline', true);
     console.log('✅ New scrollable timeline enabled. Reload the page to see changes.');
   };
-  
+
   (window as any).disableNewTimeline = () => {
-    disableScrollableTimeline();
-    console.log('✅ New scrollable timeline disabled. Reload the page to revert to legacy timeline.');
+    setFeatureFlag('cv_use_scrollable_timeline', false);
+    console.log('✅ New scrollable timeline disabled. Reload the page to see changes.');
   };
-  
-  (window as any).checkTimelineMode = () => {
-    const isEnabled = useScrollableTimeline();
-    console.log(`Timeline mode: ${isEnabled ? 'NEW (TimelineV2)' : 'LEGACY (Timeline)'}`);
-    return isEnabled;
+
+  (window as any).getFeatureFlags = () => {
+    const flags = getAllFeatureFlags();
+    console.table(flags);
+    return flags;
   };
 }
