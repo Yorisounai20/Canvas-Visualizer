@@ -703,10 +703,10 @@ export default function TimelineV2({
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white" onClick={() => setContextMenu(null)}>
-      {/* Header with zoom controls */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium">Zoom:</span>
+      {/* Header with zoom controls - reduced padding from py-2 to py-1 */}
+      <div className="flex items-center justify-between px-3 py-1 bg-gray-800 border-b border-gray-700 text-xs">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-medium">Zoom:</span>
           <input
             type="range"
             min={MIN_ZOOM}
@@ -714,20 +714,20 @@ export default function TimelineV2({
             step={0.25}
             value={zoomLevel}
             onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
-            className="w-32"
+            className="w-24"
           />
-          <span className="text-xs text-gray-400">{zoomLevel.toFixed(2)}x</span>
+          <span className="text-[10px] text-gray-400">{zoomLevel.toFixed(2)}x</span>
           <button
             onClick={() => setZoomLevel(1.0)}
-            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+            className="px-1.5 py-0.5 text-[10px] bg-gray-700 hover:bg-gray-600 rounded"
           >
             Reset
           </button>
-          <span className="text-xs text-gray-500 ml-4">
-            💡 Shift+Wheel=Zoom, Right-click=Pan, Shift+Right-click=Select, Arrows=Step
+          <span className="text-[10px] text-gray-500 ml-2">
+            💡 Shift+Wheel=Zoom, Right-click=Pan, Shift+Right=Select, Arrows=Step
           </span>
         </div>
-        <div className="text-sm text-gray-400">
+        <div className="text-[10px] text-gray-400">
           {formatTime(currentTime)} / {formatTime(duration)}
         </div>
       </div>
