@@ -81,7 +81,21 @@ export default function TimelineV2({
   textKeyframes = [],
   environmentKeyframes = [],
 }: TimelineProps) {
-  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_zoom_level');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= MIN_ZOOM && parsed <= MAX_ZOOM) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load zoom level from localStorage:', e);
+    }
+    return 1.0;
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
@@ -99,10 +113,34 @@ export default function TimelineV2({
   } | null>(null);
   
   // Track collapse state (Chunk 6.1)
-  const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(new Set());
+  const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_collapsed_tracks');
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        return new Set(parsed);
+      }
+    } catch (e) {
+      console.warn('Failed to load collapsed tracks from localStorage:', e);
+    }
+    return new Set();
+  });
   
   // Track naming state (Chunk 6.2)
-  const [trackNames, setTrackNames] = useState<Map<string, string>>(new Map());
+  const [trackNames, setTrackNames] = useState<Map<string, string>>(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_track_names');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return new Map(Object.entries(parsed));
+      }
+    } catch (e) {
+      console.warn('Failed to load track names from localStorage:', e);
+    }
+    return new Map();
+  });
   const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
   const [editingTrackName, setEditingTrackName] = useState('');
   
@@ -378,6 +416,35 @@ export default function TimelineV2({
       container.scrollLeft = playheadPixelX - viewportWidth + 50; // 50px padding
     }
   }, [currentTime, pixelsPerSecond]);
+  
+  // Persist zoom level to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      localStorage.setItem('cv_timeline_zoom_level', zoomLevel.toString());
+    } catch (e) {
+      console.warn('Failed to save zoom level to localStorage:', e);
+    }
+  }, [zoomLevel]);
+  
+  // Persist collapsed tracks to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      const array = Array.from(collapsedTracks);
+      localStorage.setItem('cv_timeline_collapsed_tracks', JSON.stringify(array));
+    } catch (e) {
+      console.warn('Failed to save collapsed tracks to localStorage:', e);
+    }
+  }, [collapsedTracks]);
+  
+  // Persist track names to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      const obj = Object.fromEntries(trackNames);
+      localStorage.setItem('cv_timeline_track_names', JSON.stringify(obj));
+    } catch (e) {
+      console.warn('Failed to save track names to localStorage:', e);
+    }
+  }, [trackNames]);
 
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
