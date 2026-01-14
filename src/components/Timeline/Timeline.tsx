@@ -147,6 +147,22 @@ export default function Timeline({
     initialTime: number;
   }>({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
 
+  // Bug #6: Marquee selection and right-click tracking
+  const [marqueeState, setMarqueeState] = useState<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  }>({ active: false, startX: 0, startY: 0, endX: 0, endY: 0 });
+
+  const [rightClickState, setRightClickState] = useState<{
+    isDown: boolean;
+    startX: number;
+    startY: number;
+    hasMoved: boolean;
+  }>({ isDown: false, startX: 0, startY: 0, hasMoved: false });
+
   const formatTime = (s: number) => 
     `${Math.floor(s/60)}:${(Math.floor(s%60)).toString().padStart(2,'0')}`;
 
@@ -205,7 +221,33 @@ export default function Timeline({
   // Get context menu items for keyframes
   const getKeyframeContextMenuItems = (): ContextMenuItem[] => {
     const items: ContextMenuItem[] = [];
-    
+
+    // Bug #6: General timeline context menu (when type is null)
+    if (contextMenu.type === null && contextMenu.keyframeTime !== undefined) {
+      const time = contextMenu.keyframeTime;
+      items.push({
+        label: 'Add Preset Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => onAddPresetKeyframe?.(time)
+      });
+      items.push({
+        label: 'Add Camera Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => onAddCameraKeyframe?.(time)
+      });
+      items.push({
+        label: 'Add Text Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => onAddTextKeyframe?.(time)
+      });
+      items.push({
+        label: 'Add Environment Keyframe',
+        icon: <Plus size={14} />,
+        onClick: () => onAddEnvironmentKeyframe?.(time)
+      });
+      return items;
+    }
+
     if (contextMenu.type === 'preset' && contextMenu.keyframeId !== undefined) {
       const keyframe = presetKeyframes.find(kf => kf.id === contextMenu.keyframeId);
       if (keyframe) {
@@ -531,6 +573,131 @@ export default function Timeline({
     }
   }, [timelineWidth]); // CRITICAL FIX: Changed from [duration] to [timelineWidth]
 
+  // Bug #6: Handle right-click context menu and marquee selection
+  const handleTimelineContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    // If right-click was a drag (pan or marquee), don't show menu
+    if (rightClickState.hasMoved) {
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!timelineRef.current) return;
+    
+    // Calculate time at cursor position
+    const rect = timelineRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left + scrollOffset;
+    const time = pixelsToTime(x);
+    
+    // Show general timeline context menu at cursor
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      type: null, // General timeline menu
+      keyframeTime: time
+    });
+  };
+
+  // Bug #6: Handle right mouse button down for pan/marquee
+  const handleTimelineMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 2) { // Right mouse button
+      e.preventDefault();
+      setRightClickState({
+        isDown: true,
+        startX: e.clientX,
+        startY: e.clientY,
+        hasMoved: false
+      });
+    }
+  };
+
+  // Bug #6: Track right-click drag for pan or marquee
+  useEffect(() => {
+    if (!rightClickState.isDown) return;
+
+    let rafId: number | null = null;
+    let lastClientX = 0;
+    let lastClientY = 0;
+    const MOVE_THRESHOLD = 5; // pixels
+
+    const handleMouseMove = (e: MouseEvent) => {
+      lastClientX = e.clientX;
+      lastClientY = e.clientY;
+
+      const deltaX = Math.abs(lastClientX - rightClickState.startX);
+      const deltaY = Math.abs(lastClientY - rightClickState.startY);
+      const hasMoved = deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD;
+
+      if (hasMoved && !rightClickState.hasMoved) {
+        setRightClickState(prev => ({ ...prev, hasMoved: true }));
+      }
+
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+
+          if (e.shiftKey) {
+            // Bug #6: Shift+right-drag = Marquee selection
+            setMarqueeState({
+              active: true,
+              startX: rightClickState.startX,
+              startY: rightClickState.startY,
+              endX: lastClientX,
+              endY: lastClientY
+            });
+          } else if (hasMoved) {
+            // Right-drag (without shift) = Pan
+            const deltaX = lastClientX - rightClickState.startX;
+            const deltaY = lastClientY - rightClickState.startY;
+            
+            // Update scroll offset for horizontal pan
+            setScrollOffset(prev => Math.max(0, prev - deltaX * 0.5));
+            
+            // Update right-click start position for continuous pan
+            setRightClickState(prev => ({
+              ...prev,
+              startX: lastClientX,
+              startY: lastClientY
+            }));
+          }
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setRightClickState({ isDown: false, startX: 0, startY: 0, hasMoved: false });
+      
+      // If marquee was active, select keyframes in area
+      if (marqueeState.active) {
+        // TODO: Implement keyframe selection based on marquee rectangle
+        // This would require props for selected keyframes state and onSelectKeyframes callback
+        console.log('Marquee selection:', marqueeState);
+      }
+      
+      setMarqueeState({ active: false, startX: 0, startY: 0, endX: 0, endY: 0 });
+      
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    };
+
+    document.body.style.cursor = marqueeState.active ? 'crosshair' : 'grab';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [rightClickState, marqueeState, scrollOffset, pixelsToTime]);
+
   // Bug #8 fix: Keyboard handler for spacebar play/pause and arrow key stepping
   // Note: onPlayPause prop needs to be added to TimelineProps interface and passed from parent
   useEffect(() => {
@@ -743,6 +910,8 @@ export default function Timeline({
               className="relative cursor-pointer flex-1"
               style={{ width: `${timelineWidth}px`, minHeight: `${Math.max(sections.length * (TIMELINE_HEIGHT + 4), 80)}px` }}
               onClick={handleTimelineClick}
+              onContextMenu={handleTimelineContextMenu}
+              onMouseDown={handleTimelineMouseDown}
             >
               {/* Grid lines */}
               {snapToGrid && (
@@ -809,6 +978,19 @@ export default function Timeline({
               >
                 <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-red-500 rounded-full" />
               </div>
+
+              {/* Bug #6: Marquee selection rectangle */}
+              {marqueeState.active && (
+                <div
+                  className="absolute border-2 border-cyan-400 bg-cyan-400 bg-opacity-10 z-30 pointer-events-none"
+                  style={{
+                    left: `${Math.min(marqueeState.startX, marqueeState.endX) - timelineRef.current!.getBoundingClientRect().left}px`,
+                    top: `${Math.min(marqueeState.startY, marqueeState.endY) - timelineRef.current!.getBoundingClientRect().top}px`,
+                    width: `${Math.abs(marqueeState.endX - marqueeState.startX)}px`,
+                    height: `${Math.abs(marqueeState.endY - marqueeState.startY)}px`
+                  }}
+                />
+              )}
 
               {/* Section bars */}
               {sections.map((section, index) => {
