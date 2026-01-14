@@ -8019,6 +8019,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
+      } else if (e.key === '`' || e.key === '~') {
+        // Bug #2: Toggle debug console with backtick key
+        e.preventDefault();
+        setShowDebugConsole(prev => !prev);
       } else if (e.key >= '1' && e.key <= '9') {
         // Number keys 1-9 for tab navigation
         const tabIndex = parseInt(e.key) - 1;
@@ -8033,7 +8037,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu, showDebugConsole]);
 
   // Close file menu when clicking outside
   useEffect(() => {
@@ -9213,6 +9217,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
                       <span className="text-gray-300">Toggle camera rig hints</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">G</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Debug/Developer */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Debug/Developer</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle debug console</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">`</kbd>
                     </div>
                   </div>
                 </div>
