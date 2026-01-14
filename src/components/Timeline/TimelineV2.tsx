@@ -89,6 +89,15 @@ export default function TimelineV2({
   // Playhead dragging state
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   
+  // Keyframe dragging state
+  const [isDraggingKeyframe, setIsDraggingKeyframe] = useState(false);
+  const [draggedKeyframe, setDraggedKeyframe] = useState<{
+    trackType: string;
+    keyframeId: string;
+    originalTime: number;
+    currentTime: number;
+  } | null>(null);
+  
   // Marquee selection state
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
@@ -415,18 +424,77 @@ export default function TimelineV2({
     
     return keyframes.map((kf, idx) => {
       const time = 'time' in kf ? kf.time : 0;
-      const x = timeToPixels(time, pixelsPerSecond);
       const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
-      const isSelected = selectedKeyframes.has(`${trackType}-${keyId}`);
+      const fullKeyId = `${trackType}-${keyId}`;
+      const isSelected = selectedKeyframes.has(fullKeyId);
+      const isDragging = isDraggingKeyframe && draggedKeyframe?.keyframeId === fullKeyId;
+      const displayTime = isDragging && draggedKeyframe ? draggedKeyframe.currentTime : time;
+      const x = timeToPixels(displayTime, pixelsPerSecond);
+      
+      const handleKeyframeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        setIsDraggingKeyframe(true);
+        setDraggedKeyframe({
+          trackType,
+          keyframeId: fullKeyId,
+          originalTime: time,
+          currentTime: time,
+        });
+        
+        const handleMouseMove = (moveE: MouseEvent) => {
+          if (!scrollContainerRef.current) return;
+          
+          requestAnimationFrame(() => {
+            const rect = scrollContainerRef.current!.getBoundingClientRect();
+            const scrollLeft = scrollContainerRef.current!.scrollLeft;
+            const relativeX = moveE.clientX - rect.left + scrollLeft;
+            let newTime = pixelsToTime(relativeX, pixelsPerSecond);
+            
+            // Clamp to valid range
+            newTime = Math.max(0, Math.min(duration, newTime));
+            
+            // Round to nearest frame (30fps default)
+            newTime = Math.round(newTime * 30) / 30;
+            
+            setDraggedKeyframe(prev => prev ? { ...prev, currentTime: newTime } : null);
+          });
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+          
+          if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
+            // TODO: Call appropriate onMove callback based on track type
+            // For now, just log the change
+            console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
+          }
+          
+          setIsDraggingKeyframe(false);
+          setDraggedKeyframe(null);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'grabbing';
+      };
       
       return (
         <div
-          key={`${trackType}-${keyId}`}
+          key={fullKeyId}
           className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
-            isSelected ? 'ring-2 ring-white' : ''
-          } cursor-pointer hover:scale-125 transition-transform`}
-          style={{ left: `${x}px`, marginLeft: '-6px' }}
-          title={`${trackType} keyframe at ${formatTime(time)}`}
+            isSelected || isDragging ? 'ring-2 ring-white' : ''
+          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'}`}
+          style={{ 
+            left: `${x}px`, 
+            marginLeft: '-6px',
+            opacity: isDragging ? 1 : isSelected ? 0.9 : 0.8,
+          }}
+          title={`${trackType} keyframe at ${formatTime(displayTime)}`}
+          onMouseDown={handleKeyframeMouseDown}
         />
       );
     });
