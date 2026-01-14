@@ -8202,39 +8202,39 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       currentTime={currentTime}
       duration={duration}
       animationTypes={animationTypes}
-      selectedSectionId={selectedSectionId}
-      audioBuffer={audioBuffer}
+      selectedSectionId={null}
+      audioBuffer={audioBufferRef.current}
       showWaveform={true}
       presetKeyframes={presetKeyframes}
       cameraKeyframes={cameraKeyframes}
-      textKeyframes={textKeyframes}
+      textKeyframes={textAnimatorKeyframes}
       environmentKeyframes={environmentKeyframes}
-      workspaceObjects={workspaceObjects}
+      workspaceObjects={[]}
       cameraFXClips={cameraFXClips}
       selectedFXClipId={selectedFXClipId}
-      onSelectSection={selectSection}
+      onSelectSection={() => {}}
       onUpdateSection={updateSection}
       onAddSection={addSection}
       onSeek={seekTo}
-      onAddPresetKeyframe={addPresetKeyframe}
-      onAddCameraKeyframe={addCameraKeyframe}
-      onAddTextKeyframe={addTextKeyframe}
-      onAddEnvironmentKeyframe={addEnvironmentKeyframe}
-      onDeletePresetKeyframe={deletePresetKeyframe}
-      onDeleteCameraKeyframe={deleteCameraKeyframe}
-      onDeleteTextKeyframe={deleteTextKeyframe}
-      onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
-      onUpdatePresetKeyframe={updatePresetKeyframe}
-      onUpdateCameraKeyframe={updateCameraKeyframe}
-      onUpdateTextKeyframe={updateTextKeyframe}
-      onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
-      onMovePresetKeyframe={movePresetKeyframe}
-      onMoveTextKeyframe={moveTextKeyframe}
-      onMoveEnvironmentKeyframe={moveEnvironmentKeyframe}
-      onSelectFXClip={selectFXClip}
-      onUpdateCameraFXClip={updateCameraFXClip}
-      onDeleteCameraFXClip={deleteCameraFXClip}
-      onAddCameraFXClip={addCameraFXClip}
+      onAddPresetKeyframe={() => {}}
+      onAddCameraKeyframe={() => {}}
+      onAddTextKeyframe={() => {}}
+      onAddEnvironmentKeyframe={() => {}}
+      onDeletePresetKeyframe={() => {}}
+      onDeleteCameraKeyframe={() => {}}
+      onDeleteTextKeyframe={() => {}}
+      onDeleteEnvironmentKeyframe={() => {}}
+      onUpdatePresetKeyframe={() => {}}
+      onUpdateCameraKeyframe={() => {}}
+      onUpdateTextKeyframe={() => {}}
+      onUpdateEnvironmentKeyframe={() => {}}
+      onMovePresetKeyframe={() => {}}
+      onMoveTextKeyframe={() => {}}
+      onMoveEnvironmentKeyframe={() => {}}
+      onSelectFXClip={() => {}}
+      onUpdateCameraFXClip={() => {}}
+      onDeleteCameraFXClip={() => {}}
+      onAddCameraFXClip={() => {}}
     />
   ) : (
     // Original waveform display timeline
