@@ -98,6 +98,9 @@ export default function TimelineV2({
     currentTime: number;
   } | null>(null);
   
+  // Track collapse state (Chunk 6.1)
+  const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(new Set());
+  
   // Marquee selection state
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
@@ -381,6 +384,19 @@ export default function TimelineV2({
     const time = pixelsToTime(x, pixelsPerSecond);
     onSeek(Math.max(0, Math.min(duration, time)));
   };
+  
+  // Handle track collapse/expand toggle (Chunk 6.1)
+  const toggleTrackCollapse = useCallback((trackId: string) => {
+    setCollapsedTracks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(trackId)) {
+        newSet.delete(trackId);
+      } else {
+        newSet.add(trackId);
+      }
+      return newSet;
+    });
+  }, []);
 
   // Render time ruler markers
   const renderRulerMarkers = () => {
@@ -633,15 +649,26 @@ export default function TimelineV2({
           />
           
           {/* Track labels */}
-          {tracks.map((track) => (
-            <div
-              key={track.id}
-              className="flex items-center px-4 border-b border-gray-700"
-              style={{ height: `${TRACK_HEIGHT}px` }}
-            >
-              <span className="text-sm font-medium">{track.name}</span>
-            </div>
-          ))}
+          {tracks.map((track) => {
+            const isCollapsed = collapsedTracks.has(track.id);
+            return (
+              <div
+                key={track.id}
+                className="flex items-center px-2 border-b border-gray-700"
+                style={{ height: `${TRACK_HEIGHT}px` }}
+              >
+                {/* Collapse/expand button */}
+                <button
+                  onClick={() => toggleTrackCollapse(track.id)}
+                  className="p-1 hover:bg-gray-700 rounded mr-2 text-gray-400 hover:text-gray-200"
+                  title={isCollapsed ? "Expand track" : "Collapse track"}
+                >
+                  {isCollapsed ? '▶' : '▼'}
+                </button>
+                <span className="text-sm font-medium">{track.name}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Right column - Scrollable timeline content */}
@@ -678,48 +705,56 @@ export default function TimelineV2({
             onClick={handleTimelineClick}
           >
             {/* Track rows */}
-            {tracks.map((track, index) => (
-              <div
-                key={track.id}
-                className="relative border-b border-gray-700"
-                style={{ height: `${TRACK_HEIGHT}px` }}
-              >
-                {/* Waveform for audio track */}
-                {track.type === 'audio' && showWaveform && audioBuffer && (
-                  <WaveformVisualizer
-                    audioBuffer={audioBuffer}
-                    duration={duration}
-                    width={timelineWidth}
-                    height={TRACK_HEIGHT}
-                    color="rgba(100, 180, 255, 0.3)"
-                  />
-                )}
+            {tracks.map((track, index) => {
+              const isCollapsed = collapsedTracks.has(track.id);
+              return (
+                <div
+                  key={track.id}
+                  className="relative border-b border-gray-700 overflow-hidden transition-all"
+                  style={{ height: isCollapsed ? '40px' : `${TRACK_HEIGHT}px` }}
+                >
+                  {/* Only render track content if not collapsed */}
+                  {!isCollapsed && (
+                    <>
+                      {/* Waveform for audio track */}
+                      {track.type === 'audio' && showWaveform && audioBuffer && (
+                        <WaveformVisualizer
+                          audioBuffer={audioBuffer}
+                          duration={duration}
+                          width={timelineWidth}
+                          height={TRACK_HEIGHT}
+                          color="rgba(100, 180, 255, 0.3)"
+                        />
+                      )}
 
                 {/* Grid lines for visual reference */}
-                <div className="absolute inset-0 pointer-events-none">
-                  {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
-                    const x = timeToPixels(i, pixelsPerSecond);
-                    return (
-                      <div
-                        key={i}
-                        className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
-                        style={{ left: `${x}px` }}
-                      />
-                    );
-                  })}
-                </div>
+                      <div className="absolute inset-0 pointer-events-none">
+                        {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
+                          const x = timeToPixels(i, pixelsPerSecond);
+                          return (
+                            <div
+                              key={i}
+                              className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
+                              style={{ left: `${x}px` }}
+                            />
+                          );
+                        })}
+                      </div>
 
-                {/* Render keyframes for this track */}
-                {track.type === 'preset' && renderKeyframes('preset')}
-                {track.type === 'camera' && renderKeyframes('camera')}
-                {track.type === 'text' && renderKeyframes('text')}
-                {track.type === 'environment' && (
-                  <div className="absolute inset-0">
-                    {renderKeyframes('environment')}
-                  </div>
-                )}
-              </div>
-            ))}
+                      {/* Render keyframes for this track */}
+                      {track.type === 'preset' && renderKeyframes('preset')}
+                      {track.type === 'camera' && renderKeyframes('camera')}
+                      {track.type === 'text' && renderKeyframes('text')}
+                      {track.type === 'environment' && (
+                        <div className="absolute inset-0">
+                          {renderKeyframes('environment')}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
 
             {/* Playhead - spans all tracks */}
             <div
