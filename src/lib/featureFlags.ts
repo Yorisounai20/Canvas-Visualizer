@@ -72,3 +72,23 @@ export function enableScrollableTimeline(): void {
 export function disableScrollableTimeline(): void {
   setFeatureFlag('cv_use_scrollable_timeline', false);
 }
+
+// Expose feature flag functions globally for developer convenience
+// Usage in browser console: window.enableNewTimeline()
+if (typeof window !== 'undefined') {
+  (window as any).enableNewTimeline = () => {
+    enableScrollableTimeline();
+    console.log('✅ New scrollable timeline enabled. Reload the page to see changes.');
+  };
+  
+  (window as any).disableNewTimeline = () => {
+    disableScrollableTimeline();
+    console.log('✅ New scrollable timeline disabled. Reload the page to revert to legacy timeline.');
+  };
+  
+  (window as any).checkTimelineMode = () => {
+    const isEnabled = useScrollableTimeline();
+    console.log(`Timeline mode: ${isEnabled ? 'NEW (TimelineV2)' : 'LEGACY (Timeline)'}`);
+    return isEnabled;
+  };
+}

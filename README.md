@@ -134,11 +134,14 @@ Canvas Visualizer supports runtime feature flags for testing new features:
 The new scrollable per-track timeline is available behind a feature flag:
 
 ```javascript
-// Enable in browser console:
-localStorage.setItem('cv_use_scrollable_timeline', 'true');
+// Quick enable/disable in browser console:
+window.enableNewTimeline()   // Enable new timeline
+window.disableNewTimeline()  // Revert to legacy timeline
+window.checkTimelineMode()   // Check current mode
 
-// Disable (revert to legacy timeline):
-localStorage.setItem('cv_use_scrollable_timeline', 'false');
+// Or use localStorage directly:
+localStorage.setItem('cv_use_scrollable_timeline', 'true');   // Enable
+localStorage.setItem('cv_use_scrollable_timeline', 'false');  // Disable
 
 // Or set via environment variable:
 REACT_APP_CV_USE_SCROLLABLE_TIMELINE=true
