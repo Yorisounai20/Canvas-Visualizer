@@ -103,6 +103,15 @@ export default function TimelineV2({
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
   const [selectedKeyframes, setSelectedKeyframes] = useState<Set<string>>(new Set());
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    trackType: string;
+    keyframeId: string;
+    time: number;
+  } | null>(null);
 
   // Calculate dimensions
   const pixelsPerSecond = useMemo(() => calculatePixelsPerSecond(zoomLevel), [zoomLevel]);
@@ -435,6 +444,9 @@ export default function TimelineV2({
         e.stopPropagation();
         e.preventDefault();
         
+        // Left click only - right click handled by onContextMenu
+        if (e.button !== 0) return;
+        
         setIsDraggingKeyframe(true);
         setDraggedKeyframe({
           trackType,
@@ -482,6 +494,18 @@ export default function TimelineV2({
         document.body.style.cursor = 'grabbing';
       };
       
+      const handleKeyframeContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          trackType,
+          keyframeId: fullKeyId,
+          time,
+        });
+      };
+      
       return (
         <div
           key={fullKeyId}
@@ -495,6 +519,7 @@ export default function TimelineV2({
           }}
           title={`${trackType} keyframe at ${formatTime(displayTime)}`}
           onMouseDown={handleKeyframeMouseDown}
+          onContextMenu={handleKeyframeContextMenu}
         />
       );
     });
@@ -525,8 +550,30 @@ export default function TimelineV2({
   // Render playhead
   const playheadX = timeToPixels(currentTime, pixelsPerSecond);
 
+  // Handle context menu actions
+  const handleContextMenuAction = (action: 'copy' | 'delete' | 'duplicate') => {
+    if (!contextMenu) return;
+    
+    const { trackType, keyframeId, time } = contextMenu;
+    console.log(`${action} keyframe: ${keyframeId} at ${formatTime(time)}`);
+    
+    // TODO: Implement actual actions based on track type
+    // For now, just log the action
+    
+    setContextMenu(null);
+  };
+  
+  // Close context menu on click away
+  useEffect(() => {
+    if (!contextMenu) return;
+    
+    const handleClickAway = () => setContextMenu(null);
+    document.addEventListener('click', handleClickAway);
+    return () => document.removeEventListener('click', handleClickAway);
+  }, [contextMenu]);
+
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white">
+    <div className="flex flex-col h-full bg-gray-900 text-white" onClick={() => setContextMenu(null)}>
       {/* Header with zoom controls */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center gap-4">
@@ -682,6 +729,38 @@ export default function TimelineV2({
           </div>
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-gray-800 border border-gray-700 rounded shadow-lg py-1 z-50"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('copy')}
+          >
+            <span>📋</span> Copy Keyframe
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('duplicate')}
+          >
+            <span>➕</span> Duplicate
+          </button>
+          <div className="border-t border-gray-700 my-1" />
+          <button
+            className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('delete')}
+          >
+            <span>🗑️</span> Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
