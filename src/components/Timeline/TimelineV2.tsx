@@ -86,6 +86,9 @@ export default function TimelineV2({
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
+  // Playhead dragging state
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
+  
   // Marquee selection state
   const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
@@ -199,6 +202,14 @@ export default function TimelineV2({
         const x = e.clientX - rect.left + container.scrollLeft;
         const y = e.clientY - rect.top + container.scrollTop;
         setMarqueeEnd({ x, y });
+      } else if (isDraggingPlayhead) {
+        // Smooth playhead dragging with RAF throttling
+        requestAnimationFrame(() => {
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left + container.scrollLeft;
+          const time = pixelsToTime(x, pixelsPerSecond);
+          onSeek(Math.max(0, Math.min(duration, time)));
+        });
       }
     };
 
@@ -216,10 +227,13 @@ export default function TimelineV2({
         
         // TODO: Implement keyframe selection logic based on marquee rectangle
         // This will be implemented when we add keyframe interaction handlers
+      } else if (isDraggingPlayhead) {
+        setIsDraggingPlayhead(false);
+        document.body.style.cursor = '';
       }
     };
 
-    if (isPanning || isMarqueeSelecting) {
+    if (isPanning || isMarqueeSelecting || isDraggingPlayhead) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
@@ -228,7 +242,7 @@ export default function TimelineV2({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isPanning, isMarqueeSelecting, marqueeStart]);
+  }, [isPanning, isMarqueeSelecting, isDraggingPlayhead, marqueeStart, pixelsPerSecond, duration, onSeek]);
 
   // Attach wheel listener to scroll container
   useEffect(() => {
@@ -341,8 +355,8 @@ export default function TimelineV2({
 
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Don't seek if we were panning
-    if (isPanning) return;
+    // Don't seek if we were panning or dragging playhead
+    if (isPanning || isDraggingPlayhead) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -578,10 +592,21 @@ export default function TimelineV2({
 
             {/* Playhead - spans all tracks */}
             <div
-              className="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-10"
-              style={{ left: `${playheadX}px` }}
+              className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+              style={{ left: `${playheadX}px`, pointerEvents: 'none' }}
             >
-              <div className="absolute -top-1 -left-2 w-4 h-4 bg-red-500 rounded-full" />
+              {/* Playhead handle - draggable */}
+              <div 
+                className="absolute -top-1 -left-2 w-4 h-4 bg-red-500 rounded-full cursor-grab hover:scale-125 transition-transform"
+                style={{ pointerEvents: 'auto' }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setIsDraggingPlayhead(true);
+                  document.body.style.cursor = 'grabbing';
+                }}
+                title="Drag to scrub timeline"
+              />
             </div>
             
             {/* Marquee selection rectangle */}
