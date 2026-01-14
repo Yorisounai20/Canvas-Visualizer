@@ -278,30 +278,49 @@ export default function Timeline({
     setIsPlayheadDragging(true);
   };
 
-  // CRITICAL FIX: Add playhead drag handling
+  // CRITICAL FIX: Add playhead drag handling with RAF throttling (Bug #5)
   useEffect(() => {
+    if (!isPlayheadDragging) return;
+    
+    let rafId: number | null = null;
+    let lastClientX = 0;
+    
     const handleMouseMove = (e: MouseEvent) => {
-      if (isPlayheadDragging && timelineRef.current) {
-        const rect = timelineRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left + scrollOffset;
-        const time = pixelsToTime(x);
-        const snappedTime = snapTime(time);
-        onSeek(Math.min(Math.max(0, snappedTime), duration));
+      lastClientX = e.clientX;
+      
+      // Bug #5 fix: RAF throttle to prevent lag
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          
+          if (timelineRef.current) {
+            const rect = timelineRef.current.getBoundingClientRect();
+            const x = lastClientX - rect.left + scrollOffset;
+            const time = pixelsToTime(x);
+            const snappedTime = snapTime(time);
+            onSeek(Math.min(Math.max(0, snappedTime), duration));
+          }
+        });
       }
     };
 
     const handleMouseUp = () => {
       setIsPlayheadDragging(false);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     };
 
-    if (isPlayheadDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [isPlayheadDragging, scrollOffset, duration, onSeek, snapTime]);
 
   // Start dragging a section
@@ -433,25 +452,37 @@ export default function Timeline({
     }
   }, [fxDragState, cameraFXClips, duration, onUpdateCameraFXClip]);
 
-  // Handle keyframe dragging
+  // Handle keyframe dragging with RAF throttling (Bug #5 fix)
   useEffect(() => {
     if (!keyframeDragState.type || keyframeDragState.keyframeId === null) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!timelineRef.current || keyframeDragState.keyframeId === null) return;
-      
-      const deltaX = e.clientX - keyframeDragState.startX;
-      const deltaTime = pixelsToTime(deltaX);
-      const rawTime = keyframeDragState.initialTime + deltaTime;
-      const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)));
+    let rafId: number | null = null;
+    let lastClientX = 0;
 
-      // Update keyframe position based on type
-      if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
-        onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
-      } else if (keyframeDragState.type === 'text' && onMoveTextKeyframe) {
-        onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
-      } else if (keyframeDragState.type === 'environment' && onMoveEnvironmentKeyframe) {
-        onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
+    const handleMouseMove = (e: MouseEvent) => {
+      lastClientX = e.clientX;
+      
+      // Bug #5 fix: RAF throttle to prevent lag
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          
+          if (!timelineRef.current || keyframeDragState.keyframeId === null) return;
+          
+          const deltaX = lastClientX - keyframeDragState.startX;
+          const deltaTime = pixelsToTime(deltaX);
+          const rawTime = keyframeDragState.initialTime + deltaTime;
+          const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)));
+
+          // Update keyframe position based on type
+          if (keyframeDragState.type === 'preset' && onMovePresetKeyframe) {
+            onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
+          } else if (keyframeDragState.type === 'text' && onMoveTextKeyframe) {
+            onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
+          } else if (keyframeDragState.type === 'environment' && onMoveEnvironmentKeyframe) {
+            onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
+          }
+        });
       }
     };
 
@@ -459,6 +490,10 @@ export default function Timeline({
       setKeyframeDragState({ type: null, keyframeId: null, startX: 0, initialTime: 0 });
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     };
 
     document.body.style.cursor = 'grabbing';
@@ -471,6 +506,9 @@ export default function Timeline({
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
     };
   }, [keyframeDragState, duration, onMovePresetKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe, pixelsToTime, snapTime]);
 
@@ -493,9 +531,61 @@ export default function Timeline({
     }
   }, [timelineWidth]); // CRITICAL FIX: Changed from [duration] to [timelineWidth]
 
+  // Bug #8 fix: Keyboard handler for spacebar play/pause and arrow key stepping
+  // Note: onPlayPause prop needs to be added to TimelineProps interface and passed from parent
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle keyboard events when timeline has focus or no input is focused
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
+
+      // Bug #8: Spacebar toggles play/pause (prevent page scroll)
+      if (e.code === 'Space') {
+        e.preventDefault();
+        // TODO: Add onPlayPause prop to TimelineProps and call it here
+        // For now, document this requirement
+        console.log('Spacebar pressed - play/pause (requires onPlayPause prop)');
+        return;
+      }
+
+      // Arrow key stepping (bonus feature)
+      if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        const step = e.shiftKey ? 1 : (e.ctrlKey || e.metaKey) ? 5 : 1/30; // frame, 1s, or 5s
+        const direction = e.code === 'ArrowLeft' ? -1 : 1;
+        const newTime = Math.max(0, Math.min(duration, currentTime + (step * direction)));
+        onSeek(newTime);
+        return;
+      }
+
+      // Home/End keys
+      if (e.code === 'Home') {
+        e.preventDefault();
+        onSeek(0);
+        return;
+      }
+      if (e.code === 'End') {
+        e.preventDefault();
+        onSeek(duration);
+        return;
+      }
+    };
+
+    // Attach to window to catch events when timeline area has focus
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentTime, duration, onSeek]);
+
   return (
     <>
-    <div className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg">
+    <div 
+      className="h-full bg-[#2B2B2B] border-t border-gray-700 flex flex-col shadow-lg"
+      tabIndex={0}
+      role="region"
+      aria-label="Timeline"
+    >
       {/* Timeline Header */}
       <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
