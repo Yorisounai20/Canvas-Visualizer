@@ -1,98 +1,112 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { debounce } from './utils';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface WaveformVisualizerProps {
   audioBuffer: AudioBuffer | null;
+  duration: number;
   width: number;
   height?: number;
   color?: string;
-  waveformMode?: 'top' | 'mirrored'; // Bug #4: Support top-half only mode
+  debounceMs?: number; // Debounce time for canvas redraws
 }
 
 /**
  * WaveformVisualizer Component - Displays audio waveform in timeline
+ * Renders waveform from audio buffer data with optimized canvas handling
  * 
- * Bug #3: Performance optimizations - sample capping, debouncing
- * Bug #4: Top-half waveform mode support
+ * Performance improvements:
+ * - Debounced canvas redraws to avoid repeated canvas resets during resize/zoom
+ * - Only redraws when audioBuffer or dimensions actually change
+ * - Avoids redrawing during scroll (canvas is positioned, not redrawn)
  */
 export default function WaveformVisualizer({
   audioBuffer,
+  duration,
   width,
   height = 60,
   color = 'rgba(100, 180, 255, 0.3)',
-  waveformMode = 'top', // Bug #4: Default to top-half only
+  debounceMs = 150
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const debounceTimerRef = useRef<number | null>(null);
+  const [debouncedWidth, setDebouncedWidth] = useState(width);
+  const [debouncedHeight, setDebouncedHeight] = useState(height);
 
+  // Debounce width/height changes to avoid excessive redraws
   useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      // Only update if values actually changed
+      if (width !== debouncedWidth) {
+        setDebouncedWidth(width);
+      }
+      if (height !== debouncedHeight) {
+        setDebouncedHeight(height);
+      }
+    }, debounceMs) as unknown as number;
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [width, height, debounceMs, debouncedWidth, debouncedHeight]);
+
+  // Draw waveform only when debounced dimensions or audioBuffer change
+  const drawWaveform = useCallback(() => {
     if (!audioBuffer || !canvasRef.current) return;
 
-    // Bug #3: Debounce rendering for performance (100ms)
-    const debouncedRender = debounce(() => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-      setIsLoading(true);
+    // Set canvas size (this resets the canvas)
+    canvas.width = debouncedWidth;
+    canvas.height = debouncedHeight;
 
-      // Set canvas size
-      canvas.width = width;
-      canvas.height = height;
+    // Clear canvas
+    ctx.clearRect(0, 0, debouncedWidth, debouncedHeight);
 
-      // Clear canvas
-      ctx.clearRect(0, 0, width, height);
+    // Get audio data from first channel
+    const rawData = audioBuffer.getChannelData(0);
+    const samples = debouncedWidth; // One sample per pixel
+    const blockSize = Math.floor(rawData.length / samples);
+    const filteredData = [];
 
-      // Get audio data from first channel
-      const rawData = audioBuffer.getChannelData(0);
-      
-      // Bug #3: Cap samples to max 2048 for performance
-      const samples = Math.min(Math.max(256, Math.floor(width)), 2048);
-      const blockSize = Math.floor(rawData.length / samples);
-      const filteredData = [];
-
-      // Downsample the data
-      for (let i = 0; i < samples; i++) {
-        const blockStart = blockSize * i;
-        let sum = 0;
-        for (let j = 0; j < blockSize; j++) {
-          sum += Math.abs(rawData[blockStart + j]);
-        }
-        filteredData.push(sum / blockSize);
+    // Downsample the data to match the width
+    for (let i = 0; i < samples; i++) {
+      const blockStart = blockSize * i;
+      let sum = 0;
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(rawData[blockStart + j]);
       }
+      filteredData.push(sum / blockSize);
+    }
 
-      // Normalize the data
-      const max = Math.max(...filteredData);
-      const normalizedData = filteredData.map(n => n / max);
+    // Normalize the data
+    const max = Math.max(...filteredData);
+    const normalizedData = filteredData.map(n => n / max);
 
-      // Draw waveform
-      ctx.fillStyle = color;
-      ctx.beginPath();
+    // Draw waveform
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    
+    const middle = debouncedHeight / 2;
+    
+    for (let i = 0; i < normalizedData.length; i++) {
+      const x = i;
+      const barHeight = normalizedData[i] * middle;
       
-      const middle = height / 2;
-      const barWidth = width / samples;
-      
-      for (let i = 0; i < normalizedData.length; i++) {
-        const x = i * barWidth;
-        const barHeight = normalizedData[i] * (waveformMode === 'top' ? height : middle);
-        
-        // Bug #4: Draw based on waveformMode
-        if (waveformMode === 'top') {
-          // Top-half only: bars from bottom to top
-          ctx.fillRect(x, height - barHeight, Math.max(1, barWidth), barHeight);
-        } else {
-          // Mirrored: bars from middle outward
-          ctx.fillRect(x, middle - barHeight, Math.max(1, barWidth), barHeight * 2);
-        }
-      }
-      
-      setIsLoading(false);
-    }, 100);
+      // Draw mirrored bars (top and bottom)
+      ctx.fillRect(x, middle - barHeight, 1, barHeight * 2);
+    }
+  }, [audioBuffer, debouncedWidth, debouncedHeight, color]);
 
-    debouncedRender();
-  }, [audioBuffer, width, height, color, waveformMode]);
+  useEffect(() => {
+    drawWaveform();
+  }, [drawWaveform]);
 
   if (!audioBuffer) {
     return (
@@ -106,18 +120,10 @@ export default function WaveformVisualizer({
   }
 
   return (
-    <div className="relative" style={{ width: `${width}px`, height: `${height}px` }}>
-      {/* Bug #3: Loading indicator */}
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50 z-10">
-          <span className="text-xs text-gray-400">Rendering waveform...</span>
-        </div>
-      )}
-      <canvas
-        ref={canvasRef}
-        className="absolute top-0 left-0 pointer-events-none opacity-50"
-        style={{ width: `${width}px`, height: `${height}px` }}
-      />
-    </div>
+    <canvas
+      ref={canvasRef}
+      className="absolute top-0 left-0 pointer-events-none opacity-50"
+      style={{ width: `${width}px`, height: `${height}px` }}
+    />
   );
 }
