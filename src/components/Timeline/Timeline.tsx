@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Play, Pause } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
@@ -384,114 +384,148 @@ export default function Timeline({
     onSelectSection(section.id);
   };
 
-  // Handle mouse move during drag
+  // Handle mouse move during drag with RAF throttling (Bug #7 fix)
   useEffect(() => {
+    if (!dragState.type || !dragState.sectionId) return;
+
+    let rafId: number | null = null;
+    let lastClientX = 0;
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (!dragState.type || !dragState.sectionId) return;
+      lastClientX = e.clientX;
 
-      const deltaX = e.clientX - dragState.startX;
-      const deltaTime = pixelsToTime(deltaX);
+      // Bug #7 fix: RAF throttle to prevent lag
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
 
-      const section = sections.find(s => s.id === dragState.sectionId);
-      if (!section) return;
+          const deltaX = lastClientX - dragState.startX;
+          const deltaTime = pixelsToTime(deltaX);
 
-      if (dragState.type === 'move') {
-        // Move the entire section
-        const newStart = Math.max(0, dragState.initialStart + deltaTime);
-        const duration = dragState.initialEnd - dragState.initialStart;
-        const newEnd = newStart + duration;
-        
-        onUpdateSection(dragState.sectionId, 'start', newStart);
-        onUpdateSection(dragState.sectionId, 'end', newEnd);
-      } else if (dragState.type === 'resize-start') {
-        // Resize from the start
-        const newStart = Math.max(0, Math.min(dragState.initialStart + deltaTime, dragState.initialEnd - 1));
-        onUpdateSection(dragState.sectionId, 'start', newStart);
-      } else if (dragState.type === 'resize-end') {
-        // Resize from the end
-        const newEnd = Math.max(dragState.initialStart + 1, dragState.initialEnd + deltaTime);
-        onUpdateSection(dragState.sectionId, 'end', newEnd);
+          const section = sections.find(s => s.id === dragState.sectionId);
+          if (!section) return;
+
+          if (dragState.type === 'move') {
+            // Move the entire section
+            const newStart = Math.max(0, dragState.initialStart + deltaTime);
+            const duration = dragState.initialEnd - dragState.initialStart;
+            const newEnd = newStart + duration;
+            
+            onUpdateSection(dragState.sectionId, 'start', newStart);
+            onUpdateSection(dragState.sectionId, 'end', newEnd);
+          } else if (dragState.type === 'resize-start') {
+            // Resize from the start
+            const newStart = Math.max(0, Math.min(dragState.initialStart + deltaTime, dragState.initialEnd - 1));
+            onUpdateSection(dragState.sectionId, 'start', newStart);
+          } else if (dragState.type === 'resize-end') {
+            // Resize from the end
+            const newEnd = Math.max(dragState.initialStart + 1, dragState.initialEnd + deltaTime);
+            onUpdateSection(dragState.sectionId, 'end', newEnd);
+          }
+        });
       }
     };
 
     const handleMouseUp = () => {
       setDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
-      // Re-enable text selection
       document.body.style.userSelect = '';
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     };
 
-    if (dragState.type) {
-      // Prevent text selection during drag
-      document.body.style.userSelect = 'none';
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      
-      return () => {
-        document.body.style.userSelect = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [dragState, sections, onUpdateSection]);
+    // Prevent text selection during drag
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [dragState, sections, onUpdateSection, pixelsToTime]);
 
-  // Handle FX clip dragging
+  // Handle FX clip dragging with RAF throttling (Bug #7 fix)
   useEffect(() => {
     if (!fxDragState.type || !fxDragState.clipId) return;
 
+    let rafId: number | null = null;
+    let lastMouseEvent: MouseEvent | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (!timelineRef.current) return;
-      
-      const rect = timelineRef.current.getBoundingClientRect();
-      const currentX = e.clientX - rect.left;
-      const deltaX = currentX - fxDragState.startX;
-      const deltaTime = (deltaX / rect.width) * duration;
+      lastMouseEvent = e;
 
-      const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
-      if (!clip || !fxDragState.clipId) return;
+      // Bug #7 fix: RAF throttle to prevent lag
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
 
-      let newStart = fxDragState.initialStart;
-      let newEnd = fxDragState.initialEnd;
+          if (!timelineRef.current || !lastMouseEvent) return;
+          
+          const rect = timelineRef.current.getBoundingClientRect();
+          const currentX = lastMouseEvent.clientX - rect.left;
+          const deltaX = currentX - fxDragState.startX;
+          const deltaTime = (deltaX / rect.width) * duration;
 
-      if (fxDragState.type === 'move') {
-        newStart = Math.max(0, fxDragState.initialStart + deltaTime);
-        newEnd = Math.min(duration, fxDragState.initialEnd + deltaTime);
-        const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
-        
-        // Keep duration constant when moving
-        if (newStart + clipDuration > duration) {
-          newStart = duration - clipDuration;
-          newEnd = duration;
-        }
-      } else if (fxDragState.type === 'resize-start') {
-        newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
-      } else if (fxDragState.type === 'resize-end') {
-        newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
+          const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
+          if (!clip || !fxDragState.clipId) return;
+
+          let newStart = fxDragState.initialStart;
+          let newEnd = fxDragState.initialEnd;
+
+          if (fxDragState.type === 'move') {
+            newStart = Math.max(0, fxDragState.initialStart + deltaTime);
+            newEnd = Math.min(duration, fxDragState.initialEnd + deltaTime);
+            const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
+            
+            // Keep duration constant when moving
+            if (newStart + clipDuration > duration) {
+              newStart = duration - clipDuration;
+              newEnd = duration;
+            }
+          } else if (fxDragState.type === 'resize-start') {
+            newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
+          } else if (fxDragState.type === 'resize-end') {
+            newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
+          }
+
+          onUpdateCameraFXClip?.(fxDragState.clipId, {
+            startTime: parseFloat(newStart.toFixed(2)),
+            endTime: parseFloat(newEnd.toFixed(2))
+          });
+        });
       }
-
-      onUpdateCameraFXClip?.(fxDragState.clipId, {
-        startTime: parseFloat(newStart.toFixed(2)),
-        endTime: parseFloat(newEnd.toFixed(2))
-      });
     };
 
     const handleMouseUp = () => {
       setFxDragState({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
     };
 
-    if (fxDragState.type) {
-      document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
-      document.body.style.userSelect = 'none';
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
+    document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [fxDragState, cameraFXClips, duration, onUpdateCameraFXClip]);
 
   // Handle keyframe dragging with RAF throttling (Bug #5 fix)
@@ -753,29 +787,41 @@ export default function Timeline({
       role="region"
       aria-label="Timeline"
     >
-      {/* Timeline Header */}
-      <div className="px-4 py-2 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-4">
+      {/* Timeline Header - Bug #1 & #9: Compact header with play button */}
+      <div className="px-3 py-1.5 border-b border-gray-700 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          {/* Bug #9: Play/Pause button in header */}
+          <button
+            onClick={() => {
+              // Note: Requires onPlayPause prop to be passed from parent
+              console.log('Play/Pause clicked - requires onPlayPause prop');
+            }}
+            className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs transition-colors flex items-center gap-1"
+            title="Play/Pause (Space)"
+          >
+            <Play size={12} />
+          </button>
+          
           <div>
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+            <h2 className="text-xs font-semibold text-gray-300 uppercase tracking-wide">
               Timeline
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-[10px] text-gray-500">
               {showTimecode ? formatTimecode(currentTime) : formatTime(currentTime)} / {showTimecode ? formatTimecode(duration) : formatTime(duration)}
             </p>
           </div>
           
-          {/* Video Editor Controls */}
-          <div className="flex items-center gap-2 border-l border-gray-700 pl-4">
+          {/* Video Editor Controls - Bug #1: More compact spacing */}
+          <div className="flex items-center gap-1.5 border-l border-gray-700 pl-3">
             {/* Snap to Grid */}
-            <label className="flex items-center gap-1.5 cursor-pointer" title="Snap to grid">
+            <label className="flex items-center gap-1 cursor-pointer" title="Snap to grid">
               <input
                 type="checkbox"
                 checked={snapToGrid}
                 onChange={(e) => setSnapToGrid(e.target.checked)}
                 className="w-3 h-3 cursor-pointer"
               />
-              <span className="text-xs text-gray-400">Snap</span>
+              <span className="text-[10px] text-gray-400">Snap</span>
             </label>
             
             {/* Grid Size */}
@@ -783,7 +829,7 @@ export default function Timeline({
               <select
                 value={gridSize}
                 onChange={(e) => setGridSize(Number(e.target.value))}
-                className="bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded border border-gray-600"
+                className="bg-gray-700 text-gray-300 text-[10px] px-1.5 py-0.5 rounded border border-gray-600"
                 title="Grid size"
               >
                 <option value="0.1">0.1s</option>
@@ -796,24 +842,24 @@ export default function Timeline({
             {/* Timecode Toggle */}
             <button
               onClick={() => setShowTimecode(!showTimecode)}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded transition-colors"
+              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-gray-300 rounded transition-colors"
               title="Toggle timecode display"
             >
               {showTimecode ? 'TC' : 'Time'}
             </button>
             
             {/* In/Out Points */}
-            <div className="flex items-center gap-1 border-l border-gray-700 pl-2">
+            <div className="flex items-center gap-0.5 border-l border-gray-700 pl-1.5">
               <button
                 onClick={() => setInPoint(currentTime)}
-                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-green-400 rounded transition-colors"
+                className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-green-400 rounded transition-colors"
                 title="Set In Point (I)"
               >
                 In
               </button>
               <button
                 onClick={() => setOutPoint(currentTime)}
-                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-red-400 rounded transition-colors"
+                className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-red-400 rounded transition-colors"
                 title="Set Out Point (O)"
               >
                 Out
@@ -824,7 +870,7 @@ export default function Timeline({
                     setInPoint(null);
                     setOutPoint(null);
                   }}
-                  className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-xs text-gray-400 rounded transition-colors"
+                  className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-[10px] text-gray-400 rounded transition-colors"
                   title="Clear In/Out"
                 >
                   Clear
@@ -835,28 +881,28 @@ export default function Timeline({
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Zoom Controls */}
-          <div className="flex items-center gap-1 mr-2">
+          {/* Zoom Controls - Bug #1: Compact */}
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => setZoomLevel(prev => Math.max(MIN_ZOOM, prev - 0.25))}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
+              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors"
               title="Zoom out (-))"
             >
               −
             </button>
-            <span className="text-xs text-gray-400 min-w-[50px] text-center">
+            <span className="text-[10px] text-gray-400 min-w-[40px] text-center">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
               onClick={() => setZoomLevel(prev => Math.min(MAX_ZOOM, prev + 0.25))}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors"
+              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors"
               title="Zoom in (+)"
             >
               +
             </button>
             <button
               onClick={() => setZoomLevel(DEFAULT_ZOOM)}
-              className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded text-xs transition-colors ml-1"
+              className="px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 text-white rounded text-[10px] transition-colors ml-0.5"
               title="Reset zoom (0)"
             >
               Reset
@@ -864,10 +910,10 @@ export default function Timeline({
           </div>
           <button
             onClick={onAddSection}
-            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-semibold transition-colors"
             title="Add new section"
           >
-            <Plus size={14} />
+            <Plus size={12} />
             <span>Add Section</span>
           </button>
         </div>
