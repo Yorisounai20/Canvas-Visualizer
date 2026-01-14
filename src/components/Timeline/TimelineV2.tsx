@@ -1,0 +1,261 @@
+/**
+ * TimelineV2 - Scrollable Per-Track Timeline
+ * 
+ * New timeline implementation with:
+ * - Two-column layout (fixed left labels, scrollable right content)
+ * - Sticky time ruler at top
+ * - Per-track waveforms
+ * - Horizontal and vertical scrolling
+ * - Wheel zoom and pan (to be implemented in PR C)
+ */
+
+import React, { useState, useRef, useMemo } from 'react';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
+import WaveformVisualizer from './WaveformVisualizer';
+import { 
+  BASE_PX_PER_SECOND, 
+  MIN_ZOOM, 
+  MAX_ZOOM, 
+  calculatePixelsPerSecond,
+  calculateTimelineWidth,
+  formatTime,
+  timeToPixels,
+  pixelsToTime
+} from './utils';
+
+// Re-export TimelineProps from original Timeline for compatibility
+interface TimelineProps {
+  sections: Section[];
+  currentTime: number;
+  duration: number;
+  animationTypes: AnimationType[];
+  selectedSectionId: number | null;
+  audioBuffer: AudioBuffer | null;
+  showWaveform?: boolean;
+  presetKeyframes: PresetKeyframe[];
+  cameraKeyframes: CameraKeyframe[];
+  textKeyframes: TextKeyframe[];
+  environmentKeyframes: EnvironmentKeyframe[];
+  workspaceObjects?: WorkspaceObject[];
+  cameraFXClips?: CameraFXClip[];
+  selectedFXClipId?: string | null;
+  onSelectSection: (id: number) => void;
+  onUpdateSection: (id: number, field: string, value: any) => void;
+  onAddSection: () => void;
+  onSeek: (time: number) => void;
+  onAddPresetKeyframe?: (time: number) => void;
+  onAddCameraKeyframe?: (time: number) => void;
+  onAddTextKeyframe?: (time: number) => void;
+  onAddEnvironmentKeyframe?: (time: number) => void;
+  onDeletePresetKeyframe?: (id: number) => void;
+  onDeleteCameraKeyframe?: (time: number) => void;
+  onDeleteTextKeyframe?: (id: number) => void;
+  onDeleteEnvironmentKeyframe?: (id: number) => void;
+  onUpdatePresetKeyframe?: (id: number, preset: string) => void;
+  onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
+  onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
+  onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
+  onMovePresetKeyframe?: (id: number, newTime: number) => void;
+  onMoveTextKeyframe?: (id: number, newTime: number) => void;
+  onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
+  onSelectFXClip?: (id: string) => void;
+  onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
+  onDeleteCameraFXClip?: (id: string) => void;
+  onAddCameraFXClip?: (type: 'grid' | 'kaleidoscope' | 'pip', startTime: number) => void;
+}
+
+const LEFT_COLUMN_WIDTH = 240; // Fixed width for track labels
+const RULER_HEIGHT = 40; // Height of time ruler
+const TRACK_HEIGHT = 80; // Height of each track row
+const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
+
+export default function TimelineV2({
+  currentTime,
+  duration,
+  audioBuffer,
+  showWaveform = true,
+  onSeek,
+}: TimelineProps) {
+  const [zoomLevel, setZoomLevel] = useState(1.0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate dimensions
+  const pixelsPerSecond = useMemo(() => calculatePixelsPerSecond(zoomLevel), [zoomLevel]);
+  const timelineWidth = useMemo(
+    () => calculateTimelineWidth(duration, zoomLevel, MIN_TIMELINE_WIDTH),
+    [duration, zoomLevel]
+  );
+
+  // Mock tracks for initial implementation
+  // TODO: Replace with actual track data from props in future PRs
+  const tracks = useMemo(() => [
+    { id: 'audio', name: 'Audio', type: 'audio' as const },
+    { id: 'presets', name: 'Presets', type: 'preset' as const },
+    { id: 'camera', name: 'Camera', type: 'camera' as const },
+    { id: 'text', name: 'Text', type: 'text' as const },
+  ], []);
+
+  // Handle timeline click for seeking
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const time = pixelsToTime(x, pixelsPerSecond);
+    onSeek(Math.max(0, Math.min(duration, time)));
+  };
+
+  // Render time ruler markers
+  const renderRulerMarkers = () => {
+    const markers: JSX.Element[] = [];
+    const secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    
+    for (let time = 0; time <= duration; time += secondsInterval) {
+      const x = timeToPixels(time, pixelsPerSecond);
+      markers.push(
+        <div
+          key={time}
+          className="absolute top-0 bottom-0 flex flex-col items-center"
+          style={{ left: `${x}px` }}
+        >
+          <div className="w-px h-2 bg-gray-500" />
+          <span className="text-xs text-gray-400 mt-1">
+            {formatTime(time)}
+          </span>
+        </div>
+      );
+    }
+    
+    return markers;
+  };
+
+  // Render playhead
+  const playheadX = timeToPixels(currentTime, pixelsPerSecond);
+
+  return (
+    <div className="flex flex-col h-full bg-gray-900 text-white">
+      {/* Header with zoom controls */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium">Zoom:</span>
+          <input
+            type="range"
+            min={MIN_ZOOM}
+            max={MAX_ZOOM}
+            step={0.25}
+            value={zoomLevel}
+            onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+            className="w-32"
+          />
+          <span className="text-xs text-gray-400">{zoomLevel.toFixed(2)}x</span>
+          <button
+            onClick={() => setZoomLevel(1.0)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
+          >
+            Reset
+          </button>
+        </div>
+        <div className="text-sm text-gray-400">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+      </div>
+
+      {/* Main timeline area - two-column layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left column - Fixed track labels */}
+        <div 
+          className="flex-shrink-0 bg-gray-800 border-r border-gray-700 overflow-y-auto"
+          style={{ width: `${LEFT_COLUMN_WIDTH}px` }}
+        >
+          {/* Spacer for ruler */}
+          <div 
+            className="border-b border-gray-700"
+            style={{ height: `${RULER_HEIGHT}px` }}
+          />
+          
+          {/* Track labels */}
+          {tracks.map((track) => (
+            <div
+              key={track.id}
+              className="flex items-center px-4 border-b border-gray-700"
+              style={{ height: `${TRACK_HEIGHT}px` }}
+            >
+              <span className="text-sm font-medium">{track.name}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Right column - Scrollable timeline content */}
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-auto relative"
+        >
+          {/* Sticky ruler at top */}
+          <div
+            className="sticky top-0 z-20 bg-gray-800 border-b border-gray-700"
+            style={{ 
+              height: `${RULER_HEIGHT}px`,
+              width: `${timelineWidth}px`
+            }}
+          >
+            <div className="relative h-full">
+              {renderRulerMarkers()}
+            </div>
+          </div>
+
+          {/* Timeline content container */}
+          <div
+            className="relative"
+            style={{ 
+              width: `${timelineWidth}px`,
+              minHeight: `${tracks.length * TRACK_HEIGHT}px`
+            }}
+            onClick={handleTimelineClick}
+          >
+            {/* Track rows */}
+            {tracks.map((track, index) => (
+              <div
+                key={track.id}
+                className="relative border-b border-gray-700"
+                style={{ height: `${TRACK_HEIGHT}px` }}
+              >
+                {/* Waveform for audio track */}
+                {track.type === 'audio' && showWaveform && audioBuffer && (
+                  <WaveformVisualizer
+                    audioBuffer={audioBuffer}
+                    duration={duration}
+                    width={timelineWidth}
+                    height={TRACK_HEIGHT}
+                    color="rgba(100, 180, 255, 0.3)"
+                  />
+                )}
+
+                {/* Grid lines for visual reference */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
+                    const x = timeToPixels(i, pixelsPerSecond);
+                    return (
+                      <div
+                        key={i}
+                        className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
+                        style={{ left: `${x}px` }}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* TODO: Render keyframes/clips for this track (PR C) */}
+              </div>
+            ))}
+
+            {/* Playhead - spans all tracks */}
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-red-500 pointer-events-none z-10"
+              style={{ left: `${playheadX}px` }}
+            >
+              <div className="absolute -top-1 -left-2 w-4 h-4 bg-red-500 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
