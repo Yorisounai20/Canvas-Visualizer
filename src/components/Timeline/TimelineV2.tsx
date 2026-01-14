@@ -2,6 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Play, Pause, ZoomIn, ZoomOut } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
+import { 
+  BASE_PX_PER_SECOND, 
+  MIN_ZOOM, 
+  MAX_ZOOM, 
+  formatTime, 
+  getPixelsPerSecond 
+} from './utils';
 
 interface TimelineV2Props {
   sections: Section[];
@@ -102,6 +109,9 @@ export default function TimelineV2({
   // Zoom and scroll state
   const [zoom, setZoom] = useState(1.0);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Calculate pixels per second based on zoom
+  const pixelsPerSecond = getPixelsPerSecond(zoom);
 
   // Placeholder: Will be implemented in chunks
   return (
@@ -119,20 +129,20 @@ export default function TimelineV2({
         </div>
 
         <div className="text-sm font-mono">
-          {formatTimeDisplay(currentTime)} / {formatTimeDisplay(duration)}
+          {formatTime(currentTime)} / {formatTime(duration)}
         </div>
 
         <div className="flex items-center gap-2 ml-auto">
           <span className="text-xs text-gray-400">Zoom: {Math.round(zoom * 100)}%</span>
           <button
-            onClick={() => setZoom(Math.max(0.25, zoom - 0.25))}
+            onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - 0.25))}
             className="p-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
             title="Zoom Out"
           >
             <ZoomOut size={14} />
           </button>
           <button
-            onClick={() => setZoom(Math.min(4.0, zoom + 0.25))}
+            onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + 0.25))}
             className="p-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
             title="Zoom In"
           >
@@ -149,9 +159,10 @@ export default function TimelineV2({
         <div className="timeline-placeholder p-8 text-center text-gray-500">
           <p className="text-lg font-semibold mb-2">🚧 New Timeline (TimelineV2) - Under Construction</p>
           <p className="text-sm">This is the new scrollable per-track timeline.</p>
-          <p className="text-sm mt-2">Current time: {formatTimeDisplay(currentTime)}</p>
-          <p className="text-sm">Duration: {formatTimeDisplay(duration)}</p>
+          <p className="text-sm mt-2">Current time: {formatTime(currentTime)}</p>
+          <p className="text-sm">Duration: {formatTime(duration)}</p>
           <p className="text-sm">Zoom: {Math.round(zoom * 100)}%</p>
+          <p className="text-sm">Pixels per second: {Math.round(pixelsPerSecond)}</p>
           <p className="text-xs mt-4 text-gray-600">
             To disable this new timeline, run in browser console:
             <br />
@@ -165,14 +176,4 @@ export default function TimelineV2({
       </div>
     </div>
   );
-}
-
-/**
- * Format time in MM:SS.mmm format
- */
-function formatTimeDisplay(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
 }
