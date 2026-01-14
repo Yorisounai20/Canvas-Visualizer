@@ -447,6 +447,10 @@ export default function TimelineV2({
         // Left click only - right click handled by onContextMenu
         if (e.button !== 0) return;
         
+        let hasMoved = false;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        
         setIsDraggingKeyframe(true);
         setDraggedKeyframe({
           trackType,
@@ -457,6 +461,13 @@ export default function TimelineV2({
         
         const handleMouseMove = (moveE: MouseEvent) => {
           if (!scrollContainerRef.current) return;
+          
+          // Check if mouse moved enough to consider it a drag (>3px)
+          const dx = Math.abs(moveE.clientX - startX);
+          const dy = Math.abs(moveE.clientY - startY);
+          if (dx > 3 || dy > 3) {
+            hasMoved = true;
+          }
           
           requestAnimationFrame(() => {
             const rect = scrollContainerRef.current!.getBoundingClientRect();
@@ -479,10 +490,15 @@ export default function TimelineV2({
           document.removeEventListener('mouseup', handleMouseUp);
           document.body.style.cursor = '';
           
-          if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
-            // TODO: Call appropriate onMove callback based on track type
-            // For now, just log the change
+          if (!hasMoved) {
+            // This was a click, not a drag - select the keyframe
+            console.log(`Selected keyframe: ${fullKeyId} at ${formatTime(time)}`);
+            // TODO: Open inspector panel and focus on this keyframe
+            setSelectedKeyframes(new Set([fullKeyId]));
+          } else if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
+            // This was a drag - move the keyframe
             console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
+            // TODO: Call appropriate onMove callback based on track type
           }
           
           setIsDraggingKeyframe(false);
