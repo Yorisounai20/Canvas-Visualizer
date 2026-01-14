@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 
 interface WaveformVisualizerProps {
   audioBuffer: AudioBuffer | null;
@@ -6,72 +6,38 @@ interface WaveformVisualizerProps {
   width: number;
   height?: number;
   color?: string;
-  debounceMs?: number; // Debounce time for canvas redraws
 }
 
 /**
  * WaveformVisualizer Component - Displays audio waveform in timeline
- * Renders waveform from audio buffer data with optimized canvas handling
- * 
- * Performance improvements:
- * - Debounced canvas redraws to avoid repeated canvas resets during resize/zoom
- * - Only redraws when audioBuffer or dimensions actually change
- * - Avoids redrawing during scroll (canvas is positioned, not redrawn)
+ * Renders waveform from audio buffer data
  */
 export default function WaveformVisualizer({
   audioBuffer,
   duration,
   width,
   height = 60,
-  color = 'rgba(100, 180, 255, 0.3)',
-  debounceMs = 150
+  color = 'rgba(100, 180, 255, 0.3)'
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const debounceTimerRef = useRef<number | null>(null);
-  const [debouncedWidth, setDebouncedWidth] = useState(width);
-  const [debouncedHeight, setDebouncedHeight] = useState(height);
 
-  // Debounce width/height changes to avoid excessive redraws
   useEffect(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-
-    debounceTimerRef.current = setTimeout(() => {
-      // Only update if values actually changed
-      if (width !== debouncedWidth) {
-        setDebouncedWidth(width);
-      }
-      if (height !== debouncedHeight) {
-        setDebouncedHeight(height);
-      }
-    }, debounceMs) as unknown as number;
-
-    return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-      }
-    };
-  }, [width, height, debounceMs, debouncedWidth, debouncedHeight]);
-
-  // Draw waveform only when debounced dimensions or audioBuffer change
-  const drawWaveform = useCallback(() => {
     if (!audioBuffer || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size (this resets the canvas)
-    canvas.width = debouncedWidth;
-    canvas.height = debouncedHeight;
+    // Set canvas size
+    canvas.width = width;
+    canvas.height = height;
 
     // Clear canvas
-    ctx.clearRect(0, 0, debouncedWidth, debouncedHeight);
+    ctx.clearRect(0, 0, width, height);
 
     // Get audio data from first channel
     const rawData = audioBuffer.getChannelData(0);
-    const samples = debouncedWidth; // One sample per pixel
+    const samples = width; // One sample per pixel
     const blockSize = Math.floor(rawData.length / samples);
     const filteredData = [];
 
@@ -93,7 +59,7 @@ export default function WaveformVisualizer({
     ctx.fillStyle = color;
     ctx.beginPath();
     
-    const middle = debouncedHeight / 2;
+    const middle = height / 2;
     
     for (let i = 0; i < normalizedData.length; i++) {
       const x = i;
@@ -102,11 +68,7 @@ export default function WaveformVisualizer({
       // Draw mirrored bars (top and bottom)
       ctx.fillRect(x, middle - barHeight, 1, barHeight * 2);
     }
-  }, [audioBuffer, debouncedWidth, debouncedHeight, color]);
-
-  useEffect(() => {
-    drawWaveform();
-  }, [drawWaveform]);
+  }, [audioBuffer, width, height, color]);
 
   if (!audioBuffer) {
     return (

@@ -79,9 +79,6 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
-import Timeline from './components/Timeline/Timeline';
-import TimelineV2 from './components/Timeline/TimelineV2';
-import { getFeatureFlag } from './lib/featureFlags';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -8192,62 +8189,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  // Check feature flag for new timeline
-  const useNewTimeline = getFeatureFlag('cv_use_scrollable_timeline');
-  
-  // Log timeline mode for debugging
-  useEffect(() => {
-    console.log(`[Timeline] Using ${useNewTimeline ? 'TimelineV2 (new scrollable)' : 'original waveform display'}`);
-    if (useNewTimeline) {
-      console.log('[Timeline] To disable: window.disableNewTimeline()');
-    } else {
-      console.log('[Timeline] To enable: window.enableNewTimeline()');
-    }
-  }, [useNewTimeline]);
-
-  const timelinePanelJSX = useNewTimeline ? (
-    // New scrollable timeline (PR B+)
-    <TimelineV2
-      sections={sections}
-      currentTime={currentTime}
-      duration={duration}
-      animationTypes={animationTypes}
-      selectedSectionId={null}
-      audioBuffer={audioBufferRef.current}
-      showWaveform={true}
-      presetKeyframes={presetKeyframes}
-      cameraKeyframes={cameraKeyframes}
-      textKeyframes={textAnimatorKeyframes}
-      environmentKeyframes={environmentKeyframes}
-      workspaceObjects={[]}
-      cameraFXClips={cameraFXClips}
-      selectedFXClipId={selectedFXClipId}
-      onSelectSection={() => {}}
-      onUpdateSection={updateSection}
-      onAddSection={addSection}
-      onSeek={seekTo}
-      onAddPresetKeyframe={() => {}}
-      onAddCameraKeyframe={() => {}}
-      onAddTextKeyframe={() => {}}
-      onAddEnvironmentKeyframe={() => {}}
-      onDeletePresetKeyframe={() => {}}
-      onDeleteCameraKeyframe={() => {}}
-      onDeleteTextKeyframe={() => {}}
-      onDeleteEnvironmentKeyframe={() => {}}
-      onUpdatePresetKeyframe={() => {}}
-      onUpdateCameraKeyframe={() => {}}
-      onUpdateTextKeyframe={() => {}}
-      onUpdateEnvironmentKeyframe={() => {}}
-      onMovePresetKeyframe={() => {}}
-      onMoveTextKeyframe={() => {}}
-      onMoveEnvironmentKeyframe={() => {}}
-      onSelectFXClip={() => {}}
-      onUpdateCameraFXClip={() => {}}
-      onDeleteCameraFXClip={() => {}}
-      onAddCameraFXClip={() => {}}
-    />
-  ) : (
-    // Original waveform display timeline
+  const timelinePanelJSX = (
     <>
       {/* Waveform Display - Between Canvas and Tabs - Always visible */}
       <div className="bg-gray-800 rounded-lg p-4">
