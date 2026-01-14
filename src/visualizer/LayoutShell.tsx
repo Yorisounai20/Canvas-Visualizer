@@ -15,8 +15,8 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
   
   // Calculate timeline height: collapsed = 40px (header only), expanded = 128px
   const timelineHeight = timelineCollapsed ? '40px' : '128px';
-  const canvasBottom = timelineCollapsed ? 'calc(40px+0.5px)' : 'calc(8rem+0.5px)';
-  const panelHeight = timelineCollapsed ? 'calc(100%-40px-10px-0.5px)' : 'calc(100%-8rem-10px-0.5px)';
+  // Canvas bottom: timeline height + 0.5px gap
+  const canvasBottom = timelineCollapsed ? 'calc(40px + 0.5px)' : 'calc(128px + 0.5px)';
   
   return (
     <div className="cv-layout flex flex-col h-screen w-full bg-gray-900 overflow-hidden">
@@ -29,7 +29,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
       <div className="flex-1 relative overflow-hidden min-h-0">
         {/* Center content - main canvas with 10px gap from top */}
         <main 
-          className="absolute left-0 right-0 top-[10px] overflow-hidden flex flex-col transition-all duration-200"
+          className="absolute inset-x-0 top-[10px] overflow-hidden flex flex-col transition-all duration-200"
           style={{ bottom: canvasBottom }}
         >
           {children}
@@ -38,7 +38,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
         {/* Left sidebar - shortened to align with canvas bottom */}
         <aside 
           className="absolute left-0 top-[10px] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl overflow-y-auto transition-all duration-200"
-          style={{ height: panelHeight }}
+          style={{ bottom: canvasBottom }}
         >
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
             {left}
@@ -48,7 +48,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
         {/* Right sidebar - shortened to align with canvas bottom */}
         <aside 
           className="absolute right-0 top-[10px] w-64 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl overflow-y-auto transition-all duration-200"
-          style={{ height: panelHeight }}
+          style={{ bottom: canvasBottom }}
         >
           <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
             {inspector}
