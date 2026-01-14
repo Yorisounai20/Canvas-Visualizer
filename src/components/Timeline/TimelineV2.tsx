@@ -126,20 +126,30 @@ export default function TimelineV2({
   // RAF-throttled drag state (stored in refs to avoid re-renders during drag)
   const dragStateRef = useRef<{
     isDragging: boolean;
-    type: 'playhead' | 'keyframe' | null;
+    type: 'playhead' | 'keyframe' | 'pan' | null;
     keyframeId: number | null;
     startX: number;
+    startY: number;
     startTime: number;
     lastClientX: number;
+    lastClientY: number;
+    startScrollLeft: number;
+    startScrollTop: number;
     rafId: number | null;
+    mouseButton: number | null;
   }>({
     isDragging: false,
     type: null,
     keyframeId: null,
     startX: 0,
+    startY: 0,
     startTime: 0,
     lastClientX: 0,
-    rafId: null
+    lastClientY: 0,
+    startScrollLeft: 0,
+    startScrollTop: 0,
+    rafId: null,
+    mouseButton: null
   });
   
   // Preview position during drag (only updated via RAF)
@@ -320,6 +330,174 @@ export default function TimelineV2({
       document.removeEventListener('pointerup', handlePointerUp);
     };
   }, [handlePointerMove, handlePointerUp]);
+  
+  // Wheel handler for zoom (Shift+wheel) and horizontal scroll
+  const handleWheel = useCallback((e: WheelEvent) => {
+    const container = timelineContentRef.current;
+    if (!container) return;
+    
+    if (e.shiftKey) {
+      // Shift+wheel: zoom centered on mouse
+      e.preventDefault();
+      
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseTime = pixelsToTime(mouseX + container.scrollLeft, pixelsPerSecond);
+      
+      // Calculate new zoom
+      const ZOOM_SENSITIVITY = 0.0015;
+      const zoomFactor = 1 - e.deltaY * ZOOM_SENSITIVITY;
+      const newZoom = clamp(zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
+      
+      setZoom(newZoom);
+      
+      // Adjust scroll to keep mouse position at same time
+      requestAnimationFrame(() => {
+        const newPPS = getPixelsPerSecond(newZoom);
+        const newMousePixels = timeToPixels(mouseTime, newPPS);
+        container.scrollLeft = newMousePixels - mouseX;
+      });
+    } else {
+      // Regular wheel: horizontal scroll
+      // Prefer deltaX if available (horizontal scroll), otherwise map deltaY to horizontal
+      const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
+      container.scrollLeft += delta;
+    }
+  }, [pixelsPerSecond, zoom]);
+  
+  // Right-click drag to pan
+  const handleTimelinePointerDown = useCallback((e: React.PointerEvent) => {
+    const container = timelineContentRef.current;
+    if (!container) return;
+    
+    // Right button (button 2)
+    if (e.button === 2) {
+      e.preventDefault();
+      
+      dragStateRef.current = {
+        isDragging: true,
+        type: 'pan',
+        keyframeId: null,
+        startX: e.clientX,
+        startY: e.clientY,
+        startTime: 0,
+        lastClientX: e.clientX,
+        lastClientY: e.clientY,
+        startScrollLeft: container.scrollLeft,
+        startScrollTop: container.scrollTop,
+        rafId: null,
+        mouseButton: 2
+      };
+      
+      // Set cursor
+      container.style.cursor = 'grabbing';
+    }
+  }, []);
+  
+  // Update pointer move handler to support pan
+  useEffect(() => {
+    const handleMove = (e: PointerEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState.isDragging) return;
+      
+      dragState.lastClientX = e.clientX;
+      dragState.lastClientY = e.clientY;
+      
+      // Throttle updates using RAF
+      if (!dragState.rafId) {
+        dragState.rafId = requestAnimationFrame(() => {
+          dragState.rafId = null;
+          
+          const container = timelineContentRef.current;
+          if (!container) return;
+          
+          if (dragState.type === 'pan') {
+            // Pan: update scroll position
+            const dx = dragState.startX - dragState.lastClientX;
+            const dy = dragState.startY - dragState.lastClientY;
+            container.scrollLeft = dragState.startScrollLeft + dx;
+            container.scrollTop = dragState.startScrollTop + dy;
+          } else if (dragState.type === 'playhead') {
+            // Playhead: update preview time
+            const rect = container.getBoundingClientRect();
+            const currentX = dragState.lastClientX - rect.left + container.scrollLeft;
+            const newTime = pixelsToTime(currentX, pixelsPerSecond);
+            const snappedTime = snapTime(newTime, gridSize, snapEnabled);
+            const clampedTime = clamp(snappedTime, 0, duration);
+            setPreviewTime(clampedTime);
+          }
+        });
+      }
+    };
+    
+    const handleUp = (e: PointerEvent) => {
+      const dragState = dragStateRef.current;
+      if (!dragState.isDragging) return;
+      
+      // Cancel any pending RAF
+      if (dragState.rafId) {
+        cancelAnimationFrame(dragState.rafId);
+        dragState.rafId = null;
+      }
+      
+      const container = timelineContentRef.current;
+      
+      if (dragState.type === 'pan') {
+        // Check if it was a short click (< 5px movement) for context menu
+        const dx = Math.abs(e.clientX - dragState.startX);
+        const dy = Math.abs(e.clientY - dragState.startY);
+        const wasShortClick = dx < 5 && dy < 5;
+        
+        if (wasShortClick && dragState.mouseButton === 2) {
+          // TODO: Show context menu (Chunk 5)
+        }
+        
+        // Reset cursor
+        if (container) {
+          container.style.cursor = 'default';
+        }
+      } else if (dragState.type === 'playhead' && container) {
+        // Commit playhead position
+        const rect = container.getBoundingClientRect();
+        const finalX = e.clientX - rect.left + container.scrollLeft;
+        const finalTime = pixelsToTime(finalX, pixelsPerSecond);
+        const snappedTime = snapTime(finalTime, gridSize, snapEnabled);
+        const clampedTime = clamp(snappedTime, 0, duration);
+        onSeek(clampedTime);
+      }
+      
+      // Reset drag state
+      dragStateRef.current.isDragging = false;
+      dragStateRef.current.type = null;
+      setPreviewTime(null);
+    };
+    
+    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointerup', handleUp);
+    
+    return () => {
+      document.removeEventListener('pointermove', handleMove);
+      document.removeEventListener('pointerup', handleUp);
+    };
+  }, [duration, gridSize, onSeek, pixelsPerSecond, snapEnabled]);
+  
+  // Set up wheel event listener
+  useEffect(() => {
+    const container = timelineContentRef.current;
+    if (!container) return;
+    
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+  
+  // Context menu handler (prevent default, will implement menu in Chunk 5)
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // Context menu implementation in Chunk 5
+  }, []);
 
   // Calculate playhead position
   const playheadX = timeToPixels(previewTime ?? currentTime, pixelsPerSecond);
@@ -394,6 +572,8 @@ export default function TimelineV2({
       <div
         ref={timelineContentRef}
         className="timeline-content flex-1 overflow-auto relative bg-gray-950"
+        onPointerDown={handleTimelinePointerDown}
+        onContextMenu={handleContextMenu}
       >
         {/* Timeline ruler and tracks */}
         <div 
@@ -454,12 +634,13 @@ export default function TimelineV2({
             
             {/* Info panel */}
             <div className="p-4 text-gray-500 text-sm">
-              <p className="font-semibold mb-2">✅ Chunk 3 Complete - Waveform Optimization</p>
+              <p className="font-semibold mb-2">✅ Chunk 4 Complete - Wheel/Zoom/Pan/Scroll</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Sample count capped: 256-4096 (adaptive based on width)</li>
-                <li>Debounced redraw: 100ms delay on width changes</li>
-                <li>Cached downsampled waveform data</li>
-                <li>Loading spinner during waveform generation</li>
+                <li>Shift+Wheel: Zoom centered on mouse position</li>
+                <li>Regular wheel: Horizontal scroll (maps deltaY to scrollLeft)</li>
+                <li>Right-click drag: Pan both axes (shows grabbing cursor)</li>
+                <li>Short right-click: Context menu (will show in Chunk 5)</li>
+                <li>Zoom sensitivity: 0.0015 (smooth zooming)</li>
                 <li>Waveform mode: 
                   <select
                     value={waveformMode}
