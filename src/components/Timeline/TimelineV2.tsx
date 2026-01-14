@@ -116,6 +116,7 @@ export default function TimelineV2({
   const [zoom, setZoom] = useState(1.0);
   const [snapEnabled, setSnapEnabled] = useState(true);
   const [gridSize, setGridSize] = useState(0.1); // 100ms grid by default
+  const [waveformMode, setWaveformMode] = useState<'mirrored' | 'top'>('top'); // Waveform display mode
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineContentRef = useRef<HTMLDivElement>(null);
   
@@ -431,23 +432,45 @@ export default function TimelineV2({
           </div>
           
           {/* Tracks placeholder */}
-          <div className="timeline-tracks p-4">
-            <div className="text-gray-500 text-sm">
-              <p className="font-semibold mb-2">✅ Chunk 2 Complete - RAF-Throttled Interactions</p>
+          <div className="timeline-tracks relative">
+            {/* Audio track with waveform */}
+            {audioBuffer && (
+              <div className="track-row h-24 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <span className="text-xs text-gray-400 font-medium">Audio</span>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  <WaveformVisualizer
+                    audioBuffer={audioBuffer}
+                    duration={duration}
+                    width={timelineWidth}
+                    height={96}
+                    color="rgba(6, 182, 212, 0.4)"
+                    mode={waveformMode}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Info panel */}
+            <div className="p-4 text-gray-500 text-sm">
+              <p className="font-semibold mb-2">✅ Chunk 3 Complete - Waveform Optimization</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Playhead drag with RAF throttling</li>
-                <li>Snap-to-grid: {snapEnabled ? 'ON' : 'OFF'} (Grid: {gridSize}s)</li>
-                <li>Keyboard navigation implemented:</li>
-                <li className="ml-4">• Space: Play/Pause</li>
-                <li className="ml-4">• Left/Right: Frame step (±{(1/DEFAULT_FPS).toFixed(3)}s)</li>
-                <li className="ml-4">• Shift+Left/Right: ±1s</li>
-                <li className="ml-4">• Ctrl/Cmd+Left/Right: ±5s</li>
-                <li className="ml-4">• PageUp/PageDown: Viewport jump</li>
-                <li className="ml-4">• Home/End: Start/End</li>
+                <li>Sample count capped: 256-4096 (adaptive based on width)</li>
+                <li>Debounced redraw: 100ms delay on width changes</li>
+                <li>Cached downsampled waveform data</li>
+                <li>Loading spinner during waveform generation</li>
+                <li>Waveform mode: 
+                  <select
+                    value={waveformMode}
+                    onChange={(e) => setWaveformMode(e.target.value as 'mirrored' | 'top')}
+                    className="ml-2 text-xs bg-gray-700 text-white px-2 py-1 rounded"
+                  >
+                    <option value="top">Top only</option>
+                    <option value="mirrored">Mirrored</option>
+                  </select>
+                </li>
               </ul>
-              <p className="mt-3 text-xs text-gray-600">
-                Click timeline ruler to test playhead drag. Focus timeline and use keyboard shortcuts.
-              </p>
             </div>
           </div>
           
