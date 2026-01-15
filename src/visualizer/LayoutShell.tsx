@@ -35,20 +35,20 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
           {children}
         </main>
 
-        {/* Left sidebar - shortened to align with canvas bottom */}
+        {/* Left sidebar - half-page height, scrollable */}
         <aside 
           className="absolute left-0 top-[10px] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl overflow-y-auto transition-all duration-200"
-          style={{ bottom: canvasBottom }}
+          style={{ height: 'calc(50vh - 10px)' }}
         >
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Right sidebar - shortened to align with canvas bottom */}
+        {/* Right sidebar - half-page height, scrollable */}
         <aside 
           className="absolute right-0 top-[10px] w-64 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl overflow-y-auto transition-all duration-200"
-          style={{ bottom: canvasBottom }}
+          style={{ height: 'calc(50vh - 10px)' }}
         >
           <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
             {inspector}

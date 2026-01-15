@@ -8627,25 +8627,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
       </div>
-
-      {/* Debug Console Modal - Toggled with ` key */}
-      <DebugConsole 
-        logs={errorLog} 
-        isOpen={showDebugConsole} 
-        onToggle={() => setShowDebugConsole(prev => !prev)} 
-      />
     </div>
   );
   // --- End constants ---
 
   return (
-    <LayoutShell
-      left={leftPanelJSX}
-      inspector={inspectorJSX}
-      timeline={timelineV2JSX}
-      top={topBarJSX}
-    >
-      {canvasAreaJSX}
+    <>
+      <LayoutShell
+        left={leftPanelJSX}
+        inspector={inspectorJSX}
+        timeline={timelineV2JSX}
+        top={topBarJSX}
+      >
+        {canvasAreaJSX}
 
       {/* Export Modal */}
       <VideoExportModal
@@ -9215,5 +9209,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         />
       )}
     </LayoutShell>
+
+    {/* Debug Console Modal - Full viewport overlay, outside LayoutShell - Toggled with ` key */}
+    <DebugConsole 
+      logs={errorLog} 
+      isOpen={showDebugConsole} 
+      onToggle={() => setShowDebugConsole(prev => !prev)} 
+    />
+  </>
   );
 }
