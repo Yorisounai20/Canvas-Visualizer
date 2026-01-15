@@ -79,9 +79,7 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
-import Timeline from './components/Timeline/Timeline';
 import TimelineV2 from './components/Timeline/TimelineV2';
-import { getFeatureFlag } from './lib/featureFlags';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -97,9 +95,6 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
-  // Feature flag: check if new scrollable timeline should be used
-  const useNewTimeline = getFeatureFlag('cv_use_scrollable_timeline');
-  
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -8195,7 +8190,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  const timelinePanelJSX = useNewTimeline ? (
+  const timelinePanelJSX = (
     <TimelineV2
       sections={sections}
       currentTime={currentTime}
@@ -8246,76 +8241,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onDeleteCameraFXClip={deleteCameraFXClip}
       onAddCameraFXClip={addCameraFXClip}
     />
-  ) : (
-    // Original waveform display timeline
-    <>
-      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-4">
-          {/* Time Display and Preset Info - No Audio Upload */}
-          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
-            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && (() => {
-              const currentPreset = getCurrentPreset();
-              const animType = animationTypes.find(a => a.value === currentPreset);
-              return animType && (
-                <p className="text-cyan-400 text-xs mt-1">
-                  {animType.icon} {animType.label}
-                </p>
-              );
-            })()}
-            
-            {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
-          </div>
-          
-          {/* Combined Waveform from all tracks */}
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && audioTracks.length > 0 ? (
-                <canvas 
-                  ref={waveformCanvasRef} 
-                  width={800} 
-                  height={120}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
-                </div>
-              )}
-            </div>
-            
-            {/* Timeline Slider - Always visible when audio is ready */}
-            {audioReady && duration > 0 && (
-              <div className="flex items-center gap-3">
-                <input 
-                  type="range" id="currentTime" name="currentTime" 
-                  min="0" 
-                  max={duration} 
-                  step="0.1" 
-                  value={currentTime} 
-                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
-                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
-                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
-                />
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <input 
-                    type="checkbox" 
-                    id="waveformMode" 
-                    checked={waveformMode === 'static'} 
-                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
-                    className="w-3 h-3 cursor-pointer"
-                    aria-label="Toggle between scrolling and static waveform modes"
-                  />
-                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
   );
 
   const canvasAreaJSX = (
