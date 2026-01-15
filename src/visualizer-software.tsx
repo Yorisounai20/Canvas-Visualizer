@@ -79,6 +79,7 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
+import TimelineV2 from './components/Timeline/TimelineV2';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -94,6 +95,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Drag & Drop state
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -8019,6 +8023,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
+      } else if (e.key === '`' || e.key === '~') {
+        // Bug #2: Toggle debug console with backtick key
+        e.preventDefault();
+        setShowDebugConsole(prev => !prev);
       } else if (e.key >= '1' && e.key <= '9') {
         // Number keys 1-9 for tab navigation
         const tabIndex = parseInt(e.key) - 1;
@@ -8033,7 +8041,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu, showDebugConsole]);
 
   // Close file menu when clicking outside
   useEffect(() => {
@@ -8189,79 +8197,67 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  const timelinePanelJSX = (
-    <>
-      {/* Waveform Display - Between Canvas and Tabs - Always visible */}
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex items-center gap-4">
-          {/* Time Display and Preset Info - No Audio Upload */}
-          <div className="flex-shrink-0 bg-gray-700 rounded-lg px-4 py-3">
-            <p className="text-white text-lg font-mono font-bold">{formatTime(currentTime)} / {formatTime(duration)}</p>
-            {showPresetDisplay && (() => {
-              const currentPreset = getCurrentPreset();
-              const animType = animationTypes.find(a => a.value === currentPreset);
-              return animType && (
-                <p className="text-cyan-400 text-xs mt-1">
-                  {animType.icon} {animType.label}
-                </p>
-              );
-            })()}
-            
-            {/* Play/Stop Button */}
-            {audioReady && <button onClick={isPlaying ? (audioTracks.length > 0 ? stopMultiTrackAudio : stopAudio) : (audioTracks.length > 0 ? playMultiTrackAudio : playAudio)} className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm">{isPlaying ? <><Square size={14} /> Stop</> : <><Play size={14} /> Play</>}</button>}
-          </div>
-          
-          {/* Combined Waveform from all tracks */}
-          <div className="flex-1 flex flex-col gap-2">
-            <div className="bg-black rounded-lg p-2 cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all" onClick={audioReady ? handleWaveformClick : undefined} title="Click to seek">
-              {audioReady && audioTracks.length > 0 ? (
-                <canvas 
-                  ref={waveformCanvasRef} 
-                  width={800} 
-                  height={120}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="flex items-center justify-center h-[120px] text-gray-500 text-sm">
-                  {audioTracks.length === 0 ? 'Add audio tracks in the Waveforms tab to see combined visualization' : 'Upload an audio file to see the waveform'}
-                </div>
-              )}
-            </div>
-            
-            {/* Timeline Slider - Always visible when audio is ready */}
-            {audioReady && duration > 0 && (
-              <div className="flex items-center gap-3">
-                <input 
-                  type="range" id="currentTime" name="currentTime" 
-                  min="0" 
-                  max={duration} 
-                  step="0.1" 
-                  value={currentTime} 
-                  onChange={(e) => seekTo(parseFloat(e.target.value))} 
-                  className="flex-1 h-2 rounded-full appearance-none cursor-pointer" 
-                  style={{background:`linear-gradient(to right, #06b6d4 0%, #06b6d4 ${(currentTime/duration)*100}%, #374151 ${(currentTime/duration)*100}%, #374151 100%)`}} 
-                />
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <input 
-                    type="checkbox" 
-                    id="waveformMode" 
-                    checked={waveformMode === 'static'} 
-                    onChange={(e) => setWaveformMode(e.target.checked ? 'static' : 'scrolling')} 
-                    className="w-3 h-3 cursor-pointer"
-                    aria-label="Toggle between scrolling and static waveform modes"
-                  />
-                  <label htmlFor="waveformMode" className="cursor-pointer whitespace-nowrap">Static</label>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </>
+  // TimelineV2 component
+  const timelineV2JSX = (
+    <TimelineV2
+      currentTime={currentTime}
+      duration={duration}
+      audioBuffer={audioTracks[0]?.buffer || null}
+      onSeek={seekTo}
+      isPlaying={isPlaying}
+      onPlayPause={audioReady ? (audioTracks.length > 0 ? playMultiTrackAudio : playAudio) : undefined}
+    />
   );
 
+  // Drag and drop handlers for audio files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingFile(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set false if we're leaving the drop zone entirely
+    if (e.currentTarget === e.target) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const audioFile = files.find(f => f.type.startsWith('audio/'));
+    
+    if (audioFile) {
+      await addAudioTrack(audioFile);
+    } else {
+      addLog('Please drop an audio file', 'error');
+    }
+  };
+
   const canvasAreaJSX = (
-    <div className="flex items-start justify-center w-full h-full bg-gray-950 pt-8">
+    <div 
+      className="flex items-start justify-center w-full h-full bg-gray-950 pt-8 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 bg-purple-900 bg-opacity-80 flex items-center justify-center z-40 pointer-events-none">
+          <div className="bg-purple-700 rounded-lg p-8 shadow-2xl animate-pulse">
+            <p className="text-white text-2xl font-bold">🎵 Drop Audio File Here</p>
+          </div>
+        </div>
+      )}
+      
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -8544,15 +8540,39 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
-            <p className="text-xs text-gray-400 mb-3">
-              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
-            </p>
-            <p className="text-xs text-gray-500 italic">
-              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
-            </p>
-          </div>
+          <EffectsTab
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            skyboxGradientTop={skyboxGradientTop}
+            skyboxGradientBottom={skyboxGradientBottom}
+            skyboxImageUrl={skyboxImageUrl}
+            starCount={starCount}
+            galaxyColor={galaxyColor}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setSkyboxGradientTop={setSkyboxGradientTop}
+            setSkyboxGradientBottom={setSkyboxGradientBottom}
+            setSkyboxImageUrl={setSkyboxImageUrl}
+            setStarCount={setStarCount}
+            setGalaxyColor={setGalaxyColor}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setBorderColor={setBorderColor}
+            showLetterbox={showLetterbox}
+            letterboxSize={letterboxSize}
+            setShowLetterbox={setShowLetterbox}
+            setLetterboxSize={setLetterboxSize}
+            useLetterboxAnimation={useLetterboxAnimation}
+            setUseLetterboxAnimation={setUseLetterboxAnimation}
+            letterboxKeyframes={letterboxKeyframes}
+            setLetterboxKeyframes={setLetterboxKeyframes}
+            currentTime={currentTime}
+            duration={duration}
+            nextLetterboxKeyframeId={nextLetterboxKeyframeId}
+          />
         )}
         
         {activeTab === 'environments' && (
@@ -8681,25 +8701,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
       </div>
-
-      {/* Debug Console Modal - Toggled with ` key */}
-      <DebugConsole 
-        logs={errorLog} 
-        isOpen={showDebugConsole} 
-        onToggle={() => setShowDebugConsole(prev => !prev)} 
-      />
     </div>
   );
   // --- End constants ---
 
   return (
-    <LayoutShell
-      left={leftPanelJSX}
-      inspector={inspectorJSX}
-      timeline={timelinePanelJSX}
-      top={topBarJSX}
-    >
-      {canvasAreaJSX}
+    <>
+      <LayoutShell
+        left={leftPanelJSX}
+        inspector={inspectorJSX}
+        timeline={timelineV2JSX}
+        top={topBarJSX}
+      >
+        {canvasAreaJSX}
 
       {/* Export Modal */}
       <VideoExportModal
@@ -9217,6 +9231,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   </div>
                 </div>
 
+                {/* Debug/Developer */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Debug/Developer</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle debug console</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">`</kbd>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Mouse Controls */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Mouse Controls (When Paused)</h3>
@@ -9258,5 +9283,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         />
       )}
     </LayoutShell>
+
+    {/* Debug Console Modal - Full viewport overlay, outside LayoutShell - Toggled with ` key */}
+    <DebugConsole 
+      logs={errorLog} 
+      isOpen={showDebugConsole} 
+      onToggle={() => setShowDebugConsole(prev => !prev)} 
+    />
+  </>
   );
 }
