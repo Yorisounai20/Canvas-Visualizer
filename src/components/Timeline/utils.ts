@@ -102,26 +102,6 @@ export function roundToFrame(time: number, fps: number = DEFAULT_FPS): number {
 }
 
 /**
- * Format time in seconds to human-readable string (MM:SS or MM:SS:FF)
- * @param seconds - Time in seconds
- * @param fps - Optional frames per second for frame display
- * @returns Formatted time string
- */
-export function formatTime(seconds: number, fps?: number): string {
-  const absSeconds = Math.abs(seconds);
-  const sign = seconds < 0 ? '-' : '';
-  const minutes = Math.floor(absSeconds / 60);
-  const secs = Math.floor(absSeconds % 60);
-  
-  if (fps) {
-    const frames = Math.floor((absSeconds % 1) * fps);
-    return `${sign}${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-  }
-  
-  return `${sign}${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
-/**
  * Clamp zoom level to valid range
  * @param zoom - Desired zoom level
  * @returns Clamped zoom level between MIN_ZOOM and MAX_ZOOM
@@ -174,18 +154,6 @@ export function stepByFrames(
  */
 export function timeToFrame(time: number, fps: number = DEFAULT_FPS): number {
   return Math.floor(time * fps);
-}
-
-/**
- * Get time from frame number
- * @param frame - Frame number (0-indexed)
- * @param fps - Frames per second (default: 30)
- * @param timeSec - Time in seconds
- * @param fps - Frames per second (defaults to DEFAULT_FPS)
- * @returns Frame number (0-indexed)
- */
-export function timeToFrame(timeSec: number, fps: number = DEFAULT_FPS): number {
-  return Math.floor(timeSec * fps);
 }
 
 /**
