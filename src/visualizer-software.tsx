@@ -95,6 +95,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Drag & Drop state
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -8206,8 +8209,55 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     />
   );
 
+  // Drag and drop handlers for audio files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingFile(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set false if we're leaving the drop zone entirely
+    if (e.currentTarget === e.target) {
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const audioFile = files.find(f => f.type.startsWith('audio/'));
+    
+    if (audioFile) {
+      await addAudioTrack(audioFile);
+    } else {
+      addLog('Please drop an audio file', 'error');
+    }
+  };
+
   const canvasAreaJSX = (
-    <div className="flex items-start justify-center w-full h-full bg-gray-950 pt-8">
+    <div 
+      className="flex items-start justify-center w-full h-full bg-gray-950 pt-8 relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 bg-purple-900 bg-opacity-80 flex items-center justify-center z-40 pointer-events-none">
+          <div className="bg-purple-700 rounded-lg p-8 shadow-2xl animate-pulse">
+            <p className="text-white text-2xl font-bold">🎵 Drop Audio File Here</p>
+          </div>
+        </div>
+      )}
+      
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -8490,15 +8540,39 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
-            <p className="text-xs text-gray-400 mb-3">
-              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
-            </p>
-            <p className="text-xs text-gray-500 italic">
-              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
-            </p>
-          </div>
+          <EffectsTab
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            skyboxGradientTop={skyboxGradientTop}
+            skyboxGradientBottom={skyboxGradientBottom}
+            skyboxImageUrl={skyboxImageUrl}
+            starCount={starCount}
+            galaxyColor={galaxyColor}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setSkyboxGradientTop={setSkyboxGradientTop}
+            setSkyboxGradientBottom={setSkyboxGradientBottom}
+            setSkyboxImageUrl={setSkyboxImageUrl}
+            setStarCount={setStarCount}
+            setGalaxyColor={setGalaxyColor}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setBorderColor={setBorderColor}
+            showLetterbox={showLetterbox}
+            letterboxSize={letterboxSize}
+            setShowLetterbox={setShowLetterbox}
+            setLetterboxSize={setLetterboxSize}
+            useLetterboxAnimation={useLetterboxAnimation}
+            setUseLetterboxAnimation={setUseLetterboxAnimation}
+            letterboxKeyframes={letterboxKeyframes}
+            setLetterboxKeyframes={setLetterboxKeyframes}
+            currentTime={currentTime}
+            duration={duration}
+            nextLetterboxKeyframeId={nextLetterboxKeyframeId}
+          />
         )}
         
         {activeTab === 'environments' && (
