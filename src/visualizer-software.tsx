@@ -8197,7 +8197,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       duration={duration}
       animationTypes={animationTypes}
       selectedSectionId={selectedSectionId}
-      selectedSectionId={null}
       audioBuffer={audioBufferRef.current}
       showWaveform={true}
       presetKeyframes={presetKeyframes}
