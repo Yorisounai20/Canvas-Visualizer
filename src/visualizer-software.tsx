@@ -98,7 +98,7 @@ interface ThreeDVisualizerProps {
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
   // Feature flag: check if new scrollable timeline should be used
-  const useNewTimeline = useScrollableTimeline();
+  const useNewTimeline = getFeatureFlag('cv_use_scrollable_timeline');
   
   // Get authenticated user
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -8194,6 +8194,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       </button>
     </div>
   );
+
+  const timelinePanelJSX = useNewTimeline ? (
     <TimelineV2
       sections={sections}
       currentTime={currentTime}
@@ -8243,36 +8245,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onUpdateCameraFXClip={updateCameraFXClip}
       onDeleteCameraFXClip={deleteCameraFXClip}
       onAddCameraFXClip={addCameraFXClip}
-    />
-  ) : (
-      textKeyframes={textAnimatorKeyframes}
-      environmentKeyframes={environmentKeyframes}
-      workspaceObjects={[]}
-      cameraFXClips={cameraFXClips}
-      selectedFXClipId={selectedFXClipId}
-      onSelectSection={() => {}}
-      onUpdateSection={updateSection}
-      onAddSection={addSection}
-      onSeek={seekTo}
-      onAddPresetKeyframe={() => {}}
-      onAddCameraKeyframe={() => {}}
-      onAddTextKeyframe={() => {}}
-      onAddEnvironmentKeyframe={() => {}}
-      onDeletePresetKeyframe={() => {}}
-      onDeleteCameraKeyframe={() => {}}
-      onDeleteTextKeyframe={() => {}}
-      onDeleteEnvironmentKeyframe={() => {}}
-      onUpdatePresetKeyframe={() => {}}
-      onUpdateCameraKeyframe={() => {}}
-      onUpdateTextKeyframe={() => {}}
-      onUpdateEnvironmentKeyframe={() => {}}
-      onMovePresetKeyframe={() => {}}
-      onMoveTextKeyframe={() => {}}
-      onMoveEnvironmentKeyframe={() => {}}
-      onSelectFXClip={() => {}}
-      onUpdateCameraFXClip={() => {}}
-      onDeleteCameraFXClip={() => {}}
-      onAddCameraFXClip={() => {}}
     />
   ) : (
     // Original waveform display timeline
