@@ -99,6 +99,9 @@ export function formatTime(seconds: number, fps?: number): string {
 export function roundToFrame(time: number, fps: number = DEFAULT_FPS): number {
   const frameTime = 1 / fps;
   return Math.round(time / frameTime) * frameTime;
+}
+
+/**
  * Format time in seconds to human-readable string (MM:SS or MM:SS:FF)
  * @param seconds - Time in seconds
  * @param fps - Optional frames per second for frame display
@@ -213,6 +216,9 @@ export function clamp(value: number, min: number, max: number): number {
  */
 export function getPixelsPerSecond(zoom: number): number {
   return BASE_PX_PER_SECOND * zoom;
+}
+
+/**
  * Calculate timeline width based on duration and zoom
  * @param durationSec - Duration in seconds
  * @param zoom - Zoom level multiplier
