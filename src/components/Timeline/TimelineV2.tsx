@@ -724,34 +724,39 @@ export default function TimelineV2({
           style={{ width: `${timelineWidth}px`, minHeight: '200px' }}
         >
           {/* Ruler */}
-          <div className="timeline-ruler h-8 bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
-            <svg width={timelineWidth} height={32}>
-              {/* Draw time markers every second */}
-              {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => {
-                const x = timeToPixels(i, pixelsPerSecond);
-                return (
-                  <g key={i}>
-                    <line
-                      x1={x}
-                      y1={20}
-                      x2={x}
-                      y2={32}
-                      stroke="#4b5563"
-                      strokeWidth={1}
-                    />
-                    <text
-                      x={x + 4}
-                      y={16}
-                      fill="#9ca3af"
-                      fontSize={10}
-                      fontFamily="monospace"
-                    >
-                      {formatTime(i)}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
+          <div className="timeline-ruler h-8 bg-gray-800 border-b border-gray-700 sticky top-0 z-10 flex">
+            {/* Left spacer to align with track labels */}
+            <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700" />
+            {/* Ruler content */}
+            <div className="flex-1 relative">
+              <svg width={timelineWidth} height={32}>
+                {/* Draw time markers every second */}
+                {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => {
+                  const x = timeToPixels(i, pixelsPerSecond);
+                  return (
+                    <g key={i}>
+                      <line
+                        x1={x}
+                        y1={20}
+                        x2={x}
+                        y2={32}
+                        stroke="#4b5563"
+                        strokeWidth={1}
+                      />
+                      <text
+                        x={x + 4}
+                        y={16}
+                        fill="#9ca3af"
+                        fontSize={10}
+                        fontFamily="monospace"
+                      >
+                        {formatTime(i)}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
           </div>
           
           {/* Tracks placeholder */}
@@ -912,7 +917,7 @@ export default function TimelineV2({
           {/* Playhead */}
           <div
             className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-20 pointer-events-none"
-            style={{ left: `${playheadX}px` }}
+            style={{ left: `${playheadX + 128}px` }}
           >
             <div 
               className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-cyan-400 cursor-ew-resize pointer-events-auto"
