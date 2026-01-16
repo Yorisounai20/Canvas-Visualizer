@@ -774,19 +774,6 @@ export default function TimelineV2({
                 </div>
               </div>
             )}
-            
-            {/* Info panel */}
-            <div className="p-4 text-gray-500 text-sm">
-              <p className="font-semibold mb-2">✅ Chunk 5 Complete - Context Menu & Marquee</p>
-              <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>Right-click: Context menu with Add Keyframe options</li>
-                <li>Shift+right-drag: Marquee selection (green rectangle)</li>
-                <li>Context menu prevented during drag (&gt; 5px movement)</li>
-                <li>Menu items: Add Preset/Camera/Text/Environment Keyframes</li>
-                <li>Placeholder items: Copy, Delete, Rename (for future use)</li>
-                <li>ESC or click outside closes context menu</li>
-              </ul>
-            </div>
           </div>
           
           {/* Marquee selection rectangle */}
