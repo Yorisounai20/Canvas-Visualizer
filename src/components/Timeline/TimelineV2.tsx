@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { Play, Pause } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import { 
@@ -40,10 +41,12 @@ interface TimelineProps {
   workspaceObjects?: WorkspaceObject[];
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
+  isPlaying?: boolean;
   onSelectSection: (id: number) => void;
   onUpdateSection: (id: number, field: string, value: any) => void;
   onAddSection: () => void;
   onSeek: (time: number) => void;
+  onTogglePlayPause?: () => void;
   onAddPresetKeyframe?: (time: number) => void;
   onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
@@ -76,6 +79,8 @@ export default function TimelineV2({
   audioBuffer,
   showWaveform = true,
   onSeek,
+  isPlaying = false,
+  onTogglePlayPause,
   presetKeyframes = [],
   cameraKeyframes = [],
   textKeyframes = [],
@@ -330,6 +335,14 @@ export default function TimelineV2({
     const frameTime = 1 / DEFAULT_FPS;
 
     switch (e.key) {
+      case ' ':
+      case 'Spacebar': // For older browsers
+        e.preventDefault();
+        if (onTogglePlayPause) {
+          onTogglePlayPause();
+        }
+        break;
+
       case 'ArrowLeft':
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
@@ -721,9 +734,20 @@ export default function TimelineV2({
 
   return (
     <div className="flex flex-col h-full bg-gray-900 text-white" onClick={() => setContextMenu(null)}>
-      {/* Header with zoom controls */}
+      {/* Header with play/pause and zoom controls */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center gap-4">
+          {/* Play/Pause button */}
+          {onTogglePlayPause && (
+            <button
+              onClick={onTogglePlayPause}
+              className="p-2 rounded bg-cyan-600 hover:bg-cyan-700 transition-colors flex items-center justify-center"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+            </button>
+          )}
+          
           <span className="text-sm font-medium">Zoom:</span>
           <input
             type="range"
@@ -742,7 +766,7 @@ export default function TimelineV2({
             Reset
           </button>
           <span className="text-xs text-gray-500 ml-4">
-            💡 Shift+Wheel=Zoom, Right-click=Pan, Shift+Right-click=Select, Arrows=Step
+            💡 Space=Play, Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
           </span>
         </div>
         <div className="text-sm text-gray-400">
