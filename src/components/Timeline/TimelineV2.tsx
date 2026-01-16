@@ -13,6 +13,27 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { Play, Pause } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
+
+// Particle emitter keyframe type (not in main types yet)
+interface ParticleEmitterKeyframe {
+  id: number;
+  time: number;
+  duration: number;
+  emissionRate: number;
+  lifetime: number;
+  maxParticles: number;
+  spawnX: number;
+  spawnY: number;
+  spawnZ: number;
+  spawnRadius: number;
+  startColor: string;
+  endColor: string;
+  startSize: number;
+  endSize: number;
+  audioTrack: 'bass' | 'mids' | 'highs' | 'all';
+  shape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
+  enabled: boolean;
+}
 import { 
   BASE_PX_PER_SECOND, 
   MIN_ZOOM, 
@@ -44,6 +65,7 @@ interface TimelineProps {
   maskRevealKeyframes?: MaskRevealKeyframe[];
   cameraRigKeyframes?: CameraRigKeyframe[];
   cameraFXKeyframes?: CameraFXKeyframe[];
+  particleEmitterKeyframes?: ParticleEmitterKeyframe[];
   workspaceObjects?: WorkspaceObject[];
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -97,6 +119,7 @@ export default function TimelineV2({
   maskRevealKeyframes = [],
   cameraRigKeyframes = [],
   cameraFXKeyframes = [],
+  particleEmitterKeyframes = [],
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -197,6 +220,8 @@ export default function TimelineV2({
     { id: 'text-animator', name: 'Text Animator', type: 'textAnimator' as const },
     { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
     { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
+    { id: 'particles', name: 'Particles', type: 'particles' as const },
+    { id: 'environment', name: 'Environment', type: 'environment' as const },
   ], []);
 
   // Handle wheel zoom (shift+wheel) and scroll (wheel)
@@ -569,8 +594,8 @@ export default function TimelineV2({
   };
 
   // Render keyframes for a track
-  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX') => {
-    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | { id: number; time: number; speed: number; easing: string };
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles') => {
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | { id: number; time: number; speed: number; easing: string };
     let keyframes: KeyframeWithTime[] = [];
     let color = '';
     
@@ -610,6 +635,10 @@ export default function TimelineV2({
       case 'maskReveal':
         keyframes = maskRevealKeyframes;
         color = 'bg-pink-500';
+        break;
+      case 'particles':
+        keyframes = particleEmitterKeyframes;
+        color = 'bg-blue-500'; // Blue for particles
         break;
       case 'environment':
         keyframes = environmentKeyframes;
@@ -963,6 +992,7 @@ export default function TimelineV2({
                       {track.type === 'textAnimator' && renderKeyframes('textAnimator')}
                       {track.type === 'letterbox' && renderKeyframes('letterbox')}
                       {track.type === 'maskReveal' && renderKeyframes('maskReveal')}
+                      {track.type === 'particles' && renderKeyframes('particles')}
                       {track.type === 'environment' && (
                         <div className="absolute inset-0">
                           {renderKeyframes('environment')}
