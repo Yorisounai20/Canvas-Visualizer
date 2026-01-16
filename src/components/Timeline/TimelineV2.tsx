@@ -97,6 +97,7 @@ export default function TimelineV2({
     return 1.0;
   });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
@@ -397,6 +398,25 @@ export default function TimelineV2({
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleKeyDown]);
+  
+  // Sync left column vertical scroll with right column
+  useEffect(() => {
+    const rightColumn = scrollContainerRef.current;
+    const leftColumn = leftColumnRef.current;
+    
+    if (!rightColumn || !leftColumn) return;
+    
+    const handleScroll = () => {
+      // Sync vertical scroll from right to left
+      leftColumn.scrollTop = rightColumn.scrollTop;
+    };
+    
+    rightColumn.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      rightColumn.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   // Auto-scroll to keep playhead visible
   useEffect(() => {
@@ -732,9 +752,10 @@ export default function TimelineV2({
 
       {/* Main timeline area - two-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left column - Fixed track labels */}
+        {/* Left column - Fixed track labels (synced scroll) */}
         <div 
-          className="flex-shrink-0 bg-gray-800 border-r border-gray-700 overflow-y-auto"
+          ref={leftColumnRef}
+          className="flex-shrink-0 bg-gray-800 border-r border-gray-700 overflow-y-hidden"
           style={{ width: `${LEFT_COLUMN_WIDTH}px` }}
         >
           {/* Spacer for ruler */}
