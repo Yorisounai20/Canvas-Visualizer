@@ -1,4 +1,3 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
 interface WaveformVisualizerProps {
@@ -8,21 +7,10 @@ interface WaveformVisualizerProps {
   height?: number;
   color?: string;
   debounceMs?: number; // Debounce time for canvas redraws
+  mode?: 'top-only' | 'mirrored'; // Display mode for waveform
 }
 
-// Optimization constants
-const MIN_SAMPLES = 256;
-const MAX_SAMPLES = 4096;
-const DEBOUNCE_DELAY_MS = 100;
-
 /**
- * WaveformVisualizer Component - Optimized audio waveform display
- * 
- * Optimizations:
- * - Caps sample count (256-4096) to avoid performance issues with large widths
- * - Debounces redraw on width changes
- * - Caches downsampled waveform data for reuse
- * - Supports top-only or mirrored display modes
  * WaveformVisualizer Component - Displays audio waveform in timeline
  * Renders waveform from audio buffer data with optimized canvas handling
  * 
@@ -37,7 +25,8 @@ export default function WaveformVisualizer({
   width,
   height = 60,
   color = 'rgba(100, 180, 255, 0.3)',
-  debounceMs = 150
+  debounceMs = 150,
+  mode = 'mirrored'
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const debounceTimerRef = useRef<number | null>(null);
@@ -95,34 +84,30 @@ export default function WaveformVisualizer({
       for (let j = 0; j < blockSize; j++) {
         sum += Math.abs(rawData[blockStart + j]);
       }
-      
-      // Normalize the data
-      const max = Math.max(...filteredData, 0.0001); // Avoid division by zero
-      const normalizedData = filteredData.map(n => n / max);
-      
-      setIsLoading(false);
-      return normalizedData;
-    } catch (error) {
-      console.error('Error generating waveform data:', error);
-      setIsLoading(false);
-      return null;
+      filteredData.push(sum / blockSize);
     }
-  }, [audioBuffer, width]); // Recompute when audioBuffer or width changes significantly
 
-  useEffect(() => {
-    if (!waveformData || !canvasRef.current) return;
-    
+    // Normalize the data
+    const max = Math.max(...filteredData, 0.0001); // Avoid division by zero
+    const normalizedData = filteredData.map(n => n / max);
+
+    // Draw the waveform
+    ctx.fillStyle = color;
     const middle = debouncedHeight / 2;
-    
-    debounceTimerRef.current = window.setTimeout(() => {
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (!canvas || !ctx) return;
-      
-      // Draw mirrored bars (top and bottom)
-      ctx.fillRect(x, middle - barHeight, 1, barHeight * 2);
-    }
-  }, [audioBuffer, debouncedWidth, debouncedHeight, color]);
+
+    normalizedData.forEach((value, i) => {
+      const barHeight = value * (debouncedHeight / 2);
+      const x = i;
+
+      if (mode === 'mirrored') {
+        // Draw mirrored bars (top and bottom)
+        ctx.fillRect(x, middle - barHeight, 1, barHeight * 2);
+      } else {
+        // Draw top-only bars
+        ctx.fillRect(x, debouncedHeight - barHeight, 1, barHeight);
+      }
+    });
+  }, [audioBuffer, debouncedWidth, debouncedHeight, color, mode]);
 
   useEffect(() => {
     drawWaveform();
@@ -135,17 +120,6 @@ export default function WaveformVisualizer({
         className="flex items-center justify-center bg-gray-800 bg-opacity-50"
       >
         <span className="text-xs text-gray-500">No audio loaded</span>
-      </div>
-    );
-  }
-  
-  if (isLoading) {
-    return (
-      <div 
-        style={{ width: `${width}px`, height: `${height}px` }}
-        className="flex items-center justify-center bg-gray-800 bg-opacity-50"
-      >
-        <span className="text-xs text-gray-500">Loading waveform...</span>
       </div>
     );
   }
