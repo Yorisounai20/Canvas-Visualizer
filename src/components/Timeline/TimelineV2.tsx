@@ -167,6 +167,15 @@ export default function TimelineV2({
     endY: number;
   } | null>(null);
   
+  // Section drag state
+  const [sectionDragState, setSectionDragState] = useState<{
+    type: 'move' | 'resize-start' | 'resize-end' | null;
+    sectionId: number | null;
+    startX: number;
+    initialStart: number;
+    initialEnd: number;
+  }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+  
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Only handle keys when timeline is focused or when we're the active panel
@@ -255,7 +264,8 @@ export default function TimelineV2({
     if (!container) return;
     
     const rect = container.getBoundingClientRect();
-    const clickX = e.clientX - rect.left + container.scrollLeft;
+    // Account for the 128px label column offset
+    const clickX = e.clientX - rect.left + container.scrollLeft - 128;
     const clickTime = pixelsToTime(clickX, pixelsPerSecond);
     
     dragStateRef.current = {
@@ -263,9 +273,14 @@ export default function TimelineV2({
       type: 'playhead',
       keyframeId: null,
       startX: clickX,
+      startY: 0,
       startTime: clickTime,
       lastClientX: e.clientX,
-      rafId: null
+      lastClientY: e.clientY,
+      startScrollLeft: container.scrollLeft,
+      startScrollTop: container.scrollTop,
+      rafId: null,
+      mouseButton: e.button
     };
     
     // Immediately seek to clicked position
@@ -469,7 +484,8 @@ export default function TimelineV2({
           } else if (dragState.type === 'playhead') {
             // Playhead: update preview time
             const rect = container.getBoundingClientRect();
-            const currentX = dragState.lastClientX - rect.left + container.scrollLeft;
+            // Account for the 128px label column offset
+            const currentX = dragState.lastClientX - rect.left + container.scrollLeft - 128;
             const newTime = pixelsToTime(currentX, pixelsPerSecond);
             const snappedTime = snapTime(newTime, gridSize, snapEnabled);
             const clampedTime = clamp(snappedTime, 0, duration);
@@ -514,7 +530,8 @@ export default function TimelineV2({
       } else if (dragState.type === 'playhead' && container) {
         // Commit playhead position
         const rect = container.getBoundingClientRect();
-        const finalX = e.clientX - rect.left + container.scrollLeft;
+        // Account for the 128px label column offset
+        const finalX = e.clientX - rect.left + container.scrollLeft - 128;
         const finalTime = pixelsToTime(finalX, pixelsPerSecond);
         const snappedTime = snapTime(finalTime, gridSize, snapEnabled);
         const clampedTime = clamp(snappedTime, 0, duration);
@@ -547,6 +564,79 @@ export default function TimelineV2({
       container.removeEventListener('wheel', handleWheel);
     };
   }, [handleWheel]);
+  
+  // Helper function to get animation info
+  const getAnimationInfo = useCallback((animValue: string) => {
+    return animationTypes.find(a => a.value === animValue) || {
+      value: animValue,
+      label: animValue,
+      icon: '🎵'
+    };
+  }, [animationTypes]);
+  
+  // Handle section drag start
+  const handleSectionMouseDown = useCallback((
+    e: React.MouseEvent,
+    section: Section,
+    type: 'move' | 'resize-start' | 'resize-end'
+  ) => {
+    e.stopPropagation();
+    setSectionDragState({
+      type,
+      sectionId: section.id,
+      startX: e.clientX,
+      initialStart: section.start,
+      initialEnd: section.end
+    });
+    onSelectSection(section.id);
+  }, [onSelectSection]);
+  
+  // Handle section dragging
+  useEffect(() => {
+    if (!sectionDragState.type || !sectionDragState.sectionId) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = timelineContentRef.current;
+      if (!container) return;
+      
+      const deltaX = e.clientX - sectionDragState.startX;
+      const deltaTime = pixelsToTime(deltaX, pixelsPerSecond);
+      
+      if (sectionDragState.type === 'move') {
+        // Move the entire section
+        const newStart = Math.max(0, sectionDragState.initialStart + deltaTime);
+        const sectionDuration = sectionDragState.initialEnd - sectionDragState.initialStart;
+        const newEnd = newStart + sectionDuration;
+        
+        onUpdateSection(sectionDragState.sectionId, 'start', newStart);
+        onUpdateSection(sectionDragState.sectionId, 'end', newEnd);
+      } else if (sectionDragState.type === 'resize-start') {
+        // Resize from the start
+        const newStart = Math.max(0, Math.min(sectionDragState.initialStart + deltaTime, sectionDragState.initialEnd - 1));
+        onUpdateSection(sectionDragState.sectionId, 'start', newStart);
+      } else if (sectionDragState.type === 'resize-end') {
+        // Resize from the end  
+        const newEnd = Math.max(sectionDragState.initialStart + 1, sectionDragState.initialEnd + deltaTime);
+        onUpdateSection(sectionDragState.sectionId, 'end', newEnd);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setSectionDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      document.body.style.userSelect = '';
+    };
+    
+    // Prevent text selection during drag
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [sectionDragState, onUpdateSection, pixelsPerSecond]);
   
   // Context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -776,6 +866,82 @@ export default function TimelineV2({
                     color="rgba(6, 182, 212, 0.4)"
                     mode={waveformMode}
                   />
+                </div>
+              </div>
+            )}
+            
+            {/* Track: Sections (Animation Presets as bars) */}
+            {sections.length > 0 && (
+              <div className="track-row relative bg-gray-900 border-b border-gray-800" style={{ height: `${sections.length * 68 + 8}px` }}>
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📊</span>
+                    <span className="text-xs text-gray-400 font-medium">Sections</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {sections.map((section, index) => {
+                    const animInfo = getAnimationInfo(section.animation);
+                    const isSelected = section.id === selectedSectionId;
+                    const left = timeToPixels(section.start, pixelsPerSecond);
+                    const width = timeToPixels(section.end - section.start, pixelsPerSecond);
+                    const top = index * 68 + 4;
+                    
+                    return (
+                      <div
+                        key={section.id}
+                        className={`absolute rounded transition-all ${
+                          isSelected
+                            ? 'ring-2 ring-cyan-400 z-10'
+                            : 'hover:ring-1 hover:ring-gray-500'
+                        } cursor-move`}
+                        style={{
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: `${width}px`,
+                          height: '60px',
+                          backgroundColor: isSelected ? '#06b6d4' : '#5a5a5a',
+                          backgroundImage: isSelected 
+                            ? 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)'
+                            : 'none'
+                        }}
+                        onMouseDown={(e) => handleSectionMouseDown(e, section, 'move')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectSection(section.id);
+                        }}
+                      >
+                        {/* Section content */}
+                        <div className="h-full px-2 py-1 flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm">{animInfo.icon}</span>
+                            <span className="text-xs font-semibold text-white truncate">
+                              {animInfo.label}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-300 font-mono">
+                            {formatTime(section.start)} - {formatTime(section.end)}
+                          </div>
+                          
+                          {/* Resize handles */}
+                          <>
+                            {/* Left resize handle */}
+                            <div
+                              className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
+                              onMouseDown={(e) => handleSectionMouseDown(e, section, 'resize-start')}
+                              title="Resize start"
+                            />
+                            {/* Right resize handle */}
+                            <div
+                              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
+                              onMouseDown={(e) => handleSectionMouseDown(e, section, 'resize-end')}
+                              title="Resize end"
+                            />
+                          </>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
