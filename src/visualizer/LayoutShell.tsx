@@ -11,7 +11,7 @@ type LayoutShellProps = {
 };
 
 export default function LayoutShell({ left, inspector, timeline, top, children }: LayoutShellProps) {
-  const [timelineHeight, setTimelineHeight] = useState(384); // Default 384px (h-96)
+  const [timelineHeight, setTimelineHeight] = useState(450); // Default 450px - increased for better visibility
   const [isResizing, setIsResizing] = useState(false);
   const [isFullHeight, setIsFullHeight] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -22,8 +22,8 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
 
     const handleMouseMove = (e: MouseEvent) => {
       const newHeight = window.innerHeight - e.clientY;
-      // Constrain between 200px and 800px
-      setTimelineHeight(Math.max(200, Math.min(800, newHeight)));
+      // Constrain between 300px and 800px - increased minimum for better visibility
+      setTimelineHeight(Math.max(300, Math.min(800, newHeight)));
     };
 
     const handleMouseUp = () => {
@@ -63,20 +63,20 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
 
       {/* Main content area - full width, panels as thin collapsed tabs by default */}
       <div className="flex-1 relative overflow-hidden min-h-0">
-        {/* Center content - main canvas with small top gap */}
-        <main className="absolute inset-0 overflow-hidden flex flex-col pt-2">
+        {/* Center content - main canvas moved up with no top gap */}
+        <main className="absolute inset-0 overflow-hidden flex flex-col">
           {children}
         </main>
 
-        {/* Left sidebar - shorter and narrower */}
-        <aside className="absolute left-0 top-0 h-[calc(100%-10rem)] w-20 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        {/* Left sidebar - adjusted for larger timeline */}
+        <aside className="absolute left-0 top-0 h-[calc(100%-28rem)] w-20 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Right sidebar - shorter and narrower */}
-        <aside className="absolute right-0 top-0 h-[calc(100%-10rem)] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        {/* Right sidebar - adjusted for larger timeline */}
+        <aside className="absolute right-0 top-0 h-[calc(100%-28rem)] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
           <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
             {inspector}
           </PanelContainer>

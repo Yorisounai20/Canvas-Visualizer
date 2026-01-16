@@ -99,23 +99,6 @@ export function formatTime(seconds: number, fps?: number): string {
 export function roundToFrame(time: number, fps: number = DEFAULT_FPS): number {
   const frameTime = 1 / fps;
   return Math.round(time / frameTime) * frameTime;
- * Format time in seconds to human-readable string (MM:SS or MM:SS:FF)
- * @param seconds - Time in seconds
- * @param fps - Optional frames per second for frame display
- * @returns Formatted time string
- */
-export function formatTime(seconds: number, fps?: number): string {
-  const absSeconds = Math.abs(seconds);
-  const sign = seconds < 0 ? '-' : '';
-  const minutes = Math.floor(absSeconds / 60);
-  const secs = Math.floor(absSeconds % 60);
-  
-  if (fps) {
-    const frames = Math.floor((absSeconds % 1) * fps);
-    return `${sign}${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-  }
-  
-  return `${sign}${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -174,18 +157,6 @@ export function timeToFrame(time: number, fps: number = DEFAULT_FPS): number {
 }
 
 /**
- * Get time from frame number
- * @param frame - Frame number (0-indexed)
- * @param fps - Frames per second (default: 30)
- * @param timeSec - Time in seconds
- * @param fps - Frames per second (defaults to DEFAULT_FPS)
- * @returns Frame number (0-indexed)
- */
-export function timeToFrame(timeSec: number, fps: number = DEFAULT_FPS): number {
-  return Math.floor(timeSec * fps);
-}
-
-/**
  * Convert frame number to time
  * @param frame - Frame number (0-indexed)
  * @param fps - Frames per second (defaults to DEFAULT_FPS)
@@ -213,6 +184,9 @@ export function clamp(value: number, min: number, max: number): number {
  */
 export function getPixelsPerSecond(zoom: number): number {
   return BASE_PX_PER_SECOND * zoom;
+}
+
+/**
  * Calculate timeline width based on duration and zoom
  * @param durationSec - Duration in seconds
  * @param zoom - Zoom level multiplier
