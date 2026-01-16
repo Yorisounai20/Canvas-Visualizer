@@ -11,7 +11,7 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Play, Pause } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import { 
   BASE_PX_PER_SECOND, 
@@ -38,6 +38,12 @@ interface TimelineProps {
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
+  presetSpeedKeyframes?: Array<{ id: number; time: number; speed: number; easing: string }>;
+  letterboxKeyframes?: LetterboxKeyframe[];
+  textAnimatorKeyframes?: TextAnimatorKeyframe[];
+  maskRevealKeyframes?: MaskRevealKeyframe[];
+  cameraRigKeyframes?: CameraRigKeyframe[];
+  cameraFXKeyframes?: CameraFXKeyframe[];
   workspaceObjects?: WorkspaceObject[];
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -85,6 +91,12 @@ export default function TimelineV2({
   cameraKeyframes = [],
   textKeyframes = [],
   environmentKeyframes = [],
+  presetSpeedKeyframes = [],
+  letterboxKeyframes = [],
+  textAnimatorKeyframes = [],
+  maskRevealKeyframes = [],
+  cameraRigKeyframes = [],
+  cameraFXKeyframes = [],
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -177,8 +189,14 @@ export default function TimelineV2({
   const tracks = useMemo(() => [
     { id: 'audio', name: 'Audio', type: 'audio' as const },
     { id: 'presets', name: 'Presets', type: 'preset' as const },
+    { id: 'preset-speed', name: 'Preset Speed', type: 'presetSpeed' as const },
     { id: 'camera', name: 'Camera', type: 'camera' as const },
+    { id: 'camera-rig', name: 'Camera Rig', type: 'cameraRig' as const },
+    { id: 'camera-fx', name: 'Camera FX', type: 'cameraFX' as const },
     { id: 'text', name: 'Text', type: 'text' as const },
+    { id: 'text-animator', name: 'Text Animator', type: 'textAnimator' as const },
+    { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
+    { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
   ], []);
 
   // Handle wheel zoom (shift+wheel) and scroll (wheel)
@@ -551,8 +569,8 @@ export default function TimelineV2({
   };
 
   // Render keyframes for a track
-  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment') => {
-    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe;
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX') => {
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | { id: number; time: number; speed: number; easing: string };
     let keyframes: KeyframeWithTime[] = [];
     let color = '';
     
@@ -561,13 +579,37 @@ export default function TimelineV2({
         keyframes = presetKeyframes;
         color = 'bg-cyan-500';
         break;
+      case 'presetSpeed':
+        keyframes = presetSpeedKeyframes;
+        color = 'bg-cyan-300'; // Lighter cyan for speed
+        break;
       case 'camera':
         keyframes = cameraKeyframes;
         color = 'bg-purple-500';
         break;
+      case 'cameraRig':
+        keyframes = cameraRigKeyframes;
+        color = 'bg-purple-300'; // Lighter purple for rig
+        break;
+      case 'cameraFX':
+        keyframes = cameraFXKeyframes;
+        color = 'bg-purple-700'; // Darker purple for FX
+        break;
       case 'text':
         keyframes = textKeyframes;
         color = 'bg-green-500';
+        break;
+      case 'textAnimator':
+        keyframes = textAnimatorKeyframes;
+        color = 'bg-green-300'; // Lighter green for animator
+        break;
+      case 'letterbox':
+        keyframes = letterboxKeyframes;
+        color = 'bg-yellow-500';
+        break;
+      case 'maskReveal':
+        keyframes = maskRevealKeyframes;
+        color = 'bg-pink-500';
         break;
       case 'environment':
         keyframes = environmentKeyframes;
@@ -913,8 +955,14 @@ export default function TimelineV2({
 
                       {/* Render keyframes for this track */}
                       {track.type === 'preset' && renderKeyframes('preset')}
+                      {track.type === 'presetSpeed' && renderKeyframes('presetSpeed')}
                       {track.type === 'camera' && renderKeyframes('camera')}
+                      {track.type === 'cameraRig' && renderKeyframes('cameraRig')}
+                      {track.type === 'cameraFX' && renderKeyframes('cameraFX')}
                       {track.type === 'text' && renderKeyframes('text')}
+                      {track.type === 'textAnimator' && renderKeyframes('textAnimator')}
+                      {track.type === 'letterbox' && renderKeyframes('letterbox')}
+                      {track.type === 'maskReveal' && renderKeyframes('maskReveal')}
                       {track.type === 'environment' && (
                         <div className="absolute inset-0">
                           {renderKeyframes('environment')}
