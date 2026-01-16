@@ -387,7 +387,8 @@ export default function TimelineV2({
       
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const mouseTime = pixelsToTime(mouseX + container.scrollLeft, pixelsPerSecond);
+      const currentPPS = BASE_PX_PER_SECOND * zoom;
+      const mouseTime = pixelsToTime(mouseX + container.scrollLeft, currentPPS);
       
       // Calculate new zoom
       const ZOOM_SENSITIVITY = 0.0015;
@@ -398,7 +399,7 @@ export default function TimelineV2({
       
       // Adjust scroll to keep mouse position at same time
       requestAnimationFrame(() => {
-        const newPPS = getPixelsPerSecond(newZoom);
+        const newPPS = BASE_PX_PER_SECOND * newZoom;
         const newMousePixels = timeToPixels(mouseTime, newPPS);
         container.scrollLeft = newMousePixels - mouseX;
       });
@@ -408,7 +409,7 @@ export default function TimelineV2({
       const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
       container.scrollLeft += delta;
     }
-  }, [pixelsPerSecond, zoom]);
+  }, [zoom]);
   
   // Right-click drag to pan or marquee (with Shift)
   const handleTimelinePointerDown = useCallback((e: React.PointerEvent) => {
@@ -795,6 +796,7 @@ export default function TimelineV2({
   // Context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     // Don't show if we're currently dragging
     if (dragStateRef.current.isDragging) return;
     
