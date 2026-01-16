@@ -774,6 +774,126 @@ export default function TimelineV2({
                 </div>
               </div>
             )}
+            
+            {/* Track: Presets */}
+            {presetKeyframes.length > 0 && (
+              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🎨</span>
+                    <span className="text-xs text-gray-400 font-medium">Presets</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {presetKeyframes.map((kf) => (
+                    <div
+                      key={kf.id}
+                      className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-pointer group"
+                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(kf.time);
+                      }}
+                    >
+                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-cyan-400 rounded-full" />
+                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
+                        {formatTime(kf.time)} - {animationTypes.find(a => a.value === kf.preset)?.label || kf.preset}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Track: Camera */}
+            {cameraKeyframes.length > 0 && (
+              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📷</span>
+                    <span className="text-xs text-gray-400 font-medium">Camera</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {cameraKeyframes.map((kf, idx) => (
+                    <div
+                      key={idx}
+                      className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-pointer group"
+                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(kf.time);
+                      }}
+                    >
+                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
+                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
+                        {formatTime(kf.time)} - Camera
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Track: Text */}
+            {textKeyframes.length > 0 && (
+              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📝</span>
+                    <span className="text-xs text-gray-400 font-medium">Text</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {textKeyframes.map((kf) => (
+                    <div
+                      key={kf.id}
+                      className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-pointer group`}
+                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(kf.time);
+                      }}
+                    >
+                      <div className={`absolute -top-1 -left-1.5 w-3 h-3 ${kf.show ? 'bg-green-400' : 'bg-red-400'} rounded-full`} />
+                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
+                        {formatTime(kf.time)} - {kf.show ? 'Show' : 'Hide'} Text
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Track: Environment */}
+            {environmentKeyframes.length > 0 && (
+              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🌍</span>
+                    <span className="text-xs text-gray-400 font-medium">Environment</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {environmentKeyframes.map((kf) => (
+                    <div
+                      key={kf.id}
+                      className="absolute top-0 w-1 h-full bg-orange-400 hover:bg-orange-300 transition-colors cursor-pointer group"
+                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSeek(kf.time);
+                      }}
+                    >
+                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-orange-400 rounded-full" />
+                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
+                        {formatTime(kf.time)} - {kf.type}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Marquee selection rectangle */}
