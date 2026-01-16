@@ -1260,17 +1260,16 @@ export default function TimelineV2({
               </div>
             )}
             
-            {/* Track: Camera FX Clips */}
-            {cameraFXClips.length > 0 && (
-              <div className="track-row h-20 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">🎬</span>
-                    <span className="text-xs text-gray-400 font-medium">Camera FX</span>
-                  </div>
+            {/* Track: Camera FX Clips - Always visible */}
+            <div className="track-row h-20 bg-gray-900 border-b border-gray-800 relative">
+              <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🎬</span>
+                  <span className="text-xs text-gray-400 font-medium">Camera FX</span>
                 </div>
-                <div className="track-content ml-32 h-full relative">
-                  {cameraFXClips.map((clip) => {
+              </div>
+              <div className="track-content ml-32 h-full relative">
+                {cameraFXClips.map((clip) => {
                     const isSelected = clip.id === selectedFXClipId;
                     const left = timeToPixels(clip.startTime, pixelsPerSecond);
                     const width = timeToPixels(clip.endTime - clip.startTime, pixelsPerSecond);
@@ -1336,7 +1335,6 @@ export default function TimelineV2({
                   })}
                 </div>
               </div>
-            )}
           </div>
           
           {/* Marquee selection rectangle */}
@@ -1365,6 +1363,17 @@ export default function TimelineV2({
           </div>
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          isOpen={true}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
