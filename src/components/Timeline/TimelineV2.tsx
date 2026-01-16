@@ -185,6 +185,15 @@ export default function TimelineV2({
     initialTime: number;
   }>({ type: null, keyframeId: null, keyframeTime: null, startX: 0, initialTime: 0 });
   
+  // FX clip drag state
+  const [fxDragState, setFxDragState] = useState<{
+    type: 'move' | 'resize-start' | 'resize-end' | null;
+    clipId: string | null;
+    startX: number;
+    initialStart: number;
+    initialEnd: number;
+  }>({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+  
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Only handle keys when timeline is focused or when we're the active panel
@@ -600,6 +609,23 @@ export default function TimelineV2({
     onSelectSection(section.id);
   }, [onSelectSection]);
   
+  // Handle FX clip drag start
+  const handleFXClipMouseDown = useCallback((
+    e: React.MouseEvent,
+    clip: CameraFXClip,
+    type: 'move' | 'resize-start' | 'resize-end'
+  ) => {
+    e.stopPropagation();
+    setFxDragState({
+      type,
+      clipId: clip.id,
+      startX: e.clientX,
+      initialStart: clip.startTime,
+      initialEnd: clip.endTime
+    });
+    onSelectFXClip?.(clip.id);
+  }, [onSelectFXClip]);
+  
   // Handle section dragging
   useEffect(() => {
     if (!sectionDragState.type || !sectionDragState.sectionId) return;
@@ -698,6 +724,73 @@ export default function TimelineV2({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [keyframeDragState, duration, gridSize, snapEnabled, pixelsPerSecond, cameraKeyframes, onMovePresetKeyframe, onUpdateCameraKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe]);
+  
+  // Handle FX clip dragging
+  useEffect(() => {
+    if (!fxDragState.type || !fxDragState.clipId) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = timelineContentRef.current;
+      if (!container) return;
+      
+      const deltaX = e.clientX - fxDragState.startX;
+      const deltaTime = pixelsToTime(deltaX, pixelsPerSecond);
+      
+      const clip = cameraFXClips.find(c => c.id === fxDragState.clipId);
+      if (!clip || !fxDragState.clipId) return;
+      
+      let newStart = fxDragState.initialStart;
+      let newEnd = fxDragState.initialEnd;
+      
+      if (fxDragState.type === 'move') {
+        // Move the entire clip
+        const clipDuration = fxDragState.initialEnd - fxDragState.initialStart;
+        newStart = Math.max(0, fxDragState.initialStart + deltaTime);
+        newEnd = newStart + clipDuration;
+        
+        // Keep within bounds
+        if (newEnd > duration) {
+          newEnd = duration;
+          newStart = duration - clipDuration;
+        }
+      } else if (fxDragState.type === 'resize-start') {
+        // Resize from the start (minimum 0.5s clip duration)
+        newStart = Math.max(0, Math.min(fxDragState.initialEnd - 0.5, fxDragState.initialStart + deltaTime));
+      } else if (fxDragState.type === 'resize-end') {
+        // Resize from the end (minimum 0.5s clip duration)
+        newEnd = Math.max(fxDragState.initialStart + 0.5, Math.min(duration, fxDragState.initialEnd + deltaTime));
+      }
+      
+      // Apply snapping if enabled
+      const snappedStart = snapTime(newStart, gridSize, snapEnabled);
+      const snappedEnd = snapTime(newEnd, gridSize, snapEnabled);
+      newStart = snappedStart;
+      newEnd = snappedEnd;
+      
+      onUpdateCameraFXClip?.(fxDragState.clipId, {
+        startTime: parseFloat(newStart.toFixed(2)),
+        endTime: parseFloat(newEnd.toFixed(2))
+      });
+    };
+    
+    const handleMouseUp = () => {
+      setFxDragState({ type: null, clipId: null, startX: 0, initialStart: 0, initialEnd: 0 });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    
+    document.body.style.cursor = fxDragState.type === 'move' ? 'grabbing' : 'ew-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [fxDragState, cameraFXClips, duration, gridSize, snapEnabled, pixelsPerSecond, onUpdateCameraFXClip]);
   
   // Context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -925,7 +1018,7 @@ export default function TimelineV2({
                     width={timelineWidth}
                     height={96}
                     color="rgba(6, 182, 212, 0.4)"
-                    mode={waveformMode}
+                    mode={waveformMode === 'top' ? 'top-only' : 'mirrored'}
                   />
                 </div>
               </div>
@@ -1163,6 +1256,84 @@ export default function TimelineV2({
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Track: Camera FX Clips */}
+            {cameraFXClips.length > 0 && (
+              <div className="track-row h-20 bg-gray-900 border-b border-gray-800 relative">
+                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🎬</span>
+                    <span className="text-xs text-gray-400 font-medium">Camera FX</span>
+                  </div>
+                </div>
+                <div className="track-content ml-32 h-full relative">
+                  {cameraFXClips.map((clip) => {
+                    const isSelected = clip.id === selectedFXClipId;
+                    const left = timeToPixels(clip.startTime, pixelsPerSecond);
+                    const width = timeToPixels(clip.endTime - clip.startTime, pixelsPerSecond);
+                    
+                    return (
+                      <div
+                        key={clip.id}
+                        className={`absolute top-2 h-16 rounded transition-all ${
+                          isSelected
+                            ? 'ring-2 ring-cyan-400 z-10'
+                            : 'hover:ring-1 hover:ring-gray-500'
+                        } cursor-move`}
+                        style={{
+                          left: `${left}px`,
+                          width: `${width}px`,
+                          backgroundColor: isSelected ? '#4A90E2' : '#6a6a6a',
+                          backgroundImage: isSelected 
+                            ? 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)'
+                            : 'none'
+                        }}
+                        onMouseDown={(e) => handleFXClipMouseDown(e, clip, 'move')}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectFXClip?.(clip.id);
+                        }}
+                      >
+                        {/* Clip content */}
+                        <div className="h-full px-2 py-1 flex flex-col justify-between relative overflow-hidden">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm">
+                              {clip.type === 'grid' && '🔲'}
+                              {clip.type === 'kaleidoscope' && '🔷'}
+                              {clip.type === 'pip' && '📺'}
+                            </span>
+                            <span className="text-xs font-semibold text-white truncate">
+                              {clip.type === 'grid' && 'Grid'}
+                              {clip.type === 'kaleidoscope' && 'Kaleidoscope'}
+                              {clip.type === 'pip' && 'PiP'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-300 font-mono">
+                            {formatTime(clip.startTime)} - {formatTime(clip.endTime)}
+                          </div>
+                          
+                          {/* Resize handles */}
+                          <>
+                            {/* Left resize handle */}
+                            <div
+                              className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
+                              onMouseDown={(e) => handleFXClipMouseDown(e, clip, 'resize-start')}
+                              title="Resize start"
+                            />
+                            {/* Right resize handle */}
+                            <div
+                              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
+                              onMouseDown={(e) => handleFXClipMouseDown(e, clip, 'resize-end')}
+                              title="Resize end"
+                            />
+                          </>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
