@@ -176,6 +176,15 @@ export default function TimelineV2({
     initialEnd: number;
   }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
   
+  // Keyframe drag state
+  const [keyframeDragState, setKeyframeDragState] = useState<{
+    type: 'preset' | 'camera' | 'text' | 'environment' | null;
+    keyframeId: number | null;
+    keyframeTime: number | null;
+    startX: number;
+    initialTime: number;
+  }>({ type: null, keyframeId: null, keyframeTime: null, startX: 0, initialTime: 0 });
+  
   // Keyboard navigation
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     // Only handle keys when timeline is focused or when we're the active panel
@@ -638,6 +647,58 @@ export default function TimelineV2({
     };
   }, [sectionDragState, onUpdateSection, pixelsPerSecond]);
   
+  // Handle keyframe dragging
+  useEffect(() => {
+    if (!keyframeDragState.type) return;
+    
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = timelineContentRef.current;
+      if (!container) return;
+      
+      const deltaX = e.clientX - keyframeDragState.startX;
+      const deltaTime = pixelsToTime(deltaX, pixelsPerSecond);
+      const rawTime = keyframeDragState.initialTime + deltaTime;
+      const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)), gridSize, snapEnabled);
+      
+      // Update keyframe position based on type
+      if (keyframeDragState.type === 'preset' && keyframeDragState.keyframeId !== null && onMovePresetKeyframe) {
+        onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'camera' && keyframeDragState.keyframeTime !== null && onUpdateCameraKeyframe) {
+        // For camera keyframes, we need to update via time
+        const oldKeyframe = cameraKeyframes.find(kf => kf.time === keyframeDragState.keyframeTime);
+        if (oldKeyframe) {
+          // Delete old and create new at new time
+          const updatedKeyframes = cameraKeyframes.filter(kf => kf.time !== keyframeDragState.keyframeTime);
+          updatedKeyframes.push({ ...oldKeyframe, time: newTime });
+          // This is a workaround - ideally we'd have a proper move handler
+          onUpdateCameraKeyframe(keyframeDragState.keyframeTime, { time: newTime });
+        }
+      } else if (keyframeDragState.type === 'text' && keyframeDragState.keyframeId !== null && onMoveTextKeyframe) {
+        onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
+      } else if (keyframeDragState.type === 'environment' && keyframeDragState.keyframeId !== null && onMoveEnvironmentKeyframe) {
+        onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setKeyframeDragState({ type: null, keyframeId: null, keyframeTime: null, startX: 0, initialTime: 0 });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    
+    document.body.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [keyframeDragState, duration, gridSize, snapEnabled, pixelsPerSecond, cameraKeyframes, onMovePresetKeyframe, onUpdateCameraKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe]);
+  
   // Context menu handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -959,11 +1020,21 @@ export default function TimelineV2({
                   {presetKeyframes.map((kf) => (
                     <div
                       key={kf.id}
-                      className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-pointer group"
+                      className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-grab group"
                       style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSeek(kf.time);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setKeyframeDragState({
+                          type: 'preset',
+                          keyframeId: kf.id,
+                          keyframeTime: null,
+                          startX: e.clientX,
+                          initialTime: kf.time
+                        });
                       }}
                     >
                       <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-cyan-400 rounded-full" />
@@ -989,11 +1060,21 @@ export default function TimelineV2({
                   {cameraKeyframes.map((kf, idx) => (
                     <div
                       key={idx}
-                      className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-pointer group"
+                      className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-grab group"
                       style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSeek(kf.time);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setKeyframeDragState({
+                          type: 'camera',
+                          keyframeId: null,
+                          keyframeTime: kf.time,
+                          startX: e.clientX,
+                          initialTime: kf.time
+                        });
                       }}
                     >
                       <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
@@ -1019,11 +1100,21 @@ export default function TimelineV2({
                   {textKeyframes.map((kf) => (
                     <div
                       key={kf.id}
-                      className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-pointer group`}
+                      className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-grab group`}
                       style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSeek(kf.time);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setKeyframeDragState({
+                          type: 'text',
+                          keyframeId: kf.id,
+                          keyframeTime: null,
+                          startX: e.clientX,
+                          initialTime: kf.time
+                        });
                       }}
                     >
                       <div className={`absolute -top-1 -left-1.5 w-3 h-3 ${kf.show ? 'bg-green-400' : 'bg-red-400'} rounded-full`} />
@@ -1049,11 +1140,21 @@ export default function TimelineV2({
                   {environmentKeyframes.map((kf) => (
                     <div
                       key={kf.id}
-                      className="absolute top-0 w-1 h-full bg-orange-400 hover:bg-orange-300 transition-colors cursor-pointer group"
+                      className="absolute top-0 w-1 h-full bg-orange-400 hover:bg-orange-300 transition-colors cursor-grab group"
                       style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSeek(kf.time);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setKeyframeDragState({
+                          type: 'environment',
+                          keyframeId: kf.id,
+                          keyframeTime: null,
+                          startX: e.clientX,
+                          initialTime: kf.time
+                        });
                       }}
                     >
                       <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-orange-400 rounded-full" />
