@@ -12,18 +12,6 @@ export const MAX_ZOOM = 4.0;  // Maximum zoom level (4.0x = 400%)
 export const DEFAULT_FPS = 30; // Default frames per second for frame stepping
 
 /**
- * Convert time in seconds to pixel position
- * Timeline utilities for time/pixel conversion and formatting
- * Part of the scrollable per-track timeline implementation (PR A)
- */
-
-// Constants for timeline sizing and zoom
-export const BASE_PX_PER_SECOND = 40;
-export const MIN_ZOOM = 0.25;
-export const MAX_ZOOM = 4.0;
-export const DEFAULT_FPS = 30;
-
-/**
  * Convert time in seconds to pixels based on current zoom level
  * @param timeSec - Time in seconds
  * @param pixelsPerSecond - Current pixels per second (BASE_PX_PER_SECOND * zoom)
@@ -34,7 +22,6 @@ export function timeToPixels(timeSec: number, pixelsPerSecond: number): number {
 }
 
 /**
- * Convert pixel position to time in seconds
  * Convert pixel position to time in seconds based on current zoom level
  * @param px - Pixel position
  * @param pixelsPerSecond - Current pixels per second (BASE_PX_PER_SECOND * zoom)
@@ -117,17 +104,6 @@ export function clampZoom(zoom: number): number {
  */
 export function calculatePixelsPerSecond(zoom: number): number {
   return BASE_PX_PER_SECOND * clampZoom(zoom);
-}
-
-/**
- * Round time to nearest frame boundary
- * @param timeSec - Time in seconds
- * @param fps - Frames per second (defaults to DEFAULT_FPS)
- * @returns Time rounded to nearest frame
- */
-export function roundToFrame(timeSec: number, fps: number = DEFAULT_FPS): number {
-  const frameTime = 1 / fps;
-  return Math.round(timeSec / frameTime) * frameTime;
 }
 
 /**

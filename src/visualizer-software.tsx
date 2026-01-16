@@ -426,6 +426,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     { id: 2, start: 20, end: 40, animation: 'explosion' },
     { id: 3, start: 40, end: 60, animation: 'chill' }
   ]);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [textKeyframes, setTextKeyframes] = useState<any[]>([]);
+  const [workspaceObjects, setWorkspaceObjects] = useState<any[]>([]);
+  
   // Start with null to prevent canvas disappearing on first preset
   // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
   const prevAnimRef = useRef<string | null>(null);
@@ -960,6 +964,123 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
   const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+  
+  // Section handlers for Timeline
+  const handleSelectSection = (id: number) => setSelectedSectionId(id);
+  const handleUpdateSection = (id: number, field: string, value: any) => updateSection(id, field, value);
+  const handleAddSection = () => {
+    const lastSection = sections[sections.length - 1];
+    const newId = Math.max(...sections.map(s => s.id), 0) + 1;
+    setSections([...sections, {
+      id: newId,
+      start: lastSection ? lastSection.end : 0,
+      end: lastSection ? lastSection.end + 20 : 20,
+      animation: 'orbit'
+    }]);
+  };
+  
+  // Wrapper functions for Timeline keyframe handlers
+  const addPresetKeyframe = (time?: number) => {
+    if (time !== undefined) {
+      const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+      const nextKeyframe = sorted.find(kf => kf.time > time);
+      const defaultEndTime = nextKeyframe ? nextKeyframe.time : time + 20;
+      
+      const newKeyframe = {
+        id: nextPresetKeyframeId.current++,
+        time: time,
+        endTime: Math.max(time + 1, Math.min(defaultEndTime, duration || time + 20)),
+        preset: 'orbit',
+        speed: 1.0
+      };
+      setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    } else {
+      handleAddPresetKeyframe();
+    }
+  };
+  const deletePresetKeyframe = (id: number) => handleDeletePresetKeyframe(id);
+  const updatePresetKeyframe = (id: number, preset: string) => handleUpdatePresetKeyframe(id, 'preset', preset);
+  const movePresetKeyframe = (id: number, newTime: number) => handleUpdatePresetKeyframe(id, 'time', newTime);
+  
+  const addCameraKeyframe = (time?: number) => {
+    const useTime = time !== undefined ? time : currentTime;
+    const lastKeyframe = cameraKeyframes[cameraKeyframes.length - 1] || {
+      distance: DEFAULT_CAMERA_DISTANCE,
+      height: DEFAULT_CAMERA_HEIGHT,
+      rotation: DEFAULT_CAMERA_ROTATION,
+      easing: 'easeInOut'
+    };
+    
+    setCameraKeyframes([...cameraKeyframes, {
+      time: useTime,
+      distance: lastKeyframe.distance,
+      height: lastKeyframe.height,
+      rotation: lastKeyframe.rotation,
+      easing: lastKeyframe.easing
+    }].sort((a, b) => a.time - b.time));
+  };
+  const deleteCameraKeyframe = (time: number) => {
+    if (cameraKeyframes.length > 1) {
+      setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
+    }
+  };
+  const updateCameraKeyframe = (time: number, updates: any) => {
+    setCameraKeyframes(cameraKeyframes.map(kf =>
+      kf.time === time ? { ...kf, ...updates } : kf
+    ));
+  };
+  const moveCameraKeyframe = (oldTime: number, newTime: number) => {
+    setCameraKeyframes(cameraKeyframes.map(kf =>
+      kf.time === oldTime ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const addTextKeyframe = (time?: number) => {
+    const useTime = time !== undefined ? time : currentTime;
+    const newKeyframe = {
+      id: Date.now(),
+      time: useTime,
+      show: true,
+      text: 'Sample Text'
+    };
+    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  const deleteTextKeyframe = (id: number) => {
+    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
+  };
+  const updateTextKeyframe = (id: number, show: boolean, text?: string) => {
+    setTextKeyframes(textKeyframes.map(kf =>
+      kf.id === id ? { ...kf, show, ...(text !== undefined && { text }) } : kf
+    ));
+  };
+  const moveTextKeyframe = (id: number, newTime: number) => {
+    setTextKeyframes(textKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const addEnvironmentKeyframe = (time?: number) => {
+    const useTime = time !== undefined ? time : currentTime;
+    handleAddEnvironmentKeyframe();
+    // Update the last added keyframe's time
+    if (time !== undefined) {
+      setEnvironmentKeyframes(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1].time = useTime;
+        }
+        return updated.sort((a, b) => a.time - b.time);
+      });
+    }
+  };
+  const deleteEnvironmentKeyframe = (id: number) => handleDeleteEnvironmentKeyframe(id);
+  const updateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) =>
+    handleUpdateEnvironmentKeyframe(id, type, intensity, color);
+  const moveEnvironmentKeyframe = (id: number, newTime: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
   
   // Preset keyframe handlers
   const handleAddPresetKeyframe = () => {
