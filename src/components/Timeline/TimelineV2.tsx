@@ -122,6 +122,11 @@ export default function TimelineV2({
   cameraRigKeyframes = [],
   cameraFXKeyframes = [],
   particleEmitterKeyframes = [],
+  parameterEvents = [],
+  onMovePresetKeyframe,
+  onMoveTextKeyframe,
+  onMoveEnvironmentKeyframe,
+  onUpdateCameraKeyframe,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -300,6 +305,11 @@ export default function TimelineV2({
       };
       document.body.style.cursor = 'grabbing';
     }
+    // Left-click on empty area = clear selection
+    else if (e.button === 0) {
+      // Clear selection when clicking on timeline background
+      setSelectedKeyframes(new Set());
+    }
   }, []);
 
   // Handle pan move and end at document level
@@ -366,7 +376,9 @@ export default function TimelineV2({
           ];
           
           allKeyframes.forEach((kf: any) => {
-            const kfX = timeToPixels(kf.time, pixelsPerSecond);
+            // Handle different time field names
+            const kfTime = kf.time !== undefined ? kf.time : kf.startTime !== undefined ? kf.startTime : 0;
+            const kfX = timeToPixels(kfTime, pixelsPerSecond);
             const kfY = kf.y; // Approximate track Y position
             
             if (kfX >= left && kfX <= right && kfY >= top && kfY <= bottom) {
@@ -634,8 +646,8 @@ export default function TimelineV2({
   };
 
   // Render keyframes for a track
-  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles') => {
-    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | { id: number; time: number; speed: number; easing: string };
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
     let keyframes: KeyframeWithTime[] = [];
     let color = '';
     
@@ -691,7 +703,8 @@ export default function TimelineV2({
     }
     
     return keyframes.map((kf, idx) => {
-      const time = 'time' in kf ? kf.time : 0;
+      // Extract time from various keyframe types
+      const time = 'time' in kf ? kf.time : 'startTime' in kf ? kf.startTime : 0;
       const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
       const fullKeyId = `${trackType}-${keyId}`;
       const isSelected = selectedKeyframes.has(fullKeyId);
@@ -752,12 +765,31 @@ export default function TimelineV2({
           if (!hasMoved) {
             // This was a click, not a drag - select the keyframe
             console.log(`Selected keyframe: ${fullKeyId} at ${formatTime(time)}`);
-            // TODO: Open inspector panel and focus on this keyframe
             setSelectedKeyframes(new Set([fullKeyId]));
           } else if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
             // This was a drag - move the keyframe
             console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
-            // TODO: Call appropriate onMove callback based on track type
+            
+            // Call appropriate onMove callback based on track type
+            const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+            
+            switch (trackType) {
+              case 'preset':
+                onMovePresetKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'text':
+                onMoveTextKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'environment':
+                onMoveEnvironmentKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'camera':
+                // Camera keyframes identified by time, update via onUpdateCameraKeyframe
+                onUpdateCameraKeyframe?.(draggedKeyframe.originalTime, { time: draggedKeyframe.currentTime });
+                break;
+              default:
+                console.warn(`No move handler for track type: ${trackType}`);
+            }
           }
           
           setIsDraggingKeyframe(false);
