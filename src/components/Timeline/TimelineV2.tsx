@@ -13,6 +13,7 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { Play, Pause } from 'lucide-react';
 import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
+import { ParameterEvent } from '../VisualizerSoftware/types';
 
 // Particle emitter keyframe type (not in main types yet)
 interface ParticleEmitterKeyframe {
@@ -66,6 +67,7 @@ interface TimelineProps {
   cameraRigKeyframes?: CameraRigKeyframe[];
   cameraFXKeyframes?: CameraFXKeyframe[];
   particleEmitterKeyframes?: ParticleEmitterKeyframe[];
+  parameterEvents?: ParameterEvent[];
   workspaceObjects?: WorkspaceObject[];
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -221,6 +223,7 @@ export default function TimelineV2({
     { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
     { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
     { id: 'particles', name: 'Particles', type: 'particles' as const },
+    { id: 'fx-events', name: 'FX Events', type: 'fxEvents' as const },
     { id: 'environment', name: 'Environment', type: 'environment' as const },
   ], []);
 
@@ -639,6 +642,10 @@ export default function TimelineV2({
       case 'particles':
         keyframes = particleEmitterKeyframes;
         color = 'bg-blue-500'; // Blue for particles
+        break;
+      case 'fxEvents':
+        keyframes = parameterEvents;
+        color = 'bg-red-500'; // Red for FX events
         break;
       case 'environment':
         keyframes = environmentKeyframes;

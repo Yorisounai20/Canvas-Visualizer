@@ -8331,6 +8331,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       cameraRigKeyframes={cameraRigKeyframes}
       cameraFXKeyframes={cameraFXKeyframes}
       particleEmitterKeyframes={particleEmitterKeyframes}
+      parameterEvents={parameterEvents}
       workspaceObjects={workspaceObjects}
       cameraFXClips={cameraFXClips}
       selectedFXClipId={selectedFXClipId}
