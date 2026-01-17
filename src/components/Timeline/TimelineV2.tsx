@@ -664,8 +664,12 @@ export default function TimelineV2({
   };
 
   // Helper function to extract keyframe IDs in the correct type
+  // Keyframes may have numeric or string IDs depending on their type
+  // Some keyframes use compound IDs like "preset-1" which need to be parsed
   const extractKeyframeIds = (kf: any, keyId: string | number) => {
+    // Try to get numeric ID directly, or parse it from compound ID format
     const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+    // Try to get string ID directly, or use the full keyId as string
     const stringId = 'id' in kf && typeof kf.id === 'string' ? kf.id : String(keyId);
     return { numericId, stringId };
   };
