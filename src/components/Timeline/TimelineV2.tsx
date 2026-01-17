@@ -175,7 +175,7 @@ export default function TimelineV2({
     // Load from localStorage
     try {
       const saved = localStorage.getItem('cv_timeline_snap_mode');
-      if (saved && ['none', 'frame', 'beat', 'second'].includes(saved)) {
+      if (saved && SNAP_MODES.includes(saved as SnapMode)) {
         return saved as SnapMode;
       }
     } catch (e) {
@@ -697,17 +697,18 @@ export default function TimelineV2({
   // These match the default recording settings and common music tempo
   const applySnapping = (time: number): number => {
     const BEATS_PER_SECOND = DEFAULT_BPM / 60; // 2 beats/sec at 120 BPM
-    const QUARTER_BEATS_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter beats/sec
+    // At 120 BPM: 1 beat = 0.5s, quarter note = 0.125s, so 8 quarter notes per second
+    const QUARTER_NOTES_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter notes/sec
     
     switch (snapMode) {
       case 'none':
         return time; // No snapping
       case 'frame':
-        // Snap to 30fps frames
+        // Snap to 30fps frames (~0.033s per frame)
         return Math.round(time * DEFAULT_FPS) / DEFAULT_FPS;
       case 'beat':
-        // Snap to quarter beats (1/4 of a beat at 120 BPM = 0.125s)
-        return Math.round(time * QUARTER_BEATS_PER_SECOND) / QUARTER_BEATS_PER_SECOND;
+        // Snap to quarter notes (1/4 of a beat at 120 BPM = 0.125s)
+        return Math.round(time * QUARTER_NOTES_PER_SECOND) / QUARTER_NOTES_PER_SECOND;
       case 'second':
         // Snap to whole seconds
         return Math.round(time);
