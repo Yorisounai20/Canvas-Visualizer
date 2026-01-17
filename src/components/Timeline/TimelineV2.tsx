@@ -111,6 +111,11 @@ const RULER_HEIGHT = 40; // Height of time ruler
 const TRACK_HEIGHT = 80; // Height of each track row
 const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
 
+// Snap mode constants
+const DEFAULT_FPS = 30; // Fixed frame rate for the application
+const DEFAULT_BPM = 120; // Fixed tempo for beat snapping
+const SNAP_MODES: Array<'none' | 'frame' | 'beat' | 'second'> = ['none', 'frame', 'beat', 'second'];
+
 export default function TimelineV2({
   currentTime,
   duration,
@@ -688,12 +693,10 @@ export default function TimelineV2({
   };
 
   // Apply snapping based on current snap mode
-  // Note: Frame rate (30fps) and BPM (120) are fixed for this timeline implementation
+  // Note: Frame rate and BPM are fixed constants for this timeline implementation
   // These match the default recording settings and common music tempo
   const applySnapping = (time: number): number => {
-    const FPS = 30; // Fixed frame rate for the application
-    const BPM = 120; // Fixed tempo for beat snapping (2 beats/sec)
-    const BEATS_PER_SECOND = BPM / 60; // 2 beats/sec
+    const BEATS_PER_SECOND = DEFAULT_BPM / 60; // 2 beats/sec at 120 BPM
     const QUARTER_BEATS_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter beats/sec
     
     switch (snapMode) {
@@ -701,7 +704,7 @@ export default function TimelineV2({
         return time; // No snapping
       case 'frame':
         // Snap to 30fps frames
-        return Math.round(time * FPS) / FPS;
+        return Math.round(time * DEFAULT_FPS) / DEFAULT_FPS;
       case 'beat':
         // Snap to quarter beats (1/4 of a beat at 120 BPM = 0.125s)
         return Math.round(time * QUARTER_BEATS_PER_SECOND) / QUARTER_BEATS_PER_SECOND;
@@ -710,6 +713,17 @@ export default function TimelineV2({
         return Math.round(time);
       default:
         return time;
+    }
+  };
+  
+  // Get snap mode label for button display
+  const getSnapModeLabel = (mode: SnapMode): string => {
+    switch (mode) {
+      case 'none': return 'Off';
+      case 'frame': return 'Frame';
+      case 'beat': return 'Beat';
+      case 'second': return 'Sec';
+      default: return 'Off';
     }
   };
   
@@ -1040,9 +1054,8 @@ export default function TimelineV2({
           {/* Snap mode toggle button */}
           <button
             onClick={() => {
-              const modes: SnapMode[] = ['none', 'frame', 'beat', 'second'];
-              const currentIndex = modes.indexOf(snapMode);
-              const nextMode = modes[(currentIndex + 1) % modes.length];
+              const currentIndex = SNAP_MODES.indexOf(snapMode);
+              const nextMode = SNAP_MODES[(currentIndex + 1) % SNAP_MODES.length];
               setSnapMode(nextMode);
             }}
             className={`px-2 py-1 text-xs rounded flex items-center gap-1 transition-colors ${
@@ -1053,7 +1066,7 @@ export default function TimelineV2({
             title={`Snap Mode: ${getSnapModeDescription(snapMode)}\nClick to cycle modes`}
           >
             <span className="text-base">🧲</span>
-            <span className="capitalize">{snapMode === 'frame' ? 'Frame' : snapMode === 'beat' ? 'Beat' : snapMode === 'second' ? 'Sec' : 'Off'}</span>
+            <span className="capitalize">{getSnapModeLabel(snapMode)}</span>
           </button>
           
           <span className="text-xs text-gray-500 ml-4">
