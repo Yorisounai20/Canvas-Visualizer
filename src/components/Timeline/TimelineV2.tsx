@@ -1,23 +1,54 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, ZoomIn, ZoomOut, Copy, Trash2, Edit2, Plus } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip } from '../../types';
+/**
+ * TimelineV2 - Scrollable Per-Track Timeline
+ * 
+ * New timeline implementation with:
+ * - Two-column layout (fixed left labels, scrollable right content)
+ * - Sticky time ruler at top
+ * - Per-track waveforms
+ * - Horizontal and vertical scrolling
+ * - Wheel zoom and pan (to be implemented in PR C)
+ */
+
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { Play, Pause } from 'lucide-react';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
-import ContextMenu, { ContextMenuItem } from '../Common/ContextMenu';
+import { ParameterEvent } from '../VisualizerSoftware/types';
+
+// Particle emitter keyframe type (not in main types yet)
+interface ParticleEmitterKeyframe {
+  id: number;
+  time: number;
+  duration: number;
+  emissionRate: number;
+  lifetime: number;
+  maxParticles: number;
+  spawnX: number;
+  spawnY: number;
+  spawnZ: number;
+  spawnRadius: number;
+  startColor: string;
+  endColor: string;
+  startSize: number;
+  endSize: number;
+  audioTrack: 'bass' | 'mids' | 'highs' | 'all';
+  shape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
+  enabled: boolean;
+}
 import { 
   BASE_PX_PER_SECOND, 
   MIN_ZOOM, 
   MAX_ZOOM, 
-  DEFAULT_FPS,
-  formatTime, 
-  getPixelsPerSecond,
+  calculatePixelsPerSecond,
+  calculateTimelineWidth,
+  formatTime,
   timeToPixels,
   pixelsToTime,
-  snapTime,
-  clamp,
-  frameToTime
+  clampZoom
 } from './utils';
 
-interface TimelineV2Props {
+// Re-export TimelineProps from original Timeline for compatibility
+interface TimelineProps {
   sections: Section[];
   currentTime: number;
   duration: number;
@@ -29,6 +60,14 @@ interface TimelineV2Props {
   cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
+  presetSpeedKeyframes?: Array<{ id: number; time: number; speed: number; easing: string }>;
+  letterboxKeyframes?: LetterboxKeyframe[];
+  textAnimatorKeyframes?: TextAnimatorKeyframe[];
+  maskRevealKeyframes?: MaskRevealKeyframe[];
+  cameraRigKeyframes?: CameraRigKeyframe[];
+  cameraFXKeyframes?: CameraFXKeyframe[];
+  particleEmitterKeyframes?: ParticleEmitterKeyframe[];
+  parameterEvents?: ParameterEvent[];
   workspaceObjects?: WorkspaceObject[];
   cameraFXClips?: CameraFXClip[];
   selectedFXClipId?: string | null;
@@ -59,1141 +98,1044 @@ interface TimelineV2Props {
   onAddCameraFXClip?: (type: 'grid' | 'kaleidoscope' | 'pip', startTime: number) => void;
 }
 
-/**
- * TimelineV2 - Modern scrollable per-track timeline component
- * 
- * Features:
- * - Horizontal and vertical scrolling
- * - Per-track waveforms
- * - Smooth RAF-throttled interactions
- * - Snap-to-grid
- * - Keyboard navigation
- * - Context menu and marquee selection
- * - Resizable keyframe bars
- * - Zoom centered on mouse
- */
+const LEFT_COLUMN_WIDTH = 240; // Fixed width for track labels
+const RULER_HEIGHT = 40; // Height of time ruler
+const TRACK_HEIGHT = 80; // Height of each track row
+const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
+
 export default function TimelineV2({
-  sections,
   currentTime,
   duration,
-  animationTypes,
-  selectedSectionId,
   audioBuffer,
   showWaveform = true,
-  presetKeyframes,
-  cameraKeyframes,
-  textKeyframes,
-  environmentKeyframes,
-  workspaceObjects = [],
-  cameraFXClips = [],
-  selectedFXClipId,
-  isPlaying = false,
-  onSelectSection,
-  onUpdateSection,
-  onAddSection,
   onSeek,
+  isPlaying = false,
   onTogglePlayPause,
-  onAddPresetKeyframe,
-  onAddCameraKeyframe,
-  onAddTextKeyframe,
-  onAddEnvironmentKeyframe,
-  onDeletePresetKeyframe,
-  onDeleteCameraKeyframe,
-  onDeleteTextKeyframe,
-  onDeleteEnvironmentKeyframe,
-  onUpdatePresetKeyframe,
-  onUpdateCameraKeyframe,
-  onUpdateTextKeyframe,
-  onUpdateEnvironmentKeyframe,
+  presetKeyframes = [],
+  cameraKeyframes = [],
+  textKeyframes = [],
+  environmentKeyframes = [],
+  presetSpeedKeyframes = [],
+  letterboxKeyframes = [],
+  textAnimatorKeyframes = [],
+  maskRevealKeyframes = [],
+  cameraRigKeyframes = [],
+  cameraFXKeyframes = [],
+  particleEmitterKeyframes = [],
+  parameterEvents = [],
   onMovePresetKeyframe,
   onMoveTextKeyframe,
   onMoveEnvironmentKeyframe,
-  onSelectFXClip,
-  onUpdateCameraFXClip,
-  onDeleteCameraFXClip,
-  onAddCameraFXClip
-}: TimelineV2Props) {
-  // Zoom and scroll state
-  const [zoom, setZoom] = useState(1.0);
-  const [snapEnabled, setSnapEnabled] = useState(true);
-  const [gridSize, setGridSize] = useState(0.1); // 100ms grid by default
-  const [waveformMode, setWaveformMode] = useState<'mirrored' | 'top'>('top'); // Waveform display mode
-  const containerRef = useRef<HTMLDivElement>(null);
-  const timelineContentRef = useRef<HTMLDivElement>(null);
-  
-  // Calculate pixels per second based on zoom
-  const pixelsPerSecond = getPixelsPerSecond(zoom);
-  
-  // RAF-throttled drag state (stored in refs to avoid re-renders during drag)
-  const dragStateRef = useRef<{
-    isDragging: boolean;
-    type: 'playhead' | 'keyframe' | 'pan' | null;
-    keyframeId: number | null;
-    startX: number;
-    startY: number;
-    startTime: number;
-    lastClientX: number;
-    lastClientY: number;
-    startScrollLeft: number;
-    startScrollTop: number;
-    rafId: number | null;
-    mouseButton: number | null;
-  }>({
-    isDragging: false,
-    type: null,
-    keyframeId: null,
-    startX: 0,
-    startY: 0,
-    startTime: 0,
-    lastClientX: 0,
-    lastClientY: 0,
-    startScrollLeft: 0,
-    startScrollTop: 0,
-    rafId: null,
-    mouseButton: null
+  onUpdateCameraKeyframe,
+}: TimelineProps) {
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_zoom_level');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= MIN_ZOOM && parsed <= MAX_ZOOM) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load zoom level from localStorage:', e);
+    }
+    return 1.0;
   });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
-  // Preview position during drag (only updated via RAF)
-  const [previewTime, setPreviewTime] = useState<number | null>(null);
+  // Playhead dragging state
+  const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   
-  // Context menu state
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
-  
-  // Marquee selection state
-  const [marquee, setMarquee] = useState<{ 
-    startX: number; 
-    startY: number; 
-    endX: number; 
-    endY: number;
+  // Keyframe dragging state
+  const [isDraggingKeyframe, setIsDraggingKeyframe] = useState(false);
+  const [draggedKeyframe, setDraggedKeyframe] = useState<{
+    trackType: string;
+    keyframeId: string;
+    originalTime: number;
+    currentTime: number;
   } | null>(null);
   
-  // Section drag state
-  const [sectionDragState, setSectionDragState] = useState<{
-    type: 'move' | 'resize-start' | 'resize-end' | null;
-    sectionId: number | null;
-    startX: number;
-    initialStart: number;
-    initialEnd: number;
-  }>({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
-  
-  // Keyframe drag state
-  const [keyframeDragState, setKeyframeDragState] = useState<{
-    type: 'preset' | 'camera' | 'text' | 'environment' | null;
-    keyframeId: number | null;
-    keyframeTime: number | null;
-    startX: number;
-    initialTime: number;
-  }>({ type: null, keyframeId: null, keyframeTime: null, startX: 0, initialTime: 0 });
-  
-  // Keyboard navigation
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Only handle keys when timeline is focused or when we're the active panel
-    const isTimelineFocused = containerRef.current?.contains(document.activeElement);
-    
-    // Spacebar: toggle play/pause
-    if (e.code === 'Space' && isTimelineFocused) {
-      e.preventDefault();
-      onTogglePlayPause?.();
-      return;
-    }
-    
-    // Arrow keys and other navigation
-    if (isTimelineFocused) {
-      const frameTime = frameToTime(1, DEFAULT_FPS);
-      let newTime = currentTime;
-      
-      if (e.code === 'ArrowLeft') {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd+Left: -5s
-          newTime = Math.max(0, currentTime - 5);
-        } else if (e.shiftKey) {
-          // Shift+Left: -1s
-          newTime = Math.max(0, currentTime - 1);
-        } else {
-          // Left: -1 frame
-          newTime = Math.max(0, currentTime - frameTime);
-        }
-        onSeek(newTime);
-      } else if (e.code === 'ArrowRight') {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-          // Ctrl/Cmd+Right: +5s
-          newTime = Math.min(duration, currentTime + 5);
-        } else if (e.shiftKey) {
-          // Shift+Right: +1s
-          newTime = Math.min(duration, currentTime + 1);
-        } else {
-          // Right: +1 frame
-          newTime = Math.min(duration, currentTime + frameTime);
-        }
-        onSeek(newTime);
-      } else if (e.code === 'Home') {
-        e.preventDefault();
-        onSeek(0);
-      } else if (e.code === 'End') {
-        e.preventDefault();
-        onSeek(duration);
-      } else if (e.code === 'PageUp') {
-        e.preventDefault();
-        // Jump back by viewport width (in seconds)
-        const container = timelineContentRef.current;
-        if (container) {
-          const viewportWidthSeconds = pixelsToTime(container.clientWidth, pixelsPerSecond);
-          newTime = Math.max(0, currentTime - viewportWidthSeconds);
-          onSeek(newTime);
-        }
-      } else if (e.code === 'PageDown') {
-        e.preventDefault();
-        // Jump forward by viewport width (in seconds)
-        const container = timelineContentRef.current;
-        if (container) {
-          const viewportWidthSeconds = pixelsToTime(container.clientWidth, pixelsPerSecond);
-          newTime = Math.min(duration, currentTime + viewportWidthSeconds);
-          onSeek(newTime);
-        }
+  // Track collapse state (Chunk 6.1)
+  const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_collapsed_tracks');
+      if (saved) {
+        const parsed: string[] = JSON.parse(saved);
+        return new Set(parsed);
       }
+    } catch (e) {
+      console.warn('Failed to load collapsed tracks from localStorage:', e);
     }
-  }, [currentTime, duration, onSeek, onTogglePlayPause, pixelsPerSecond]);
+    return new Set();
+  });
   
-  // Set up keyboard event listeners
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleKeyDown]);
-  
-  // RAF-throttled playhead drag
-  const handlePlayheadPointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const container = timelineContentRef.current;
-    if (!container) return;
-    
-    const rect = container.getBoundingClientRect();
-    // Account for the 128px label column offset
-    const clickX = e.clientX - rect.left + container.scrollLeft - 128;
-    const clickTime = pixelsToTime(clickX, pixelsPerSecond);
-    
-    dragStateRef.current = {
-      isDragging: true,
-      type: 'playhead',
-      keyframeId: null,
-      startX: clickX,
-      startY: 0,
-      startTime: clickTime,
-      lastClientX: e.clientX,
-      lastClientY: e.clientY,
-      startScrollLeft: container.scrollLeft,
-      startScrollTop: container.scrollTop,
-      rafId: null,
-      mouseButton: e.button
-    };
-    
-    // Immediately seek to clicked position
-    onSeek(clamp(clickTime, 0, duration));
-    
-    // Capture pointer
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [duration, onSeek, pixelsPerSecond]);
-  
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    const dragState = dragStateRef.current;
-    if (!dragState.isDragging) return;
-    
-    dragState.lastClientX = e.clientX;
-    
-    // Throttle updates using RAF
-    if (!dragState.rafId) {
-      dragState.rafId = requestAnimationFrame(() => {
-        dragState.rafId = null;
-        
-        const container = timelineContentRef.current;
-        if (!container) return;
-        
-        const rect = container.getBoundingClientRect();
-        const currentX = dragState.lastClientX - rect.left + container.scrollLeft;
-        const newTime = pixelsToTime(currentX, pixelsPerSecond);
-        const snappedTime = snapTime(newTime, gridSize, snapEnabled);
-        const clampedTime = clamp(snappedTime, 0, duration);
-        
-        // Update preview during drag
-        setPreviewTime(clampedTime);
-      });
+  // Track naming state (Chunk 6.2)
+  const [trackNames, setTrackNames] = useState<Map<string, string>>(() => {
+    // Load from localStorage (Chunk 6.4)
+    try {
+      const saved = localStorage.getItem('cv_timeline_track_names');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return new Map(Object.entries(parsed));
+      }
+    } catch (e) {
+      console.warn('Failed to load track names from localStorage:', e);
     }
-  }, [duration, gridSize, pixelsPerSecond, snapEnabled]);
+    return new Map();
+  });
+  const [editingTrackId, setEditingTrackId] = useState<string | null>(null);
+  const [editingTrackName, setEditingTrackName] = useState('');
   
-  const handlePointerUp = useCallback((e: PointerEvent) => {
-    const dragState = dragStateRef.current;
-    if (!dragState.isDragging) return;
-    
-    // Cancel any pending RAF
-    if (dragState.rafId) {
-      cancelAnimationFrame(dragState.rafId);
-      dragState.rafId = null;
-    }
-    
-    // Commit final position
-    const container = timelineContentRef.current;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      const finalX = e.clientX - rect.left + container.scrollLeft;
-      const finalTime = pixelsToTime(finalX, pixelsPerSecond);
-      const snappedTime = snapTime(finalTime, gridSize, snapEnabled);
-      const clampedTime = clamp(snappedTime, 0, duration);
-      
-      onSeek(clampedTime);
-    }
-    
-    // Reset drag state
-    dragStateRef.current.isDragging = false;
-    dragStateRef.current.type = null;
-    setPreviewTime(null);
-    
-    // Release pointer capture
-    (e.target as HTMLElement)?.releasePointerCapture((e as any).pointerId);
-  }, [duration, gridSize, onSeek, pixelsPerSecond, snapEnabled]);
+  // Marquee selection state
+  const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+  const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null);
+  const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null);
+  const [selectedKeyframes, setSelectedKeyframes] = useState<Set<string>>(new Set());
   
-  // Set up document-level pointer event listeners for dragging
-  useEffect(() => {
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
-    
-    return () => {
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [handlePointerMove, handlePointerUp]);
-  
-  // Wheel handler for zoom (Shift+wheel) and horizontal scroll
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    trackType: string;
+    keyframeId: string;
+    time: number;
+  } | null>(null);
+
+  // Calculate dimensions
+  const pixelsPerSecond = useMemo(() => calculatePixelsPerSecond(zoomLevel), [zoomLevel]);
+  const timelineWidth = useMemo(
+    () => calculateTimelineWidth(duration, zoomLevel, MIN_TIMELINE_WIDTH),
+    [duration, zoomLevel]
+  );
+
+  // Mock tracks for initial implementation
+  // TODO: Replace with actual track data from props in future PRs
+  const tracks = useMemo(() => [
+    { id: 'audio', name: 'Audio', type: 'audio' as const },
+    { id: 'presets', name: 'Presets', type: 'preset' as const },
+    { id: 'preset-speed', name: 'Preset Speed', type: 'presetSpeed' as const },
+    { id: 'camera', name: 'Camera', type: 'camera' as const },
+    { id: 'camera-rig', name: 'Camera Rig', type: 'cameraRig' as const },
+    { id: 'camera-fx', name: 'Camera FX', type: 'cameraFX' as const },
+    { id: 'text', name: 'Text', type: 'text' as const },
+    { id: 'text-animator', name: 'Text Animator', type: 'textAnimator' as const },
+    { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
+    { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
+    { id: 'particles', name: 'Particles', type: 'particles' as const },
+    { id: 'fx-events', name: 'FX Events', type: 'fxEvents' as const },
+    { id: 'environment', name: 'Environment', type: 'environment' as const },
+  ], []);
+
+  // Handle wheel zoom (shift+wheel) and scroll (wheel)
   const handleWheel = useCallback((e: WheelEvent) => {
-    const container = timelineContentRef.current;
-    if (!container) return;
-    
+    if (!scrollContainerRef.current) return;
+
+    // Shift+wheel = zoom centered at mouse position
     if (e.shiftKey) {
-      // Shift+wheel: zoom centered on mouse
       e.preventDefault();
       
+      const container = scrollContainerRef.current;
       const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseTime = pixelsToTime(mouseX + container.scrollLeft, pixelsPerSecond);
+      const mouseX = e.clientX - rect.left + container.scrollLeft;
       
-      // Calculate new zoom
-      const ZOOM_SENSITIVITY = 0.0015;
-      const zoomFactor = 1 - e.deltaY * ZOOM_SENSITIVITY;
-      const newZoom = clamp(zoom * zoomFactor, MIN_ZOOM, MAX_ZOOM);
+      // Calculate time position under mouse before zoom
+      const timeUnderMouse = pixelsToTime(mouseX, pixelsPerSecond);
       
-      setZoom(newZoom);
+      // Calculate new zoom level
+      const zoomDelta = -e.deltaY * 0.001; // Adjust sensitivity
+      const newZoom = clampZoom(zoomLevel + zoomDelta);
       
-      // Adjust scroll to keep mouse position at same time
-      requestAnimationFrame(() => {
-        const newPPS = getPixelsPerSecond(newZoom);
-        const newMousePixels = timeToPixels(mouseTime, newPPS);
-        container.scrollLeft = newMousePixels - mouseX;
-      });
-    } else {
-      // Regular wheel: horizontal scroll
-      // Prefer deltaX if available (horizontal scroll), otherwise map deltaY to horizontal
-      const delta = e.deltaX !== 0 ? e.deltaX : e.deltaY;
-      container.scrollLeft += delta;
-    }
-  }, [pixelsPerSecond, zoom]);
-  
-  // Right-click drag to pan or marquee (with Shift)
-  const handleTimelinePointerDown = useCallback((e: React.PointerEvent) => {
-    const container = timelineContentRef.current;
-    if (!container) return;
-    
-    // Right button (button 2)
-    if (e.button === 2) {
-      e.preventDefault();
-      
-      if (e.shiftKey) {
-        // Shift+right-drag: marquee selection
-        dragStateRef.current = {
-          isDragging: true,
-          type: 'pan', // We'll check for Shift in the move handler
-          keyframeId: null,
-          startX: e.clientX,
-          startY: e.clientY,
-          startTime: 0,
-          lastClientX: e.clientX,
-          lastClientY: e.clientY,
-          startScrollLeft: container.scrollLeft,
-          startScrollTop: container.scrollTop,
-          rafId: null,
-          mouseButton: 2
-        };
+      if (newZoom !== zoomLevel) {
+        setZoomLevel(newZoom);
         
-        // Initialize marquee
-        setMarquee({
-          startX: e.clientX,
-          startY: e.clientY,
-          endX: e.clientX,
-          endY: e.clientY
+        // After zoom, calculate new pixel position for the same time
+        // and adjust scroll to keep that time under the mouse
+        requestAnimationFrame(() => {
+          const newPixelsPerSecond = calculatePixelsPerSecond(newZoom);
+          const newMouseX = timeToPixels(timeUnderMouse, newPixelsPerSecond);
+          const mouseOffsetInViewport = e.clientX - rect.left;
+          container.scrollLeft = newMouseX - mouseOffsetInViewport;
         });
-      } else {
-        // Regular right-drag: pan
-        dragStateRef.current = {
-          isDragging: true,
-          type: 'pan',
-          keyframeId: null,
-          startX: e.clientX,
-          startY: e.clientY,
-          startTime: 0,
-          lastClientX: e.clientX,
-          lastClientY: e.clientY,
-          startScrollLeft: container.scrollLeft,
-          startScrollTop: container.scrollTop,
-          rafId: null,
-          mouseButton: 2
-        };
-        
-        // Set cursor
-        container.style.cursor = 'grabbing';
       }
+    } else {
+      // Normal wheel = horizontal scroll
+      // Let browser handle this naturally, but we could customize if needed
+      e.preventDefault();
+      scrollContainerRef.current.scrollLeft += e.deltaY;
+    }
+  }, [zoomLevel, pixelsPerSecond]);
+
+  // Handle right-click pan start
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    // Always prevent browser context menu - keyframes show custom menu with stopPropagation
+    e.preventDefault();
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+    
+    const container = scrollContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Shift+right-click = marquee selection
+    if (e.button === 2 && e.shiftKey) {
+      e.preventDefault();
+      setIsMarqueeSelecting(true);
+      const x = e.clientX - rect.left + container.scrollLeft;
+      const y = e.clientY - rect.top + container.scrollTop;
+      setMarqueeStart({ x, y });
+      setMarqueeEnd({ x, y });
+      document.body.style.cursor = 'crosshair';
+    }
+    // Right-click (button 2) without shift = pan
+    else if (e.button === 2) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        scrollLeft: container.scrollLeft,
+        scrollTop: container.scrollTop,
+      };
+      document.body.style.cursor = 'grabbing';
+    }
+    // Left-click on empty area = clear selection
+    else if (e.button === 0) {
+      // Clear selection when clicking on timeline background
+      setSelectedKeyframes(new Set());
     }
   }, []);
-  
-  // Update pointer move handler to support pan
+
+  // Handle pan move and end at document level
   useEffect(() => {
-    const handleMove = (e: PointerEvent) => {
-      const dragState = dragStateRef.current;
-      if (!dragState.isDragging) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
       
-      dragState.lastClientX = e.clientX;
-      dragState.lastClientY = e.clientY;
-      
-      // Throttle updates using RAF
-      if (!dragState.rafId) {
-        dragState.rafId = requestAnimationFrame(() => {
-          dragState.rafId = null;
-          
-          const container = timelineContentRef.current;
-          if (!container) return;
-          
-          if (dragState.type === 'pan') {
-            // Check if marquee is active (Shift was held)
-            if (marquee) {
-              // Update marquee rectangle
-              setMarquee(prev => prev ? {
-                ...prev,
-                endX: dragState.lastClientX,
-                endY: dragState.lastClientY
-              } : null);
-            } else {
-              // Pan: update scroll position
-              const dx = dragState.startX - dragState.lastClientX;
-              const dy = dragState.startY - dragState.lastClientY;
-              container.scrollLeft = dragState.startScrollLeft + dx;
-              container.scrollTop = dragState.startScrollTop + dy;
-            }
-          } else if (dragState.type === 'playhead') {
-            // Playhead: update preview time
-            const rect = container.getBoundingClientRect();
-            // Account for the 128px label column offset
-            const currentX = dragState.lastClientX - rect.left + container.scrollLeft - 128;
-            const newTime = pixelsToTime(currentX, pixelsPerSecond);
-            const snappedTime = snapTime(newTime, gridSize, snapEnabled);
-            const clampedTime = clamp(snappedTime, 0, duration);
-            setPreviewTime(clampedTime);
-          }
+      if (isPanning && panStartRef.current) {
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        
+        container.scrollLeft = panStartRef.current.scrollLeft - dx;
+        container.scrollTop = panStartRef.current.scrollTop - dy;
+      } else if (isMarqueeSelecting && marqueeStart) {
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left + container.scrollLeft;
+        const y = e.clientY - rect.top + container.scrollTop;
+        setMarqueeEnd({ x, y });
+      } else if (isDraggingPlayhead) {
+        // Smooth playhead dragging with RAF throttling
+        requestAnimationFrame(() => {
+          const rect = container.getBoundingClientRect();
+          const x = e.clientX - rect.left + container.scrollLeft;
+          const time = pixelsToTime(x, pixelsPerSecond);
+          onSeek(Math.max(0, Math.min(duration, time)));
         });
       }
     };
-    
-    const handleUp = (e: PointerEvent) => {
-      const dragState = dragStateRef.current;
-      if (!dragState.isDragging) return;
-      
-      // Cancel any pending RAF
-      if (dragState.rafId) {
-        cancelAnimationFrame(dragState.rafId);
-        dragState.rafId = null;
-      }
-      
-      const container = timelineContentRef.current;
-      
-      if (dragState.type === 'pan') {
-        // Check if it was a short click (< 5px movement) for context menu
-        const dx = Math.abs(e.clientX - dragState.startX);
-        const dy = Math.abs(e.clientY - dragState.startY);
-        const wasShortClick = dx < 5 && dy < 5;
+
+    const handleMouseUp = () => {
+      if (isPanning) {
+        setIsPanning(false);
+        panStartRef.current = null;
+        document.body.style.cursor = '';
+      } else if (isMarqueeSelecting) {
+        // Finalize marquee selection
+        setIsMarqueeSelecting(false);
+        document.body.style.cursor = '';
         
-        if (wasShortClick && dragState.mouseButton === 2 && !marquee) {
-          // Show context menu
-          showContextMenuAt(e.clientX, e.clientY);
-        } else if (marquee) {
-          // Marquee selection complete
-          // TODO: Select keyframes in marquee area (will implement in Chunk 6 with keyframes)
-          console.log('Marquee selection area:', marquee);
-          setMarquee(null);
+        // Select keyframes within marquee rectangle
+        if (marqueeStart && marqueeEnd) {
+          const left = Math.min(marqueeStart.x, marqueeEnd.x);
+          const right = Math.max(marqueeStart.x, marqueeEnd.x);
+          const top = Math.min(marqueeStart.y, marqueeEnd.y);
+          const bottom = Math.max(marqueeStart.y, marqueeEnd.y);
+          
+          const newSelectedKeyframes = new Set<string>();
+          
+          // Check all keyframes from all tracks
+          const allKeyframes = [
+            ...presetKeyframes.map(k => ({ ...k, type: 'preset', y: 80 })), // Estimate track Y positions
+            ...presetSpeedKeyframes.map(k => ({ ...k, type: 'presetSpeed', y: 160 })),
+            ...cameraKeyframes.map(k => ({ ...k, type: 'camera', y: 240 })),
+            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 320 })),
+            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 400 })),
+            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 480 })),
+            ...textAnimatorKeyframes.map(k => ({ ...k, type: 'textAnimator', y: 560 })),
+            ...letterboxKeyframes.map(k => ({ ...k, type: 'letterbox', y: 640 })),
+            ...maskRevealKeyframes.map(k => ({ ...k, type: 'maskReveal', y: 720 })),
+            ...particleEmitterKeyframes.map(k => ({ ...k, type: 'particleEmitter', y: 800 })),
+            ...parameterEvents.map(k => ({ ...k, type: 'parameterEvent', y: 880 })),
+            ...environmentKeyframes.map(k => ({ ...k, type: 'environment', y: 960 })),
+          ];
+          
+          allKeyframes.forEach((kf: any) => {
+            // Handle different time field names
+            const kfTime = kf.time !== undefined ? kf.time : kf.startTime !== undefined ? kf.startTime : 0;
+            const kfX = timeToPixels(kfTime, pixelsPerSecond);
+            const kfY = kf.y; // Approximate track Y position
+            
+            if (kfX >= left && kfX <= right && kfY >= top && kfY <= bottom) {
+              newSelectedKeyframes.add(`${kf.type}-${kf.id}`);
+            }
+          });
+          
+          setSelectedKeyframes(newSelectedKeyframes);
+          console.log(`Marquee selected ${newSelectedKeyframes.size} keyframes`);
         }
         
-        // Reset cursor
-        if (container) {
-          container.style.cursor = 'default';
-        }
-      } else if (dragState.type === 'playhead' && container) {
-        // Commit playhead position
-        const rect = container.getBoundingClientRect();
-        // Account for the 128px label column offset
-        const finalX = e.clientX - rect.left + container.scrollLeft - 128;
-        const finalTime = pixelsToTime(finalX, pixelsPerSecond);
-        const snappedTime = snapTime(finalTime, gridSize, snapEnabled);
-        const clampedTime = clamp(snappedTime, 0, duration);
-        onSeek(clampedTime);
+        setMarqueeStart(null);
+        setMarqueeEnd(null)
+      } else if (isDraggingPlayhead) {
+        setIsDraggingPlayhead(false);
+        document.body.style.cursor = '';
       }
-      
-      // Reset drag state
-      dragStateRef.current.isDragging = false;
-      dragStateRef.current.type = null;
-      setPreviewTime(null);
     };
-    
-    document.addEventListener('pointermove', handleMove);
-    document.addEventListener('pointerup', handleUp);
-    
+
+    if (isPanning || isMarqueeSelecting || isDraggingPlayhead) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
     return () => {
-      document.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerup', handleUp);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [duration, gridSize, onSeek, pixelsPerSecond, snapEnabled]);
-  
-  // Set up wheel event listener
+  }, [isPanning, isMarqueeSelecting, isDraggingPlayhead, marqueeStart, pixelsPerSecond, duration, onSeek]);
+
+  // Attach wheel listener to scroll container
   useEffect(() => {
-    const container = timelineContentRef.current;
+    const container = scrollContainerRef.current;
     if (!container) return;
-    
+
     container.addEventListener('wheel', handleWheel, { passive: false });
     
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
   }, [handleWheel]);
-  
-  // Helper function to get animation info
-  const getAnimationInfo = useCallback((animValue: string) => {
-    return animationTypes.find(a => a.value === animValue) || {
-      value: animValue,
-      label: animValue,
-      icon: '🎵'
-    };
-  }, [animationTypes]);
-  
-  // Handle section drag start
-  const handleSectionMouseDown = useCallback((
-    e: React.MouseEvent,
-    section: Section,
-    type: 'move' | 'resize-start' | 'resize-end'
-  ) => {
-    e.stopPropagation();
-    setSectionDragState({
-      type,
-      sectionId: section.id,
-      startX: e.clientX,
-      initialStart: section.start,
-      initialEnd: section.end
-    });
-    onSelectSection(section.id);
-  }, [onSelectSection]);
-  
-  // Handle section dragging
-  useEffect(() => {
-    if (!sectionDragState.type || !sectionDragState.sectionId) return;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      const container = timelineContentRef.current;
-      if (!container) return;
-      
-      const deltaX = e.clientX - sectionDragState.startX;
-      const deltaTime = pixelsToTime(deltaX, pixelsPerSecond);
-      
-      if (sectionDragState.type === 'move') {
-        // Move the entire section
-        const newStart = Math.max(0, sectionDragState.initialStart + deltaTime);
-        const sectionDuration = sectionDragState.initialEnd - sectionDragState.initialStart;
-        const newEnd = newStart + sectionDuration;
-        
-        onUpdateSection(sectionDragState.sectionId, 'start', newStart);
-        onUpdateSection(sectionDragState.sectionId, 'end', newEnd);
-      } else if (sectionDragState.type === 'resize-start') {
-        // Resize from the start
-        const newStart = Math.max(0, Math.min(sectionDragState.initialStart + deltaTime, sectionDragState.initialEnd - 1));
-        onUpdateSection(sectionDragState.sectionId, 'start', newStart);
-      } else if (sectionDragState.type === 'resize-end') {
-        // Resize from the end  
-        const newEnd = Math.max(sectionDragState.initialStart + 1, sectionDragState.initialEnd + deltaTime);
-        onUpdateSection(sectionDragState.sectionId, 'end', newEnd);
-      }
-    };
-    
-    const handleMouseUp = () => {
-      setSectionDragState({ type: null, sectionId: null, startX: 0, initialStart: 0, initialEnd: 0 });
-      document.body.style.userSelect = '';
-    };
-    
-    // Prevent text selection during drag
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    
-    return () => {
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [sectionDragState, onUpdateSection, pixelsPerSecond]);
-  
-  // Handle keyframe dragging
-  useEffect(() => {
-    if (!keyframeDragState.type) return;
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      const container = timelineContentRef.current;
-      if (!container) return;
-      
-      const deltaX = e.clientX - keyframeDragState.startX;
-      const deltaTime = pixelsToTime(deltaX, pixelsPerSecond);
-      const rawTime = keyframeDragState.initialTime + deltaTime;
-      const newTime = snapTime(Math.max(0, Math.min(duration, rawTime)), gridSize, snapEnabled);
-      
-      // Update keyframe position based on type
-      if (keyframeDragState.type === 'preset' && keyframeDragState.keyframeId !== null && onMovePresetKeyframe) {
-        onMovePresetKeyframe(keyframeDragState.keyframeId, newTime);
-      } else if (keyframeDragState.type === 'camera' && keyframeDragState.keyframeTime !== null && onUpdateCameraKeyframe) {
-        // For camera keyframes, we need to update via time
-        const oldKeyframe = cameraKeyframes.find(kf => kf.time === keyframeDragState.keyframeTime);
-        if (oldKeyframe) {
-          // Delete old and create new at new time
-          const updatedKeyframes = cameraKeyframes.filter(kf => kf.time !== keyframeDragState.keyframeTime);
-          updatedKeyframes.push({ ...oldKeyframe, time: newTime });
-          // This is a workaround - ideally we'd have a proper move handler
-          onUpdateCameraKeyframe(keyframeDragState.keyframeTime, { time: newTime });
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Only handle when timeline area has focus
+    if (!scrollContainerRef.current?.contains(document.activeElement)) return;
+
+    const DEFAULT_FPS = 30;
+    const frameTime = 1 / DEFAULT_FPS;
+
+    switch (e.key) {
+      case ' ':
+      case 'Spacebar': // For older browsers
+        e.preventDefault();
+        if (onTogglePlayPause) {
+          onTogglePlayPause();
         }
-      } else if (keyframeDragState.type === 'text' && keyframeDragState.keyframeId !== null && onMoveTextKeyframe) {
-        onMoveTextKeyframe(keyframeDragState.keyframeId, newTime);
-      } else if (keyframeDragState.type === 'environment' && keyframeDragState.keyframeId !== null && onMoveEnvironmentKeyframe) {
-        onMoveEnvironmentKeyframe(keyframeDragState.keyframeId, newTime);
-      }
-    };
-    
-    const handleMouseUp = () => {
-      setKeyframeDragState({ type: null, keyframeId: null, keyframeTime: null, startX: 0, initialTime: 0 });
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    
-    document.body.style.cursor = 'grabbing';
-    document.body.style.userSelect = 'none';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+        break;
+
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Left = -5 seconds
+          onSeek(Math.max(0, currentTime - 5));
+        } else if (e.shiftKey) {
+          // Shift+Left = -1 second
+          onSeek(Math.max(0, currentTime - 1));
+        } else {
+          // Left = -1 frame
+          onSeek(Math.max(0, currentTime - frameTime));
+        }
+        break;
+
+      case 'ArrowRight':
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl/Cmd+Right = +5 seconds
+          onSeek(Math.min(duration, currentTime + 5));
+        } else if (e.shiftKey) {
+          // Shift+Right = +1 second
+          onSeek(Math.min(duration, currentTime + 1));
+        } else {
+          // Right = +1 frame
+          onSeek(Math.min(duration, currentTime + frameTime));
+        }
+        break;
+
+      case 'Home':
+        e.preventDefault();
+        onSeek(0);
+        break;
+
+      case 'End':
+        e.preventDefault();
+        onSeek(duration);
+        break;
+
+      case 'PageUp':
+        e.preventDefault();
+        // Jump backward by visible viewport width (in time)
+        if (scrollContainerRef.current) {
+          const viewportWidth = scrollContainerRef.current.clientWidth;
+          const viewportTime = pixelsToTime(viewportWidth, pixelsPerSecond);
+          onSeek(Math.max(0, currentTime - viewportTime));
+        }
+        break;
+
+      case 'PageDown':
+        e.preventDefault();
+        // Jump forward by visible viewport width (in time)
+        if (scrollContainerRef.current) {
+          const viewportWidth = scrollContainerRef.current.clientWidth;
+          const viewportTime = pixelsToTime(viewportWidth, pixelsPerSecond);
+          onSeek(Math.min(duration, currentTime + viewportTime));
+        }
+        break;
+    }
+  }, [currentTime, duration, onSeek, pixelsPerSecond]);
+
+  // Attach keyboard listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
     
     return () => {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [keyframeDragState, duration, gridSize, snapEnabled, pixelsPerSecond, cameraKeyframes, onMovePresetKeyframe, onUpdateCameraKeyframe, onMoveTextKeyframe, onMoveEnvironmentKeyframe]);
+  }, [handleKeyDown]);
   
-  // Context menu handler
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    // Don't show if we're currently dragging
-    if (dragStateRef.current.isDragging) return;
+  // Sync left column vertical scroll with right column
+  useEffect(() => {
+    const rightColumn = scrollContainerRef.current;
+    const leftColumn = leftColumnRef.current;
     
-    showContextMenuAt(e.clientX, e.clientY);
+    if (!rightColumn || !leftColumn) return;
+    
+    const handleScroll = () => {
+      // Sync vertical scroll from right to left
+      leftColumn.scrollTop = rightColumn.scrollTop;
+    };
+    
+    rightColumn.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      rightColumn.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
+
+  // Auto-scroll to keep playhead visible
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const playheadPixelX = timeToPixels(currentTime, pixelsPerSecond);
+    const scrollLeft = container.scrollLeft;
+    const viewportWidth = container.clientWidth;
+    
+    // If playhead is off-screen to the left
+    if (playheadPixelX < scrollLeft) {
+      container.scrollLeft = playheadPixelX - 50; // 50px padding
+    }
+    // If playhead is off-screen to the right
+    else if (playheadPixelX > scrollLeft + viewportWidth) {
+      container.scrollLeft = playheadPixelX - viewportWidth + 50; // 50px padding
+    }
+  }, [currentTime, pixelsPerSecond]);
+  
+  // Persist zoom level to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      localStorage.setItem('cv_timeline_zoom_level', zoomLevel.toString());
+    } catch (e) {
+      console.warn('Failed to save zoom level to localStorage:', e);
+    }
+  }, [zoomLevel]);
+  
+  // Persist collapsed tracks to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      const array = Array.from(collapsedTracks);
+      localStorage.setItem('cv_timeline_collapsed_tracks', JSON.stringify(array));
+    } catch (e) {
+      console.warn('Failed to save collapsed tracks to localStorage:', e);
+    }
+  }, [collapsedTracks]);
+  
+  // Persist track names to localStorage (Chunk 6.4)
+  useEffect(() => {
+    try {
+      const obj = Object.fromEntries(trackNames);
+      localStorage.setItem('cv_timeline_track_names', JSON.stringify(obj));
+    } catch (e) {
+      console.warn('Failed to save track names to localStorage:', e);
+    }
+  }, [trackNames]);
+
+  // Handle timeline click for seeking
+  const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't seek if we were panning or dragging playhead
+    if (isPanning || isDraggingPlayhead) return;
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const time = pixelsToTime(x, pixelsPerSecond);
+    onSeek(Math.max(0, Math.min(duration, time)));
+  };
+  
+  // Handle track collapse/expand toggle (Chunk 6.1)
+  const toggleTrackCollapse = useCallback((trackId: string) => {
+    setCollapsedTracks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(trackId)) {
+        newSet.delete(trackId);
+      } else {
+        newSet.add(trackId);
+      }
+      return newSet;
+    });
   }, []);
   
-  // Show context menu at position
-  const showContextMenuAt = useCallback((x: number, y: number) => {
-    const menuItems: ContextMenuItem[] = [
-      {
-        label: 'Add Preset Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => {
-          const container = timelineContentRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const clickX = x - rect.left + container.scrollLeft;
-            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
-            onAddPresetKeyframe?.(clickTime);
-          }
-        }
-      },
-      {
-        label: 'Add Camera Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => {
-          const container = timelineContentRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const clickX = x - rect.left + container.scrollLeft;
-            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
-            onAddCameraKeyframe?.(clickTime);
-          }
-        }
-      },
-      {
-        label: 'Add Text Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => {
-          const container = timelineContentRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const clickX = x - rect.left + container.scrollLeft;
-            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
-            onAddTextKeyframe?.(clickTime);
-          }
-        }
-      },
-      {
-        label: 'Add Environment Keyframe',
-        icon: <Plus size={14} />,
-        onClick: () => {
-          const container = timelineContentRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            const clickX = x - rect.left + container.scrollLeft;
-            const clickTime = pixelsToTime(clickX, pixelsPerSecond);
-            onAddEnvironmentKeyframe?.(clickTime);
-          }
-        }
-      },
-      { separator: true } as ContextMenuItem,
-      {
-        label: 'Copy',
-        icon: <Copy size={14} />,
-        onClick: () => {
-          console.log('Copy (not implemented yet)');
-        },
-        disabled: true
-      },
-      {
-        label: 'Delete',
-        icon: <Trash2 size={14} />,
-        onClick: () => {
-          console.log('Delete (not implemented yet)');
-        },
-        disabled: true
-      },
-      {
-        label: 'Rename',
-        icon: <Edit2 size={14} />,
-        onClick: () => {
-          console.log('Rename (not implemented yet)');
-        },
-        disabled: true
-      }
-    ];
-    
-    setContextMenu({ x, y, items: menuItems });
-  }, [onAddPresetKeyframe, onAddCameraKeyframe, onAddTextKeyframe, onAddEnvironmentKeyframe, pixelsPerSecond]);
+  // Handle track rename (Chunk 6.2)
+  const startRenameTrack = useCallback((trackId: string, currentName: string) => {
+    setEditingTrackId(trackId);
+    setEditingTrackName(trackNames.get(trackId) || currentName);
+  }, [trackNames]);
+  
+  const commitTrackRename = useCallback(() => {
+    if (editingTrackId && editingTrackName.trim()) {
+      setTrackNames(prev => {
+        const newMap = new Map(prev);
+        newMap.set(editingTrackId, editingTrackName.trim());
+        return newMap;
+      });
+    }
+    setEditingTrackId(null);
+    setEditingTrackName('');
+  }, [editingTrackId, editingTrackName]);
+  
+  const cancelTrackRename = useCallback(() => {
+    setEditingTrackId(null);
+    setEditingTrackName('');
+  }, []);
 
-  // Calculate playhead position
-  const playheadX = timeToPixels(previewTime ?? currentTime, pixelsPerSecond);
-  const timelineWidth = Math.max(timeToPixels(duration, pixelsPerSecond), 1000);
+  // Render time ruler markers
+  const renderRulerMarkers = () => {
+    const markers: JSX.Element[] = [];
+    const secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    
+    for (let time = 0; time <= duration; time += secondsInterval) {
+      const x = timeToPixels(time, pixelsPerSecond);
+      markers.push(
+        <div
+          key={time}
+          className="absolute top-0 bottom-0 flex flex-col items-center"
+          style={{ left: `${x}px` }}
+        >
+          <div className="w-px h-2 bg-gray-500" />
+          <span className="text-xs text-gray-400 mt-1">
+            {formatTime(time)}
+          </span>
+        </div>
+      );
+    }
+    
+    return markers;
+  };
+
+  // Render keyframes for a track
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
+    let keyframes: KeyframeWithTime[] = [];
+    let color = '';
+    
+    switch (trackType) {
+      case 'preset':
+        keyframes = presetKeyframes;
+        color = 'bg-cyan-500';
+        break;
+      case 'presetSpeed':
+        keyframes = presetSpeedKeyframes;
+        color = 'bg-cyan-300'; // Lighter cyan for speed
+        break;
+      case 'camera':
+        keyframes = cameraKeyframes;
+        color = 'bg-purple-500';
+        break;
+      case 'cameraRig':
+        keyframes = cameraRigKeyframes;
+        color = 'bg-purple-300'; // Lighter purple for rig
+        break;
+      case 'cameraFX':
+        keyframes = cameraFXKeyframes;
+        color = 'bg-purple-700'; // Darker purple for FX
+        break;
+      case 'text':
+        keyframes = textKeyframes;
+        color = 'bg-green-500';
+        break;
+      case 'textAnimator':
+        keyframes = textAnimatorKeyframes;
+        color = 'bg-green-300'; // Lighter green for animator
+        break;
+      case 'letterbox':
+        keyframes = letterboxKeyframes;
+        color = 'bg-yellow-500';
+        break;
+      case 'maskReveal':
+        keyframes = maskRevealKeyframes;
+        color = 'bg-pink-500';
+        break;
+      case 'particles':
+        keyframes = particleEmitterKeyframes;
+        color = 'bg-blue-500'; // Blue for particles
+        break;
+      case 'fxEvents':
+        keyframes = parameterEvents;
+        color = 'bg-red-500'; // Red for FX events
+        break;
+      case 'environment':
+        keyframes = environmentKeyframes;
+        color = 'bg-orange-500';
+        break;
+    }
+    
+    return keyframes.map((kf, idx) => {
+      // Extract time from various keyframe types
+      const time = 'time' in kf ? kf.time : 'startTime' in kf ? kf.startTime : 0;
+      const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
+      const fullKeyId = `${trackType}-${keyId}`;
+      const isSelected = selectedKeyframes.has(fullKeyId);
+      const isDragging = isDraggingKeyframe && draggedKeyframe?.keyframeId === fullKeyId;
+      const displayTime = isDragging && draggedKeyframe ? draggedKeyframe.currentTime : time;
+      const x = timeToPixels(displayTime, pixelsPerSecond);
+      
+      const handleKeyframeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Left click only - right click handled by onContextMenu
+        if (e.button !== 0) return;
+        
+        let hasMoved = false;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        
+        setIsDraggingKeyframe(true);
+        setDraggedKeyframe({
+          trackType,
+          keyframeId: fullKeyId,
+          originalTime: time,
+          currentTime: time,
+        });
+        
+        const handleMouseMove = (moveE: MouseEvent) => {
+          if (!scrollContainerRef.current) return;
+          
+          // Check if mouse moved enough to consider it a drag (>3px)
+          const dx = Math.abs(moveE.clientX - startX);
+          const dy = Math.abs(moveE.clientY - startY);
+          if (dx > 3 || dy > 3) {
+            hasMoved = true;
+          }
+          
+          requestAnimationFrame(() => {
+            const rect = scrollContainerRef.current!.getBoundingClientRect();
+            const scrollLeft = scrollContainerRef.current!.scrollLeft;
+            const relativeX = moveE.clientX - rect.left + scrollLeft;
+            let newTime = pixelsToTime(relativeX, pixelsPerSecond);
+            
+            // Clamp to valid range
+            newTime = Math.max(0, Math.min(duration, newTime));
+            
+            // Round to nearest frame (30fps default)
+            newTime = Math.round(newTime * 30) / 30;
+            
+            setDraggedKeyframe(prev => prev ? { ...prev, currentTime: newTime } : null);
+          });
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+          
+          if (!hasMoved) {
+            // This was a click, not a drag - select the keyframe
+            console.log(`Selected keyframe: ${fullKeyId} at ${formatTime(time)}`);
+            setSelectedKeyframes(new Set([fullKeyId]));
+          } else if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
+            // This was a drag - move the keyframe
+            console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
+            
+            // Call appropriate onMove callback based on track type
+            const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+            
+            switch (trackType) {
+              case 'preset':
+                onMovePresetKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'text':
+                onMoveTextKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'environment':
+                onMoveEnvironmentKeyframe?.(keyframeId, draggedKeyframe.currentTime);
+                break;
+              case 'camera':
+                // Camera keyframes identified by time, update via onUpdateCameraKeyframe
+                onUpdateCameraKeyframe?.(draggedKeyframe.originalTime, { time: draggedKeyframe.currentTime });
+                break;
+              default:
+                console.warn(`No move handler for track type: ${trackType}`);
+            }
+          }
+          
+          setIsDraggingKeyframe(false);
+          setDraggedKeyframe(null);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'grabbing';
+      };
+      
+      const handleKeyframeContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+          x: e.clientX,
+          y: e.clientY,
+          trackType,
+          keyframeId: fullKeyId,
+          time,
+        });
+      };
+      
+      return (
+        <div
+          key={fullKeyId}
+          className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
+            isSelected || isDragging ? 'ring-2 ring-white' : ''
+          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'}`}
+          style={{ 
+            left: `${x}px`, 
+            marginLeft: '-6px',
+            opacity: isDragging ? 1 : isSelected ? 0.9 : 0.8,
+          }}
+          title={`${trackType} keyframe at ${formatTime(displayTime)}`}
+          onMouseDown={handleKeyframeMouseDown}
+          onContextMenu={handleKeyframeContextMenu}
+        />
+      );
+    });
+  };
+
+  // Render marquee selection rectangle
+  const renderMarquee = () => {
+    if (!isMarqueeSelecting || !marqueeStart || !marqueeEnd) return null;
+    
+    const left = Math.min(marqueeStart.x, marqueeEnd.x);
+    const top = Math.min(marqueeStart.y, marqueeEnd.y);
+    const width = Math.abs(marqueeEnd.x - marqueeStart.x);
+    const height = Math.abs(marqueeEnd.y - marqueeStart.y);
+    
+    return (
+      <div
+        className="absolute border-2 border-cyan-500 bg-cyan-500 bg-opacity-20 pointer-events-none z-30"
+        style={{
+          left: `${left}px`,
+          top: `${top}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+        }}
+      />
+    );
+  };
+
+  // Render playhead
+  const playheadX = timeToPixels(currentTime, pixelsPerSecond);
+
+  // Handle context menu actions
+  const handleContextMenuAction = (action: 'copy' | 'delete' | 'duplicate') => {
+    if (!contextMenu) return;
+    
+    const { trackType, keyframeId, time } = contextMenu;
+    console.log(`${action} keyframe: ${keyframeId} at ${formatTime(time)}`);
+    
+    // TODO: Implement actual actions based on track type
+    // For now, just log the action
+    
+    setContextMenu(null);
+  };
+  
+  // Close context menu on click away
+  useEffect(() => {
+    if (!contextMenu) return;
+    
+    const handleClickAway = () => setContextMenu(null);
+    document.addEventListener('click', handleClickAway);
+    return () => document.removeEventListener('click', handleClickAway);
+  }, [contextMenu]);
 
   return (
-    <div 
-      ref={containerRef}
-      className="timeline-v2 flex flex-col h-full bg-gray-900 text-white"
-      tabIndex={0}
-    >
-      {/* Header */}
-      <div className="timeline-header flex items-center gap-4 px-4 py-2 bg-gray-800 border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onTogglePlayPause}
-            className="p-2 rounded bg-cyan-600 hover:bg-cyan-700 transition-colors"
-            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-          >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          </button>
-        </div>
-
-        <div className="text-sm font-mono">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1 text-xs text-gray-400">
-            <input
-              type="checkbox"
-              checked={snapEnabled}
-              onChange={(e) => setSnapEnabled(e.target.checked)}
-              className="w-3 h-3"
-            />
-            Snap
-          </label>
-          <select
-            value={gridSize}
-            onChange={(e) => setGridSize(parseFloat(e.target.value))}
-            className="text-xs bg-gray-700 text-white px-2 py-1 rounded"
-            title="Grid size"
-          >
-            <option value={1/30}>1 frame</option>
-            <option value={0.1}>100ms</option>
-            <option value={0.25}>250ms</option>
-            <option value={0.5}>500ms</option>
-            <option value={1.0}>1s</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-gray-400">Zoom: {Math.round(zoom * 100)}%</span>
-          <button
-            onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - 0.25))}
-            className="p-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-            title="Zoom Out"
-          >
-            <ZoomOut size={14} />
-          </button>
-          <button
-            onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + 0.25))}
-            className="p-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
-            title="Zoom In"
-          >
-            <ZoomIn size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* Timeline content */}
-      <div
-        ref={timelineContentRef}
-        className="timeline-content flex-1 overflow-auto relative bg-gray-950"
-        onPointerDown={handleTimelinePointerDown}
-        onContextMenu={handleContextMenu}
-      >
-        {/* Timeline ruler and tracks */}
-        <div 
-          className="timeline-canvas relative"
-          style={{ width: `${timelineWidth}px`, minHeight: '200px' }}
-        >
-          {/* Ruler */}
-          <div className="timeline-ruler h-8 bg-gray-800 border-b border-gray-700 sticky top-0 z-10 flex">
-            {/* Left spacer to align with track labels */}
-            <div className="w-32 flex-shrink-0 bg-gray-800 border-r border-gray-700" />
-            {/* Ruler content */}
-            <div className="flex-1 relative">
-              <svg width={timelineWidth} height={32}>
-                {/* Draw time markers every second */}
-                {Array.from({ length: Math.ceil(duration) + 1 }, (_, i) => {
-                  const x = timeToPixels(i, pixelsPerSecond);
-                  return (
-                    <g key={i}>
-                      <line
-                        x1={x}
-                        y1={20}
-                        x2={x}
-                        y2={32}
-                        stroke="#4b5563"
-                        strokeWidth={1}
-                      />
-                      <text
-                        x={x + 4}
-                        y={16}
-                        fill="#9ca3af"
-                        fontSize={10}
-                        fontFamily="monospace"
-                      >
-                        {formatTime(i)}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-          </div>
-          
-          {/* Tracks placeholder */}
-          <div className="timeline-tracks relative">
-            {/* Audio track with waveform */}
-            {audioBuffer && (
-              <div className="track-row h-24 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <span className="text-xs text-gray-400 font-medium">Audio</span>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  <WaveformVisualizer
-                    audioBuffer={audioBuffer}
-                    duration={duration}
-                    width={timelineWidth}
-                    height={96}
-                    color="rgba(6, 182, 212, 0.4)"
-                    mode={waveformMode}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Track: Sections (Animation Presets as bars) */}
-            {sections.length > 0 && (
-              <div className="track-row relative bg-gray-900 border-b border-gray-800" style={{ height: `${sections.length * 68 + 8}px` }}>
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">📊</span>
-                    <span className="text-xs text-gray-400 font-medium">Sections</span>
-                  </div>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  {sections.map((section, index) => {
-                    const animInfo = getAnimationInfo(section.animation);
-                    const isSelected = section.id === selectedSectionId;
-                    const left = timeToPixels(section.start, pixelsPerSecond);
-                    const width = timeToPixels(section.end - section.start, pixelsPerSecond);
-                    const top = index * 68 + 4;
-                    
-                    return (
-                      <div
-                        key={section.id}
-                        className={`absolute rounded transition-all ${
-                          isSelected
-                            ? 'ring-2 ring-cyan-400 z-10'
-                            : 'hover:ring-1 hover:ring-gray-500'
-                        } cursor-move`}
-                        style={{
-                          left: `${left}px`,
-                          top: `${top}px`,
-                          width: `${width}px`,
-                          height: '60px',
-                          backgroundColor: isSelected ? '#06b6d4' : '#5a5a5a',
-                          backgroundImage: isSelected 
-                            ? 'linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%)'
-                            : 'none'
-                        }}
-                        onMouseDown={(e) => handleSectionMouseDown(e, section, 'move')}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectSection(section.id);
-                        }}
-                      >
-                        {/* Section content */}
-                        <div className="h-full px-2 py-1 flex flex-col justify-between relative overflow-hidden">
-                          <div className="flex items-center gap-1">
-                            <span className="text-sm">{animInfo.icon}</span>
-                            <span className="text-xs font-semibold text-white truncate">
-                              {animInfo.label}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-300 font-mono">
-                            {formatTime(section.start)} - {formatTime(section.end)}
-                          </div>
-                          
-                          {/* Resize handles */}
-                          <>
-                            {/* Left resize handle */}
-                            <div
-                              className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
-                              onMouseDown={(e) => handleSectionMouseDown(e, section, 'resize-start')}
-                              title="Resize start"
-                            />
-                            {/* Right resize handle */}
-                            <div
-                              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-cyan-400 bg-opacity-50 transition-colors z-20"
-                              onMouseDown={(e) => handleSectionMouseDown(e, section, 'resize-end')}
-                              title="Resize end"
-                            />
-                          </>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            
-            {/* Track: Presets */}
-            {presetKeyframes.length > 0 && (
-              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">🎨</span>
-                    <span className="text-xs text-gray-400 font-medium">Presets</span>
-                  </div>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  {presetKeyframes.map((kf) => (
-                    <div
-                      key={kf.id}
-                      className="absolute top-0 w-1 h-full bg-cyan-400 hover:bg-cyan-300 transition-colors cursor-grab group"
-                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(kf.time);
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setKeyframeDragState({
-                          type: 'preset',
-                          keyframeId: kf.id,
-                          keyframeTime: null,
-                          startX: e.clientX,
-                          initialTime: kf.time
-                        });
-                      }}
-                    >
-                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-cyan-400 rounded-full" />
-                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
-                        {formatTime(kf.time)} - {animationTypes.find(a => a.value === kf.preset)?.label || kf.preset}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Track: Camera */}
-            {cameraKeyframes.length > 0 && (
-              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">📷</span>
-                    <span className="text-xs text-gray-400 font-medium">Camera</span>
-                  </div>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  {cameraKeyframes.map((kf, idx) => (
-                    <div
-                      key={idx}
-                      className="absolute top-0 w-1 h-full bg-purple-400 hover:bg-purple-300 transition-colors cursor-grab group"
-                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(kf.time);
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setKeyframeDragState({
-                          type: 'camera',
-                          keyframeId: null,
-                          keyframeTime: kf.time,
-                          startX: e.clientX,
-                          initialTime: kf.time
-                        });
-                      }}
-                    >
-                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-purple-400 rounded-full" />
-                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
-                        {formatTime(kf.time)} - Camera
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Track: Text */}
-            {textKeyframes.length > 0 && (
-              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">📝</span>
-                    <span className="text-xs text-gray-400 font-medium">Text</span>
-                  </div>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  {textKeyframes.map((kf) => (
-                    <div
-                      key={kf.id}
-                      className={`absolute top-0 w-1 h-full ${kf.show ? 'bg-green-400 hover:bg-green-300' : 'bg-red-400 hover:bg-red-300'} transition-colors cursor-grab group`}
-                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(kf.time);
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setKeyframeDragState({
-                          type: 'text',
-                          keyframeId: kf.id,
-                          keyframeTime: null,
-                          startX: e.clientX,
-                          initialTime: kf.time
-                        });
-                      }}
-                    >
-                      <div className={`absolute -top-1 -left-1.5 w-3 h-3 ${kf.show ? 'bg-green-400' : 'bg-red-400'} rounded-full`} />
-                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
-                        {formatTime(kf.time)} - {kf.show ? 'Show' : 'Hide'} Text
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Track: Environment */}
-            {environmentKeyframes.length > 0 && (
-              <div className="track-row h-16 bg-gray-900 border-b border-gray-800 relative">
-                <div className="track-label absolute left-0 top-0 h-full w-32 bg-gray-800 border-r border-gray-700 flex items-center px-3 z-10">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">🌍</span>
-                    <span className="text-xs text-gray-400 font-medium">Environment</span>
-                  </div>
-                </div>
-                <div className="track-content ml-32 h-full relative">
-                  {environmentKeyframes.map((kf) => (
-                    <div
-                      key={kf.id}
-                      className="absolute top-0 w-1 h-full bg-orange-400 hover:bg-orange-300 transition-colors cursor-grab group"
-                      style={{ left: `${timeToPixels(kf.time, pixelsPerSecond)}px` }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSeek(kf.time);
-                      }}
-                      onMouseDown={(e) => {
-                        e.stopPropagation();
-                        setKeyframeDragState({
-                          type: 'environment',
-                          keyframeId: kf.id,
-                          keyframeTime: null,
-                          startX: e.clientX,
-                          initialTime: kf.time
-                        });
-                      }}
-                    >
-                      <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-orange-400 rounded-full" />
-                      <div className="absolute top-4 left-2 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-30 shadow-lg">
-                        {formatTime(kf.time)} - {kf.type}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          {/* Marquee selection rectangle */}
-          {marquee && (
-            <div
-              className="absolute border-2 border-green-500 bg-green-500 bg-opacity-10 pointer-events-none z-30"
-              style={{
-                left: `${Math.min(marquee.startX, marquee.endX)}px`,
-                top: `${Math.min(marquee.startY, marquee.endY)}px`,
-                width: `${Math.abs(marquee.endX - marquee.startX)}px`,
-                height: `${Math.abs(marquee.endY - marquee.startY)}px`
-              }}
-            />
+    <div className="flex flex-col h-full bg-gray-900 text-white">
+      {/* Header with play/pause and zoom controls */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center gap-4">
+          {/* Play/Pause button */}
+          {onTogglePlayPause && (
+            <button
+              onClick={onTogglePlayPause}
+              className="p-2 rounded bg-cyan-600 hover:bg-cyan-700 transition-colors flex items-center justify-center"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+            </button>
           )}
           
-          {/* Playhead */}
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 z-20 pointer-events-none"
-            style={{ left: `${playheadX + 128}px` }}
+          <span className="text-sm font-medium">Zoom:</span>
+          <input
+            type="range"
+            min={MIN_ZOOM}
+            max={MAX_ZOOM}
+            step={0.25}
+            value={zoomLevel}
+            onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+            className="w-32"
+          />
+          <span className="text-xs text-gray-400">{zoomLevel.toFixed(2)}x</span>
+          <button
+            onClick={() => setZoomLevel(1.0)}
+            className="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded"
           >
-            <div 
-              className="absolute top-0 left-1/2 -translate-x-1/2 w-3 h-3 bg-cyan-400 cursor-ew-resize pointer-events-auto"
-              style={{ clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)' }}
-              onPointerDown={handlePlayheadPointerDown}
-            />
+            Reset
+          </button>
+          <span className="text-xs text-gray-500 ml-4">
+            💡 Space=Play, Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
+          </span>
+        </div>
+        <div className="text-sm text-gray-400">
+          {formatTime(currentTime)} / {formatTime(duration)}
+        </div>
+      </div>
+
+      {/* Main timeline area - two-column layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left column - Fixed track labels (synced scroll) */}
+        <div 
+          ref={leftColumnRef}
+          className="flex-shrink-0 bg-gray-800 border-r border-gray-700 overflow-y-hidden"
+          style={{ width: `${LEFT_COLUMN_WIDTH}px` }}
+        >
+          {/* Spacer for ruler */}
+          <div 
+            className="border-b border-gray-700"
+            style={{ height: `${RULER_HEIGHT}px` }}
+          />
+          
+          {/* Track labels */}
+          {tracks.map((track) => {
+            const isCollapsed = collapsedTracks.has(track.id);
+            const displayName = trackNames.get(track.id) || track.name;
+            const isEditing = editingTrackId === track.id;
+            
+            return (
+              <div
+                key={track.id}
+                className="flex items-center px-2 border-b border-gray-700"
+                style={{ height: `${TRACK_HEIGHT}px` }}
+              >
+                {/* Collapse/expand button */}
+                <button
+                  onClick={() => toggleTrackCollapse(track.id)}
+                  className="p-1 hover:bg-gray-700 rounded mr-2 text-gray-400 hover:text-gray-200"
+                  title={isCollapsed ? "Expand track" : "Collapse track"}
+                >
+                  {isCollapsed ? '▶' : '▼'}
+                </button>
+                
+                {/* Track name - editable on double-click */}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editingTrackName}
+                    onChange={(e) => setEditingTrackName(e.target.value)}
+                    onBlur={commitTrackRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        commitTrackRename();
+                      } else if (e.key === 'Escape') {
+                        cancelTrackRename();
+                      }
+                    }}
+                    autoFocus
+                    className="text-sm font-medium bg-gray-700 text-white px-2 py-1 rounded border border-cyan-500 focus:outline-none"
+                    style={{ width: '140px' }}
+                  />
+                ) : (
+                  <span
+                    className="text-sm font-medium cursor-text hover:text-cyan-400"
+                    onDoubleClick={() => startRenameTrack(track.id, displayName)}
+                    title="Double-click to rename"
+                  >
+                    {displayName}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Right column - Scrollable timeline content */}
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-auto relative focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          onContextMenu={handleContextMenu}
+          onMouseDown={handleMouseDown}
+          style={{ cursor: isPanning ? 'grabbing' : 'default' }}
+          tabIndex={0}
+          role="region"
+          aria-label="Timeline content"
+        >
+          {/* Sticky ruler at top */}
+          <div
+            className="sticky top-0 z-20 bg-gray-800 border-b border-gray-700"
+            style={{ 
+              height: `${RULER_HEIGHT}px`,
+              width: `${timelineWidth}px`
+            }}
+          >
+            <div className="relative h-full">
+              {renderRulerMarkers()}
+            </div>
+          </div>
+
+          {/* Timeline content container */}
+          <div
+            className="relative"
+            style={{ 
+              width: `${timelineWidth}px`,
+              minHeight: `${tracks.length * TRACK_HEIGHT}px`
+            }}
+            onClick={handleTimelineClick}
+          >
+            {/* Track rows */}
+            {tracks.map((track, index) => {
+              const isCollapsed = collapsedTracks.has(track.id);
+              return (
+                <div
+                  key={track.id}
+                  className="relative border-b border-gray-700 overflow-hidden transition-all"
+                  style={{ height: isCollapsed ? '40px' : `${TRACK_HEIGHT}px` }}
+                >
+                  {/* Only render track content if not collapsed */}
+                  {!isCollapsed && (
+                    <>
+                      {/* Waveform for audio track */}
+                      {track.type === 'audio' && showWaveform && audioBuffer && (
+                        <WaveformVisualizer
+                          audioBuffer={audioBuffer}
+                          duration={duration}
+                          width={timelineWidth}
+                          height={TRACK_HEIGHT}
+                          color="rgba(100, 180, 255, 0.3)"
+                        />
+                      )}
+
+                {/* Grid lines for visual reference */}
+                      <div className="absolute inset-0 pointer-events-none">
+                        {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
+                          const x = timeToPixels(i, pixelsPerSecond);
+                          return (
+                            <div
+                              key={i}
+                              className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
+                              style={{ left: `${x}px` }}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Render keyframes for this track */}
+                      {track.type === 'preset' && renderKeyframes('preset')}
+                      {track.type === 'presetSpeed' && renderKeyframes('presetSpeed')}
+                      {track.type === 'camera' && renderKeyframes('camera')}
+                      {track.type === 'cameraRig' && renderKeyframes('cameraRig')}
+                      {track.type === 'cameraFX' && renderKeyframes('cameraFX')}
+                      {track.type === 'text' && renderKeyframes('text')}
+                      {track.type === 'textAnimator' && renderKeyframes('textAnimator')}
+                      {track.type === 'letterbox' && renderKeyframes('letterbox')}
+                      {track.type === 'maskReveal' && renderKeyframes('maskReveal')}
+                      {track.type === 'particles' && renderKeyframes('particles')}
+                      {track.type === 'environment' && (
+                        <div className="absolute inset-0">
+                          {renderKeyframes('environment')}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Playhead - spans all tracks */}
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
+              style={{ left: `${playheadX}px`, pointerEvents: 'none' }}
+            >
+              {/* Playhead handle - draggable */}
+              <div 
+                className="absolute -top-1 -left-2 w-4 h-4 bg-red-500 rounded-full cursor-grab hover:scale-125 transition-transform"
+                style={{ pointerEvents: 'auto' }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setIsDraggingPlayhead(true);
+                  document.body.style.cursor = 'grabbing';
+                }}
+                title="Drag to scrub timeline"
+              />
+            </div>
+            
+            {/* Marquee selection rectangle */}
+            {renderMarquee()}
           </div>
         </div>
       </div>
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-gray-800 border border-gray-700 rounded shadow-lg py-1 z-50"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('copy')}
+          >
+            <span>📋</span> Copy Keyframe
+          </button>
+          <button
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('duplicate')}
+          >
+            <span>➕</span> Duplicate
+          </button>
+          <div className="border-t border-gray-700 my-1" />
+          <button
+            className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-gray-700 flex items-center gap-2"
+            onClick={() => handleContextMenuAction('delete')}
+          >
+            <span>🗑️</span> Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }
