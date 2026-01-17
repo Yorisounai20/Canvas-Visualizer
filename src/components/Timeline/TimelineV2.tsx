@@ -164,6 +164,21 @@ export default function TimelineV2({
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
+  // Snap mode state - controls how keyframes snap when dragging
+  type SnapMode = 'none' | 'frame' | 'beat' | 'second';
+  const [snapMode, setSnapMode] = useState<SnapMode>(() => {
+    // Load from localStorage
+    try {
+      const saved = localStorage.getItem('cv_timeline_snap_mode');
+      if (saved && ['none', 'frame', 'beat', 'second'].includes(saved)) {
+        return saved as SnapMode;
+      }
+    } catch (e) {
+      console.warn('Failed to load snap mode from localStorage:', e);
+    }
+    return 'frame'; // Default to frame snapping
+  });
+  
   // Playhead dragging state
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   
@@ -591,6 +606,15 @@ export default function TimelineV2({
       console.warn('Failed to save track names to localStorage:', e);
     }
   }, [trackNames]);
+  
+  // Persist snap mode to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('cv_timeline_snap_mode', snapMode);
+    } catch (e) {
+      console.warn('Failed to save snap mode to localStorage:', e);
+    }
+  }, [snapMode]);
 
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -661,6 +685,25 @@ export default function TimelineV2({
     }
     
     return markers;
+  };
+
+  // Apply snapping based on current snap mode
+  const applySnapping = (time: number): number => {
+    switch (snapMode) {
+      case 'none':
+        return time; // No snapping
+      case 'frame':
+        // Snap to 30fps frames (default)
+        return Math.round(time * 30) / 30;
+      case 'beat':
+        // Snap to quarter beats (assuming 120 BPM = 2 beats/sec = 0.5s per beat, 0.125s per quarter)
+        return Math.round(time * 8) / 8;
+      case 'second':
+        // Snap to whole seconds
+        return Math.round(time);
+      default:
+        return time;
+    }
   };
 
   // Helper function to extract keyframe IDs in the correct type
@@ -783,8 +826,8 @@ export default function TimelineV2({
             // Clamp to valid range
             newTime = Math.max(0, Math.min(duration, newTime));
             
-            // Round to nearest frame (30fps default)
-            newTime = Math.round(newTime * 30) / 30;
+            // Apply snapping based on current snap mode
+            newTime = applySnapping(newTime);
             
             // Update both state and ref
             draggedTimeRef.current = newTime;
@@ -975,6 +1018,26 @@ export default function TimelineV2({
           >
             Reset
           </button>
+          
+          {/* Snap mode toggle button */}
+          <button
+            onClick={() => {
+              const modes: SnapMode[] = ['none', 'frame', 'beat', 'second'];
+              const currentIndex = modes.indexOf(snapMode);
+              const nextMode = modes[(currentIndex + 1) % modes.length];
+              setSnapMode(nextMode);
+            }}
+            className={`px-2 py-1 text-xs rounded flex items-center gap-1 transition-colors ${
+              snapMode === 'none' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-400' 
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            }`}
+            title={`Snap Mode: ${snapMode === 'none' ? 'Off' : snapMode === 'frame' ? 'Frame (30fps)' : snapMode === 'beat' ? 'Beat (1/4)' : 'Second'}\nClick to cycle modes`}
+          >
+            <span className="text-base">🧲</span>
+            <span className="capitalize">{snapMode === 'frame' ? 'Frame' : snapMode === 'beat' ? 'Beat' : snapMode === 'second' ? 'Sec' : 'Off'}</span>
+          </button>
+          
           <span className="text-xs text-gray-500 ml-4">
             💡 Space=Play, Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
           </span>
