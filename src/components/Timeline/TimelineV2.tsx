@@ -159,6 +159,8 @@ export default function TimelineV2({
     originalTime: number;
     currentTime: number;
   } | null>(null);
+  // Use ref to track drag time to avoid closure issues
+  const draggedTimeRef = useRef<number>(0);
   
   // Track collapse state (Chunk 6.1)
   const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(() => {
@@ -722,6 +724,10 @@ export default function TimelineV2({
         let hasMoved = false;
         const startX = e.clientX;
         const startY = e.clientY;
+        const originalTime = time;
+        
+        // Initialize ref with original time
+        draggedTimeRef.current = time;
         
         setIsDraggingKeyframe(true);
         setDraggedKeyframe({
@@ -753,6 +759,8 @@ export default function TimelineV2({
             // Round to nearest frame (30fps default)
             newTime = Math.round(newTime * 30) / 30;
             
+            // Update both state and ref
+            draggedTimeRef.current = newTime;
             setDraggedKeyframe(prev => prev ? { ...prev, currentTime: newTime } : null);
           });
         };
@@ -766,29 +774,33 @@ export default function TimelineV2({
             // This was a click, not a drag - select the keyframe
             console.log(`Selected keyframe: ${fullKeyId} at ${formatTime(time)}`);
             setSelectedKeyframes(new Set([fullKeyId]));
-          } else if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
-            // This was a drag - move the keyframe
-            console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
-            
-            // Call appropriate onMove callback based on track type
-            const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
-            
-            switch (trackType) {
-              case 'preset':
-                onMovePresetKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'text':
-                onMoveTextKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'environment':
-                onMoveEnvironmentKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'camera':
-                // Camera keyframes identified by time, update via onUpdateCameraKeyframe
-                onUpdateCameraKeyframe?.(draggedKeyframe.originalTime, { time: draggedKeyframe.currentTime });
-                break;
-              default:
-                console.warn(`No move handler for track type: ${trackType}`);
+          } else {
+            // This was a drag - check if position actually changed using ref
+            const finalTime = draggedTimeRef.current;
+            if (finalTime !== originalTime) {
+              // Move the keyframe
+              console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime}`);
+              
+              // Call appropriate onMove callback based on track type
+              const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+              
+              switch (trackType) {
+                case 'preset':
+                  onMovePresetKeyframe?.(keyframeId, finalTime);
+                  break;
+                case 'text':
+                  onMoveTextKeyframe?.(keyframeId, finalTime);
+                  break;
+                case 'environment':
+                  onMoveEnvironmentKeyframe?.(keyframeId, finalTime);
+                  break;
+                case 'camera':
+                  // Camera keyframes identified by time, update via onUpdateCameraKeyframe
+                  onUpdateCameraKeyframe?.(originalTime, { time: finalTime });
+                  break;
+                default:
+                  console.warn(`No move handler for track type: ${trackType}`);
+              }
             }
           }
           
