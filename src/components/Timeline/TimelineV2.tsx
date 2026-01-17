@@ -663,6 +663,13 @@ export default function TimelineV2({
     return markers;
   };
 
+  // Helper function to extract keyframe IDs in the correct type
+  const extractKeyframeIds = (kf: any, keyId: string | number) => {
+    const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+    const stringId = 'id' in kf && typeof kf.id === 'string' ? kf.id : String(keyId);
+    return { numericId, stringId };
+  };
+
   // Render keyframes for a track
   const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
     type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
@@ -797,10 +804,8 @@ export default function TimelineV2({
               // Move the keyframe
               console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime}`);
               
-              // Call appropriate onMove callback based on track type
               // Extract the correct ID based on keyframe structure
-              const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
-              const stringId = 'id' in kf && typeof kf.id === 'string' ? kf.id : String(keyId);
+              const { numericId, stringId } = extractKeyframeIds(kf, keyId);
               
               switch (trackType) {
                 case 'preset':

@@ -1222,6 +1222,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
   
   const moveParameterEvent = (id: string, newTime: number) => {
+    // Note: ParameterEvent uses 'startTime' field, not 'time'
     setParameterEvents(parameterEvents.map(event =>
       event.id === id ? { ...event, startTime: newTime } : event
     ).sort((a, b) => a.startTime - b.startTime));
