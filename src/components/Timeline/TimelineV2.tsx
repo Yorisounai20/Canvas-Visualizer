@@ -688,21 +688,39 @@ export default function TimelineV2({
   };
 
   // Apply snapping based on current snap mode
+  // Note: Frame rate (30fps) and BPM (120) are fixed for this timeline implementation
+  // These match the default recording settings and common music tempo
   const applySnapping = (time: number): number => {
+    const FPS = 30; // Fixed frame rate for the application
+    const BPM = 120; // Fixed tempo for beat snapping (2 beats/sec)
+    const BEATS_PER_SECOND = BPM / 60; // 2 beats/sec
+    const QUARTER_BEATS_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter beats/sec
+    
     switch (snapMode) {
       case 'none':
         return time; // No snapping
       case 'frame':
-        // Snap to 30fps frames (default)
-        return Math.round(time * 30) / 30;
+        // Snap to 30fps frames
+        return Math.round(time * FPS) / FPS;
       case 'beat':
-        // Snap to quarter beats (assuming 120 BPM = 2 beats/sec = 0.5s per beat, 0.125s per quarter)
-        return Math.round(time * 8) / 8;
+        // Snap to quarter beats (1/4 of a beat at 120 BPM = 0.125s)
+        return Math.round(time * QUARTER_BEATS_PER_SECOND) / QUARTER_BEATS_PER_SECOND;
       case 'second':
         // Snap to whole seconds
         return Math.round(time);
       default:
         return time;
+    }
+  };
+  
+  // Get snap mode description for tooltip
+  const getSnapModeDescription = (mode: SnapMode): string => {
+    switch (mode) {
+      case 'none': return 'Off';
+      case 'frame': return 'Frame (30fps)';
+      case 'beat': return 'Beat (1/4)';
+      case 'second': return 'Second';
+      default: return 'Unknown';
     }
   };
 
@@ -1032,7 +1050,7 @@ export default function TimelineV2({
                 ? 'bg-gray-700 hover:bg-gray-600 text-gray-400' 
                 : 'bg-purple-600 hover:bg-purple-700 text-white'
             }`}
-            title={`Snap Mode: ${snapMode === 'none' ? 'Off' : snapMode === 'frame' ? 'Frame (30fps)' : snapMode === 'beat' ? 'Beat (1/4)' : 'Second'}\nClick to cycle modes`}
+            title={`Snap Mode: ${getSnapModeDescription(snapMode)}\nClick to cycle modes`}
           >
             <span className="text-base">🧲</span>
             <span className="capitalize">{snapMode === 'frame' ? 'Frame' : snapMode === 'beat' ? 'Beat' : snapMode === 'second' ? 'Sec' : 'Off'}</span>
