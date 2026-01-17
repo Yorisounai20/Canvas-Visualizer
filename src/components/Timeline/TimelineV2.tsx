@@ -268,7 +268,15 @@ export default function TimelineV2({
 
   // Handle right-click pan start
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent context menu
+    // Only prevent context menu if it's directly on the timeline container
+    // Allow it to bubble up from keyframes (they have stopPropagation)
+    const target = e.target as HTMLElement;
+    const isTimelineContainer = target === scrollContainerRef.current || 
+                                target.classList.contains('timeline-track-content');
+    
+    if (isTimelineContainer) {
+      e.preventDefault(); // Prevent context menu on empty timeline areas only
+    }
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -337,12 +345,48 @@ export default function TimelineV2({
       } else if (isMarqueeSelecting) {
         // Finalize marquee selection
         setIsMarqueeSelecting(false);
-        setMarqueeStart(null);
-        setMarqueeEnd(null);
         document.body.style.cursor = '';
         
-        // TODO: Implement keyframe selection logic based on marquee rectangle
-        // This will be implemented when we add keyframe interaction handlers
+        // Select keyframes within marquee rectangle
+        if (marqueeStart && marqueeEnd) {
+          const left = Math.min(marqueeStart.x, marqueeEnd.x);
+          const right = Math.max(marqueeStart.x, marqueeEnd.x);
+          const top = Math.min(marqueeStart.y, marqueeEnd.y);
+          const bottom = Math.max(marqueeStart.y, marqueeEnd.y);
+          
+          const newSelectedKeyframes = new Set<string>();
+          
+          // Check all keyframes from all tracks
+          const allKeyframes = [
+            ...presetKeyframes.map(k => ({ ...k, type: 'preset', y: 80 })), // Estimate track Y positions
+            ...presetSpeedKeyframes.map(k => ({ ...k, type: 'presetSpeed', y: 160 })),
+            ...cameraKeyframes.map(k => ({ ...k, type: 'camera', y: 240 })),
+            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 320 })),
+            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 400 })),
+            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 480 })),
+            ...textAnimatorKeyframes.map(k => ({ ...k, type: 'textAnimator', y: 560 })),
+            ...letterboxKeyframes.map(k => ({ ...k, type: 'letterbox', y: 640 })),
+            ...maskRevealKeyframes.map(k => ({ ...k, type: 'maskReveal', y: 720 })),
+            ...particleEmitterKeyframes.map(k => ({ ...k, type: 'particleEmitter', y: 800 })),
+            ...parameterEvents.map(k => ({ ...k, type: 'parameterEvent', y: 880 })),
+            ...environmentKeyframes.map(k => ({ ...k, type: 'environment', y: 960 })),
+          ];
+          
+          allKeyframes.forEach((kf: any) => {
+            const kfX = timeToPixels(kf.time, pixelsPerSecond);
+            const kfY = kf.y; // Approximate track Y position
+            
+            if (kfX >= left && kfX <= right && kfY >= top && kfY <= bottom) {
+              newSelectedKeyframes.add(`${kf.type}-${kf.id}`);
+            }
+          });
+          
+          setSelectedKeyframes(newSelectedKeyframes);
+          console.log(`Marquee selected ${newSelectedKeyframes.size} keyframes`);
+        }
+        
+        setMarqueeStart(null);
+        setMarqueeEnd(null)
       } else if (isDraggingPlayhead) {
         setIsDraggingPlayhead(false);
         document.body.style.cursor = '';
