@@ -268,15 +268,8 @@ export default function TimelineV2({
 
   // Handle right-click pan start
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    // Only prevent context menu if it's directly on the timeline container
-    // Allow it to bubble up from keyframes (they have stopPropagation)
-    const target = e.target as HTMLElement;
-    const isTimelineContainer = target === scrollContainerRef.current || 
-                                target.classList.contains('timeline-track-content');
-    
-    if (isTimelineContainer) {
-      e.preventDefault(); // Prevent context menu on empty timeline areas only
-    }
+    // Always prevent browser context menu - keyframes show custom menu with stopPropagation
+    e.preventDefault();
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
