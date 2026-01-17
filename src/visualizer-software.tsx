@@ -8408,6 +8408,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onDeleteTextKeyframe={deleteTextKeyframe}
       onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
       onUpdatePresetKeyframe={updatePresetKeyframe}
+      onUpdatePresetKeyframeField={handleUpdatePresetKeyframe}
       onUpdateCameraKeyframe={updateCameraKeyframe}
       onUpdateTextKeyframe={updateTextKeyframe}
       onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}

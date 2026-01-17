@@ -86,6 +86,7 @@ interface TimelineProps {
   onDeleteTextKeyframe?: (id: number) => void;
   onDeleteEnvironmentKeyframe?: (id: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
+  onUpdatePresetKeyframeField?: (id: number, field: string, value: any) => void;
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
@@ -148,6 +149,7 @@ export default function TimelineV2({
   onMoveParticleEmitterKeyframe,
   onMoveParameterEvent,
   onUpdateCameraKeyframe,
+  onUpdatePresetKeyframeField,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -183,6 +185,16 @@ export default function TimelineV2({
     }
     return 'frame'; // Default to frame snapping
   });
+  
+  // Keyframe resize state
+  const [isResizingKeyframe, setIsResizingKeyframe] = useState(false);
+  const [resizingKeyframe, setResizingKeyframe] = useState<{
+    trackType: string;
+    keyframeId: string;
+    originalEndTime: number;
+    currentEndTime: number;
+  } | null>(null);
+  const resizedEndTimeRef = useRef<number>(0); // Track current endTime to avoid closure issues
   
   // Playhead dragging state
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
@@ -887,13 +899,18 @@ export default function TimelineV2({
     }
     
     return keyframes.map((kf, idx) => {
-      // Extract time from various keyframe types
+      // Extract time and endTime from various keyframe types
       const time = 'time' in kf ? kf.time : 'startTime' in kf ? kf.startTime : 0;
+      const endTime = 'endTime' in kf && typeof kf.endTime === 'number' ? kf.endTime : null;
+      const hasEndTime = endTime !== null && trackType === 'preset'; // Only preset keyframes show as rectangles for now
+      
       const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
       const fullKeyId = `${trackType}-${keyId}`;
       const isSelected = selectedKeyframes.has(fullKeyId);
       const isDragging = isDraggingKeyframe && draggedKeyframe?.keyframeId === fullKeyId;
+      const isResizing = isResizingKeyframe && resizingKeyframe?.keyframeId === fullKeyId;
       const displayTime = isDragging && draggedKeyframe ? draggedKeyframe.currentTime : time;
+      const displayEndTime = isResizing && resizingKeyframe ? resizingKeyframe.currentEndTime : endTime;
       const x = timeToPixels(displayTime, pixelsPerSecond);
       
       const handleKeyframeMouseDown = (e: React.MouseEvent) => {
@@ -1031,12 +1048,111 @@ export default function TimelineV2({
         });
       };
       
+      // Handle resizing the right edge (endTime)
+      const handleResizeMouseDown = (e: React.MouseEvent) => {
+        if (!hasEndTime || !endTime) return;
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Prevent text selection during resize
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+        
+        const originalEndTime = endTime;
+        resizedEndTimeRef.current = endTime;
+        
+        setIsResizingKeyframe(true);
+        setResizingKeyframe({
+          trackType,
+          keyframeId: fullKeyId,
+          originalEndTime: endTime,
+          currentEndTime: endTime,
+        });
+        
+        const handleMouseMove = (moveE: MouseEvent) => {
+          if (!scrollContainerRef.current) return;
+          
+          requestAnimationFrame(() => {
+            const rect = scrollContainerRef.current!.getBoundingClientRect();
+            const scrollLeft = scrollContainerRef.current!.scrollLeft;
+            const relativeX = moveE.clientX - rect.left + scrollLeft;
+            let newEndTime = pixelsToTime(relativeX, pixelsPerSecond);
+            
+            // Clamp to valid range (must be after start time)
+            newEndTime = Math.max(time + 0.1, Math.min(duration, newEndTime));
+            
+            // Apply snapping
+            newEndTime = applySnapping(newEndTime);
+            
+            // Update both state and ref
+            resizedEndTimeRef.current = newEndTime;
+            setResizingKeyframe(prev => prev ? { ...prev, currentEndTime: newEndTime } : null);
+          });
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.body.style.webkitUserSelect = '';
+          
+          const finalEndTime = resizedEndTimeRef.current;
+          if (finalEndTime !== originalEndTime) {
+            console.log(`Resize keyframe ${fullKeyId} endTime from ${originalEndTime} to ${finalEndTime}`);
+            
+            // Update endTime via the update handler
+            if (trackType === 'preset' && onUpdatePresetKeyframeField) {
+              const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+              onUpdatePresetKeyframeField(numericId, 'endTime', finalEndTime);
+            }
+          }
+          
+          setIsResizingKeyframe(false);
+          setResizingKeyframe(null);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'ew-resize';
+      };
+      
+      // Render as rectangle if keyframe has endTime (duration)
+      if (hasEndTime && displayEndTime !== null) {
+        const width = timeToPixels(displayEndTime, pixelsPerSecond) - x;
+        
+        return (
+          <div
+            key={fullKeyId}
+            className={`absolute top-1/2 -translate-y-1/2 h-8 ${color} ${
+              isSelected || isDragging || isResizing ? 'ring-2 ring-white' : ''
+            } transition-opacity ${isDragging ? 'z-50 cursor-grabbing' : isResizing ? 'z-50' : 'cursor-grab'} rounded-sm select-none`}
+            style={{ 
+              left: `${x}px`,
+              width: `${Math.max(width, 4)}px`,
+              opacity: isDragging || isResizing ? 1 : isSelected ? 0.7 : 0.5,
+            }}
+            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}`}
+            onMouseDown={handleKeyframeMouseDown}
+            onContextMenu={handleKeyframeContextMenu}
+          >
+            {/* Resize handle on the right edge */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 transition-colors"
+              onMouseDown={handleResizeMouseDown}
+              title="Drag to adjust end time"
+            />
+          </div>
+        );
+      }
+      
+      // Render as circle for keyframes without duration
       return (
         <div
           key={fullKeyId}
           className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
             isSelected || isDragging ? 'ring-2 ring-white' : ''
-          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'}`}
+          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'} select-none`}
           style={{ 
             left: `${x}px`, 
             marginLeft: '-6px',
