@@ -1179,6 +1179,53 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return kf;
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
+  
+  // Move handlers for all keyframe types (for timeline dragging)
+  const moveSpeedKeyframe = (id: number, newTime: number) => {
+    handleUpdateSpeedKeyframe(id, 'time', newTime);
+  };
+  
+  const moveLetterboxKeyframe = (id: number, newTime: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveMaskRevealKeyframe = (id: string, newTime: number) => {
+    setMaskRevealKeyframes(maskRevealKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveCameraRigKeyframe = (id: string, newTime: number) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveCameraFXKeyframe = (id: string, newTime: number) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParticleEmitterKeyframe = (id: number, newTime: number) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParameterEvent = (id: string, newTime: number) => {
+    setParameterEvents(parameterEvents.map(event =>
+      event.id === id ? { ...event, startTime: newTime } : event
+    ).sort((a, b) => a.startTime - b.startTime));
+  };
 
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
@@ -8364,6 +8411,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onMovePresetKeyframe={movePresetKeyframe}
       onMoveTextKeyframe={moveTextKeyframe}
       onMoveEnvironmentKeyframe={moveEnvironmentKeyframe}
+      onMoveSpeedKeyframe={moveSpeedKeyframe}
+      onMoveLetterboxKeyframe={moveLetterboxKeyframe}
+      onMoveTextAnimatorKeyframe={moveTextAnimatorKeyframe}
+      onMoveMaskRevealKeyframe={moveMaskRevealKeyframe}
+      onMoveCameraRigKeyframe={moveCameraRigKeyframe}
+      onMoveCameraFXKeyframe={moveCameraFXKeyframe}
+      onMoveParticleEmitterKeyframe={moveParticleEmitterKeyframe}
+      onMoveParameterEvent={moveParameterEvent}
       onSelectFXClip={setSelectedFXClipId}
       onUpdateCameraFXClip={updateCameraFXClip}
       onDeleteCameraFXClip={deleteCameraFXClip}

@@ -92,6 +92,14 @@ interface TimelineProps {
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
   onMoveTextKeyframe?: (id: number, newTime: number) => void;
   onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
+  onMoveSpeedKeyframe?: (id: number, newTime: number) => void;
+  onMoveLetterboxKeyframe?: (id: number, newTime: number) => void;
+  onMoveTextAnimatorKeyframe?: (id: string, newTime: number) => void;
+  onMoveMaskRevealKeyframe?: (id: string, newTime: number) => void;
+  onMoveCameraRigKeyframe?: (id: string, newTime: number) => void;
+  onMoveCameraFXKeyframe?: (id: string, newTime: number) => void;
+  onMoveParticleEmitterKeyframe?: (id: number, newTime: number) => void;
+  onMoveParameterEvent?: (id: string, newTime: number) => void;
   onSelectFXClip?: (id: string) => void;
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onDeleteCameraFXClip?: (id: string) => void;
@@ -126,6 +134,14 @@ export default function TimelineV2({
   onMovePresetKeyframe,
   onMoveTextKeyframe,
   onMoveEnvironmentKeyframe,
+  onMoveSpeedKeyframe,
+  onMoveLetterboxKeyframe,
+  onMoveTextAnimatorKeyframe,
+  onMoveMaskRevealKeyframe,
+  onMoveCameraRigKeyframe,
+  onMoveCameraFXKeyframe,
+  onMoveParticleEmitterKeyframe,
+  onMoveParameterEvent,
   onUpdateCameraKeyframe,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
@@ -782,21 +798,47 @@ export default function TimelineV2({
               console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime}`);
               
               // Call appropriate onMove callback based on track type
-              const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+              // Extract the correct ID based on keyframe structure
+              const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+              const stringId = 'id' in kf && typeof kf.id === 'string' ? kf.id : String(keyId);
               
               switch (trackType) {
                 case 'preset':
-                  onMovePresetKeyframe?.(keyframeId, finalTime);
+                  onMovePresetKeyframe?.(numericId, finalTime);
+                  break;
+                case 'presetSpeed':
+                  onMoveSpeedKeyframe?.(numericId, finalTime);
                   break;
                 case 'text':
-                  onMoveTextKeyframe?.(keyframeId, finalTime);
+                  onMoveTextKeyframe?.(numericId, finalTime);
                   break;
                 case 'environment':
-                  onMoveEnvironmentKeyframe?.(keyframeId, finalTime);
+                  onMoveEnvironmentKeyframe?.(numericId, finalTime);
                   break;
                 case 'camera':
                   // Camera keyframes identified by time, update via onUpdateCameraKeyframe
                   onUpdateCameraKeyframe?.(originalTime, { time: finalTime });
+                  break;
+                case 'letterbox':
+                  onMoveLetterboxKeyframe?.(numericId, finalTime);
+                  break;
+                case 'textAnimator':
+                  onMoveTextAnimatorKeyframe?.(stringId, finalTime);
+                  break;
+                case 'maskReveal':
+                  onMoveMaskRevealKeyframe?.(stringId, finalTime);
+                  break;
+                case 'cameraRig':
+                  onMoveCameraRigKeyframe?.(stringId, finalTime);
+                  break;
+                case 'cameraFX':
+                  onMoveCameraFXKeyframe?.(stringId, finalTime);
+                  break;
+                case 'particles':
+                  onMoveParticleEmitterKeyframe?.(numericId, finalTime);
+                  break;
+                case 'fxEvents':
+                  onMoveParameterEvent?.(stringId, finalTime);
                   break;
                 default:
                   console.warn(`No move handler for track type: ${trackType}`);
