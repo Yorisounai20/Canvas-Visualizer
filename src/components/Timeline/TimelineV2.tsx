@@ -668,10 +668,27 @@ export default function TimelineV2({
     setEditingTrackName('');
   }, []);
 
-  // Render time ruler markers
+  // Render time ruler markers - adapts to snap mode
   const renderRulerMarkers = () => {
     const markers: JSX.Element[] = [];
-    const secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    let secondsInterval: number;
+    
+    // Determine interval based on snap mode and zoom level
+    if (snapMode === 'none') {
+      // Default behavior: zoom-based intervals
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else if (snapMode === 'frame') {
+      // Show every 1 second (multiple frames grouped for readability)
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else if (snapMode === 'beat') {
+      // Show every beat (0.5s at 120 BPM) or every 2 beats for clarity
+      secondsInterval = zoomLevel < 1 ? 1.0 : 0.5;
+    } else if (snapMode === 'second') {
+      // Show whole seconds
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else {
+      secondsInterval = 1;
+    }
     
     for (let time = 0; time <= duration; time += secondsInterval) {
       const x = timeToPixels(time, pixelsPerSecond);
@@ -726,6 +743,68 @@ export default function TimelineV2({
       case 'second': return 'Sec';
       default: return 'Off';
     }
+  };
+  
+  // Render grid lines based on snap mode
+  const renderGridLines = () => {
+    const lines: JSX.Element[] = [];
+    let interval: number;
+    let showMinorLines = true;
+    
+    // Determine grid interval based on snap mode and zoom
+    switch (snapMode) {
+      case 'none':
+        interval = 1.0; // 1 second intervals
+        showMinorLines = false;
+        break;
+      case 'frame':
+        // Show frame lines only at higher zoom levels to avoid clutter
+        if (zoomLevel >= 2.0) {
+          interval = 1.0 / DEFAULT_FPS; // Frame intervals (~0.033s)
+        } else if (zoomLevel >= 1.0) {
+          interval = 0.1; // Every 3 frames (10fps markers)
+        } else {
+          interval = 1.0; // 1 second at low zoom
+          showMinorLines = false;
+        }
+        break;
+      case 'beat':
+        // Show beat subdivisions at higher zoom
+        if (zoomLevel >= 1.5) {
+          interval = 0.125; // Quarter note intervals (0.125s at 120 BPM)
+        } else if (zoomLevel >= 0.75) {
+          interval = 0.25; // Half beat intervals
+        } else {
+          interval = 0.5; // Full beat intervals
+          showMinorLines = false;
+        }
+        break;
+      case 'second':
+        interval = 1.0; // 1 second intervals
+        showMinorLines = false;
+        break;
+      default:
+        interval = 1.0;
+        showMinorLines = false;
+    }
+    
+    // Generate grid lines at calculated intervals
+    for (let time = 0; time <= duration; time += interval) {
+      const x = timeToPixels(time, pixelsPerSecond);
+      // Make major lines (whole seconds) more visible
+      const isSecond = Math.abs(time - Math.round(time)) < 0.001;
+      lines.push(
+        <div
+          key={time}
+          className={`absolute top-0 bottom-0 w-px pointer-events-none ${
+            isSecond ? 'bg-gray-700 opacity-40' : 'bg-gray-700 opacity-20'
+          }`}
+          style={{ left: `${x}px` }}
+        />
+      );
+    }
+    
+    return lines;
   };
   
   // Get snap mode description for tooltip
@@ -1202,18 +1281,9 @@ export default function TimelineV2({
                         />
                       )}
 
-                {/* Grid lines for visual reference */}
+                {/* Grid lines for visual reference - adapt to snap mode */}
                       <div className="absolute inset-0 pointer-events-none">
-                        {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
-                          const x = timeToPixels(i, pixelsPerSecond);
-                          return (
-                            <div
-                              key={i}
-                              className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
-                              style={{ left: `${x}px` }}
-                            />
-                          );
-                        })}
+                        {renderGridLines()}
                       </div>
 
                       {/* Render keyframes for this track */}
