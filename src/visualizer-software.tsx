@@ -1110,11 +1110,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setPresetKeyframes(presetKeyframes.map(kf => {
       if (kf.id === id) {
         const updated = { ...kf, [field]: value };
-        // Ensure endTime is always after time
-        if (field === 'time' && updated.endTime <= value) {
-          updated.endTime = value + 1;
+        // When moving the start time, maintain the segment duration
+        if (field === 'time') {
+          const originalDuration = kf.endTime - kf.time;
+          updated.endTime = value + originalDuration;
         }
-        if (field === 'endTime' && value <= updated.time) {
+        // Ensure endTime is always after time
+        if (updated.endTime <= updated.time) {
           updated.endTime = updated.time + 1;
         }
         return updated;
