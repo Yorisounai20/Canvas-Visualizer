@@ -57,13 +57,11 @@ interface TimelineProps {
   audioBuffer: AudioBuffer | null;
   showWaveform?: boolean;
   presetKeyframes: PresetKeyframe[];
-  cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
   presetSpeedKeyframes?: Array<{ id: number; time: number; speed: number; easing: string }>;
   letterboxKeyframes?: LetterboxKeyframe[];
   textAnimatorKeyframes?: TextAnimatorKeyframe[];
-  maskRevealKeyframes?: MaskRevealKeyframe[];
   cameraRigKeyframes?: CameraRigKeyframe[];
   cameraFXKeyframes?: CameraFXKeyframe[];
   particleEmitterKeyframes?: ParticleEmitterKeyframe[];
@@ -78,11 +76,9 @@ interface TimelineProps {
   onSeek: (time: number) => void;
   onTogglePlayPause?: () => void;
   onAddPresetKeyframe?: (time: number) => void;
-  onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
   onAddEnvironmentKeyframe?: (time: number) => void;
   onDeletePresetKeyframe?: (id: number) => void;
-  onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
   onDeleteEnvironmentKeyframe?: (id: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
@@ -90,7 +86,7 @@ interface TimelineProps {
   onUpdateLetterboxKeyframe?: (id: number, field: string, value: any) => void;
   onUpdateParticleEmitterKeyframe?: (id: number, field: string, value: any) => void;
   onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
-  onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
+  onUpdateTextAnimatorKeyframe?: (id: string, field: string, value: any) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
@@ -99,7 +95,6 @@ interface TimelineProps {
   onMoveSpeedKeyframe?: (id: number, newTime: number) => void;
   onMoveLetterboxKeyframe?: (id: number, newTime: number) => void;
   onMoveTextAnimatorKeyframe?: (id: string, newTime: number) => void;
-  onMoveMaskRevealKeyframe?: (id: string, newTime: number) => void;
   onMoveCameraRigKeyframe?: (id: string, newTime: number) => void;
   onMoveCameraFXKeyframe?: (id: string, newTime: number) => void;
   onMoveParticleEmitterKeyframe?: (id: number, newTime: number) => void;
@@ -129,13 +124,11 @@ export default function TimelineV2({
   isPlaying = false,
   onTogglePlayPause,
   presetKeyframes = [],
-  cameraKeyframes = [],
   textKeyframes = [],
   environmentKeyframes = [],
   presetSpeedKeyframes = [],
   letterboxKeyframes = [],
   textAnimatorKeyframes = [],
-  maskRevealKeyframes = [],
   cameraRigKeyframes = [],
   cameraFXKeyframes = [],
   particleEmitterKeyframes = [],
@@ -146,16 +139,15 @@ export default function TimelineV2({
   onMoveSpeedKeyframe,
   onMoveLetterboxKeyframe,
   onMoveTextAnimatorKeyframe,
-  onMoveMaskRevealKeyframe,
   onMoveCameraRigKeyframe,
   onMoveCameraFXKeyframe,
   onMoveParticleEmitterKeyframe,
   onMoveParameterEvent,
-  onUpdateCameraKeyframe,
   onUpdatePresetKeyframeField,
   onUpdateLetterboxKeyframe,
   onUpdateParticleEmitterKeyframe,
   onUpdateParameterEvent,
+  onUpdateTextAnimatorKeyframe,
   onUpdateCameraFXClip,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
@@ -277,13 +269,11 @@ export default function TimelineV2({
     { id: 'audio', name: 'Audio', type: 'audio' as const },
     { id: 'presets', name: 'Presets', type: 'preset' as const },
     { id: 'preset-speed', name: 'Preset Speed', type: 'presetSpeed' as const },
-    { id: 'camera', name: 'Camera', type: 'camera' as const },
     { id: 'camera-rig', name: 'Camera Rig', type: 'cameraRig' as const },
     { id: 'camera-fx', name: 'Camera FX', type: 'cameraFX' as const },
     { id: 'text', name: 'Text', type: 'text' as const },
     { id: 'text-animator', name: 'Text Animator', type: 'textAnimator' as const },
     { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
-    { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
     { id: 'particles', name: 'Particles', type: 'particles' as const },
     { id: 'fx-events', name: 'FX Events', type: 'fxEvents' as const },
     { id: 'environment', name: 'Environment', type: 'environment' as const },
@@ -863,10 +853,6 @@ export default function TimelineV2({
         keyframes = presetSpeedKeyframes;
         color = 'bg-cyan-300'; // Lighter cyan for speed
         break;
-      case 'camera':
-        keyframes = cameraKeyframes;
-        color = 'bg-purple-500';
-        break;
       case 'cameraRig':
         keyframes = cameraRigKeyframes;
         color = 'bg-purple-300'; // Lighter purple for rig
@@ -886,10 +872,6 @@ export default function TimelineV2({
       case 'letterbox':
         keyframes = letterboxKeyframes;
         color = 'bg-yellow-500';
-        break;
-      case 'maskReveal':
-        keyframes = maskRevealKeyframes;
-        color = 'bg-pink-500';
         break;
       case 'particles':
         keyframes = particleEmitterKeyframes;
@@ -922,6 +904,7 @@ export default function TimelineV2({
         trackType === 'preset' || 
         trackType === 'letterbox' || 
         trackType === 'particles' ||
+        trackType === 'textAnimator' || // Text Animator now supports duration
         trackType === 'fxEvents'
       );
       
@@ -1017,18 +1000,11 @@ export default function TimelineV2({
                 case 'environment':
                   onMoveEnvironmentKeyframe?.(numericId, finalTime);
                   break;
-                case 'camera':
-                  // Camera keyframes identified by time, update via onUpdateCameraKeyframe
-                  onUpdateCameraKeyframe?.(originalTime, { time: finalTime });
-                  break;
                 case 'letterbox':
                   onMoveLetterboxKeyframe?.(numericId, finalTime);
                   break;
                 case 'textAnimator':
                   onMoveTextAnimatorKeyframe?.(stringId, finalTime);
-                  break;
-                case 'maskReveal':
-                  onMoveMaskRevealKeyframe?.(stringId, finalTime);
                   break;
                 case 'cameraRig':
                   onMoveCameraRigKeyframe?.(stringId, finalTime);
@@ -1135,6 +1111,10 @@ export default function TimelineV2({
               // Particles use 'duration' field
               const newDuration = finalEndTime - time;
               onUpdateParticleEmitterKeyframe(numericId, 'duration', newDuration);
+            } else if (trackType === 'textAnimator' && onUpdateTextAnimatorKeyframe) {
+              // Text Animator uses 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateTextAnimatorKeyframe(stringId, 'duration', newDuration);
             } else if (trackType === 'fxEvents') {
               if (onUpdateParameterEvent) {
                 onUpdateParameterEvent(stringId, { endTime: finalEndTime });
