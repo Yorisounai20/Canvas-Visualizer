@@ -62,11 +62,13 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
       </header>
 
       {/* Main content area - full width, panels as thin collapsed tabs by default */}
-      <div className="flex-1 relative overflow-hidden min-h-0">
-        {/* Center content - main canvas with bottom offset to avoid timeline overlap */}
+      <div 
+        className="flex-1 relative overflow-hidden min-h-0"
+        style={{ marginBottom: effectiveTimelineHeight }}
+      >
+        {/* Center content - main canvas */}
         <main 
-          className="absolute inset-x-0 top-0 overflow-hidden flex flex-col"
-          style={{ bottom: effectiveTimelineHeight }}
+          className="absolute inset-0 overflow-hidden flex flex-col"
         >
           {children}
         </main>
