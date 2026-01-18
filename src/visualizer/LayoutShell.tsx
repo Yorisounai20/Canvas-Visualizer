@@ -87,7 +87,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
 
       {/* Bottom timeline - resizable with controls */}
       <footer 
-        className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-20 shadow-2xl relative"
+        className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative"
         style={{ height: effectiveTimelineHeight }}
       >
         {/* Resize handle */}
