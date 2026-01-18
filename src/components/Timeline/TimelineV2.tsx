@@ -440,10 +440,9 @@ export default function TimelineV2({
           const allKeyframes = [
             ...presetKeyframes.map(k => ({ ...k, type: 'preset', y: 80 })), // Estimate track Y positions
             ...presetSpeedKeyframes.map(k => ({ ...k, type: 'presetSpeed', y: 160 })),
-            ...cameraKeyframes.map(k => ({ ...k, type: 'camera', y: 240 })),
-            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 320 })),
-            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 400 })),
-            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 480 })),
+            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 240 })),
+            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 320 })),
+            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 400 })),
             ...textAnimatorKeyframes.map(k => ({ ...k, type: 'textAnimator', y: 560 })),
             ...letterboxKeyframes.map(k => ({ ...k, type: 'letterbox', y: 640 })),
             ...maskRevealKeyframes.map(k => ({ ...k, type: 'maskReveal', y: 720 })),

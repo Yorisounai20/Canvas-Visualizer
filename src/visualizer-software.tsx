@@ -1214,19 +1214,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // REMOVED: Global keyframe management (orphaned camera feature)
 
-  const deleteKeyframe = (keyframeIndex) => {
-    // Keep at least one keyframe
-    if (cameraKeyframes.length > 1) {
-      setCameraKeyframes(cameraKeyframes.filter((_, i) => i !== keyframeIndex));
-    }
-  };
-
-  const updateKeyframe = (keyframeIndex, field, value) => {
-    setCameraKeyframes(cameraKeyframes.map((kf, i) => 
-      i === keyframeIndex ? { ...kf, [field]: value } : kf
-    ));
-  };
-
   // Camera shake event management
   const addCameraShake = () => {
     const newTime = currentTime > 0 ? currentTime : 0;
@@ -2829,7 +2816,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         idleAnimationRef.current = null;
       }
     };
-  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
+  }, [isPlaying, currentTime, cameraDistance, cameraHeight, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
