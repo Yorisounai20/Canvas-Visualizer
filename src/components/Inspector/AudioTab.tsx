@@ -32,6 +32,32 @@ export default function AudioTab({
   setMidsGain,
   setHighsGain
 }: AudioTabProps) {
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const audioFile = files.find(f => f.type.startsWith('audio/'));
+    if (audioFile) {
+      addAudioTrack(audioFile);
+    }
+  };
+
   return (
     <div>
       <div className="mb-4 bg-gray-700 rounded-lg p-3">
@@ -49,8 +75,23 @@ export default function AudioTab({
         </div>
         
         {audioTracks.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm">
-            No audio tracks loaded. Click "Add Track" to upload audio files.
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`text-center py-12 text-gray-400 text-sm border-2 border-dashed rounded-lg transition-colors ${
+              isDragging
+                ? 'border-purple-500 bg-purple-900/20 text-purple-300'
+                : 'border-gray-600 hover:border-gray-500'
+            }`}
+          >
+            <div className="text-4xl mb-2">🎵</div>
+            <div className="font-medium mb-1">
+              {isDragging ? 'Drop audio file here' : 'Drag & drop audio files here'}
+            </div>
+            <div className="text-xs text-gray-500">
+              or click "Add Track" button above
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

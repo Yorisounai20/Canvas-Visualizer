@@ -68,16 +68,16 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
           {children}
         </main>
 
-        {/* Left sidebar - adjusted for larger timeline */}
-        <aside className="absolute left-0 top-0 h-[calc(100%-28rem)] w-20 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
-          <PanelContainer name="🎨 Toolbox" defaultCollapsed={true} icon="🎨">
+        {/* Left sidebar - 45% vertical space, expanded by default */}
+        <aside className="absolute left-0 top-0 h-[45vh] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+          <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Right sidebar - adjusted for larger timeline */}
-        <aside className="absolute right-0 top-0 h-[calc(100%-28rem)] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
-          <PanelContainer name="🔍 Inspector" defaultCollapsed={true} icon="🔍">
+        {/* Right sidebar - 45% vertical space, expanded by default */}
+        <aside className="absolute right-0 top-0 h-[45vh] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+          <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
             {inspector}
           </PanelContainer>
         </aside>

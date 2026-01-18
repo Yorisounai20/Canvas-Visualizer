@@ -303,7 +303,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showDebugConsole, setShowDebugConsole] = useState(false);
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
+  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -497,6 +497,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showTextAnimatorPanel, setShowTextAnimatorPanel] = useState(false);
   const [showMaskPanel, setShowMaskPanel] = useState(false);
   const [showCameraRigPanel, setShowCameraRigPanel] = useState(false);
+
+  // PHASE 5: Mask system state
+  const [masks, setMasks] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'circle' | 'rectangle' | 'custom';
+    enabled: boolean;
+  }>>([]);
+  const [maskRevealKeyframes, setMaskRevealKeyframes] = useState<Array<{
+    id: string;
+    time: number;
+    maskId: string;
+    animation: 'expand-circle' | 'wipe-left' | 'wipe-right' | 'fade';
+    duration: number;
+  }>>([]);
 
   // Memoized sorted letterbox keyframes for performance
   const sortedLetterboxKeyframes = useMemo(() => {
@@ -7887,7 +7902,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -8047,6 +8062,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
+      } else if (e.key === '`') {
+        // Toggle debug console
+        setShowDebugConsole(prev => !prev);
       } else if (e.key >= '1' && e.key <= '9') {
         // Number keys 1-9 for tab navigation
         const tabIndex = parseInt(e.key) - 1;
@@ -8061,7 +8079,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu, showDebugConsole]);
 
   // Close file menu when clicking outside
   useEffect(() => {
@@ -8498,7 +8516,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             letterboxSize={letterboxSize}
             setShowLetterbox={setShowLetterbox}
             setLetterboxSize={setLetterboxSize}
-            addKeyframe={addKeyframe}
           />
         )}
         
@@ -8511,6 +8528,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setCameraRigs={setCameraRigs}
             cameraRigKeyframes={cameraRigKeyframes}
             setCameraRigKeyframes={setCameraRigKeyframes}
+            createCameraRigKeyframe={createCameraRigKeyframe}
             // Issue #5: Advanced Camera Rig Controls
             showPaths={showPaths}
             setShowPaths={setShowPaths}
@@ -8706,13 +8724,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
       </div>
-
-      {/* Debug Console Modal - Toggled with ` key */}
-      <DebugConsole 
-        logs={errorLog} 
-        isOpen={showDebugConsole} 
-        onToggle={() => setShowDebugConsole(prev => !prev)} 
-      />
     </div>
   );
   // --- End constants ---
@@ -9186,36 +9197,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">1</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Controls</span>
+                      <span className="text-gray-300">Switch to Presets</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">2</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Settings</span>
+                      <span className="text-gray-300">Switch to Controls</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">3</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Rig</span>
+                      <span className="text-gray-300">Switch to Camera Settings</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">4</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Effects</span>
+                      <span className="text-gray-300">Switch to Camera Rig</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">5</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Environments</span>
+                      <span className="text-gray-300">Switch to Camera FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">6</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Post-FX</span>
+                      <span className="text-gray-300">Switch to Effects</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">7</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Presets</span>
+                      <span className="text-gray-300">Switch to Environments</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">8</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <span className="text-gray-300">Switch to Post-FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">9</kbd>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">0</kbd>
                     </div>
                   </div>
                 </div>
@@ -9227,6 +9242,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
                       <span className="text-gray-300">Close modals/dialogs</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Esc</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Debug */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Debug</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle debug console</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">`</kbd>
                     </div>
                   </div>
                 </div>
@@ -9282,6 +9308,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           currentProjectId={currentProjectId}
         />
       )}
+
+      {/* Debug Console Modal - Toggled with ` key */}
+      <DebugConsole 
+        logs={errorLog} 
+        isOpen={showDebugConsole} 
+        onToggle={() => setShowDebugConsole(prev => !prev)} 
+      />
     </LayoutShell>
   );
 }
