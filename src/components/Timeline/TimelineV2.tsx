@@ -1184,6 +1184,40 @@ export default function TimelineV2({
       }
       
       // Render as circle for keyframes without duration
+      // Special rendering for speed keyframes (lightning bolt)
+      if (trackType === 'presetSpeed') {
+        return (
+          <div
+            key={fullKeyId}
+            className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center ${
+              isSelected || isDragging ? 'ring-2 ring-white ring-offset-1' : ''
+            } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'} select-none rounded`}
+            style={{ 
+              left: `${x}px`, 
+              marginLeft: '-8px',
+              width: '16px',
+              height: '16px',
+              opacity: isDragging ? 1 : isSelected ? 0.9 : 0.8,
+            }}
+            title={`${trackType} keyframe at ${formatTime(displayTime)}`}
+            onMouseDown={handleKeyframeMouseDown}
+            onContextMenu={handleKeyframeContextMenu}
+          >
+            {/* Lightning bolt icon */}
+            <svg 
+              width="14" 
+              height="14" 
+              viewBox="0 0 24 24" 
+              fill="currentColor"
+              className={color.replace('bg-', 'text-')}
+            >
+              <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+            </svg>
+          </div>
+        );
+      }
+      
+      // Regular circle rendering for other keyframes
       return (
         <div
           key={fullKeyId}
