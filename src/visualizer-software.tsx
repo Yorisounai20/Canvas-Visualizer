@@ -303,7 +303,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showDebugConsole, setShowDebugConsole] = useState(false);
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'presets', 'textAnimator'] as const;
+  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -9182,36 +9182,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">1</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Controls</span>
+                      <span className="text-gray-300">Switch to Presets</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">2</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Settings</span>
+                      <span className="text-gray-300">Switch to Controls</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">3</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Camera Rig</span>
+                      <span className="text-gray-300">Switch to Camera Settings</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">4</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Effects</span>
+                      <span className="text-gray-300">Switch to Camera Rig</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">5</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Environments</span>
+                      <span className="text-gray-300">Switch to Camera FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">6</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Post-FX</span>
+                      <span className="text-gray-300">Switch to Effects</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">7</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Presets</span>
+                      <span className="text-gray-300">Switch to Environments</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">8</kbd>
                     </div>
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
-                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <span className="text-gray-300">Switch to Post-FX</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">9</kbd>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Text Animator</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">0</kbd>
                     </div>
                   </div>
                 </div>
@@ -9223,6 +9227,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
                       <span className="text-gray-300">Close modals/dialogs</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Esc</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Debug */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Debug</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Toggle debug console</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">`</kbd>
                     </div>
                   </div>
                 </div>
