@@ -498,6 +498,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showMaskPanel, setShowMaskPanel] = useState(false);
   const [showCameraRigPanel, setShowCameraRigPanel] = useState(false);
 
+  // PHASE 5: Mask system state
+  const [masks, setMasks] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'circle' | 'rectangle' | 'custom';
+    enabled: boolean;
+  }>>([]);
+  const [maskRevealKeyframes, setMaskRevealKeyframes] = useState<Array<{
+    id: string;
+    time: number;
+    maskId: string;
+    animation: 'expand-circle' | 'wipe-left' | 'wipe-right' | 'fade';
+    duration: number;
+  }>>([]);
+
   // Memoized sorted letterbox keyframes for performance
   const sortedLetterboxKeyframes = useMemo(() => {
     return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
@@ -2037,6 +2052,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const deleteMaskRevealKeyframe = (id: string) => {
     setMaskRevealKeyframes(prev => prev.filter(kf => kf.id !== id));
     addLog(`Deleted mask reveal keyframe`, 'info');
+  };
+
+  // Camera keyframe function (placeholder for Camera Tab)
+  const addKeyframe = () => {
+    addLog(`Camera keyframe feature - click on timeline to add keyframes`, 'info');
   };
 
   // PHASE 5: Camera Rig Functions
