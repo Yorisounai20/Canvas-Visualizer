@@ -958,6 +958,7 @@ export default function TimelineV2({
         const startX = e.clientX;
         const startY = e.clientY;
         const originalTime = time;
+        const originalDuration = endTime ? endTime - time : 0;
         
         // Initialize ref with original time
         draggedTimeRef.current = time;
@@ -986,8 +987,9 @@ export default function TimelineV2({
             const relativeX = moveE.clientX - rect.left + scrollLeft;
             let newTime = pixelsToTime(relativeX, pixelsPerSecond);
             
-            // Clamp to valid range
-            newTime = Math.max(0, Math.min(duration, newTime));
+            // Clamp to valid range - ensure keyframe with duration doesn't exceed timeline
+            const maxTime = originalDuration > 0 ? duration - originalDuration : duration;
+            newTime = Math.max(0, Math.min(maxTime, newTime));
             
             // Apply snapping based on current snap mode
             newTime = applySnapping(newTime);
@@ -1012,7 +1014,7 @@ export default function TimelineV2({
             const finalTime = draggedTimeRef.current;
             if (finalTime !== originalTime) {
               // Move the keyframe
-              console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime}`);
+              console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime} (duration: ${originalDuration})`);
               
               // Extract the correct ID based on keyframe structure
               const { numericId, stringId } = extractKeyframeIds(kf, keyId);
@@ -1020,6 +1022,10 @@ export default function TimelineV2({
               switch (trackType) {
                 case 'preset':
                   onMovePresetKeyframe?.(numericId, finalTime);
+                  // For keyframes with duration, also update endTime to preserve duration
+                  if (originalDuration > 0 && onUpdatePresetKeyframeField) {
+                    onUpdatePresetKeyframeField(numericId, 'endTime', finalTime + originalDuration);
+                  }
                   break;
                 case 'presetSpeed':
                   onMoveSpeedKeyframe?.(numericId, finalTime);
@@ -1032,21 +1038,31 @@ export default function TimelineV2({
                   break;
                 case 'letterbox':
                   onMoveLetterboxKeyframe?.(numericId, finalTime);
+                  // Duration is handled in the move handler for letterbox
                   break;
                 case 'textAnimator':
                   onMoveTextAnimatorKeyframe?.(stringId, finalTime);
+                  // Duration is handled in the move handler for textAnimator
                   break;
                 case 'cameraRig':
                   onMoveCameraRigKeyframe?.(stringId, finalTime);
+                  // Duration is handled in the move handler for cameraRig
                   break;
                 case 'cameraFX':
                   onMoveCameraFXKeyframe?.(stringId, finalTime);
                   break;
                 case 'particles':
                   onMoveParticleEmitterKeyframe?.(numericId, finalTime);
+                  // Duration is handled in the move handler for particles
                   break;
                 case 'fxEvents':
                   onMoveParameterEvent?.(stringId, finalTime);
+                  // For fxEvents with endTime, preserve duration
+                  if (originalDuration > 0 && onUpdateParameterEvent) {
+                    onUpdateParameterEvent(stringId, { endTime: finalTime + originalDuration });
+                  } else if (originalDuration > 0 && onUpdateCameraFXClip) {
+                    onUpdateCameraFXClip(stringId, { endTime: finalTime + originalDuration });
+                  }
                   break;
                 default:
                   console.warn(`No move handler for track type: ${trackType}`);
@@ -1193,13 +1209,13 @@ export default function TimelineV2({
             key={fullKeyId}
             className={`absolute top-1/2 -translate-y-1/2 h-8 ${color} ${
               isSelected || isDragging || isResizing ? 'ring-2 ring-white' : ''
-            } transition-opacity ${isDragging ? 'z-50 cursor-grabbing' : isResizing ? 'z-50' : 'cursor-grab'} rounded-sm select-none`}
+            } transition-opacity ${isDragging ? 'z-50 cursor-grabbing' : isResizing ? 'z-50' : 'cursor-move'} rounded-sm select-none`}
             style={{ 
               left: `${x}px`,
               width: `${Math.max(width, 4)}px`,
               opacity: isDragging || isResizing ? 1 : isSelected ? 0.7 : 0.5,
             }}
-            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}${easingValue ? ` (${easingValue})` : ''}`}
+            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}${easingValue ? ` (${easingValue})` : ''}. Drag center to move, drag right edge to resize.`}
             onMouseDown={handleKeyframeMouseDown}
             onContextMenu={handleKeyframeContextMenu}
           >
