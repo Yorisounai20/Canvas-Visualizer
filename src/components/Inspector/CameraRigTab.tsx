@@ -24,6 +24,7 @@ interface CameraRigTabProps {
   // Camera Rig Keyframes
   cameraRigKeyframes: any[];
   setCameraRigKeyframes: (keyframes: any[]) => void;
+  createCameraRigKeyframe?: (rigId: string, time: number) => void;
   
   // Issue #5: Advanced Camera Rig Controls
   // Path Visualization
@@ -105,6 +106,12 @@ export default function CameraRigTab(props: CameraRigTabProps) {
     };
     props.setCameraRigs([...props.cameraRigs, newRig].sort((a, b) => a.startTime - b.startTime));
     props.setSelectedRigId(newRig.id);
+    
+    // Automatically create start and end keyframes for the rig
+    if (props.createCameraRigKeyframe) {
+      props.createCameraRigKeyframe(newRig.id, props.currentTime);
+      props.createCameraRigKeyframe(newRig.id, props.currentTime + 10);
+    }
   };
   
   const deleteRig = (id: string) => {

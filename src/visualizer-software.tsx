@@ -8528,6 +8528,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setCameraRigs={setCameraRigs}
             cameraRigKeyframes={cameraRigKeyframes}
             setCameraRigKeyframes={setCameraRigKeyframes}
+            createCameraRigKeyframe={createCameraRigKeyframe}
             // Issue #5: Advanced Camera Rig Controls
             showPaths={showPaths}
             setShowPaths={setShowPaths}
