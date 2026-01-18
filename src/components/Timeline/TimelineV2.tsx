@@ -11,7 +11,7 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Play, Pause } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe, EasingFunction } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import { ParameterEvent } from '../VisualizerSoftware/types';
 
@@ -57,13 +57,11 @@ interface TimelineProps {
   audioBuffer: AudioBuffer | null;
   showWaveform?: boolean;
   presetKeyframes: PresetKeyframe[];
-  cameraKeyframes: CameraKeyframe[];
   textKeyframes: TextKeyframe[];
   environmentKeyframes: EnvironmentKeyframe[];
   presetSpeedKeyframes?: Array<{ id: number; time: number; speed: number; easing: string }>;
   letterboxKeyframes?: LetterboxKeyframe[];
   textAnimatorKeyframes?: TextAnimatorKeyframe[];
-  maskRevealKeyframes?: MaskRevealKeyframe[];
   cameraRigKeyframes?: CameraRigKeyframe[];
   cameraFXKeyframes?: CameraFXKeyframe[];
   particleEmitterKeyframes?: ParticleEmitterKeyframe[];
@@ -78,20 +76,30 @@ interface TimelineProps {
   onSeek: (time: number) => void;
   onTogglePlayPause?: () => void;
   onAddPresetKeyframe?: (time: number) => void;
-  onAddCameraKeyframe?: (time: number) => void;
   onAddTextKeyframe?: (time: number) => void;
   onAddEnvironmentKeyframe?: (time: number) => void;
   onDeletePresetKeyframe?: (id: number) => void;
-  onDeleteCameraKeyframe?: (time: number) => void;
   onDeleteTextKeyframe?: (id: number) => void;
   onDeleteEnvironmentKeyframe?: (id: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
-  onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
+  onUpdatePresetKeyframeField?: (id: number, field: string, value: any) => void;
+  onUpdateLetterboxKeyframe?: (id: number, field: string, value: any) => void;
+  onUpdateParticleEmitterKeyframe?: (id: number, field: string, value: any) => void;
+  onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
+  onUpdateTextAnimatorKeyframe?: (id: string, field: string, value: any) => void;
+  onUpdateCameraRigKeyframe?: (id: string, field: string, value: any) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
   onMoveTextKeyframe?: (id: number, newTime: number) => void;
   onMoveEnvironmentKeyframe?: (id: number, newTime: number) => void;
+  onMoveSpeedKeyframe?: (id: number, newTime: number) => void;
+  onMoveLetterboxKeyframe?: (id: number, newTime: number) => void;
+  onMoveTextAnimatorKeyframe?: (id: string, newTime: number) => void;
+  onMoveCameraRigKeyframe?: (id: string, newTime: number) => void;
+  onMoveCameraFXKeyframe?: (id: string, newTime: number) => void;
+  onMoveParticleEmitterKeyframe?: (id: number, newTime: number) => void;
+  onMoveParameterEvent?: (id: string, newTime: number) => void;
   onSelectFXClip?: (id: string) => void;
   onUpdateCameraFXClip?: (id: string, updates: Partial<CameraFXClip>) => void;
   onDeleteCameraFXClip?: (id: string) => void;
@@ -103,6 +111,40 @@ const RULER_HEIGHT = 40; // Height of time ruler
 const TRACK_HEIGHT = 80; // Height of each track row
 const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
 
+// Snap mode constants
+const DEFAULT_FPS = 30; // Fixed frame rate for the application
+const DEFAULT_BPM = 120; // Fixed tempo for beat snapping
+const SNAP_MODES: Array<'none' | 'frame' | 'beat' | 'second'> = ['none', 'frame', 'beat', 'second'];
+
+// Easing icons - Simple visual representations
+const EASING_ICONS: Record<string, string> = {
+  'linear': '━',
+  'easeIn': '╱',
+  'easeOut': '╲',
+  'easeInOut': '∿',
+  'easeInSine': '╱',
+  'easeOutSine': '╲',
+  'easeInOutSine': '∿',
+  'easeInCubic': '╱',
+  'easeOutCubic': '╲',
+  'easeInOutCubic': '∿',
+};
+
+// Cycle through common easing types
+const EASING_CYCLE: EasingFunction[] = ['linear', 'easeIn', 'easeOut', 'easeInOut'];
+
+// Get next easing in cycle
+const getNextEasing = (current: EasingFunction): EasingFunction => {
+  const currentIndex = EASING_CYCLE.indexOf(current);
+  if (currentIndex === -1) return 'linear'; // Default if not found
+  return EASING_CYCLE[(currentIndex + 1) % EASING_CYCLE.length];
+};
+
+// Get easing icon display text
+const getEasingIcon = (easing: EasingFunction): string => {
+  return EASING_ICONS[easing] || '━';
+};
+
 export default function TimelineV2({
   currentTime,
   duration,
@@ -112,13 +154,11 @@ export default function TimelineV2({
   isPlaying = false,
   onTogglePlayPause,
   presetKeyframes = [],
-  cameraKeyframes = [],
   textKeyframes = [],
   environmentKeyframes = [],
   presetSpeedKeyframes = [],
   letterboxKeyframes = [],
   textAnimatorKeyframes = [],
-  maskRevealKeyframes = [],
   cameraRigKeyframes = [],
   cameraFXKeyframes = [],
   particleEmitterKeyframes = [],
@@ -126,7 +166,19 @@ export default function TimelineV2({
   onMovePresetKeyframe,
   onMoveTextKeyframe,
   onMoveEnvironmentKeyframe,
-  onUpdateCameraKeyframe,
+  onMoveSpeedKeyframe,
+  onMoveLetterboxKeyframe,
+  onMoveTextAnimatorKeyframe,
+  onMoveCameraRigKeyframe,
+  onMoveCameraFXKeyframe,
+  onMoveParticleEmitterKeyframe,
+  onMoveParameterEvent,
+  onUpdatePresetKeyframeField,
+  onUpdateLetterboxKeyframe,
+  onUpdateParticleEmitterKeyframe,
+  onUpdateParameterEvent,
+  onUpdateTextAnimatorKeyframe,
+  onUpdateCameraFXClip,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -148,6 +200,31 @@ export default function TimelineV2({
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null);
   
+  // Snap mode state - controls how keyframes snap when dragging
+  type SnapMode = 'none' | 'frame' | 'beat' | 'second';
+  const [snapMode, setSnapMode] = useState<SnapMode>(() => {
+    // Load from localStorage
+    try {
+      const saved = localStorage.getItem('cv_timeline_snap_mode');
+      if (saved && SNAP_MODES.includes(saved as SnapMode)) {
+        return saved as SnapMode;
+      }
+    } catch (e) {
+      console.warn('Failed to load snap mode from localStorage:', e);
+    }
+    return 'frame'; // Default to frame snapping
+  });
+  
+  // Keyframe resize state
+  const [isResizingKeyframe, setIsResizingKeyframe] = useState(false);
+  const [resizingKeyframe, setResizingKeyframe] = useState<{
+    trackType: string;
+    keyframeId: string;
+    originalEndTime: number;
+    currentEndTime: number;
+  } | null>(null);
+  const resizedEndTimeRef = useRef<number>(0); // Track current endTime to avoid closure issues
+  
   // Playhead dragging state
   const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
   
@@ -159,6 +236,8 @@ export default function TimelineV2({
     originalTime: number;
     currentTime: number;
   } | null>(null);
+  // Use ref to track drag time to avoid closure issues
+  const draggedTimeRef = useRef<number>(0);
   
   // Track collapse state (Chunk 6.1)
   const [collapsedTracks, setCollapsedTracks] = useState<Set<string>>(() => {
@@ -220,13 +299,11 @@ export default function TimelineV2({
     { id: 'audio', name: 'Audio', type: 'audio' as const },
     { id: 'presets', name: 'Presets', type: 'preset' as const },
     { id: 'preset-speed', name: 'Preset Speed', type: 'presetSpeed' as const },
-    { id: 'camera', name: 'Camera', type: 'camera' as const },
     { id: 'camera-rig', name: 'Camera Rig', type: 'cameraRig' as const },
     { id: 'camera-fx', name: 'Camera FX', type: 'cameraFX' as const },
     { id: 'text', name: 'Text', type: 'text' as const },
     { id: 'text-animator', name: 'Text Animator', type: 'textAnimator' as const },
     { id: 'letterbox', name: 'Letterbox', type: 'letterbox' as const },
-    { id: 'mask-reveal', name: 'Mask Reveal', type: 'maskReveal' as const },
     { id: 'particles', name: 'Particles', type: 'particles' as const },
     { id: 'fx-events', name: 'FX Events', type: 'fxEvents' as const },
     { id: 'environment', name: 'Environment', type: 'environment' as const },
@@ -363,10 +440,9 @@ export default function TimelineV2({
           const allKeyframes = [
             ...presetKeyframes.map(k => ({ ...k, type: 'preset', y: 80 })), // Estimate track Y positions
             ...presetSpeedKeyframes.map(k => ({ ...k, type: 'presetSpeed', y: 160 })),
-            ...cameraKeyframes.map(k => ({ ...k, type: 'camera', y: 240 })),
-            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 320 })),
-            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 400 })),
-            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 480 })),
+            ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 240 })),
+            ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 320 })),
+            ...textKeyframes.map(k => ({ ...k, type: 'text', y: 400 })),
             ...textAnimatorKeyframes.map(k => ({ ...k, type: 'textAnimator', y: 560 })),
             ...letterboxKeyframes.map(k => ({ ...k, type: 'letterbox', y: 640 })),
             ...maskRevealKeyframes.map(k => ({ ...k, type: 'maskReveal', y: 720 })),
@@ -573,6 +649,15 @@ export default function TimelineV2({
       console.warn('Failed to save track names to localStorage:', e);
     }
   }, [trackNames]);
+  
+  // Persist snap mode to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('cv_timeline_snap_mode', snapMode);
+    } catch (e) {
+      console.warn('Failed to save snap mode to localStorage:', e);
+    }
+  }, [snapMode]);
 
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -621,10 +706,27 @@ export default function TimelineV2({
     setEditingTrackName('');
   }, []);
 
-  // Render time ruler markers
+  // Render time ruler markers - adapts to snap mode
   const renderRulerMarkers = () => {
     const markers: JSX.Element[] = [];
-    const secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    let secondsInterval: number;
+    
+    // Determine interval based on snap mode and zoom level
+    if (snapMode === 'none') {
+      // Default behavior: zoom-based intervals
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else if (snapMode === 'frame') {
+      // Show every 1 second (multiple frames grouped for readability)
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else if (snapMode === 'beat') {
+      // Show every beat (0.5s at 120 BPM) or every 2 beats for clarity
+      secondsInterval = zoomLevel < 1 ? 1.0 : 0.5;
+    } else if (snapMode === 'second') {
+      // Show whole seconds
+      secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
+    } else {
+      secondsInterval = 1;
+    }
     
     for (let time = 0; time <= duration; time += secondsInterval) {
       const x = timeToPixels(time, pixelsPerSecond);
@@ -645,6 +747,126 @@ export default function TimelineV2({
     return markers;
   };
 
+  // Apply snapping based on current snap mode
+  // Note: Frame rate and BPM are fixed constants for this timeline implementation
+  // These match the default recording settings and common music tempo
+  const applySnapping = (time: number): number => {
+    const BEATS_PER_SECOND = DEFAULT_BPM / 60; // 2 beats/sec at 120 BPM
+    // At 120 BPM: 1 beat = 0.5s, quarter note = 0.125s, so 8 quarter notes per second
+    const QUARTER_NOTES_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter notes/sec
+    
+    switch (snapMode) {
+      case 'none':
+        return time; // No snapping
+      case 'frame':
+        // Snap to 30fps frames (~0.033s per frame)
+        return Math.round(time * DEFAULT_FPS) / DEFAULT_FPS;
+      case 'beat':
+        // Snap to quarter notes (1/4 of a beat at 120 BPM = 0.125s)
+        return Math.round(time * QUARTER_NOTES_PER_SECOND) / QUARTER_NOTES_PER_SECOND;
+      case 'second':
+        // Snap to whole seconds
+        return Math.round(time);
+      default:
+        return time;
+    }
+  };
+  
+  // Get snap mode label for button display
+  const getSnapModeLabel = (mode: SnapMode): string => {
+    switch (mode) {
+      case 'none': return 'Off';
+      case 'frame': return 'Frame';
+      case 'beat': return 'Beat';
+      case 'second': return 'Sec';
+      default: return 'Off';
+    }
+  };
+  
+  // Render grid lines based on snap mode
+  const renderGridLines = () => {
+    const lines: JSX.Element[] = [];
+    let interval: number;
+    let showMinorLines = true;
+    
+    // Determine grid interval based on snap mode and zoom
+    switch (snapMode) {
+      case 'none':
+        interval = 1.0; // 1 second intervals
+        showMinorLines = false;
+        break;
+      case 'frame':
+        // Show frame lines only at higher zoom levels to avoid clutter
+        if (zoomLevel >= 2.0) {
+          interval = 1.0 / DEFAULT_FPS; // Frame intervals (~0.033s)
+        } else if (zoomLevel >= 1.0) {
+          interval = 0.1; // Every 3 frames (10fps markers)
+        } else {
+          interval = 1.0; // 1 second at low zoom
+          showMinorLines = false;
+        }
+        break;
+      case 'beat':
+        // Show beat subdivisions at higher zoom
+        if (zoomLevel >= 1.5) {
+          interval = 0.125; // Quarter note intervals (0.125s at 120 BPM)
+        } else if (zoomLevel >= 0.75) {
+          interval = 0.25; // Half beat intervals
+        } else {
+          interval = 0.5; // Full beat intervals
+          showMinorLines = false;
+        }
+        break;
+      case 'second':
+        interval = 1.0; // 1 second intervals
+        showMinorLines = false;
+        break;
+      default:
+        interval = 1.0;
+        showMinorLines = false;
+    }
+    
+    // Generate grid lines at calculated intervals
+    for (let time = 0; time <= duration; time += interval) {
+      const x = timeToPixels(time, pixelsPerSecond);
+      // Make major lines (whole seconds) more visible
+      const isSecond = Math.abs(time - Math.round(time)) < 0.001;
+      lines.push(
+        <div
+          key={time}
+          className={`absolute top-0 bottom-0 w-px pointer-events-none ${
+            isSecond ? 'bg-gray-700 opacity-40' : 'bg-gray-700 opacity-20'
+          }`}
+          style={{ left: `${x}px` }}
+        />
+      );
+    }
+    
+    return lines;
+  };
+  
+  // Get snap mode description for tooltip
+  const getSnapModeDescription = (mode: SnapMode): string => {
+    switch (mode) {
+      case 'none': return 'Off';
+      case 'frame': return 'Frame (30fps)';
+      case 'beat': return 'Beat (1/4)';
+      case 'second': return 'Second';
+      default: return 'Unknown';
+    }
+  };
+
+  // Helper function to extract keyframe IDs in the correct type
+  // Keyframes may have numeric or string IDs depending on their type
+  // Some keyframes use compound IDs like "preset-1" which need to be parsed
+  const extractKeyframeIds = (kf: any, keyId: string | number) => {
+    // Try to get numeric ID directly, or parse it from compound ID format
+    const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
+    // Try to get string ID directly, or use the full keyId as string
+    const stringId = 'id' in kf && typeof kf.id === 'string' ? kf.id : String(keyId);
+    return { numericId, stringId };
+  };
+
   // Render keyframes for a track
   const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
     type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
@@ -659,10 +881,6 @@ export default function TimelineV2({
       case 'presetSpeed':
         keyframes = presetSpeedKeyframes;
         color = 'bg-cyan-300'; // Lighter cyan for speed
-        break;
-      case 'camera':
-        keyframes = cameraKeyframes;
-        color = 'bg-purple-500';
         break;
       case 'cameraRig':
         keyframes = cameraRigKeyframes;
@@ -684,10 +902,6 @@ export default function TimelineV2({
         keyframes = letterboxKeyframes;
         color = 'bg-yellow-500';
         break;
-      case 'maskReveal':
-        keyframes = maskRevealKeyframes;
-        color = 'bg-pink-500';
-        break;
       case 'particles':
         keyframes = particleEmitterKeyframes;
         color = 'bg-blue-500'; // Blue for particles
@@ -703,13 +917,34 @@ export default function TimelineV2({
     }
     
     return keyframes.map((kf, idx) => {
-      // Extract time from various keyframe types
+      // Extract time and endTime/duration from various keyframe types
       const time = 'time' in kf ? kf.time : 'startTime' in kf ? kf.startTime : 0;
+      
+      // Calculate endTime from different field types
+      let endTime: number | null = null;
+      if ('endTime' in kf && typeof kf.endTime === 'number') {
+        endTime = kf.endTime;
+      } else if ('duration' in kf && typeof kf.duration === 'number') {
+        endTime = time + kf.duration;
+      }
+      
+      // Determine if this keyframe type should show as rectangle
+      const hasEndTime = endTime !== null && (
+        trackType === 'preset' || 
+        trackType === 'letterbox' || 
+        trackType === 'particles' ||
+        trackType === 'textAnimator' || // Text Animator now supports duration
+        trackType === 'cameraRig' || // Camera Rig has duration for transitions
+        trackType === 'fxEvents'
+      );
+      
       const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
       const fullKeyId = `${trackType}-${keyId}`;
       const isSelected = selectedKeyframes.has(fullKeyId);
       const isDragging = isDraggingKeyframe && draggedKeyframe?.keyframeId === fullKeyId;
+      const isResizing = isResizingKeyframe && resizingKeyframe?.keyframeId === fullKeyId;
       const displayTime = isDragging && draggedKeyframe ? draggedKeyframe.currentTime : time;
+      const displayEndTime = isResizing && resizingKeyframe ? resizingKeyframe.currentEndTime : endTime;
       const x = timeToPixels(displayTime, pixelsPerSecond);
       
       const handleKeyframeMouseDown = (e: React.MouseEvent) => {
@@ -722,6 +957,10 @@ export default function TimelineV2({
         let hasMoved = false;
         const startX = e.clientX;
         const startY = e.clientY;
+        const originalTime = time;
+        
+        // Initialize ref with original time
+        draggedTimeRef.current = time;
         
         setIsDraggingKeyframe(true);
         setDraggedKeyframe({
@@ -750,9 +989,11 @@ export default function TimelineV2({
             // Clamp to valid range
             newTime = Math.max(0, Math.min(duration, newTime));
             
-            // Round to nearest frame (30fps default)
-            newTime = Math.round(newTime * 30) / 30;
+            // Apply snapping based on current snap mode
+            newTime = applySnapping(newTime);
             
+            // Update both state and ref
+            draggedTimeRef.current = newTime;
             setDraggedKeyframe(prev => prev ? { ...prev, currentTime: newTime } : null);
           });
         };
@@ -766,29 +1007,50 @@ export default function TimelineV2({
             // This was a click, not a drag - select the keyframe
             console.log(`Selected keyframe: ${fullKeyId} at ${formatTime(time)}`);
             setSelectedKeyframes(new Set([fullKeyId]));
-          } else if (draggedKeyframe && draggedKeyframe.currentTime !== draggedKeyframe.originalTime) {
-            // This was a drag - move the keyframe
-            console.log(`Move keyframe ${fullKeyId} from ${draggedKeyframe.originalTime} to ${draggedKeyframe.currentTime}`);
-            
-            // Call appropriate onMove callback based on track type
-            const keyframeId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
-            
-            switch (trackType) {
-              case 'preset':
-                onMovePresetKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'text':
-                onMoveTextKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'environment':
-                onMoveEnvironmentKeyframe?.(keyframeId, draggedKeyframe.currentTime);
-                break;
-              case 'camera':
-                // Camera keyframes identified by time, update via onUpdateCameraKeyframe
-                onUpdateCameraKeyframe?.(draggedKeyframe.originalTime, { time: draggedKeyframe.currentTime });
-                break;
-              default:
-                console.warn(`No move handler for track type: ${trackType}`);
+          } else {
+            // This was a drag - check if position actually changed using ref
+            const finalTime = draggedTimeRef.current;
+            if (finalTime !== originalTime) {
+              // Move the keyframe
+              console.log(`Move keyframe ${fullKeyId} from ${originalTime} to ${finalTime}`);
+              
+              // Extract the correct ID based on keyframe structure
+              const { numericId, stringId } = extractKeyframeIds(kf, keyId);
+              
+              switch (trackType) {
+                case 'preset':
+                  onMovePresetKeyframe?.(numericId, finalTime);
+                  break;
+                case 'presetSpeed':
+                  onMoveSpeedKeyframe?.(numericId, finalTime);
+                  break;
+                case 'text':
+                  onMoveTextKeyframe?.(numericId, finalTime);
+                  break;
+                case 'environment':
+                  onMoveEnvironmentKeyframe?.(numericId, finalTime);
+                  break;
+                case 'letterbox':
+                  onMoveLetterboxKeyframe?.(numericId, finalTime);
+                  break;
+                case 'textAnimator':
+                  onMoveTextAnimatorKeyframe?.(stringId, finalTime);
+                  break;
+                case 'cameraRig':
+                  onMoveCameraRigKeyframe?.(stringId, finalTime);
+                  break;
+                case 'cameraFX':
+                  onMoveCameraFXKeyframe?.(stringId, finalTime);
+                  break;
+                case 'particles':
+                  onMoveParticleEmitterKeyframe?.(numericId, finalTime);
+                  break;
+                case 'fxEvents':
+                  onMoveParameterEvent?.(stringId, finalTime);
+                  break;
+                default:
+                  console.warn(`No move handler for track type: ${trackType}`);
+              }
             }
           }
           
@@ -813,12 +1075,208 @@ export default function TimelineV2({
         });
       };
       
+      // Handle resizing the right edge (endTime)
+      const handleResizeMouseDown = (e: React.MouseEvent) => {
+        if (!hasEndTime || !endTime) return;
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Prevent text selection during resize
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+        
+        const originalEndTime = endTime;
+        resizedEndTimeRef.current = endTime;
+        
+        setIsResizingKeyframe(true);
+        setResizingKeyframe({
+          trackType,
+          keyframeId: fullKeyId,
+          originalEndTime: endTime,
+          currentEndTime: endTime,
+        });
+        
+        const handleMouseMove = (moveE: MouseEvent) => {
+          if (!scrollContainerRef.current) return;
+          
+          requestAnimationFrame(() => {
+            const rect = scrollContainerRef.current!.getBoundingClientRect();
+            const scrollLeft = scrollContainerRef.current!.scrollLeft;
+            const relativeX = moveE.clientX - rect.left + scrollLeft;
+            let newEndTime = pixelsToTime(relativeX, pixelsPerSecond);
+            
+            // Clamp to valid range (must be after start time)
+            newEndTime = Math.max(time + 0.1, Math.min(duration, newEndTime));
+            
+            // Apply snapping
+            newEndTime = applySnapping(newEndTime);
+            
+            // Update both state and ref
+            resizedEndTimeRef.current = newEndTime;
+            setResizingKeyframe(prev => prev ? { ...prev, currentEndTime: newEndTime } : null);
+          });
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.body.style.webkitUserSelect = '';
+          
+          const finalEndTime = resizedEndTimeRef.current;
+          if (finalEndTime !== originalEndTime) {
+            console.log(`Resize keyframe ${fullKeyId} endTime/duration from ${originalEndTime} to ${finalEndTime}`);
+            
+            const { numericId, stringId } = extractKeyframeIds(kf, keyId);
+            
+            // Update endTime/duration via the appropriate update handler
+            if (trackType === 'preset' && onUpdatePresetKeyframeField) {
+              onUpdatePresetKeyframeField(numericId, 'endTime', finalEndTime);
+            } else if (trackType === 'letterbox' && onUpdateLetterboxKeyframe) {
+              // Letterbox uses 'duration' field, so calculate it from the difference
+              const newDuration = finalEndTime - time;
+              onUpdateLetterboxKeyframe(numericId, 'duration', newDuration);
+            } else if (trackType === 'particles' && onUpdateParticleEmitterKeyframe) {
+              // Particles use 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateParticleEmitterKeyframe(numericId, 'duration', newDuration);
+            } else if (trackType === 'textAnimator' && onUpdateTextAnimatorKeyframe) {
+              // Text Animator uses 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateTextAnimatorKeyframe(stringId, 'duration', newDuration);
+            } else if (trackType === 'cameraRig' && onUpdateCameraRigKeyframe) {
+              // Camera Rig uses 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateCameraRigKeyframe(stringId, 'duration', newDuration);
+            } else if (trackType === 'fxEvents') {
+              if (onUpdateParameterEvent) {
+                onUpdateParameterEvent(stringId, { endTime: finalEndTime });
+              } else if (onUpdateCameraFXClip) {
+                // Camera FX clips
+                onUpdateCameraFXClip(stringId, { endTime: finalEndTime });
+              }
+            }
+          }
+          
+          setIsResizingKeyframe(false);
+          setResizingKeyframe(null);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'ew-resize';
+      };
+      
+      // Render as rectangle if keyframe has endTime (duration)
+      if (hasEndTime && displayEndTime !== null) {
+        const width = timeToPixels(displayEndTime, pixelsPerSecond) - x;
+        
+        // Get easing for Camera Rig keyframes
+        const easingValue = trackType === 'cameraRig' && 'easing' in kf ? (kf as CameraRigKeyframe).easing : null;
+        
+        // Handle easing icon clicks for Camera Rig
+        const handleEasingClick = (e: React.MouseEvent, position: 'start' | 'end') => {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          if (trackType === 'cameraRig' && easingValue && onUpdateCameraRigKeyframe) {
+            const nextEasing = getNextEasing(easingValue);
+            const { stringId } = extractKeyframeIds(kf, keyId);
+            onUpdateCameraRigKeyframe(stringId, 'easing', nextEasing);
+            console.log(`Changed Camera Rig easing from ${easingValue} to ${nextEasing}`);
+          }
+        };
+        
+        return (
+          <div
+            key={fullKeyId}
+            className={`absolute top-1/2 -translate-y-1/2 h-8 ${color} ${
+              isSelected || isDragging || isResizing ? 'ring-2 ring-white' : ''
+            } transition-opacity ${isDragging ? 'z-50 cursor-grabbing' : isResizing ? 'z-50' : 'cursor-grab'} rounded-sm select-none`}
+            style={{ 
+              left: `${x}px`,
+              width: `${Math.max(width, 4)}px`,
+              opacity: isDragging || isResizing ? 1 : isSelected ? 0.7 : 0.5,
+            }}
+            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}${easingValue ? ` (${easingValue})` : ''}`}
+            onMouseDown={handleKeyframeMouseDown}
+            onContextMenu={handleKeyframeContextMenu}
+          >
+            {/* Easing badges for Camera Rig keyframes */}
+            {trackType === 'cameraRig' && easingValue && (
+              <>
+                {/* Start easing badge */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-r border-white border-opacity-20"
+                  onClick={(e) => handleEasingClick(e, 'start')}
+                  title={`Start easing: ${easingValue} (click to change)`}
+                >
+                  {getEasingIcon(easingValue)}
+                </div>
+                
+                {/* End easing badge */}
+                <div
+                  className="absolute right-6 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-l border-white border-opacity-20"
+                  onClick={(e) => handleEasingClick(e, 'end')}
+                  title={`End easing: ${easingValue} (click to change)`}
+                >
+                  {getEasingIcon(easingValue)}
+                </div>
+              </>
+            )}
+            
+            {/* Resize handle on the right edge */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 transition-colors"
+              onMouseDown={handleResizeMouseDown}
+              title="Drag to adjust end time"
+            />
+          </div>
+        );
+      }
+      
+      // Render as circle for keyframes without duration
+      // Special rendering for speed keyframes (lightning bolt)
+      if (trackType === 'presetSpeed') {
+        return (
+          <div
+            key={fullKeyId}
+            className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center ${
+              isSelected || isDragging ? 'ring-2 ring-white ring-offset-1' : ''
+            } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'} select-none rounded`}
+            style={{ 
+              left: `${x}px`, 
+              marginLeft: '-8px',
+              width: '16px',
+              height: '16px',
+              opacity: isDragging ? 1 : isSelected ? 0.9 : 0.8,
+            }}
+            title={`${trackType} keyframe at ${formatTime(displayTime)}`}
+            onMouseDown={handleKeyframeMouseDown}
+            onContextMenu={handleKeyframeContextMenu}
+          >
+            {/* Lightning bolt icon */}
+            <svg 
+              width="14" 
+              height="14" 
+              viewBox="0 0 24 24" 
+              fill="currentColor"
+              className={color.replace('bg-', 'text-')}
+            >
+              <path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z" />
+            </svg>
+          </div>
+        );
+      }
+      
+      // Regular circle rendering for other keyframes
       return (
         <div
           key={fullKeyId}
           className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full ${color} ${
             isSelected || isDragging ? 'ring-2 ring-white' : ''
-          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'}`}
+          } hover:scale-125 transition-transform ${isDragging ? 'z-50 cursor-grabbing' : 'cursor-grab'} select-none`}
           style={{ 
             left: `${x}px`, 
             marginLeft: '-6px',
@@ -912,6 +1370,25 @@ export default function TimelineV2({
           >
             Reset
           </button>
+          
+          {/* Snap mode toggle button */}
+          <button
+            onClick={() => {
+              const currentIndex = SNAP_MODES.indexOf(snapMode);
+              const nextMode = SNAP_MODES[(currentIndex + 1) % SNAP_MODES.length];
+              setSnapMode(nextMode);
+            }}
+            className={`px-2 py-1 text-xs rounded flex items-center gap-1 transition-colors ${
+              snapMode === 'none' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-400' 
+                : 'bg-purple-600 hover:bg-purple-700 text-white'
+            }`}
+            title={`Snap Mode: ${getSnapModeDescription(snapMode)}\nClick to cycle modes`}
+          >
+            <span className="text-base">🧲</span>
+            <span className="capitalize">{getSnapModeLabel(snapMode)}</span>
+          </button>
+          
           <span className="text-xs text-gray-500 ml-4">
             💡 Space=Play, Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
           </span>
@@ -1044,18 +1521,9 @@ export default function TimelineV2({
                         />
                       )}
 
-                {/* Grid lines for visual reference */}
+                {/* Grid lines for visual reference - adapt to snap mode */}
                       <div className="absolute inset-0 pointer-events-none">
-                        {Array.from({ length: Math.ceil(duration) }).map((_, i) => {
-                          const x = timeToPixels(i, pixelsPerSecond);
-                          return (
-                            <div
-                              key={i}
-                              className="absolute top-0 bottom-0 w-px bg-gray-700 opacity-30"
-                              style={{ left: `${x}px` }}
-                            />
-                          );
-                        })}
+                        {renderGridLines()}
                       </div>
 
                       {/* Render keyframes for this track */}

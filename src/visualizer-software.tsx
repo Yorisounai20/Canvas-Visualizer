@@ -29,7 +29,6 @@ import {
   parseTime, 
   parseTimeInput,
   applyEasing,
-  interpolateCameraKeyframes,
   animationTypes,
   generateWaveformData
 } from './components/VisualizerSoftware/utils';
@@ -386,11 +385,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const activeEmitterIds = useRef<Set<number>>(new Set()); // Track which emitters are currently active
   
   // NEW: Global camera keyframes (independent from presets)
-  const [cameraKeyframes, setCameraKeyframes] = useState([
-    { time: 0, distance: 15, height: 0, rotation: 0, easing: 'linear' },
-    { time: 20, distance: 15, height: 0, rotation: 0, easing: 'linear' },
-    { time: 40, distance: 15, height: 0, rotation: 0, easing: 'linear' }
-  ]);
+  // REMOVED: Camera keyframes (orphaned global camera feature - replaced by Camera Rig)
   
   // NEW: Preset switching keyframes (timeline-based) - Enhanced with segments
   const [presetKeyframes, setPresetKeyframes] = useState<Array<{
@@ -446,16 +441,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const lastWaveformRenderRef = useRef<number>(0);
   const waveformAnimationFrameRef = useRef<number | null>(null);
 
-  // PHASE 5: Text Animator state
+  // PHASE 5: Text Animator state - NOW WITH DURATION SUPPORT
   const [textAnimatorKeyframes, setTextAnimatorKeyframes] = useState<any[]>([]);
   const [selectedTextKeyframeId, setSelectedTextKeyframeId] = useState<string | null>(null);
   const textCharacterMeshesRef = useRef<Map<string, THREE.Mesh[]>>(new Map()); // keyframeId -> character meshes
   
-  // PHASE 5: Mask Reveals state
-  const [masks, setMasks] = useState<any[]>([]);
-  const [maskRevealKeyframes, setMaskRevealKeyframes] = useState<any[]>([]);
-  const [selectedMaskId, setSelectedMaskId] = useState<string | null>(null);
-  const maskMaterialsRef = useRef<Map<string, THREE.Material>>(new Map()); // Store mask materials
+  // REMOVED: Mask Reveals (orphaned feature)
   
   // PHASE 5: Camera Rig state
   const [cameraRigs, setCameraRigs] = useState<any[]>([]);
@@ -1002,38 +993,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const updatePresetKeyframe = (id: number, preset: string) => handleUpdatePresetKeyframe(id, 'preset', preset);
   const movePresetKeyframe = (id: number, newTime: number) => handleUpdatePresetKeyframe(id, 'time', newTime);
   
-  const addCameraKeyframe = (time?: number) => {
-    const useTime = time !== undefined ? time : currentTime;
-    const lastKeyframe = cameraKeyframes[cameraKeyframes.length - 1] || {
-      distance: DEFAULT_CAMERA_DISTANCE,
-      height: DEFAULT_CAMERA_HEIGHT,
-      rotation: DEFAULT_CAMERA_ROTATION,
-      easing: 'easeInOut'
-    };
-    
-    setCameraKeyframes([...cameraKeyframes, {
-      time: useTime,
-      distance: lastKeyframe.distance,
-      height: lastKeyframe.height,
-      rotation: lastKeyframe.rotation,
-      easing: lastKeyframe.easing
-    }].sort((a, b) => a.time - b.time));
-  };
-  const deleteCameraKeyframe = (time: number) => {
-    if (cameraKeyframes.length > 1) {
-      setCameraKeyframes(cameraKeyframes.filter(kf => kf.time !== time));
-    }
-  };
-  const updateCameraKeyframe = (time: number, updates: any) => {
-    setCameraKeyframes(cameraKeyframes.map(kf =>
-      kf.time === time ? { ...kf, ...updates } : kf
-    ));
-  };
-  const moveCameraKeyframe = (oldTime: number, newTime: number) => {
-    setCameraKeyframes(cameraKeyframes.map(kf =>
-      kf.time === oldTime ? { ...kf, time: newTime } : kf
-    ).sort((a, b) => a.time - b.time));
-  };
+  // REMOVED: Camera keyframe handlers (orphaned global camera feature)
   
   const addTextKeyframe = (time?: number) => {
     const useTime = time !== undefined ? time : currentTime;
@@ -1110,11 +1070,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setPresetKeyframes(presetKeyframes.map(kf => {
       if (kf.id === id) {
         const updated = { ...kf, [field]: value };
-        // Ensure endTime is always after time
-        if (field === 'time' && updated.endTime <= value) {
-          updated.endTime = value + 1;
+        // When moving the start time, maintain the segment duration
+        if (field === 'time') {
+          const originalDuration = kf.endTime - kf.time;
+          updated.endTime = value + originalDuration;
         }
-        if (field === 'endTime' && value <= updated.time) {
+        // Ensure endTime is always after time
+        if (updated.endTime <= updated.time) {
           updated.endTime = updated.time + 1;
         }
         return updated;
@@ -1179,6 +1141,70 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return kf;
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
+  
+  // Move handlers for all keyframe types (for timeline dragging)
+  const moveSpeedKeyframe = (id: number, newTime: number) => {
+    handleUpdateSpeedKeyframe(id, 'time', newTime);
+  };
+  
+  const moveLetterboxKeyframe = (id: number, newTime: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Update handler for letterbox keyframe fields (including duration)
+  const updateLetterboxKeyframe = (id: number, field: string, value: any) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Update handler for text animator fields (including duration)
+  const updateTextAnimatorKeyframe = (id: string, field: string, value: any) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // REMOVED: Mask reveal handler (orphaned feature)
+  
+  const moveCameraRigKeyframe = (id: string, newTime: number) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const updateCameraRigKeyframeField = (id: string, field: string, value: any) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ));
+  };
+  
+  const moveCameraFXKeyframe = (id: string, newTime: number) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParticleEmitterKeyframe = (id: number, newTime: number) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParameterEvent = (id: string, newTime: number) => {
+    // Note: ParameterEvent uses 'startTime' field, not 'time'
+    setParameterEvents(parameterEvents.map(event =>
+      event.id === id ? { ...event, startTime: newTime } : event
+    ).sort((a, b) => a.startTime - b.startTime));
+  };
 
   const resetCamera = () => {
     setCameraDistance(DEFAULT_CAMERA_DISTANCE);
@@ -1186,55 +1212,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     // Rotation is now keyframe-only, don't reset it here
   };
 
-  // Global keyframe management functions
-  const addKeyframe = () => {
-    const lastKeyframe = cameraKeyframes[cameraKeyframes.length - 1] || {
-      time: 0,
-      distance: DEFAULT_CAMERA_DISTANCE,
-      height: DEFAULT_CAMERA_HEIGHT,
-      rotation: DEFAULT_CAMERA_ROTATION,
-      easing: 'linear'
-    };
-    
-    // Find the largest gap between keyframes and place new keyframe there
-    let newTime = duration > 0 ? duration / 2 : 30;
-    
-    if (cameraKeyframes.length >= 2) {
-      const sortedKf = [...cameraKeyframes].sort((a, b) => a.time - b.time);
-      let maxGap = 0;
-      let gapStartTime = 0;
-      
-      for (let i = 0; i < sortedKf.length - 1; i++) {
-        const gap = sortedKf[i + 1].time - sortedKf[i].time;
-        if (gap > maxGap) {
-          maxGap = gap;
-          gapStartTime = sortedKf[i].time + gap / 2;
-        }
-      }
-      newTime = gapStartTime;
-    }
-    
-    setCameraKeyframes([...cameraKeyframes, {
-      time: newTime,
-      distance: lastKeyframe.distance,
-      height: lastKeyframe.height,
-      rotation: lastKeyframe.rotation,
-      easing: 'linear'
-    }]);
-  };
-
-  const deleteKeyframe = (keyframeIndex) => {
-    // Keep at least one keyframe
-    if (cameraKeyframes.length > 1) {
-      setCameraKeyframes(cameraKeyframes.filter((_, i) => i !== keyframeIndex));
-    }
-  };
-
-  const updateKeyframe = (keyframeIndex, field, value) => {
-    setCameraKeyframes(cameraKeyframes.map((kf, i) => 
-      i === keyframeIndex ? { ...kf, [field]: value } : kf
-    ));
-  };
+  // REMOVED: Global keyframe management (orphaned camera feature)
 
   // Camera shake event management
   const addCameraShake = () => {
@@ -1983,11 +1961,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     return newKeyframe;
   };
 
-  const updateTextAnimatorKeyframe = (id: string, updates: any) => {
-    setTextAnimatorKeyframes(prev => 
-      prev.map(kf => kf.id === id ? { ...kf, ...updates } : kf)
-    );
-  };
+  // REMOVED: Duplicate updateTextAnimatorKeyframe (already defined earlier with field-based updates)
 
   const deleteTextAnimatorKeyframe = (id: string) => {
     setTextAnimatorKeyframes(prev => prev.filter(kf => kf.id !== id));
@@ -2775,16 +2749,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Only apply keyframe/manual camera positioning if OrbitControls hasn't been used
         // (Once user interacts with mouse, OrbitControls takes over until play is pressed)
         if (!orbitControlsRef.current || !orbitControlsRef.current.enabled) {
-          // Update camera position based on current settings (even when not playing)
-          const currentDist = cameraKeyframes && cameraKeyframes.length > 0 
-            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).distance 
-            : cameraDistance;
-          const currentHeight = cameraKeyframes && cameraKeyframes.length > 0 
-            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).height 
-            : cameraHeight;
-          const currentRot = cameraKeyframes && cameraKeyframes.length > 0 
-            ? interpolateCameraKeyframes(cameraKeyframes, currentTime).rotation 
-            : 0;
+          // REMOVED: Global camera keyframe interpolation (orphaned feature)
+          // Now only use direct camera distance/height values
+          const currentDist = cameraDistance;
+          const currentHeight = cameraHeight;
+          const currentRot = 0;
           
           // Simple orbital camera positioning
           cam.position.set(
@@ -2827,30 +2796,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           rigHintsRef.current.gridHelper.visible = false;
         }
         
-        // Update path preview
-        if (rigHintsRef.current.pathLine && showRigHints && showRigPath && cameraKeyframes && cameraKeyframes.length >= 2) {
-          rigHintsRef.current.pathLine.visible = true;
-          const pathPoints: THREE.Vector3[] = [];
-          for (let i = 0; i < cameraKeyframes.length - 1; i++) {
-            const kf1 = cameraKeyframes[i];
-            const kf2 = cameraKeyframes[i + 1];
-            for (let j = 0; j <= 10; j++) {
-              const t = kf1.time + (kf2.time - kf1.time) * (j / 10);
-              const interp = interpolateCameraKeyframes(cameraKeyframes, t);
-              const rot = interp.rotation;
-              const dist = interp.distance;
-              const height = interp.height;
-              pathPoints.push(new THREE.Vector3(
-                Math.cos(rot) * dist,
-                10 + height,
-                Math.sin(rot) * dist
-              ));
-            }
-          }
-          rigHintsRef.current.pathLine.geometry.setFromPoints(pathPoints);
-        } else if (rigHintsRef.current.pathLine) {
-          rigHintsRef.current.pathLine.visible = false;
-        }
+        // REMOVED: Path preview for global camera keyframes (orphaned feature)
         
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
@@ -2870,7 +2816,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         idleAnimationRef.current = null;
       }
     };
-  }, [isPlaying, currentTime, cameraDistance, cameraHeight, cameraKeyframes, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
+  }, [isPlaying, currentTime, cameraDistance, cameraHeight, showRigHints, showRigPosition, showRigTarget, showRigGrid, showRigPath]);
 
   // Update scene background, fog, and lights when settings change
   useEffect(() => {
@@ -3199,19 +3145,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
       
-      // Interpolate camera settings from global keyframes or use global settings
-      let activeCameraDistance, activeCameraHeight, activeCameraRotation;
-      
-      if (cameraKeyframes && cameraKeyframes.length > 0) {
-        const interpolated = interpolateCameraKeyframes(cameraKeyframes, t);
-        activeCameraDistance = interpolated.distance;
-        activeCameraHeight = interpolated.height;
-        activeCameraRotation = interpolated.rotation;
-      } else {
-        activeCameraDistance = cameraDistance;
-        activeCameraHeight = cameraHeight;
-        activeCameraRotation = 0; // Default to 0 when no keyframes (rotation only via keyframes)
-      }
+      // REMOVED: Global camera keyframes interpolation (orphaned feature)
+      // Use direct camera settings
+      const activeCameraDistance = cameraDistance;
+      const activeCameraHeight = cameraHeight;
+      const activeCameraRotation = 0;
 
       // Animate letterbox based on keyframes (only if animation is enabled)
       if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
@@ -7667,39 +7605,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
         
         // Update keyframe path preview
-        if (hints.pathLine && showRigPath && cameraKeyframes.length >= 2) {
-          hints.pathLine.visible = true;
-          // Generate path from camera keyframes
-          const pathPoints: THREE.Vector3[] = [];
-          const sortedKf = [...cameraKeyframes].sort((a, b) => a.time - b.time);
-          
-          // Sample points along the interpolated path
-          for (let i = 0; i < sortedKf.length - 1; i++) {
-            const kf1 = sortedKf[i];
-            const kf2 = sortedKf[i + 1];
-            const steps = 10;
-            
-            for (let s = 0; s <= steps; s++) {
-              const progress = s / steps;
-              const interpolated = interpolateCameraKeyframes(cameraKeyframes, kf1.time + (kf2.time - kf1.time) * progress);
-              const angle = interpolated.rotation;
-              const dist = interpolated.distance;
-              const height = interpolated.height;
-              
-              const x = Math.cos(angle) * dist;
-              const y = height;
-              const z = Math.sin(angle) * dist;
-              pathPoints.push(new THREE.Vector3(x, y, z));
-            }
-          }
-          
-          if (pathPoints.length > 0) {
-            hints.pathLine.geometry.setFromPoints(pathPoints);
-            hints.pathLine.geometry.attributes.position.needsUpdate = true;
-          }
-        } else if (hints.pathLine) {
-          hints.pathLine.visible = false;
-        }
+        // REMOVED: Path preview from global camera keyframes (orphaned feature)
       } else if (rigHintsRef.current) {
         // Hide all hints
         if (rigHintsRef.current.positionMarker) rigHintsRef.current.positionMarker.visible = false;
@@ -8321,13 +8227,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       audioBuffer={audioBufferRef.current}
       showWaveform={true}
       presetKeyframes={presetKeyframes}
-      cameraKeyframes={cameraKeyframes}
       textKeyframes={textKeyframes}
       environmentKeyframes={environmentKeyframes}
       presetSpeedKeyframes={presetSpeedKeyframes}
       letterboxKeyframes={letterboxKeyframes}
       textAnimatorKeyframes={textAnimatorKeyframes}
-      maskRevealKeyframes={maskRevealKeyframes}
       cameraRigKeyframes={cameraRigKeyframes}
       cameraFXKeyframes={cameraFXKeyframes}
       particleEmitterKeyframes={particleEmitterKeyframes}
@@ -8350,20 +8254,30 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       }}
       onAddPresetKeyframe={addPresetKeyframe}
-      onAddCameraKeyframe={addCameraKeyframe}
       onAddTextKeyframe={addTextKeyframe}
       onAddEnvironmentKeyframe={addEnvironmentKeyframe}
       onDeletePresetKeyframe={deletePresetKeyframe}
-      onDeleteCameraKeyframe={deleteCameraKeyframe}
       onDeleteTextKeyframe={deleteTextKeyframe}
       onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
       onUpdatePresetKeyframe={updatePresetKeyframe}
-      onUpdateCameraKeyframe={updateCameraKeyframe}
+      onUpdatePresetKeyframeField={handleUpdatePresetKeyframe}
+      onUpdateLetterboxKeyframe={updateLetterboxKeyframe}
+      onUpdateParticleEmitterKeyframe={updateParticleEmitterKeyframe}
+      onUpdateParameterEvent={updateParameterEvent}
+      onUpdateTextAnimatorKeyframe={updateTextAnimatorKeyframe}
+      onUpdateCameraRigKeyframe={updateCameraRigKeyframeField}
       onUpdateTextKeyframe={updateTextKeyframe}
       onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
       onMovePresetKeyframe={movePresetKeyframe}
       onMoveTextKeyframe={moveTextKeyframe}
       onMoveEnvironmentKeyframe={moveEnvironmentKeyframe}
+      onMoveSpeedKeyframe={moveSpeedKeyframe}
+      onMoveLetterboxKeyframe={moveLetterboxKeyframe}
+      onMoveTextAnimatorKeyframe={moveTextAnimatorKeyframe}
+      onMoveCameraRigKeyframe={moveCameraRigKeyframe}
+      onMoveCameraFXKeyframe={moveCameraFXKeyframe}
+      onMoveParticleEmitterKeyframe={moveParticleEmitterKeyframe}
+      onMoveParameterEvent={moveParameterEvent}
       onSelectFXClip={setSelectedFXClipId}
       onUpdateCameraFXClip={updateCameraFXClip}
       onDeleteCameraFXClip={deleteCameraFXClip}
