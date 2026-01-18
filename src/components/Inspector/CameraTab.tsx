@@ -1,5 +1,4 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
 
 interface CameraTabProps {
   // Global Camera Controls
@@ -23,9 +22,6 @@ interface CameraTabProps {
   letterboxSize: number;
   setShowLetterbox: (show: boolean) => void;
   setLetterboxSize: (size: number) => void;
-  
-  // Camera Keyframe
-  addKeyframe: () => void;
 }
 
 /**
@@ -35,7 +31,9 @@ interface CameraTabProps {
  * - Global Camera Controls (distance, height, rotation, auto-rotate)
  * - HUD Display Options (filename display, border color)
  * - Letterbox (Cinematic Bars) with size control
- * - Camera keyframe addition
+ * 
+ * Note: Camera keyframes have been replaced by the Camera Rig system.
+ * Use the Camera Rig tab (key 5) for advanced camera animations.
  */
 export default function CameraTab(props: CameraTabProps) {
   return (
@@ -184,19 +182,6 @@ export default function CameraTab(props: CameraTabProps) {
           </div>
         )}
       </div>
-      
-      {/* Add Camera Keyframe Button */}
-      <button
-        onClick={props.addKeyframe}
-        className="w-full bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded text-white text-sm font-medium flex items-center justify-center gap-2"
-      >
-        <Plus size={16} />
-        Add Camera Keyframe
-      </button>
-      
-      <p className="text-xs text-gray-500 text-center italic">
-        Keyframes are managed in the timeline
-      </p>
     </div>
   );
 }

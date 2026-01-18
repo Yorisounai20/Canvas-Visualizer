@@ -2054,11 +2054,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     addLog(`Deleted mask reveal keyframe`, 'info');
   };
 
-  // Camera keyframe function (placeholder for Camera Tab)
-  const addKeyframe = () => {
-    addLog(`Camera keyframe feature - click on timeline to add keyframes`, 'info');
-  };
-
   // PHASE 5: Camera Rig Functions
   const createCameraRig = (type: 'orbit' | 'dolly' | 'crane' | 'custom' | 'rotation' | 'pan' | 'zoom' = 'orbit') => {
     const newRig = {
@@ -7907,7 +7902,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     anim();
     return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations]);
+  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
@@ -8521,7 +8516,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             letterboxSize={letterboxSize}
             setShowLetterbox={setShowLetterbox}
             setLetterboxSize={setLetterboxSize}
-            addKeyframe={addKeyframe}
           />
         )}
         
