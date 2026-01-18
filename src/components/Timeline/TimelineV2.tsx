@@ -11,7 +11,7 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { Play, Pause } from 'lucide-react';
-import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe } from '../../types';
+import { Section, AnimationType, PresetKeyframe, CameraKeyframe, TextKeyframe, EnvironmentKeyframe, WorkspaceObject, CameraFXClip, LetterboxKeyframe, TextAnimatorKeyframe, MaskRevealKeyframe, CameraRigKeyframe, CameraFXKeyframe, EasingFunction } from '../../types';
 import WaveformVisualizer from './WaveformVisualizer';
 import { ParameterEvent } from '../VisualizerSoftware/types';
 
@@ -87,6 +87,7 @@ interface TimelineProps {
   onUpdateParticleEmitterKeyframe?: (id: number, field: string, value: any) => void;
   onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
   onUpdateTextAnimatorKeyframe?: (id: string, field: string, value: any) => void;
+  onUpdateCameraRigKeyframe?: (id: string, field: string, value: any) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
@@ -114,6 +115,35 @@ const MIN_TIMELINE_WIDTH = 800; // Minimum width for timeline content
 const DEFAULT_FPS = 30; // Fixed frame rate for the application
 const DEFAULT_BPM = 120; // Fixed tempo for beat snapping
 const SNAP_MODES: Array<'none' | 'frame' | 'beat' | 'second'> = ['none', 'frame', 'beat', 'second'];
+
+// Easing icons - Simple visual representations
+const EASING_ICONS: Record<string, string> = {
+  'linear': '━',
+  'easeIn': '╱',
+  'easeOut': '╲',
+  'easeInOut': '∿',
+  'easeInSine': '╱',
+  'easeOutSine': '╲',
+  'easeInOutSine': '∿',
+  'easeInCubic': '╱',
+  'easeOutCubic': '╲',
+  'easeInOutCubic': '∿',
+};
+
+// Cycle through common easing types
+const EASING_CYCLE: EasingFunction[] = ['linear', 'easeIn', 'easeOut', 'easeInOut'];
+
+// Get next easing in cycle
+const getNextEasing = (current: EasingFunction): EasingFunction => {
+  const currentIndex = EASING_CYCLE.indexOf(current);
+  if (currentIndex === -1) return 'linear'; // Default if not found
+  return EASING_CYCLE[(currentIndex + 1) % EASING_CYCLE.length];
+};
+
+// Get easing icon display text
+const getEasingIcon = (easing: EasingFunction): string => {
+  return EASING_ICONS[easing] || '━';
+};
 
 export default function TimelineV2({
   currentTime,
@@ -905,6 +935,7 @@ export default function TimelineV2({
         trackType === 'letterbox' || 
         trackType === 'particles' ||
         trackType === 'textAnimator' || // Text Animator now supports duration
+        trackType === 'cameraRig' || // Camera Rig has duration for transitions
         trackType === 'fxEvents'
       );
       
@@ -1115,6 +1146,10 @@ export default function TimelineV2({
               // Text Animator uses 'duration' field
               const newDuration = finalEndTime - time;
               onUpdateTextAnimatorKeyframe(stringId, 'duration', newDuration);
+            } else if (trackType === 'cameraRig' && onUpdateCameraRigKeyframe) {
+              // Camera Rig uses 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateCameraRigKeyframe(stringId, 'duration', newDuration);
             } else if (trackType === 'fxEvents') {
               if (onUpdateParameterEvent) {
                 onUpdateParameterEvent(stringId, { endTime: finalEndTime });
@@ -1138,6 +1173,22 @@ export default function TimelineV2({
       if (hasEndTime && displayEndTime !== null) {
         const width = timeToPixels(displayEndTime, pixelsPerSecond) - x;
         
+        // Get easing for Camera Rig keyframes
+        const easingValue = trackType === 'cameraRig' && 'easing' in kf ? (kf as CameraRigKeyframe).easing : null;
+        
+        // Handle easing icon clicks for Camera Rig
+        const handleEasingClick = (e: React.MouseEvent, position: 'start' | 'end') => {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          if (trackType === 'cameraRig' && easingValue && onUpdateCameraRigKeyframe) {
+            const nextEasing = getNextEasing(easingValue);
+            const { stringId } = extractKeyframeIds(kf, keyId);
+            onUpdateCameraRigKeyframe(stringId, 'easing', nextEasing);
+            console.log(`Changed Camera Rig easing from ${easingValue} to ${nextEasing}`);
+          }
+        };
+        
         return (
           <div
             key={fullKeyId}
@@ -1149,10 +1200,33 @@ export default function TimelineV2({
               width: `${Math.max(width, 4)}px`,
               opacity: isDragging || isResizing ? 1 : isSelected ? 0.7 : 0.5,
             }}
-            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}`}
+            title={`${trackType} keyframe: ${formatTime(displayTime)} - ${formatTime(displayEndTime)}${easingValue ? ` (${easingValue})` : ''}`}
             onMouseDown={handleKeyframeMouseDown}
             onContextMenu={handleKeyframeContextMenu}
           >
+            {/* Easing badges for Camera Rig keyframes */}
+            {trackType === 'cameraRig' && easingValue && (
+              <>
+                {/* Start easing badge */}
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-r border-white border-opacity-20"
+                  onClick={(e) => handleEasingClick(e, 'start')}
+                  title={`Start easing: ${easingValue} (click to change)`}
+                >
+                  {getEasingIcon(easingValue)}
+                </div>
+                
+                {/* End easing badge */}
+                <div
+                  className="absolute right-6 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-l border-white border-opacity-20"
+                  onClick={(e) => handleEasingClick(e, 'end')}
+                  title={`End easing: ${easingValue} (click to change)`}
+                >
+                  {getEasingIcon(easingValue)}
+                </div>
+              </>
+            )}
+            
             {/* Resize handle on the right edge */}
             <div
               className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 transition-colors"

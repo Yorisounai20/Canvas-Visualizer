@@ -1181,6 +1181,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
+  const updateCameraRigKeyframeField = (id: string, field: string, value: any) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ));
+  };
+  
   const moveCameraFXKeyframe = (id: string, newTime: number) => {
     setCameraFXKeyframes(cameraFXKeyframes.map(kf =>
       kf.id === id ? { ...kf, time: newTime } : kf
@@ -8271,8 +8277,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onUpdateLetterboxKeyframe={updateLetterboxKeyframe}
       onUpdateParticleEmitterKeyframe={updateParticleEmitterKeyframe}
       onUpdateParameterEvent={updateParameterEvent}
-      onUpdateCameraFXClip={updateCameraFXClip}
       onUpdateTextAnimatorKeyframe={updateTextAnimatorKeyframe}
+      onUpdateCameraRigKeyframe={updateCameraRigKeyframeField}
       onUpdateTextKeyframe={updateTextKeyframe}
       onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
       onMovePresetKeyframe={movePresetKeyframe}
