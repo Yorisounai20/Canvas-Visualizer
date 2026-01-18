@@ -87,6 +87,9 @@ interface TimelineProps {
   onDeleteEnvironmentKeyframe?: (id: number) => void;
   onUpdatePresetKeyframe?: (id: number, preset: string) => void;
   onUpdatePresetKeyframeField?: (id: number, field: string, value: any) => void;
+  onUpdateLetterboxKeyframe?: (id: number, field: string, value: any) => void;
+  onUpdateParticleEmitterKeyframe?: (id: number, field: string, value: any) => void;
+  onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
   onUpdateCameraKeyframe?: (time: number, updates: Partial<CameraKeyframe>) => void;
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
@@ -150,6 +153,10 @@ export default function TimelineV2({
   onMoveParameterEvent,
   onUpdateCameraKeyframe,
   onUpdatePresetKeyframeField,
+  onUpdateLetterboxKeyframe,
+  onUpdateParticleEmitterKeyframe,
+  onUpdateParameterEvent,
+  onUpdateCameraFXClip,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
     // Load from localStorage (Chunk 6.4)
@@ -899,10 +906,24 @@ export default function TimelineV2({
     }
     
     return keyframes.map((kf, idx) => {
-      // Extract time and endTime from various keyframe types
+      // Extract time and endTime/duration from various keyframe types
       const time = 'time' in kf ? kf.time : 'startTime' in kf ? kf.startTime : 0;
-      const endTime = 'endTime' in kf && typeof kf.endTime === 'number' ? kf.endTime : null;
-      const hasEndTime = endTime !== null && trackType === 'preset'; // Only preset keyframes show as rectangles for now
+      
+      // Calculate endTime from different field types
+      let endTime: number | null = null;
+      if ('endTime' in kf && typeof kf.endTime === 'number') {
+        endTime = kf.endTime;
+      } else if ('duration' in kf && typeof kf.duration === 'number') {
+        endTime = time + kf.duration;
+      }
+      
+      // Determine if this keyframe type should show as rectangle
+      const hasEndTime = endTime !== null && (
+        trackType === 'preset' || 
+        trackType === 'letterbox' || 
+        trackType === 'particles' ||
+        trackType === 'fxEvents'
+      );
       
       const keyId = 'id' in kf && kf.id ? kf.id : `${trackType}-${time}-${idx}`;
       const fullKeyId = `${trackType}-${keyId}`;
@@ -1099,12 +1120,28 @@ export default function TimelineV2({
           
           const finalEndTime = resizedEndTimeRef.current;
           if (finalEndTime !== originalEndTime) {
-            console.log(`Resize keyframe ${fullKeyId} endTime from ${originalEndTime} to ${finalEndTime}`);
+            console.log(`Resize keyframe ${fullKeyId} endTime/duration from ${originalEndTime} to ${finalEndTime}`);
             
-            // Update endTime via the update handler
+            const { numericId, stringId } = extractKeyframeIds(kf, keyId);
+            
+            // Update endTime/duration via the appropriate update handler
             if (trackType === 'preset' && onUpdatePresetKeyframeField) {
-              const numericId = 'id' in kf && typeof kf.id === 'number' ? kf.id : parseInt(String(keyId).split('-').pop() || '0');
               onUpdatePresetKeyframeField(numericId, 'endTime', finalEndTime);
+            } else if (trackType === 'letterbox' && onUpdateLetterboxKeyframe) {
+              // Letterbox uses 'duration' field, so calculate it from the difference
+              const newDuration = finalEndTime - time;
+              onUpdateLetterboxKeyframe(numericId, 'duration', newDuration);
+            } else if (trackType === 'particles' && onUpdateParticleEmitterKeyframe) {
+              // Particles use 'duration' field
+              const newDuration = finalEndTime - time;
+              onUpdateParticleEmitterKeyframe(numericId, 'duration', newDuration);
+            } else if (trackType === 'fxEvents') {
+              if (onUpdateParameterEvent) {
+                onUpdateParameterEvent(stringId, { endTime: finalEndTime });
+              } else if (onUpdateCameraFXClip) {
+                // Camera FX clips
+                onUpdateCameraFXClip(stringId, { endTime: finalEndTime });
+              }
             }
           }
           

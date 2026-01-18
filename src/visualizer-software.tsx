@@ -1193,6 +1193,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
+  // Update handler for letterbox keyframe fields (including duration)
+  const updateLetterboxKeyframe = (id: number, field: string, value: any) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
   const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
     setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
       kf.id === id ? { ...kf, time: newTime } : kf
@@ -8409,6 +8416,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onDeleteEnvironmentKeyframe={deleteEnvironmentKeyframe}
       onUpdatePresetKeyframe={updatePresetKeyframe}
       onUpdatePresetKeyframeField={handleUpdatePresetKeyframe}
+      onUpdateLetterboxKeyframe={updateLetterboxKeyframe}
+      onUpdateParticleEmitterKeyframe={updateParticleEmitterKeyframe}
+      onUpdateParameterEvent={updateParameterEvent}
+      onUpdateCameraFXClip={updateCameraFXClip}
       onUpdateCameraKeyframe={updateCameraKeyframe}
       onUpdateTextKeyframe={updateTextKeyframe}
       onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
