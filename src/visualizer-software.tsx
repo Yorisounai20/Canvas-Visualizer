@@ -8047,6 +8047,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
+      } else if (e.key === '`') {
+        // Toggle debug console
+        setShowDebugConsole(prev => !prev);
       } else if (e.key >= '1' && e.key <= '9') {
         // Number keys 1-9 for tab navigation
         const tabIndex = parseInt(e.key) - 1;
@@ -8061,7 +8064,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu, showDebugConsole]);
 
   // Close file menu when clicking outside
   useEffect(() => {
@@ -8706,13 +8709,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
       </div>
-
-      {/* Debug Console Modal - Toggled with ` key */}
-      <DebugConsole 
-        logs={errorLog} 
-        isOpen={showDebugConsole} 
-        onToggle={() => setShowDebugConsole(prev => !prev)} 
-      />
     </div>
   );
   // --- End constants ---
@@ -9282,6 +9278,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           currentProjectId={currentProjectId}
         />
       )}
+
+      {/* Debug Console Modal - Toggled with ` key */}
+      <DebugConsole 
+        logs={errorLog} 
+        isOpen={showDebugConsole} 
+        onToggle={() => setShowDebugConsole(prev => !prev)} 
+      />
     </LayoutShell>
   );
 }
