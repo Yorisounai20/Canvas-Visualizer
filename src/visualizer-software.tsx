@@ -197,6 +197,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  
+  // View Mode: Editor (all panels visible) or Preview (canvas only)
+  const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
+  
   // NEW: Skybox controls
   const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
   const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
@@ -8316,7 +8320,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-    <div className="flex items-center justify-center w-full h-full bg-gray-950 py-4">
+    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
+      viewMode === 'preview' ? 'py-0' : 'py-4'
+    }`}>
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -8352,6 +8358,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       currentTime={currentTime}
       duration={duration}
       formatTime={formatTime}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
     />
   );
 
@@ -8746,6 +8754,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       inspector={inspectorJSX}
       timeline={timelinePanelJSX}
       top={topBarJSX}
+      viewMode={viewMode}
     >
       {canvasAreaJSX}
 

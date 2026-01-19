@@ -13,6 +13,8 @@ interface TopBarProps {
   currentTime: number;
   duration: number;
   formatTime: (time: number) => string;
+  viewMode: 'editor' | 'preview';
+  setViewMode: (mode: 'editor' | 'preview') => void;
 }
 
 export default function TopBar({
@@ -27,7 +29,9 @@ export default function TopBar({
   isSaving,
   currentTime,
   duration,
-  formatTime
+  formatTime,
+  viewMode,
+  setViewMode
 }: TopBarProps) {
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
@@ -54,6 +58,38 @@ export default function TopBar({
             <span>Dashboard</span>
           </button>
         )}
+        
+        {/* Editor/Preview Mode Toggle */}
+        <div className="inline-flex rounded-md shadow-sm" role="group">
+          <button
+            type="button"
+            onClick={() => setViewMode('editor')}
+            aria-label="Switch to Editor mode"
+            aria-pressed={viewMode === 'editor'}
+            className={`px-4 py-1.5 text-sm font-medium rounded-l-lg border transition-colors ${
+              viewMode === 'editor'
+                ? 'bg-cyan-600 text-white border-cyan-600'
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+            }`}
+            title="Editor mode - Show all panels and timeline"
+          >
+            📝 Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('preview')}
+            aria-label="Switch to Preview mode"
+            aria-pressed={viewMode === 'preview'}
+            className={`px-4 py-1.5 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+              viewMode === 'preview'
+                ? 'bg-cyan-600 text-white border-cyan-600'
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+            }`}
+            title="Preview mode - Show canvas only"
+          >
+            ▶️ Preview
+          </button>
+        </div>
         
         {/* File Menu Dropdown */}
         <div className="relative file-menu-container">
