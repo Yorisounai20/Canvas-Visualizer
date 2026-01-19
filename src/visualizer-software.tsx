@@ -8075,6 +8075,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // New project
         e.preventDefault();
         handleNewProject();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+        // Switch to Editor mode
+        e.preventDefault();
+        setViewMode('editor');
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        // Switch to Preview mode
+        e.preventDefault();
+        setViewMode('preview');
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
@@ -9205,6 +9213,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
                       <span className="text-gray-300">Play/Pause audio</span>
                       <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Space</kbd>
+                    </div>
+                  </div>
+                </div>
+
+                {/* View Mode */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">View Mode</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Editor mode</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Ctrl+E</kbd>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Preview mode</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Ctrl+P</kbd>
                     </div>
                   </div>
                 </div>
