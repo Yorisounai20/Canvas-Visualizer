@@ -8,6 +8,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
+import NewProjectModal from './components/Modals/NewProjectModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
 import { 
@@ -295,6 +296,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // Save/Load project state
   const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -658,23 +660,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   const handleNewProject = () => {
-    // Confirm if user wants to create a new project (losing unsaved changes)
-    const confirmNew = window.confirm(
-      'Create a new project? Any unsaved changes will be lost.'
-    );
-    
-    if (!confirmNew) return;
-    
+    // Show the New Project modal
+    setShowNewProjectModal(true);
+  };
+
+  const handleCreateNewProject = (settings: ProjectSettings, audioFile?: File) => {
     try {
       addLog('Creating new project...', 'info');
       
       // Stop playback
       if (isPlaying) {
-        stopAudio();
+        if (audioTracks.length > 0) stopMultiTrackAudio();
+        else stopAudio();
       }
       
-      // Reset project metadata
-      setProjectName('Untitled Project');
+      // Set project name from settings
+      setProjectName(settings.name);
       setCurrentProjectId(undefined);
       
       // Reset camera settings
@@ -682,11 +683,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setCameraHeight(DEFAULT_CAMERA_HEIGHT);
       setCameraRotation(DEFAULT_CAMERA_ROTATION);
       setCameraAutoRotate(false);
-      setCameraKeyframes([
-        { time: 0, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
-        { time: 20, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
-        { time: 40, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' }
-      ]);
       
       // Reset colors
       setBassColor('#8a2be2');
@@ -700,6 +696,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setLetterboxSize(0);
       setShowSongName(false);
       setCustomSongName('');
+      setBackgroundColor(settings.backgroundColor || '#0a0a14');
       
       // Reset lighting
       setAmbientLightIntensity(0.5);
@@ -730,6 +727,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setAudioFileName('');
       setCurrentTime(0);
       setDuration(0);
+      
+      // Load audio file if provided
+      if (audioFile) {
+        addAudioTrack(audioFile);
+      }
+      
+      // Close the modal
+      setShowNewProjectModal(false);
       
       addLog('New project created successfully', 'success');
     } catch (error) {
@@ -9374,6 +9379,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           onClose={() => setShowProjectsModal(false)}
           onLoadProject={handleLoadProject}
           currentProjectId={currentProjectId}
+        />
+      )}
+
+      {/* New Project Modal */}
+      {showNewProjectModal && (
+        <NewProjectModal
+          onCreateProject={handleCreateNewProject}
         />
       )}
 

@@ -55,40 +55,40 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-[#2B2B2B] border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+      <div className="bg-[#2B2B2B] border border-gray-700 rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-cyan-600 px-6 py-4">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <Film size={28} />
+        <div className="bg-gradient-to-r from-purple-600 to-cyan-600 px-5 py-3">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Film size={24} />
             New Project
           </h2>
-          <p className="text-purple-100 text-sm mt-1">
+          <p className="text-purple-100 text-xs mt-0.5">
             Configure your music visualization project
           </p>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {/* Project Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">
               Project Name
             </label>
             <input
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
-              className="w-full px-4 py-2 bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
+              className="w-full px-3 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
               placeholder="My Awesome Visualizer"
             />
           </div>
 
           {/* Resolution */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">
               Export Resolution
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {/* Preset Dropdown */}
               <select
                 onChange={(e) => {
@@ -98,7 +98,7 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
                     setHeight(preset.height);
                   }
                 }}
-                className="col-span-2 px-4 py-2 bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
+                className="col-span-2 px-3 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
               >
                 <option value="">Select a preset...</option>
                 {resolutionPresets.map((preset, idx) => (
@@ -110,38 +110,38 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
 
               {/* Custom Width */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Width (px)</label>
+                <label className="block text-xs text-gray-400 mb-1">Width</label>
                 <input
                   type="number"
                   value={width}
                   onChange={(e) => setWidth(parseInt(e.target.value) || 1920)}
                   min="320"
                   max="7680"
-                  className="w-full px-3 py-2 bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
+                  className="w-full px-2 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
                 />
               </div>
 
               {/* Custom Height */}
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Height (px)</label>
+                <label className="block text-xs text-gray-400 mb-1">Height</label>
                 <input
                   type="number"
                   value={height}
                   onChange={(e) => setHeight(parseInt(e.target.value) || 1080)}
                   min="240"
                   max="4320"
-                  className="w-full px-3 py-2 bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
+                  className="w-full px-2 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none"
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Aspect ratio: {(width / height).toFixed(2)} {width === 1920 && height === 1080 && '(16:9)'}{width === 1080 && height === 1920 && '(9:16)'}
+            <p className="text-xs text-gray-500 mt-1">
+              Ratio: {(width / height).toFixed(2)} {width === 1920 && height === 1080 && '(16:9)'}{width === 1080 && height === 1920 && '(9:16)'}
             </p>
           </div>
 
           {/* FPS */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">
               Frame Rate (FPS)
             </label>
             <div className="flex gap-2">
@@ -149,7 +149,7 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
                 <button
                   key={fpsValue}
                   onClick={() => setFps(fpsValue)}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  className={`flex-1 px-3 py-1.5 text-sm rounded-lg font-semibold transition-colors ${
                     fps === fpsValue
                       ? 'bg-purple-600 text-white'
                       : 'bg-[#1E1E1E] text-gray-300 hover:bg-gray-700'
@@ -163,33 +163,30 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
 
           {/* Background Color */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">
               Background Color
             </label>
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-2 items-center">
               <input
                 type="color"
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                className="w-16 h-10 rounded cursor-pointer bg-transparent"
+                className="w-12 h-8 rounded cursor-pointer bg-transparent"
               />
               <input
                 type="text"
                 value={backgroundColor}
                 onChange={(e) => setBackgroundColor(e.target.value)}
-                className="flex-1 px-4 py-2 bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none font-mono"
+                className="flex-1 px-3 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none font-mono"
                 placeholder="#0a0a14"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Can be changed later in canvas properties
-            </p>
           </div>
 
           {/* Optional Audio */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-              <Music size={16} />
+            <label className="block text-xs font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
+              <Music size={14} />
               Audio File (Optional)
             </label>
             <div className="relative">
@@ -202,12 +199,12 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
               />
               <label
                 htmlFor="audio-upload"
-                className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-[#1E1E1E] border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 cursor-pointer transition-colors"
+                className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 cursor-pointer transition-colors"
               >
                 {audioFile ? (
-                  <span className="text-cyan-400">{audioFile.name}</span>
+                  <span className="text-cyan-400 truncate">{audioFile.name}</span>
                 ) : (
-                  <span>Click to upload audio file (can add later)</span>
+                  <span>Click to upload (can add later)</span>
                 )}
               </label>
             </div>
@@ -215,10 +212,10 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
         </div>
 
         {/* Footer */}
-        <div className="bg-[#1E1E1E] px-6 py-4 flex justify-end gap-3 border-t border-gray-700">
+        <div className="bg-[#1E1E1E] px-4 py-3 flex justify-end gap-2 border-t border-gray-700">
           <button
             onClick={handleCreate}
-            className="px-6 py-2 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all shadow-lg"
+            className="px-5 py-1.5 text-sm bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-purple-700 hover:to-cyan-700 transition-all shadow-lg"
           >
             Create Project
           </button>
