@@ -550,17 +550,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         name: projectName,
         resolution: { width: 960, height: 540 },
         fps: 30,
-        backgroundColor: '#000000',
+        backgroundColor: backgroundColor || '#000000',
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString()
       };
 
-      // Serialize Software mode state
+      // Serialize Software mode state with ALL timeline features
       const projectState: ProjectState = {
         settings: projectSettings,
         sections: [], // Software mode doesn't use sections
         presetKeyframes: presetKeyframes,
-        textKeyframes: [],
+        textKeyframes: textKeyframes,
         environmentKeyframes: environmentKeyframes,
         cameraDistance,
         cameraHeight,
@@ -587,7 +587,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         colorGamma,
         colorTintR,
         colorTintG,
-        colorTintB
+        colorTintB,
+        // Timeline features
+        letterboxKeyframes,
+        cameraShakes,
+        parameterEvents,
+        presetSpeedKeyframes,
+        textAnimatorKeyframes,
+        cameraRigs,
+        cameraRigKeyframes,
+        particleEmitterKeyframes,
+        cameraFXClips,
+        cameraFXKeyframes,
+        maskRevealKeyframes,
+        workspaceObjects
       };
 
       // Save to database
@@ -595,7 +608,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const savedProject = await saveProject(projectState, currentProjectId, userId);
       setCurrentProjectId(savedProject.id);
       
-      addLog(`Project "${projectName}" saved successfully`, 'success');
+      addLog(`Project "${projectName}" saved successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to save project:', error);
       addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
@@ -618,10 +631,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
 
-      // Apply loaded state
+      // Apply loaded state - basic properties
       setProjectName(projectState.settings.name);
       setEnvironmentKeyframes(projectState.environmentKeyframes);
       setPresetKeyframes(projectState.presetKeyframes || []);
+      setTextKeyframes(projectState.textKeyframes || []);
       setCameraDistance(projectState.cameraDistance);
       setCameraHeight(projectState.cameraHeight);
       setCameraRotation(projectState.cameraRotation);
@@ -649,9 +663,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (projectState.colorTintG !== undefined) setColorTintG(projectState.colorTintG);
       if (projectState.colorTintB !== undefined) setColorTintB(projectState.colorTintB);
       
+      // Restore ALL timeline features
+      if (projectState.letterboxKeyframes !== undefined) setLetterboxKeyframes(projectState.letterboxKeyframes);
+      if (projectState.cameraShakes !== undefined) setCameraShakes(projectState.cameraShakes);
+      if (projectState.parameterEvents !== undefined) setParameterEvents(projectState.parameterEvents);
+      if (projectState.presetSpeedKeyframes !== undefined) setPresetSpeedKeyframes(projectState.presetSpeedKeyframes);
+      if (projectState.textAnimatorKeyframes !== undefined) setTextAnimatorKeyframes(projectState.textAnimatorKeyframes);
+      if (projectState.cameraRigs !== undefined) setCameraRigs(projectState.cameraRigs);
+      if (projectState.cameraRigKeyframes !== undefined) setCameraRigKeyframes(projectState.cameraRigKeyframes);
+      if (projectState.particleEmitterKeyframes !== undefined) setParticleEmitterKeyframes(projectState.particleEmitterKeyframes);
+      if (projectState.cameraFXClips !== undefined) setCameraFXClips(projectState.cameraFXClips);
+      if (projectState.cameraFXKeyframes !== undefined) setCameraFXKeyframes(projectState.cameraFXKeyframes);
+      if (projectState.maskRevealKeyframes !== undefined) setMaskRevealKeyframes(projectState.maskRevealKeyframes);
+      if (projectState.workspaceObjects !== undefined) setWorkspaceObjects(projectState.workspaceObjects);
+      
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
-      addLog(`Project "${projectState.settings.name}" loaded successfully`, 'success');
+      addLog(`Project "${projectState.settings.name}" loaded successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to load project:', error);
       addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
