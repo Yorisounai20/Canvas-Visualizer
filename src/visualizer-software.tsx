@@ -6,7 +6,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, X, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
@@ -8348,6 +8348,30 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           );
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        
+        {/* Playback controls overlay for Preview mode */}
+        {viewMode === 'preview' && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
+            <button 
+              onClick={() => {
+                if (isPlaying) {
+                  if (audioTracks.length > 0) stopMultiTrackAudio();
+                  else stopAudio();
+                } else {
+                  if (audioTracks.length > 0) playMultiTrackAudio();
+                  else playAudio();
+                }
+              }}
+              className="text-white hover:text-cyan-400 transition-colors p-1"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            </button>
+            <span className="text-white text-sm font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
