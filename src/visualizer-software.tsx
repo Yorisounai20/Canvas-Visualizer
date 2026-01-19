@@ -435,6 +435,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const fpsFrameCount = useRef(0);
   const fpsLastTime = useRef(0);
   
+  // Timeline update throttling (reduce from 60 FPS to 10 FPS for better performance)
+  const lastTimelineUpdateRef = useRef<number>(0);
+  const TIMELINE_UPDATE_INTERVAL_MS = 100; // 10 FPS (100ms between updates)
+  
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -3155,7 +3159,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       const el = (Date.now() - startTimeRef.current) * 0.001;
       const t = el % duration;
-      setCurrentTime(t);
+      
+      // Throttle timeline updates to 10 FPS (instead of 60 FPS) to improve performance
+      // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS milliseconds
+      const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
+      if (timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
+        setCurrentTime(t);
+        lastTimelineUpdateRef.current = now;
+      }
+      
       const type = getCurrentPreset(); // Use keyframe-based preset switching
       const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
@@ -8304,7 +8316,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-    <div className="flex items-start justify-center w-full h-full bg-gray-950 pt-8">
+    <div className="flex items-center justify-center w-full h-full bg-gray-950 py-4">
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {

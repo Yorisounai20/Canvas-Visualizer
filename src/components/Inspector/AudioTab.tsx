@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { AudioTrack } from '../VisualizerSoftware/types';
 import { generateWaveformData } from '../VisualizerSoftware/utils';
@@ -14,6 +14,64 @@ interface AudioTabProps {
   setBassGain: (gain: number) => void;
   setMidsGain: (gain: number) => void;
   setHighsGain: (gain: number) => void;
+}
+
+/**
+ * Waveform Canvas Component - Renders waveform for a single audio track
+ * Uses useEffect to properly handle buffer updates and re-renders
+ */
+function WaveformCanvas({ track }: { track: AudioTrack }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !track.buffer) return;
+    
+    try {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.warn('Could not get canvas 2d context');
+        return;
+      }
+      
+      // Generate waveform data (now with built-in error handling)
+      const waveform = generateWaveformData(track.buffer, 200);
+      
+      // Set canvas dimensions
+      canvas.width = canvas.offsetWidth;
+      canvas.height = 64;
+      
+      // Clear canvas
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw waveform bars
+      ctx.fillStyle = track.active ? '#06b6d4' : '#4b5563';
+      const barWidth = canvas.width / waveform.length;
+      
+      for (let i = 0; i < waveform.length; i++) {
+        const barHeight = waveform[i] * canvas.height;
+        const x = i * barWidth;
+        const y = (canvas.height - barHeight) / 2;
+        ctx.fillRect(x, y, barWidth - 1, barHeight);
+      }
+    } catch (error) {
+      console.error('Failed to render waveform for track:', track.name, error);
+      // Show error state on canvas
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (ctx && canvas) {
+        ctx.fillStyle = '#7f1d1d'; // Red error background
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Error rendering waveform', canvas.width / 2, canvas.height / 2);
+      }
+    }
+  }, [track.buffer, track.active, track.id, track.name]);
+
+  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
 /**
@@ -121,29 +179,7 @@ export default function AudioTab({
                 
                 {/* Waveform visualization for this track */}
                 <div className="bg-black rounded p-2 mb-2 h-16">
-                  <canvas
-                    ref={(canvas) => {
-                      if (canvas && track.buffer) {
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                          const waveform = generateWaveformData(track.buffer, 200);
-                          canvas.width = canvas.offsetWidth;
-                          canvas.height = 64;
-                          ctx.fillStyle = '#000';
-                          ctx.fillRect(0, 0, canvas.width, canvas.height);
-                          ctx.fillStyle = track.active ? '#06b6d4' : '#4b5563';
-                          const barWidth = canvas.width / waveform.length;
-                          for (let i = 0; i < waveform.length; i++) {
-                            const barHeight = waveform[i] * canvas.height;
-                            const x = i * barWidth;
-                            const y = (canvas.height - barHeight) / 2;
-                            ctx.fillRect(x, y, barWidth - 1, barHeight);
-                          }
-                        }
-                      }
-                    }}
-                    className="w-full h-full"
-                  />
+                  <WaveformCanvas track={track} />
                 </div>
               </div>
             ))}

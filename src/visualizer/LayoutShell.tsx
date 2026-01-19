@@ -63,8 +63,10 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
 
       {/* Main content area - full width, panels as thin collapsed tabs by default */}
       <div className="flex-1 relative overflow-hidden min-h-0">
-        {/* Center content - main canvas moved up with no top gap */}
-        <main className="absolute inset-0 overflow-hidden flex flex-col">
+        {/* Center content - main canvas */}
+        <main 
+          className="absolute inset-0 overflow-hidden flex flex-col"
+        >
           {children}
         </main>
 
@@ -85,7 +87,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
 
       {/* Bottom timeline - resizable with controls */}
       <footer 
-        className="absolute bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 z-20 shadow-2xl"
+        className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative"
         style={{ height: effectiveTimelineHeight }}
       >
         {/* Resize handle */}
