@@ -59,6 +59,12 @@ Want to run locally or contribute? Here's how:
 5. Add effects (skybox, letterbox, shake)
 6. Export video
 
+**Editor/Preview View Toggle (Software Mode):**
+- **Editor View** - Full editing interface with panels (Toolbox, Inspector) and timeline for complete control
+- **Preview View** - Distraction-free canvas-only view for reviewing visualizations and presentations
+- Toggle between views using buttons in the top bar or keyboard shortcuts (Ctrl+E / Ctrl+Shift+P)
+- Perfect for final review and video recording without UI elements
+
 ## Project Save/Load (Optional)
 
 Canvas Visualizer can save projects to a Neon PostgreSQL database. This is **optional** - the app works without it.
@@ -170,6 +176,8 @@ Reload the page after changing the flag. The new timeline includes:
 **Software Mode:**
 - Space - Play/Pause
 - G - Toggle camera rig visual hints
+- Ctrl/Cmd+E - Switch to Editor view (shows panels and timeline)
+- Ctrl/Cmd+Shift+P - Switch to Preview view (canvas only)
 - Ctrl/Cmd+S - Save | Ctrl/Cmd+O - Open
 - Esc - Close modals
 
