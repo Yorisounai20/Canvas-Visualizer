@@ -47,6 +47,17 @@ import {
   clampZoom
 } from './utils';
 
+// Camera Rig interface for timeline display
+interface CameraRig {
+  id: string;
+  name: string;
+  type: 'orbit' | 'rotation' | 'dolly' | 'pan' | 'crane' | 'zoom' | 'custom';
+  enabled: boolean;
+  startTime: number;
+  endTime: number;
+  [key: string]: any;
+}
+
 // Re-export TimelineProps from original Timeline for compatibility
 interface TimelineProps {
   sections: Section[];
@@ -62,7 +73,8 @@ interface TimelineProps {
   presetSpeedKeyframes?: Array<{ id: number; time: number; speed: number; easing: string }>;
   letterboxKeyframes?: LetterboxKeyframe[];
   textAnimatorKeyframes?: TextAnimatorKeyframe[];
-  cameraRigKeyframes?: CameraRigKeyframe[];
+  cameraRigs?: CameraRig[]; // High-level rig objects that display in timeline
+  cameraRigKeyframes?: CameraRigKeyframe[]; // Fine-grained keyframes for transitions
   cameraFXKeyframes?: CameraFXKeyframe[];
   particleEmitterKeyframes?: ParticleEmitterKeyframe[];
   parameterEvents?: ParameterEvent[];
@@ -159,7 +171,8 @@ export default function TimelineV2({
   presetSpeedKeyframes = [],
   letterboxKeyframes = [],
   textAnimatorKeyframes = [],
-  cameraRigKeyframes = [],
+  cameraRigs = [], // High-level rig objects
+  cameraRigKeyframes = [], // Fine-grained transition keyframes
   cameraFXKeyframes = [],
   particleEmitterKeyframes = [],
   parameterEvents = [],
@@ -440,6 +453,7 @@ export default function TimelineV2({
           const allKeyframes = [
             ...presetKeyframes.map(k => ({ ...k, type: 'preset', y: 80 })), // Estimate track Y positions
             ...presetSpeedKeyframes.map(k => ({ ...k, type: 'presetSpeed', y: 160 })),
+            ...cameraRigs.map(rig => ({ id: rig.id, time: rig.startTime, endTime: rig.endTime, type: 'cameraRig', y: 240 })),
             ...cameraRigKeyframes.map(k => ({ ...k, type: 'cameraRig', y: 240 })),
             ...cameraFXKeyframes.map(k => ({ ...k, type: 'cameraFX', y: 320 })),
             ...textKeyframes.map(k => ({ ...k, type: 'text', y: 400 })),
@@ -882,7 +896,21 @@ export default function TimelineV2({
         color = 'bg-cyan-300'; // Lighter cyan for speed
         break;
       case 'cameraRig':
-        keyframes = cameraRigKeyframes;
+        // Combine Camera Rigs (high-level) and Camera Rig Keyframes (fine-grained)
+        // Convert Camera Rigs to keyframe-like objects for display
+        const rigObjects = cameraRigs.map(rig => ({
+          id: rig.id,
+          time: rig.startTime,
+          endTime: rig.endTime,
+          duration: rig.endTime - rig.startTime,
+          name: rig.name,
+          type: rig.type,
+          enabled: rig.enabled,
+          rigId: rig.id,
+          easing: 'linear' as EasingFunction, // Default easing for display
+          isCameraRig: true, // Flag to distinguish from keyframes
+        }));
+        keyframes = [...rigObjects, ...cameraRigKeyframes];
         color = 'bg-purple-300'; // Lighter purple for rig
         break;
       case 'cameraFX':

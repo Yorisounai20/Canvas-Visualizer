@@ -8307,6 +8307,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       presetSpeedKeyframes={presetSpeedKeyframes}
       letterboxKeyframes={letterboxKeyframes}
       textAnimatorKeyframes={textAnimatorKeyframes}
+      cameraRigs={cameraRigs}
       cameraRigKeyframes={cameraRigKeyframes}
       cameraFXKeyframes={cameraFXKeyframes}
       particleEmitterKeyframes={particleEmitterKeyframes}
