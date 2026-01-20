@@ -8,9 +8,10 @@ type LayoutShellProps = {
   timeline?: React.ReactNode;
   top?: React.ReactNode;
   children: React.ReactNode; // canvas / main content
+  viewMode?: 'editor' | 'preview'; // Add this prop
 };
 
-export default function LayoutShell({ left, inspector, timeline, top, children }: LayoutShellProps) {
+export default function LayoutShell({ left, inspector, timeline, top, children, viewMode = 'editor' }: LayoutShellProps) {
   const [timelineHeight, setTimelineHeight] = useState(450); // Default 450px - increased for better visibility
   const [isResizing, setIsResizing] = useState(false);
   const [isFullHeight, setIsFullHeight] = useState(false);
@@ -70,24 +71,30 @@ export default function LayoutShell({ left, inspector, timeline, top, children }
           {children}
         </main>
 
-        {/* Left sidebar - 45% vertical space, expanded by default */}
-        <aside className="absolute left-0 top-0 h-[45vh] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        {/* Left sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
+        <aside className={`absolute left-0 top-0 h-[45vh] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+          viewMode === 'preview' ? 'hidden' : ''
+        }`}>
           <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
             {left}
           </PanelContainer>
         </aside>
 
-        {/* Right sidebar - 45% vertical space, expanded by default */}
-        <aside className="absolute right-0 top-0 h-[45vh] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl">
+        {/* Right sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
+        <aside className={`absolute right-0 top-0 h-[45vh] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+          viewMode === 'preview' ? 'hidden' : ''
+        }`}>
           <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
             {inspector}
           </PanelContainer>
         </aside>
       </div>
 
-      {/* Bottom timeline - resizable with controls */}
+      {/* Bottom timeline - hidden in preview mode using CSS to prevent unmounting/remounting */}
       <footer 
-        className="flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative"
+        className={`flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative ${
+          viewMode === 'preview' ? 'hidden' : ''
+        }`}
         style={{ height: effectiveTimelineHeight }}
       >
         {/* Resize handle */}

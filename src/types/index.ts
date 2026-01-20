@@ -48,6 +48,19 @@ export interface ProjectState {
   colorTintR?: number;
   colorTintG?: number;
   colorTintB?: number;
+  // Timeline features
+  letterboxKeyframes?: LetterboxKeyframe[];
+  cameraShakes?: CameraShake[];
+  parameterEvents?: any[]; // ParameterEvent type
+  presetSpeedKeyframes?: Array<{time: number; speed: number}>;
+  textAnimatorKeyframes?: TextAnimatorKeyframe[];
+  cameraRigs?: CameraRig[];
+  cameraRigKeyframes?: CameraRigKeyframe[];
+  particleEmitterKeyframes?: any[];
+  cameraFXClips?: CameraFXClip[];
+  cameraFXKeyframes?: CameraFXKeyframe[];
+  maskRevealKeyframes?: MaskRevealKeyframe[];
+  workspaceObjects?: WorkspaceObject[];
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations

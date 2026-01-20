@@ -6,8 +6,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { Trash2, Plus, Play, Square, X, ChevronDown } from 'lucide-react';
+import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
+import NewProjectModal from './components/Modals/NewProjectModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
 import { 
@@ -197,6 +198,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
   const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  
+  // View Mode: Editor (all panels visible) or Preview (canvas only)
+  const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
+  
   // NEW: Skybox controls
   const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
   const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
@@ -291,6 +296,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // Save/Load project state
   const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
@@ -544,17 +550,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         name: projectName,
         resolution: { width: 960, height: 540 },
         fps: 30,
-        backgroundColor: '#000000',
+        backgroundColor: backgroundColor || '#000000',
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString()
       };
 
-      // Serialize Software mode state
+      // Serialize Software mode state with ALL timeline features
       const projectState: ProjectState = {
         settings: projectSettings,
         sections: [], // Software mode doesn't use sections
         presetKeyframes: presetKeyframes,
-        textKeyframes: [],
+        textKeyframes: textKeyframes,
         environmentKeyframes: environmentKeyframes,
         cameraDistance,
         cameraHeight,
@@ -581,7 +587,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         colorGamma,
         colorTintR,
         colorTintG,
-        colorTintB
+        colorTintB,
+        // Timeline features
+        letterboxKeyframes,
+        cameraShakes,
+        parameterEvents,
+        presetSpeedKeyframes,
+        textAnimatorKeyframes,
+        cameraRigs,
+        cameraRigKeyframes,
+        particleEmitterKeyframes,
+        cameraFXClips,
+        cameraFXKeyframes,
+        maskRevealKeyframes,
+        workspaceObjects
       };
 
       // Save to database
@@ -589,7 +608,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const savedProject = await saveProject(projectState, currentProjectId, userId);
       setCurrentProjectId(savedProject.id);
       
-      addLog(`Project "${projectName}" saved successfully`, 'success');
+      addLog(`Project "${projectName}" saved successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to save project:', error);
       addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
@@ -612,10 +631,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
 
-      // Apply loaded state
+      // Apply loaded state - basic properties
       setProjectName(projectState.settings.name);
       setEnvironmentKeyframes(projectState.environmentKeyframes);
       setPresetKeyframes(projectState.presetKeyframes || []);
+      setTextKeyframes(projectState.textKeyframes || []);
       setCameraDistance(projectState.cameraDistance);
       setCameraHeight(projectState.cameraHeight);
       setCameraRotation(projectState.cameraRotation);
@@ -643,9 +663,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (projectState.colorTintG !== undefined) setColorTintG(projectState.colorTintG);
       if (projectState.colorTintB !== undefined) setColorTintB(projectState.colorTintB);
       
+      // Restore ALL timeline features
+      if (projectState.letterboxKeyframes !== undefined) setLetterboxKeyframes(projectState.letterboxKeyframes);
+      if (projectState.cameraShakes !== undefined) setCameraShakes(projectState.cameraShakes);
+      if (projectState.parameterEvents !== undefined) setParameterEvents(projectState.parameterEvents);
+      if (projectState.presetSpeedKeyframes !== undefined) setPresetSpeedKeyframes(projectState.presetSpeedKeyframes);
+      if (projectState.textAnimatorKeyframes !== undefined) setTextAnimatorKeyframes(projectState.textAnimatorKeyframes);
+      if (projectState.cameraRigs !== undefined) setCameraRigs(projectState.cameraRigs);
+      if (projectState.cameraRigKeyframes !== undefined) setCameraRigKeyframes(projectState.cameraRigKeyframes);
+      if (projectState.particleEmitterKeyframes !== undefined) setParticleEmitterKeyframes(projectState.particleEmitterKeyframes);
+      if (projectState.cameraFXClips !== undefined) setCameraFXClips(projectState.cameraFXClips);
+      if (projectState.cameraFXKeyframes !== undefined) setCameraFXKeyframes(projectState.cameraFXKeyframes);
+      if (projectState.maskRevealKeyframes !== undefined) setMaskRevealKeyframes(projectState.maskRevealKeyframes);
+      if (projectState.workspaceObjects !== undefined) setWorkspaceObjects(projectState.workspaceObjects);
+      
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
-      addLog(`Project "${projectState.settings.name}" loaded successfully`, 'success');
+      addLog(`Project "${projectState.settings.name}" loaded successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to load project:', error);
       addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
@@ -654,23 +688,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   const handleNewProject = () => {
-    // Confirm if user wants to create a new project (losing unsaved changes)
-    const confirmNew = window.confirm(
-      'Create a new project? Any unsaved changes will be lost.'
-    );
-    
-    if (!confirmNew) return;
-    
+    // Show the New Project modal
+    setShowNewProjectModal(true);
+  };
+
+  const handleCreateNewProject = (settings: ProjectSettings, audioFile?: File) => {
     try {
       addLog('Creating new project...', 'info');
       
       // Stop playback
       if (isPlaying) {
-        stopAudio();
+        if (audioTracks.length > 0) stopMultiTrackAudio();
+        else stopAudio();
       }
       
-      // Reset project metadata
-      setProjectName('Untitled Project');
+      // Set project name from settings
+      setProjectName(settings.name);
       setCurrentProjectId(undefined);
       
       // Reset camera settings
@@ -678,11 +711,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setCameraHeight(DEFAULT_CAMERA_HEIGHT);
       setCameraRotation(DEFAULT_CAMERA_ROTATION);
       setCameraAutoRotate(false);
-      setCameraKeyframes([
-        { time: 0, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
-        { time: 20, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' },
-        { time: 40, distance: DEFAULT_CAMERA_DISTANCE, height: DEFAULT_CAMERA_HEIGHT, rotation: DEFAULT_CAMERA_ROTATION, easing: 'linear' }
-      ]);
       
       // Reset colors
       setBassColor('#8a2be2');
@@ -696,6 +724,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setLetterboxSize(0);
       setShowSongName(false);
       setCustomSongName('');
+      setBackgroundColor(settings.backgroundColor || '#0a0a14');
       
       // Reset lighting
       setAmbientLightIntensity(0.5);
@@ -726,6 +755,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setAudioFileName('');
       setCurrentTime(0);
       setDuration(0);
+      
+      // Load audio file if provided
+      if (audioFile) {
+        addAudioTrack(audioFile);
+      }
+      
+      // Close the modal
+      setShowNewProjectModal(false);
       
       addLog('New project created successfully', 'success');
     } catch (error) {
@@ -8071,6 +8108,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // New project
         e.preventDefault();
         handleNewProject();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+        // Switch to Editor mode
+        e.preventDefault();
+        setViewMode('editor');
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+        // Switch to Preview mode (Ctrl+Shift+P to avoid conflict with browser print)
+        e.preventDefault();
+        setViewMode('preview');
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
@@ -8316,7 +8361,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   );
 
   const canvasAreaJSX = (
-    <div className="flex items-center justify-center w-full h-full bg-gray-950 py-4">
+    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
+      viewMode === 'preview' ? 'py-0' : 'py-4'
+    }`}>
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -8334,6 +8381,30 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           );
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        
+        {/* Playback controls overlay for Preview mode */}
+        {viewMode === 'preview' && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
+            <button 
+              onClick={() => {
+                if (isPlaying) {
+                  if (audioTracks.length > 0) stopMultiTrackAudio();
+                  else stopAudio();
+                } else {
+                  if (audioTracks.length > 0) playMultiTrackAudio();
+                  else playAudio();
+                }
+              }}
+              className="text-white hover:text-cyan-400 transition-colors p-1"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            </button>
+            <span className="text-white text-sm font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -8352,6 +8423,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       currentTime={currentTime}
       duration={duration}
       formatTime={formatTime}
+      viewMode={viewMode}
+      setViewMode={setViewMode}
     />
   );
 
@@ -8746,6 +8819,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       inspector={inspectorJSX}
       timeline={timelinePanelJSX}
       top={topBarJSX}
+      viewMode={viewMode}
     >
       {canvasAreaJSX}
 
@@ -9200,6 +9274,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   </div>
                 </div>
 
+                {/* View Mode */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">View Mode</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Editor mode</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Ctrl+E</kbd>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded bg-gray-800/50">
+                      <span className="text-gray-300">Switch to Preview mode</span>
+                      <kbd className="px-2 py-1 text-xs font-semibold text-white bg-gray-700 border border-gray-600 rounded shadow-sm">Ctrl+Shift+P</kbd>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Tab Navigation */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Tab Navigation</h3>
@@ -9318,6 +9407,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           onClose={() => setShowProjectsModal(false)}
           onLoadProject={handleLoadProject}
           currentProjectId={currentProjectId}
+        />
+      )}
+
+      {/* New Project Modal */}
+      {showNewProjectModal && (
+        <NewProjectModal
+          onCreateProject={handleCreateNewProject}
         />
       )}
 
