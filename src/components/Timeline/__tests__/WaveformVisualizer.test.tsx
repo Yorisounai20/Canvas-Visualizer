@@ -85,11 +85,11 @@ describe('WaveformVisualizer - Long Audio File Support', () => {
   });
 
   it('should handle extreme zoom levels without exceeding canvas limits', () => {
-    const audioBuffer = createMockAudioBuffer(300); // 5 minutes
+    const audioBuffer = createMockAudioBuffer(5 * 60); // 5 minutes
     const { container } = render(
       <WaveformVisualizer
         audioBuffer={audioBuffer}
-        duration={300}
+        duration={5 * 60}
         width={60000} // Extreme width that exceeds 4096px limit
         height={60}
       />
@@ -149,13 +149,13 @@ describe('WaveformVisualizer - Long Audio File Support', () => {
 
 describe('WaveformVisualizer - Performance Characteristics', () => {
   it('should limit samples to MAX_WAVEFORM_SAMPLES (1024) for performance', () => {
-    const audioBuffer = createMockAudioBuffer(300); // 5 minutes
+    const audioBuffer = createMockAudioBuffer(5 * 60); // 5 minutes
     const getChannelData = audioBuffer.getChannelData;
     
     render(
       <WaveformVisualizer
         audioBuffer={audioBuffer}
-        duration={300}
+        duration={5 * 60}
         width={10000} // Very wide timeline
         height={60}
       />

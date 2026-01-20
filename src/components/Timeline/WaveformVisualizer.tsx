@@ -74,18 +74,20 @@ export default function WaveformVisualizer({
       // CRITICAL FIX: Limit canvas size to prevent rendering failures
       // Browser canvas limits: ~32,767px, but practical limit for performance is lower
       const MAX_CANVAS_WIDTH = 4096; // Safe limit for all browsers
+      const MAX_CANVAS_HEIGHT = 200; // Reasonable maximum height for timeline track
       const MAX_WAVEFORM_SAMPLES = 1024; // Maximum samples to process for performance
+      const MIN_BLOCK_DURATION_MS = 1000; // Minimum block duration in milliseconds for quality
       
       // Clamp canvas dimensions to safe limits
       const safeCanvasWidth = Math.min(debouncedWidth, MAX_CANVAS_WIDTH);
-      const safeCanvasHeight = Math.min(debouncedHeight, 200); // Reasonable height limit
+      const clampedCanvasHeight = Math.min(debouncedHeight, MAX_CANVAS_HEIGHT);
       
       // Set canvas size (this resets the canvas)
       canvas.width = safeCanvasWidth;
-      canvas.height = safeCanvasHeight;
+      canvas.height = clampedCanvasHeight;
 
       // Clear canvas
-      ctx.clearRect(0, 0, safeCanvasWidth, safeCanvasHeight);
+      ctx.clearRect(0, 0, safeCanvasWidth, clampedCanvasHeight);
 
       // Get audio data from first channel
       const rawData = audioBuffer.getChannelData(0);
@@ -97,7 +99,7 @@ export default function WaveformVisualizer({
       
       // Calculate block size with minimum threshold for quality
       // Ensure we don't create tiny blocks that lose audio detail
-      const minBlockSize = Math.ceil(audioBuffer.sampleRate / 1000); // ~1ms minimum (44 samples at 44.1kHz)
+      const minBlockSize = Math.ceil(audioBuffer.sampleRate / MIN_BLOCK_DURATION_MS); // ~1ms minimum (44 samples at 44.1kHz)
       const calculatedBlockSize = Math.floor(rawData.length / samples);
       const blockSize = Math.max(calculatedBlockSize, minBlockSize);
       
@@ -129,11 +131,11 @@ export default function WaveformVisualizer({
 
       // Draw the waveform - scale to fit canvas width
       ctx.fillStyle = color;
-      const middle = safeCanvasHeight / 2;
+      const middle = clampedCanvasHeight / 2;
       const barWidth = safeCanvasWidth / normalizedData.length;
 
       normalizedData.forEach((value, i) => {
-        const barHeight = value * (safeCanvasHeight / 2);
+        const barHeight = value * (clampedCanvasHeight / 2);
         const x = i * barWidth;
 
         if (mode === 'mirrored') {
@@ -141,7 +143,7 @@ export default function WaveformVisualizer({
           ctx.fillRect(x, middle - barHeight, Math.max(barWidth, 1), barHeight * 2);
         } else {
           // Draw top-only bars
-          ctx.fillRect(x, safeCanvasHeight - barHeight, Math.max(barWidth, 1), barHeight);
+          ctx.fillRect(x, clampedCanvasHeight - barHeight, Math.max(barWidth, 1), barHeight);
         }
       });
     } catch (error) {
