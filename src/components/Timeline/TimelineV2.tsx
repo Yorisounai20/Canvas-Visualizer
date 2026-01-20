@@ -445,7 +445,6 @@ export default function TimelineV2({
             ...textKeyframes.map(k => ({ ...k, type: 'text', y: 400 })),
             ...textAnimatorKeyframes.map(k => ({ ...k, type: 'textAnimator', y: 560 })),
             ...letterboxKeyframes.map(k => ({ ...k, type: 'letterbox', y: 640 })),
-            ...maskRevealKeyframes.map(k => ({ ...k, type: 'maskReveal', y: 720 })),
             ...particleEmitterKeyframes.map(k => ({ ...k, type: 'particleEmitter', y: 800 })),
             ...parameterEvents.map(k => ({ ...k, type: 'parameterEvent', y: 880 })),
             ...environmentKeyframes.map(k => ({ ...k, type: 'environment', y: 960 })),
@@ -868,8 +867,8 @@ export default function TimelineV2({
   };
 
   // Render keyframes for a track
-  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'maskReveal' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
-    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | MaskRevealKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
+  const renderKeyframes = (trackType: 'preset' | 'camera' | 'text' | 'environment' | 'presetSpeed' | 'letterbox' | 'textAnimator' | 'cameraRig' | 'cameraFX' | 'particles' | 'fxEvents') => {
+    type KeyframeWithTime = PresetKeyframe | CameraKeyframe | TextKeyframe | EnvironmentKeyframe | LetterboxKeyframe | TextAnimatorKeyframe | CameraRigKeyframe | CameraFXKeyframe | ParticleEmitterKeyframe | ParameterEvent | { id: number; time: number; speed: number; easing: string };
     let keyframes: KeyframeWithTime[] = [];
     let color = '';
     
@@ -1552,8 +1551,8 @@ export default function TimelineV2({
                       {track.type === 'text' && renderKeyframes('text')}
                       {track.type === 'textAnimator' && renderKeyframes('textAnimator')}
                       {track.type === 'letterbox' && renderKeyframes('letterbox')}
-                      {track.type === 'maskReveal' && renderKeyframes('maskReveal')}
                       {track.type === 'particles' && renderKeyframes('particles')}
+                      {track.type === 'fxEvents' && renderKeyframes('fxEvents')}
                       {track.type === 'environment' && (
                         <div className="absolute inset-0">
                           {renderKeyframes('environment')}
