@@ -99,7 +99,8 @@ interface TimelineProps {
   onUpdateParticleEmitterKeyframe?: (id: number, field: string, value: any) => void;
   onUpdateParameterEvent?: (id: string, updates: Partial<ParameterEvent>) => void;
   onUpdateTextAnimatorKeyframe?: (id: string, field: string, value: any) => void;
-  onUpdateCameraRigKeyframe?: (id: string, field: string, value: any) => void;
+  onUpdateCameraRig?: (id: string, updates: any) => void; // For updating Camera Rigs
+  onUpdateCameraRigKeyframe?: (id: string, field: string, value: any) => void; // For updating Camera Rig Keyframes
   onUpdateTextKeyframe?: (id: number, show: boolean, text?: string) => void;
   onUpdateEnvironmentKeyframe?: (id: number, type: string, intensity: number, color?: string) => void;
   onMovePresetKeyframe?: (id: number, newTime: number) => void;
@@ -108,7 +109,8 @@ interface TimelineProps {
   onMoveSpeedKeyframe?: (id: number, newTime: number) => void;
   onMoveLetterboxKeyframe?: (id: number, newTime: number) => void;
   onMoveTextAnimatorKeyframe?: (id: string, newTime: number) => void;
-  onMoveCameraRigKeyframe?: (id: string, newTime: number) => void;
+  onMoveCameraRig?: (id: string, newStartTime: number, newEndTime: number) => void; // For moving Camera Rigs
+  onMoveCameraRigKeyframe?: (id: string, newTime: number) => void; // For moving Camera Rig Keyframes
   onMoveCameraFXKeyframe?: (id: string, newTime: number) => void;
   onMoveParticleEmitterKeyframe?: (id: number, newTime: number) => void;
   onMoveParameterEvent?: (id: string, newTime: number) => void;
@@ -182,6 +184,7 @@ export default function TimelineV2({
   onMoveSpeedKeyframe,
   onMoveLetterboxKeyframe,
   onMoveTextAnimatorKeyframe,
+  onMoveCameraRig,
   onMoveCameraRigKeyframe,
   onMoveCameraFXKeyframe,
   onMoveParticleEmitterKeyframe,
@@ -191,6 +194,8 @@ export default function TimelineV2({
   onUpdateParticleEmitterKeyframe,
   onUpdateParameterEvent,
   onUpdateTextAnimatorKeyframe,
+  onUpdateCameraRig,
+  onUpdateCameraRigKeyframe,
   onUpdateCameraFXClip,
 }: TimelineProps) {
   const [zoomLevel, setZoomLevel] = useState(() => {
@@ -1072,8 +1077,19 @@ export default function TimelineV2({
                   // Duration is handled in the move handler for textAnimator
                   break;
                 case 'cameraRig':
-                  onMoveCameraRigKeyframe?.(stringId, finalTime);
-                  // Duration is handled in the move handler for cameraRig
+                  // Check if this is a Camera Rig (high-level) or Camera Rig Keyframe
+                  const isCameraRigObject = 'isCameraRig' in kf && (kf as any).isCameraRig;
+                  
+                  if (isCameraRigObject && onMoveCameraRig) {
+                    // Move Camera Rig (preserve duration)
+                    const rigId = (kf as any).rigId || (kf as any).id;
+                    const newEndTime = finalTime + originalDuration;
+                    onMoveCameraRig(rigId, finalTime, newEndTime);
+                  } else if (!isCameraRigObject && onMoveCameraRigKeyframe) {
+                    // Move Camera Rig Keyframe
+                    onMoveCameraRigKeyframe?.(stringId, finalTime);
+                    // Duration is handled in the move handler for cameraRig
+                  }
                   break;
                 case 'cameraFX':
                   onMoveCameraFXKeyframe?.(stringId, finalTime);
@@ -1188,10 +1204,19 @@ export default function TimelineV2({
               // Text Animator uses 'duration' field
               const newDuration = finalEndTime - time;
               onUpdateTextAnimatorKeyframe(stringId, 'duration', newDuration);
-            } else if (trackType === 'cameraRig' && onUpdateCameraRigKeyframe) {
-              // Camera Rig uses 'duration' field
-              const newDuration = finalEndTime - time;
-              onUpdateCameraRigKeyframe(stringId, 'duration', newDuration);
+            } else if (trackType === 'cameraRig') {
+              // Check if this is a Camera Rig or Camera Rig Keyframe
+              const isCameraRigObject = 'isCameraRig' in kf && (kf as any).isCameraRig;
+              
+              if (isCameraRigObject && onUpdateCameraRig) {
+                // Update Camera Rig's endTime
+                const rigId = (kf as any).rigId || (kf as any).id;
+                onUpdateCameraRig(rigId, { endTime: finalEndTime });
+              } else if (!isCameraRigObject && onUpdateCameraRigKeyframe) {
+                // Camera Rig Keyframe uses 'duration' field
+                const newDuration = finalEndTime - time;
+                onUpdateCameraRigKeyframe(stringId, 'duration', newDuration);
+              }
             } else if (trackType === 'fxEvents') {
               if (onUpdateParameterEvent) {
                 onUpdateParameterEvent(stringId, { endTime: finalEndTime });
@@ -1223,11 +1248,23 @@ export default function TimelineV2({
           e.stopPropagation();
           e.preventDefault();
           
-          if (trackType === 'cameraRig' && easingValue && onUpdateCameraRigKeyframe) {
+          if (trackType === 'cameraRig' && easingValue) {
             const nextEasing = getNextEasing(easingValue);
-            const { stringId } = extractKeyframeIds(kf, keyId);
-            onUpdateCameraRigKeyframe(stringId, 'easing', nextEasing);
-            console.log(`Changed Camera Rig easing from ${easingValue} to ${nextEasing}`);
+            
+            // Check if this is a Camera Rig (high-level) or Camera Rig Keyframe (fine-grained)
+            const isCameraRigObject = 'isCameraRig' in kf && kf.isCameraRig;
+            
+            if (isCameraRigObject && onUpdateCameraRig) {
+              // Update Camera Rig's easing property
+              const rigId = (kf as any).rigId || (kf as any).id;
+              onUpdateCameraRig(rigId, { easing: nextEasing });
+              console.log(`Changed Camera Rig easing from ${easingValue} to ${nextEasing}`);
+            } else if (!isCameraRigObject && onUpdateCameraRigKeyframe) {
+              // Update Camera Rig Keyframe's easing
+              const { stringId } = extractKeyframeIds(kf, keyId);
+              onUpdateCameraRigKeyframe(stringId, 'easing', nextEasing);
+              console.log(`Changed Camera Rig Keyframe easing from ${easingValue} to ${nextEasing}`);
+            }
           }
         };
         
