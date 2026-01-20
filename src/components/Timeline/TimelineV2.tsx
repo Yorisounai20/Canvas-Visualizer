@@ -1134,6 +1134,125 @@ export default function TimelineV2({
         });
       };
       
+      // Handle resizing the left edge (startTime)
+      const handleResizeLeftMouseDown = (e: React.MouseEvent) => {
+        if (!hasEndTime || !endTime) return;
+        e.stopPropagation();
+        e.preventDefault();
+        
+        // Prevent text selection during resize
+        document.body.style.userSelect = 'none';
+        document.body.style.webkitUserSelect = 'none';
+        
+        const originalStartTime = time;
+        const originalEndTime = endTime;
+        const originalDuration = endTime - time;
+        
+        setIsResizingKeyframe(true);
+        setResizingKeyframe({
+          trackType,
+          keyframeId: fullKeyId,
+          originalEndTime: endTime,
+          currentEndTime: endTime,
+        });
+        
+        const handleMouseMove = (moveE: MouseEvent) => {
+          if (!scrollContainerRef.current) return;
+          
+          requestAnimationFrame(() => {
+            const rect = scrollContainerRef.current!.getBoundingClientRect();
+            const scrollLeft = scrollContainerRef.current!.scrollLeft;
+            const relativeX = moveE.clientX - rect.left + scrollLeft;
+            let newStartTime = pixelsToTime(relativeX, pixelsPerSecond);
+            
+            // Clamp to valid range (must be before end time)
+            newStartTime = Math.max(0, Math.min(originalEndTime - 0.1, newStartTime));
+            
+            // Apply snapping
+            newStartTime = applySnapping(newStartTime);
+            
+            // Update display (we'll move the keyframe and adjust duration)
+            draggedTimeRef.current = newStartTime;
+            setDraggedKeyframe({
+              trackType,
+              keyframeId: fullKeyId,
+              originalTime: originalStartTime,
+              currentTime: newStartTime,
+            });
+          });
+        };
+        
+        const handleMouseUp = () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.body.style.webkitUserSelect = '';
+          
+          const finalStartTime = draggedTimeRef.current;
+          if (finalStartTime !== originalStartTime) {
+            console.log(`Resize keyframe ${fullKeyId} startTime from ${originalStartTime} to ${finalStartTime}`);
+            
+            const { numericId, stringId } = extractKeyframeIds(kf, keyId);
+            const newDuration = originalEndTime - finalStartTime;
+            
+            // First move the keyframe to new start time
+            switch (trackType) {
+              case 'preset':
+                onMovePresetKeyframe?.(numericId, finalStartTime);
+                if (onUpdatePresetKeyframeField) {
+                  onUpdatePresetKeyframeField(numericId, 'endTime', originalEndTime);
+                }
+                break;
+              case 'letterbox':
+                onMoveLetterboxKeyframe?.(numericId, finalStartTime);
+                if (onUpdateLetterboxKeyframe) {
+                  onUpdateLetterboxKeyframe(numericId, 'duration', newDuration);
+                }
+                break;
+              case 'particles':
+                onMoveParticleEmitterKeyframe?.(numericId, finalStartTime);
+                if (onUpdateParticleEmitterKeyframe) {
+                  onUpdateParticleEmitterKeyframe(numericId, 'duration', newDuration);
+                }
+                break;
+              case 'textAnimator':
+                onMoveTextAnimatorKeyframe?.(stringId, finalStartTime);
+                if (onUpdateTextAnimatorKeyframe) {
+                  onUpdateTextAnimatorKeyframe(stringId, 'duration', newDuration);
+                }
+                break;
+              case 'cameraRig':
+                const isCameraRigObject = 'isCameraRig' in kf && (kf as any).isCameraRig;
+                if (isCameraRigObject && onMoveCameraRig) {
+                  const rigId = (kf as any).rigId || (kf as any).id;
+                  onMoveCameraRig(rigId, finalStartTime, originalEndTime);
+                } else if (!isCameraRigObject && onMoveCameraRigKeyframe) {
+                  onMoveCameraRigKeyframe(stringId, finalStartTime);
+                  if (onUpdateCameraRigKeyframe) {
+                    onUpdateCameraRigKeyframe(stringId, 'duration', newDuration);
+                  }
+                }
+                break;
+              case 'fxEvents':
+                onMoveParameterEvent?.(stringId, finalStartTime);
+                if (onUpdateParameterEvent) {
+                  onUpdateParameterEvent(stringId, { endTime: originalEndTime });
+                }
+                break;
+            }
+          }
+          
+          setIsResizingKeyframe(false);
+          setResizingKeyframe(null);
+          setDraggedKeyframe(null);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'ew-resize';
+      };
+      
       // Handle resizing the right edge (endTime)
       const handleResizeMouseDown = (e: React.MouseEvent) => {
         if (!hasEndTime || !endTime) return;
@@ -1288,7 +1407,7 @@ export default function TimelineV2({
               <>
                 {/* Start easing badge */}
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-r border-white border-opacity-20"
+                  className="absolute left-1 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-r border-white border-opacity-20 z-20"
                   onClick={(e) => handleEasingClick(e, 'start')}
                   title={`Start easing: ${easingValue} (click to change)`}
                 >
@@ -1297,7 +1416,7 @@ export default function TimelineV2({
                 
                 {/* End easing badge */}
                 <div
-                  className="absolute right-6 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-l border-white border-opacity-20"
+                  className="absolute right-7 top-0 bottom-0 w-6 flex items-center justify-center bg-black bg-opacity-40 text-white text-xs font-bold cursor-pointer hover:bg-opacity-60 transition-colors border-l border-white border-opacity-20 z-20"
                   onClick={(e) => handleEasingClick(e, 'end')}
                   title={`End easing: ${easingValue} (click to change)`}
                 >
@@ -1306,9 +1425,16 @@ export default function TimelineV2({
               </>
             )}
             
+            {/* Resize handle on the left edge */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-white hover:bg-opacity-50 transition-colors z-10"
+              onMouseDown={handleResizeLeftMouseDown}
+              title="Drag to adjust start time"
+            />
+            
             {/* Resize handle on the right edge */}
             <div
-              className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white hover:bg-opacity-30 transition-colors"
+              className="absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-white hover:bg-opacity-50 transition-colors z-10"
               onMouseDown={handleResizeMouseDown}
               title="Drag to adjust end time"
             />
