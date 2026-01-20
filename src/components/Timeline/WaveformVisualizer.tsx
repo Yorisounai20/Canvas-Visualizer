@@ -32,7 +32,7 @@ export default function WaveformVisualizer({
   height = 60,
   color = 'rgba(100, 180, 255, 0.3)',
   debounceMs = 150,
-  mode = 'mirrored'
+  mode = 'top-only'
 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const debounceTimerRef = useRef<number | null>(null);

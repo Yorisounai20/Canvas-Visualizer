@@ -1534,6 +1534,7 @@ export default function TimelineV2({
                           width={timelineWidth}
                           height={TRACK_HEIGHT}
                           color="rgba(100, 180, 255, 0.3)"
+                          mode="top-only"
                         />
                       )}
 
