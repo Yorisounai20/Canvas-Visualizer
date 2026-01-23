@@ -7,12 +7,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderOpen, Plus, Search as SearchIcon, ArrowLeft } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
+import { useVersionHistory } from '../hooks/useVersionHistory';
 import ProjectGrid from '../components/Projects/ProjectGrid';
 import SearchBar from '../components/Projects/SearchBar';
 import SortFilterBar from '../components/Projects/SortFilterBar';
 import ProjectContextMenu from '../components/Projects/ProjectContextMenu';
+import VersionHistoryModal from '../components/Projects/VersionHistoryModal';
 import NewProjectModal from '../components/Modals/NewProjectModal';
-import { loadProject, updateLastOpenedAt, saveProject } from '../lib/database';
+import { loadProject, updateLastOpenedAt, saveProject, ProjectVersion } from '../lib/database';
 import { ProjectSettings, ProjectState } from '../types';
 
 export default function ProjectsPage() {
@@ -44,6 +46,13 @@ export default function ProjectsPage() {
   } | null>(null);
 
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  
+  const [versionHistoryProject, setVersionHistoryProject] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const { restoreVersion } = useVersionHistory();
 
   const handleOpenProject = async (projectId: string) => {
     try {
@@ -123,8 +132,45 @@ export default function ProjectsPage() {
   };
 
   const handleVersionHistory = () => {
-    // TODO: Implement version history modal
-    alert('Version history feature coming soon!');
+    if (contextMenu) {
+      const project = filteredProjects.find(p => p.id === contextMenu.projectId);
+      if (project) {
+        setVersionHistoryProject({ id: project.id, name: project.name });
+      }
+    }
+  };
+
+  const handleRestoreVersion = async (version: ProjectVersion) => {
+    if (!versionHistoryProject) return;
+
+    try {
+      // Load current project state
+      const currentState = await loadProject(versionHistoryProject.id);
+      if (!currentState) {
+        throw new Error('Failed to load current project state');
+      }
+
+      // Restore the version (this also saves current state as autosave)
+      const restoredState = await restoreVersion(version.id, currentState, versionHistoryProject.id);
+      
+      if (restoredState) {
+        // Save the restored state as the current project state
+        await saveProject(restoredState, versionHistoryProject.id);
+        
+        // Close the version history modal
+        setVersionHistoryProject(null);
+        
+        // Reload projects to reflect changes
+        await loadProjects();
+        
+        alert('Version restored successfully!');
+      } else {
+        throw new Error('Failed to restore version');
+      }
+    } catch (err) {
+      console.error('Failed to restore version:', err);
+      alert('Failed to restore version. Please try again.');
+    }
   };
 
   const handleNewProject = () => {
@@ -347,6 +393,16 @@ export default function ProjectsPage() {
       {showNewProjectModal && (
         <NewProjectModal
           onCreateProject={handleCreateProject}
+        />
+      )}
+
+      {/* Version History Modal */}
+      {versionHistoryProject && (
+        <VersionHistoryModal
+          projectId={versionHistoryProject.id}
+          projectName={versionHistoryProject.name}
+          onClose={() => setVersionHistoryProject(null)}
+          onRestore={handleRestoreVersion}
         />
       )}
     </div>
