@@ -10,7 +10,7 @@ import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react'
 import ProjectsModal from './components/Modals/ProjectsModal';
 import NewProjectModal from './components/Modals/NewProjectModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
-import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation } from './types';
+import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, WorkspaceObject } from './types';
 import { 
   LogEntry, 
   AudioTrack, 
@@ -80,6 +80,9 @@ import {
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
 import TimelineV2 from './components/Timeline/TimelineV2';
+import { SceneExplorer } from './components/Workspace/SceneExplorer';
+import WorkspaceControls from './components/Workspace/WorkspaceControls';
+import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -201,6 +204,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // View Mode: Editor (all panels visible) or Preview (canvas only)
   const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
+  
+  // Workspace Mode: Manual 3D object creation and editing
+  const [workspaceMode, setWorkspaceMode] = useState(false);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showAxes, setShowAxes] = useState(false);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
   // NEW: Skybox controls
   const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
@@ -429,7 +440,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   ]);
   const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
   const [textKeyframes, setTextKeyframes] = useState<any[]>([]);
-  const [workspaceObjects, setWorkspaceObjects] = useState<any[]>([]);
+  const [workspaceObjects, setWorkspaceObjects] = useState<WorkspaceObject[]>([]);
   
   // Start with null to prevent canvas disappearing on first preset
   // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
@@ -2686,6 +2697,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
     lightsRef.current.directional = directionalLight;
+    
+    // Workspace mode: Grid and Axes helpers
+    const workspaceGrid = new THREE.GridHelper(40, 40, 0x00ffff, 0x444444);
+    workspaceGrid.visible = showGrid;
+    scene.add(workspaceGrid);
+    gridHelperRef.current = workspaceGrid;
+    
+    const workspaceAxes = new THREE.AxesHelper(10);
+    workspaceAxes.visible = showAxes;
+    scene.add(workspaceAxes);
+    axesHelperRef.current = workspaceAxes;
     
     // Create camera rig hint objects
     // Position marker (camera location)
@@ -8127,6 +8149,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } else if (e.key === 'g' || e.key === 'G') {
         // Toggle camera rig hints
         setShowRigHints(prev => !prev);
+      } else if (e.key === 'w' || e.key === 'W') {
+        // Toggle workspace mode
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          setWorkspaceMode(prev => !prev);
+        }
       } else if (e.key === '`') {
         // Toggle debug console
         setShowDebugConsole(prev => !prev);
@@ -8163,6 +8190,180 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       return () => document.removeEventListener('click', handleClickOutside);
     }
   }, [showFileMenu]);
+
+  // Update workspace grid and axes visibility
+  useEffect(() => {
+    if (gridHelperRef.current) {
+      gridHelperRef.current.visible = showGrid;
+    }
+  }, [showGrid]);
+
+  useEffect(() => {
+    if (axesHelperRef.current) {
+      axesHelperRef.current.visible = showAxes;
+    }
+  }, [showAxes]);
+
+  // Workspace object management callbacks
+  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => {
+    if (!sceneRef.current) return;
+    
+    const id = `workspace-${type}-${Date.now()}`;
+    const newObject: WorkspaceObject = {
+      id,
+      type,
+      name: `${type.charAt(0).toUpperCase() + type.slice(1)} ${workspaceObjects.length + 1}`,
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+      color: '#8a2be2',
+      wireframe: true,
+      visible: true
+    };
+    
+    // Create Three.js mesh
+    let geometry: THREE.BufferGeometry;
+    switch (type) {
+      case 'sphere':
+        geometry = new THREE.SphereGeometry(1, 32, 32);
+        break;
+      case 'box':
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+        break;
+      case 'plane':
+        geometry = new THREE.PlaneGeometry(2, 2);
+        break;
+      case 'torus':
+        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+      case 'instances':
+        // Create instanced mesh (simplified for now)
+        geometry = new THREE.SphereGeometry(0.5, 16, 16);
+        break;
+      default:
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+    }
+    
+    const material = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(newObject.color),
+      wireframe: newObject.wireframe
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(newObject.position.x, newObject.position.y, newObject.position.z);
+    sceneRef.current.add(mesh);
+    
+    newObject.mesh = mesh;
+    
+    setWorkspaceObjects(prev => [...prev, newObject]);
+    setSelectedObjectId(id);
+    
+    addLog(`Created ${type} object: ${newObject.name}`, 'success');
+  };
+  
+  const handleSelectObject = (id: string | null) => {
+    setSelectedObjectId(id);
+  };
+  
+  const handleUpdateObject = (id: string, updates: Partial<WorkspaceObject>) => {
+    setWorkspaceObjects(prev => {
+      const newObjects = prev.map(obj => {
+        if (obj.id === id) {
+          const updated = { ...obj, ...updates };
+          
+          // Update Three.js mesh
+          if (obj.mesh) {
+            if (updates.position) {
+              obj.mesh.position.set(updates.position.x, updates.position.y, updates.position.z);
+            }
+            if (updates.rotation) {
+              obj.mesh.rotation.set(
+                updates.rotation.x * Math.PI / 180,
+                updates.rotation.y * Math.PI / 180,
+                updates.rotation.z * Math.PI / 180
+              );
+            }
+            if (updates.scale) {
+              obj.mesh.scale.set(updates.scale.x, updates.scale.y, updates.scale.z);
+            }
+            if (updates.color && obj.mesh.material) {
+              (obj.mesh.material as THREE.MeshBasicMaterial).color = new THREE.Color(updates.color);
+            }
+            if (updates.wireframe !== undefined && obj.mesh.material) {
+              (obj.mesh.material as THREE.MeshBasicMaterial).wireframe = updates.wireframe;
+            }
+            if (updates.visible !== undefined) {
+              obj.mesh.visible = updates.visible;
+            }
+          }
+          
+          return updated;
+        }
+        return obj;
+      });
+      return newObjects;
+    });
+  };
+  
+  const handleDeleteObject = (id: string) => {
+    setWorkspaceObjects(prev => {
+      const obj = prev.find(o => o.id === id);
+      if (obj && obj.mesh && sceneRef.current) {
+        sceneRef.current.remove(obj.mesh);
+        if (obj.mesh.geometry) obj.mesh.geometry.dispose();
+        if (obj.mesh.material) {
+          if (Array.isArray(obj.mesh.material)) {
+            obj.mesh.material.forEach((m: THREE.Material) => m.dispose());
+          } else {
+            obj.mesh.material.dispose();
+          }
+        }
+      }
+      
+      if (selectedObjectId === id) {
+        setSelectedObjectId(null);
+      }
+      
+      addLog(`Deleted object: ${obj?.name || id}`, 'info');
+      return prev.filter(o => o.id !== id);
+    });
+  };
+  
+  const handleToggleGrid = () => {
+    setShowGrid(prev => !prev);
+  };
+  
+  const handleToggleAxes = () => {
+    setShowAxes(prev => !prev);
+  };
+
+  // Workspace mode panels
+  const workspaceLeftPanelJSX = (
+    <SceneExplorer
+      objects={workspaceObjects}
+      selectedObjectId={selectedObjectId}
+      onSelectObject={handleSelectObject}
+      onDeleteObject={handleDeleteObject}
+    />
+  );
+
+  const workspaceRightPanelJSX = (
+    <ObjectPropertiesPanel
+      selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
+      onUpdateObject={handleUpdateObject}
+      onDeleteObject={handleDeleteObject}
+      cameraDistance={cameraDistance}
+      cameraHeight={cameraHeight}
+      cameraRotation={cameraRotation}
+      onSetCameraDistance={setCameraDistance}
+      onSetCameraHeight={setCameraHeight}
+      onSetCameraRotation={setCameraRotation}
+      showLetterbox={showLetterbox}
+      letterboxSize={letterboxSize}
+      onSetShowLetterbox={setShowLetterbox}
+      onSetLetterboxSize={setLetterboxSize}
+    />
+  );
 
 
   // --- Extracted panel DOM constants ---
@@ -8392,6 +8593,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           );
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        
+        {/* Workspace Controls overlay */}
+        {workspaceMode && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="pointer-events-auto">
+              <WorkspaceControls
+                onCreateObject={handleCreateObject}
+                showGrid={showGrid}
+                onToggleGrid={handleToggleGrid}
+                showAxes={showAxes}
+                onToggleAxes={handleToggleAxes}
+              />
+            </div>
+          </div>
+        )}
         
         {/* Playback controls overlay for Preview mode */}
         {viewMode === 'preview' && (
@@ -8826,9 +9042,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   return (
     <LayoutShell
-      left={leftPanelJSX}
-      inspector={inspectorJSX}
-      timeline={timelinePanelJSX}
+      left={workspaceMode ? workspaceLeftPanelJSX : leftPanelJSX}
+      inspector={workspaceMode ? workspaceRightPanelJSX : inspectorJSX}
+      timeline={workspaceMode ? undefined : timelinePanelJSX}
       top={topBarJSX}
       viewMode={viewMode}
     >

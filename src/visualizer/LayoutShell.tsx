@@ -90,34 +90,36 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         </aside>
       </div>
 
-      {/* Bottom timeline - hidden in preview mode using CSS to prevent unmounting/remounting */}
-      <footer 
-        className={`flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative ${
-          viewMode === 'preview' ? 'hidden' : ''
-        }`}
-        style={{ height: effectiveTimelineHeight }}
-      >
-        {/* Resize handle */}
-        <div
-          ref={resizeRef}
-          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-cyan-500/50 transition-colors z-30"
-          onMouseDown={handleResizeStart}
-          title="Drag to resize timeline"
-        />
-        
-        {/* Full-height toggle button */}
-        <button
-          onClick={toggleFullHeight}
-          className="absolute top-2 right-2 z-30 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
-          title={isFullHeight ? 'Restore timeline size' : 'Maximize timeline'}
+      {/* Bottom timeline - hidden in preview mode or when timeline is undefined (workspace mode) */}
+      {timeline && (
+        <footer 
+          className={`flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative ${
+            viewMode === 'preview' ? 'hidden' : ''
+          }`}
+          style={{ height: effectiveTimelineHeight }}
         >
-          {isFullHeight ? '⬇ Restore' : '⬆ Maximize'}
-        </button>
+          {/* Resize handle */}
+          <div
+            ref={resizeRef}
+            className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-cyan-500/50 transition-colors z-30"
+            onMouseDown={handleResizeStart}
+            title="Drag to resize timeline"
+          />
+          
+          {/* Full-height toggle button */}
+          <button
+            onClick={toggleFullHeight}
+            className="absolute top-2 right-2 z-30 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
+            title={isFullHeight ? 'Restore timeline size' : 'Maximize timeline'}
+          >
+            {isFullHeight ? '⬇ Restore' : '⬆ Maximize'}
+          </button>
 
-        <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
-          {timeline}
-        </PanelContainer>
-      </footer>
+          <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
+            {timeline}
+          </PanelContainer>
+        </footer>
+      )}
     </div>
   );
 }
