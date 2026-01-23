@@ -10,6 +10,7 @@ import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react'
 import ProjectsModal from './components/Modals/ProjectsModal';
 import NewProjectModal from './components/Modals/NewProjectModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
+import { autosaveService } from './lib/autosaveService';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, WorkspaceObject } from './types';
 import { 
   LogEntry, 
@@ -310,6 +311,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
+  const [lastAutosaveTime, setLastAutosaveTime] = useState<Date | null>(null);
+  const [isAutosaving, setIsAutosaving] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
   
@@ -544,6 +547,65 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
+  // Function to get current project state (used for both manual save and autosave)
+  const getCurrentProjectState = (): ProjectState => {
+    const projectSettings: ProjectSettings = {
+      name: projectName,
+      resolution: { width: 960, height: 540 },
+      fps: 30,
+      backgroundColor: backgroundColor || '#000000',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
+    };
+
+    return {
+      settings: projectSettings,
+      sections: [], // Software mode doesn't use sections
+      presetKeyframes: presetKeyframes,
+      textKeyframes: textKeyframes,
+      environmentKeyframes: environmentKeyframes,
+      cameraDistance,
+      cameraHeight,
+      cameraRotation,
+      cameraAutoRotate,
+      ambientLightIntensity,
+      directionalLightIntensity,
+      showBorder,
+      borderColor,
+      showLetterbox,
+      letterboxSize,
+      bassColor,
+      midsColor,
+      highsColor,
+      showSongName,
+      customSongName,
+      manualMode: false,
+      // Post-FX properties
+      blendMode,
+      vignetteStrength,
+      vignetteSoftness,
+      colorSaturation,
+      colorContrast,
+      colorGamma,
+      colorTintR,
+      colorTintG,
+      colorTintB,
+      // Timeline features
+      letterboxKeyframes,
+      cameraShakes,
+      parameterEvents,
+      presetSpeedKeyframes,
+      textAnimatorKeyframes,
+      cameraRigs,
+      cameraRigKeyframes,
+      particleEmitterKeyframes,
+      cameraFXClips,
+      cameraFXKeyframes,
+      maskRevealKeyframes,
+      workspaceObjects
+    };
+  };
+
   // Save/Load project functionality (Software mode)
   const handleSaveProject = async () => {
     if (!isDatabaseAvailable()) {
@@ -556,63 +618,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setIsSaving(true);
       addLog('Saving project...', 'info');
 
-      // Create project settings
-      const projectSettings: ProjectSettings = {
-        name: projectName,
-        resolution: { width: 960, height: 540 },
-        fps: 30,
-        backgroundColor: backgroundColor || '#000000',
-        createdAt: new Date().toISOString(),
-        lastModified: new Date().toISOString()
-      };
-
-      // Serialize Software mode state with ALL timeline features
-      const projectState: ProjectState = {
-        settings: projectSettings,
-        sections: [], // Software mode doesn't use sections
-        presetKeyframes: presetKeyframes,
-        textKeyframes: textKeyframes,
-        environmentKeyframes: environmentKeyframes,
-        cameraDistance,
-        cameraHeight,
-        cameraRotation,
-        cameraAutoRotate,
-        ambientLightIntensity,
-        directionalLightIntensity,
-        showBorder,
-        borderColor,
-        showLetterbox,
-        letterboxSize,
-        bassColor,
-        midsColor,
-        highsColor,
-        showSongName,
-        customSongName,
-        manualMode: false,
-        // Post-FX properties
-        blendMode,
-        vignetteStrength,
-        vignetteSoftness,
-        colorSaturation,
-        colorContrast,
-        colorGamma,
-        colorTintR,
-        colorTintG,
-        colorTintB,
-        // Timeline features
-        letterboxKeyframes,
-        cameraShakes,
-        parameterEvents,
-        presetSpeedKeyframes,
-        textAnimatorKeyframes,
-        cameraRigs,
-        cameraRigKeyframes,
-        particleEmitterKeyframes,
-        cameraFXClips,
-        cameraFXKeyframes,
-        maskRevealKeyframes,
-        workspaceObjects
-      };
+      const projectState = getCurrentProjectState();
 
       // Save to database
       const userId = user?.id;
@@ -2807,8 +2813,67 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (particleManagerRef.current) {
         particleManagerRef.current.dispose();
       }
+      
+      // Stop autosave on cleanup
+      autosaveService.stop();
     };
   }, []); // Empty dependency array - only run once on mount
+
+  // Autosave integration - start/stop based on project ID
+  useEffect(() => {
+    if (currentProjectId && isDatabaseAvailable()) {
+      // Start autosave when a project is loaded or created
+      const userId = user?.id;
+      autosaveService.start(
+        currentProjectId,
+        getCurrentProjectState,
+        userId,
+        (success, error) => {
+          if (success) {
+            setLastAutosaveTime(new Date());
+            setIsAutosaving(false);
+            addLog('Project auto-saved', 'info');
+          } else {
+            setIsAutosaving(false);
+            addLog(`Autosave failed: ${error?.message || 'Unknown error'}`, 'error');
+          }
+        }
+      );
+      
+      // Update activity on user interaction
+      const updateActivity = () => autosaveService.updateActivity();
+      window.addEventListener('mousemove', updateActivity);
+      window.addEventListener('keydown', updateActivity);
+      window.addEventListener('click', updateActivity);
+
+      return () => {
+        window.removeEventListener('mousemove', updateActivity);
+        window.removeEventListener('keydown', updateActivity);
+        window.removeEventListener('click', updateActivity);
+      };
+    } else {
+      // Stop autosave if no project is loaded
+      autosaveService.stop();
+    }
+  }, [currentProjectId, user]);
+
+  // Show autosaving indicator briefly before autosave
+  useEffect(() => {
+    if (currentProjectId) {
+      const checkAutosave = setInterval(() => {
+        const settings = autosaveService.getSettings();
+        if (settings.enabled && lastAutosaveTime) {
+          const timeSinceLastSave = Date.now() - lastAutosaveTime.getTime();
+          // Show indicator 10 seconds before next autosave
+          if (timeSinceLastSave >= settings.intervalMs - 10000 && timeSinceLastSave < settings.intervalMs) {
+            setIsAutosaving(true);
+          }
+        }
+      }, 1000);
+
+      return () => clearInterval(checkAutosave);
+    }
+  }, [currentProjectId, lastAutosaveTime]);
 
   // Idle render loop - manages rendering when not playing
   useEffect(() => {
@@ -8725,6 +8790,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setViewMode={setViewMode}
       workspaceMode={workspaceMode}
       setWorkspaceMode={setWorkspaceMode}
+      isAutosaving={isAutosaving}
+      lastAutosaveTime={lastAutosaveTime}
     />
   );
 

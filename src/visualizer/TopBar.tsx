@@ -16,6 +16,8 @@ interface TopBarProps {
   setViewMode: (mode: 'editor' | 'preview') => void;
   workspaceMode?: boolean;
   setWorkspaceMode?: (mode: boolean) => void;
+  isAutosaving?: boolean;
+  lastAutosaveTime?: Date | null;
 }
 
 export default function TopBar({
@@ -32,7 +34,9 @@ export default function TopBar({
   viewMode,
   setViewMode,
   workspaceMode = false,
-  setWorkspaceMode
+  setWorkspaceMode,
+  isAutosaving = false,
+  lastAutosaveTime = null
 }: TopBarProps) {
   const [showAppMenu, setShowAppMenu] = useState(false);
   const appMenuRef = useRef<HTMLDivElement>(null);
@@ -197,6 +201,27 @@ export default function TopBar({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
+        {/* Autosave Indicator */}
+        {(isAutosaving || lastAutosaveTime) && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-sm">
+            {isAutosaving ? (
+              <>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <span className="text-gray-300">Autosaving...</span>
+              </>
+            ) : lastAutosaveTime ? (
+              <>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-gray-400 text-xs">
+                  Saved {new Date().getTime() - lastAutosaveTime.getTime() < 60000 
+                    ? 'just now' 
+                    : `${Math.floor((new Date().getTime() - lastAutosaveTime.getTime()) / 60000)}m ago`}
+                </span>
+              </>
+            ) : null}
+          </div>
+        )}
+
         {/* Keyboard Shortcuts Button */}
         <button
           onClick={() => setShowKeyboardShortcuts(true)}
