@@ -754,6 +754,7 @@ export default function TimelineV2({
   const renderRulerMarkers = () => {
     const markers: JSX.Element[] = [];
     let secondsInterval: number;
+    const MIN_MARKER_SPACING_PX = 60; // Minimum pixels between markers to avoid overlap
     
     // Determine interval based on snap mode and zoom level
     if (snapMode === 'none') {
@@ -773,6 +774,14 @@ export default function TimelineV2({
       secondsInterval = 1;
     }
     
+    // Ensure minimum pixel spacing between markers to prevent overlap
+    const pixelSpacing = secondsInterval * pixelsPerSecond;
+    if (pixelSpacing < MIN_MARKER_SPACING_PX) {
+      // Increase interval by a factor to ensure minimum spacing
+      const factor = Math.ceil(MIN_MARKER_SPACING_PX / pixelSpacing);
+      secondsInterval *= factor;
+    }
+    
     for (let time = 0; time <= duration; time += secondsInterval) {
       const x = timeToPixels(time, pixelsPerSecond);
       markers.push(
@@ -782,7 +791,7 @@ export default function TimelineV2({
           style={{ left: `${x}px` }}
         >
           <div className="w-px h-2 bg-gray-500" />
-          <span className="text-xs text-gray-400 mt-1">
+          <span className="text-xs text-gray-400 mt-1 whitespace-nowrap">
             {formatTime(time)}
           </span>
         </div>
