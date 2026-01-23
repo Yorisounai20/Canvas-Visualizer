@@ -8395,6 +8395,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setShowAxes(prev => !prev);
   };
 
+  // Effect: Hide default audio-reactive shapes in workspace mode
+  useEffect(() => {
+    if (!objectsRef.current) return;
+    
+    const { cubes, octas, tetras, sphere, toruses, planes } = objectsRef.current;
+    
+    if (workspaceMode) {
+      // Hide all default shapes when entering workspace mode
+      sphere.visible = false;
+      cubes.forEach(cube => { cube.visible = false; });
+      octas.forEach(octa => { octa.visible = false; });
+      tetras.forEach(tetra => { tetra.visible = false; });
+      if (toruses) toruses.forEach(torus => { torus.visible = false; });
+      if (planes) planes.forEach(plane => { plane.visible = false; });
+      
+      addLog('Workspace mode: Default shapes hidden', 'info');
+    } else {
+      // Show all default shapes when exiting workspace mode
+      sphere.visible = true;
+      cubes.forEach(cube => { cube.visible = true; });
+      octas.forEach(octa => { octa.visible = true; });
+      tetras.forEach(tetra => { tetra.visible = true; });
+      if (toruses) toruses.forEach(torus => { torus.visible = true; });
+      if (planes) planes.forEach(plane => { plane.visible = true; });
+      
+      addLog('Editor mode: Default shapes visible', 'info');
+    }
+  }, [workspaceMode]);
+
   // Workspace mode panels
   const workspaceLeftPanelJSX = (
     <SceneExplorer
