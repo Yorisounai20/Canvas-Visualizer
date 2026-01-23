@@ -9,9 +9,10 @@ type LayoutShellProps = {
   top?: React.ReactNode;
   children: React.ReactNode; // canvas / main content
   viewMode?: 'editor' | 'preview'; // Add this prop
+  workspaceMode?: boolean; // Workspace mode flag
 };
 
-export default function LayoutShell({ left, inspector, timeline, top, children, viewMode = 'editor' }: LayoutShellProps) {
+export default function LayoutShell({ left, inspector, timeline, top, children, viewMode = 'editor', workspaceMode = false }: LayoutShellProps) {
   const [timelineHeight, setTimelineHeight] = useState(450); // Default 450px - increased for better visibility
   const [isResizing, setIsResizing] = useState(false);
   const [isFullHeight, setIsFullHeight] = useState(false);
@@ -72,21 +73,37 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         </main>
 
         {/* Left sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
-        <aside className={`absolute left-0 top-0 h-[45vh] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+        <aside className={`absolute left-0 top-0 h-[45vh] border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        }`}>
-          <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
-            {left}
-          </PanelContainer>
+        } ${workspaceMode ? 'w-64' : 'w-24'}`}>
+          {workspaceMode ? (
+            // Workspace mode: Render left content directly without PanelContainer
+            <div className="h-full overflow-hidden flex flex-col">
+              {left}
+            </div>
+          ) : (
+            // Editor mode: Wrap in PanelContainer
+            <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
+              {left}
+            </PanelContainer>
+          )}
         </aside>
 
         {/* Right sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
-        <aside className={`absolute right-0 top-0 h-[45vh] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+        <aside className={`absolute right-0 top-0 h-[45vh] border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        }`}>
-          <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
-            {inspector}
-          </PanelContainer>
+        } ${workspaceMode ? 'w-80' : 'w-56'}`}>
+          {workspaceMode ? (
+            // Workspace mode: Render inspector content directly without PanelContainer
+            <div className="h-full overflow-hidden flex flex-col">
+              {inspector}
+            </div>
+          ) : (
+            // Editor mode: Wrap in PanelContainer
+            <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
+              {inspector}
+            </PanelContainer>
+          )}
         </aside>
       </div>
 

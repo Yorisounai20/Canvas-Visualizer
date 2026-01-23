@@ -15,6 +15,8 @@ interface TopBarProps {
   formatTime: (time: number) => string;
   viewMode: 'editor' | 'preview';
   setViewMode: (mode: 'editor' | 'preview') => void;
+  workspaceMode?: boolean;
+  setWorkspaceMode?: (mode: boolean) => void;
 }
 
 export default function TopBar({
@@ -31,7 +33,9 @@ export default function TopBar({
   duration,
   formatTime,
   viewMode,
-  setViewMode
+  setViewMode,
+  workspaceMode = false,
+  setWorkspaceMode
 }: TopBarProps) {
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
@@ -59,15 +63,18 @@ export default function TopBar({
           </button>
         )}
         
-        {/* Editor/Preview Mode Toggle */}
+        {/* Editor/Preview/Workspace Mode Toggle */}
         <div className="inline-flex rounded-md shadow-sm" role="group">
           <button
             type="button"
-            onClick={() => setViewMode('editor')}
+            onClick={() => {
+              setViewMode('editor');
+              if (setWorkspaceMode) setWorkspaceMode(false);
+            }}
             aria-label="Switch to Editor mode"
-            aria-pressed={viewMode === 'editor'}
+            aria-pressed={viewMode === 'editor' && !workspaceMode}
             className={`px-4 py-1.5 text-sm font-medium rounded-l-lg border transition-colors ${
-              viewMode === 'editor'
+              viewMode === 'editor' && !workspaceMode
                 ? 'bg-cyan-600 text-white border-cyan-600'
                 : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
@@ -80,7 +87,7 @@ export default function TopBar({
             onClick={() => setViewMode('preview')}
             aria-label="Switch to Preview mode"
             aria-pressed={viewMode === 'preview'}
-            className={`px-4 py-1.5 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+            className={`px-4 py-1.5 text-sm font-medium border-t border-b transition-colors ${
               viewMode === 'preview'
                 ? 'bg-cyan-600 text-white border-cyan-600'
                 : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
@@ -88,6 +95,23 @@ export default function TopBar({
             title="Preview mode - Show canvas only"
           >
             ▶️ Preview
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('editor');
+              if (setWorkspaceMode) setWorkspaceMode(true);
+            }}
+            aria-label="Switch to Workspace mode"
+            aria-pressed={workspaceMode}
+            className={`px-4 py-1.5 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+              workspaceMode
+                ? 'bg-cyan-600 text-white border-cyan-600'
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+            }`}
+            title="Workspace mode - Manual 3D object editing"
+          >
+            🔨 Workspace
           </button>
         </div>
         

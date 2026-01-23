@@ -8652,6 +8652,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       formatTime={formatTime}
       viewMode={viewMode}
       setViewMode={setViewMode}
+      workspaceMode={workspaceMode}
+      setWorkspaceMode={setWorkspaceMode}
     />
   );
 
@@ -9047,6 +9049,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       timeline={workspaceMode ? undefined : timelinePanelJSX}
       top={topBarJSX}
       viewMode={viewMode}
+      workspaceMode={workspaceMode}
     >
       {canvasAreaJSX}
 
