@@ -238,8 +238,8 @@ export default function ObjectPropertiesPanel({
           />
         </div>
 
-        {/* Metalness (for standard/phong materials) */}
-        {(selectedObject.materialType === 'standard' || selectedObject.materialType === 'phong' || !selectedObject.materialType) && (
+        {/* Metalness (for standard materials only) */}
+        {(selectedObject.materialType === 'standard' || !selectedObject.materialType) && (
           <div>
             <label className="text-xs text-gray-400 block mb-1">
               Metalness: {(selectedObject.metalness !== undefined ? selectedObject.metalness : 0.5).toFixed(2)}

@@ -92,7 +92,7 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         {/* Right sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
         <aside className={`absolute right-0 top-0 h-[45vh] border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        } ${workspaceMode ? 'w-56' : 'w-56'}`}>
+        } w-56`}>
           {workspaceMode ? (
             // Workspace mode: Render inspector content directly without PanelContainer
             <div className="h-full overflow-y-auto flex flex-col">
