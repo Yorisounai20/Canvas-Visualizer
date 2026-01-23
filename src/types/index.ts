@@ -277,6 +277,11 @@ export interface WorkspaceObject {
   wireframe: boolean;
   visible: boolean;
   mesh?: any; // THREE.Mesh reference (not serialized)
+  // Material properties
+  opacity?: number; // 0-1
+  materialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  metalness?: number; // 0-1 (for standard/phong materials)
+  roughness?: number; // 0-1 (for standard materials)
   // Camera-specific properties (when type === 'camera')
   cameraDistance?: number;
   cameraHeight?: number;

@@ -203,6 +203,78 @@ export default function ObjectPropertiesPanel({
         />
       </div>
 
+      {/* Material Properties */}
+      <div className="pt-4 border-t border-gray-700 space-y-3">
+        <div className="text-sm font-semibold text-gray-300 mb-2">Material</div>
+        
+        {/* Material Type */}
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">Type</label>
+          <select
+            value={selectedObject.materialType || 'basic'}
+            onChange={(e) => onUpdateObject(selectedObject.id, { materialType: e.target.value as any })}
+            className="w-full px-2 py-1 bg-gray-700 rounded text-xs text-white"
+          >
+            <option value="basic">Basic</option>
+            <option value="standard">Standard (PBR)</option>
+            <option value="phong">Phong</option>
+            <option value="lambert">Lambert</option>
+          </select>
+        </div>
+
+        {/* Opacity */}
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">
+            Opacity: {(selectedObject.opacity !== undefined ? selectedObject.opacity : 1).toFixed(2)}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={selectedObject.opacity !== undefined ? selectedObject.opacity : 1}
+            onChange={(e) => onUpdateObject(selectedObject.id, { opacity: parseFloat(e.target.value) })}
+            className="w-full"
+          />
+        </div>
+
+        {/* Metalness (for standard materials only) */}
+        {(selectedObject.materialType === 'standard' || !selectedObject.materialType) && (
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Metalness: {(selectedObject.metalness !== undefined ? selectedObject.metalness : 0.5).toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={selectedObject.metalness !== undefined ? selectedObject.metalness : 0.5}
+              onChange={(e) => onUpdateObject(selectedObject.id, { metalness: parseFloat(e.target.value) })}
+              className="w-full"
+            />
+          </div>
+        )}
+
+        {/* Roughness (for standard materials) */}
+        {(selectedObject.materialType === 'standard' || !selectedObject.materialType) && (
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Roughness: {(selectedObject.roughness !== undefined ? selectedObject.roughness : 0.5).toFixed(2)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={selectedObject.roughness !== undefined ? selectedObject.roughness : 0.5}
+              onChange={(e) => onUpdateObject(selectedObject.id, { roughness: parseFloat(e.target.value) })}
+              className="w-full"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Camera-specific settings (only for camera objects) */}
       {selectedObject.type === 'camera' && (
         <div className="mt-4 pt-4 border-t border-gray-700">

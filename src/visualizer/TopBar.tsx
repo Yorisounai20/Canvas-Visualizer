@@ -1,9 +1,8 @@
-import { Home, Menu, ChevronDown, BadgeHelp, Video, Save, FolderOpen, FilePlus } from 'lucide-react';
+import { Home, ChevronDown, BadgeHelp, Video, Save, FolderOpen, FilePlus } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 interface TopBarProps {
   onBackToDashboard?: () => void;
-  showFileMenu: boolean;
-  setShowFileMenu: (show: boolean) => void;
   handleNewProject: () => void;
   handleSaveProject: () => void;
   setShowProjectsModal: (show: boolean) => void;
@@ -15,12 +14,12 @@ interface TopBarProps {
   formatTime: (time: number) => string;
   viewMode: 'editor' | 'preview';
   setViewMode: (mode: 'editor' | 'preview') => void;
+  workspaceMode?: boolean;
+  setWorkspaceMode?: (mode: boolean) => void;
 }
 
 export default function TopBar({
   onBackToDashboard,
-  showFileMenu,
-  setShowFileMenu,
   handleNewProject,
   handleSaveProject,
   setShowProjectsModal,
@@ -31,15 +30,104 @@ export default function TopBar({
   duration,
   formatTime,
   viewMode,
-  setViewMode
+  setViewMode,
+  workspaceMode = false,
+  setWorkspaceMode
 }: TopBarProps) {
+  const [showAppMenu, setShowAppMenu] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close app menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (appMenuRef.current && !appMenuRef.current.contains(e.target as Node)) {
+        setShowAppMenu(false);
+      }
+    };
+
+    if (showAppMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAppMenu]);
+
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
       {/* Left: Branding and Navigation */}
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          Canvas Visualizer
-        </h1>
+        {/* Canvas Visualizer Dropdown */}
+        <div className="relative" ref={appMenuRef}>
+          <button
+            onClick={() => setShowAppMenu(!showAppMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
+          >
+            <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              Canvas Visualizer
+            </h1>
+            <ChevronDown size={16} className="text-gray-400" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {showAppMenu && (
+            <div className="absolute top-full left-0 mt-1 w-56 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 py-2 z-50">
+              {/* Back to Dashboard */}
+              {onBackToDashboard && (
+                <>
+                  <button
+                    onClick={() => {
+                      onBackToDashboard();
+                      setShowAppMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Home size={16} />
+                    <span>Back to Dashboard</span>
+                  </button>
+                  <div className="h-px bg-gray-700 my-2" />
+                </>
+              )}
+
+              {/* File Controls */}
+              <button
+                onClick={() => {
+                  handleNewProject();
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+              >
+                <FilePlus size={16} />
+                <span>New Project</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+N</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowProjectsModal(true);
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+              >
+                <FolderOpen size={16} />
+                <span>Open Project</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+O</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleSaveProject();
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                disabled={isSaving}
+              >
+                <Save size={16} />
+                <span>{isSaving ? 'Saving...' : 'Save Project'}</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+S</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <span className="text-xs text-gray-500 border-l border-gray-700 pl-3">
           Audio-Reactive 3D Editor
         </span>
@@ -47,27 +135,18 @@ export default function TopBar({
 
       {/* Center: File Menu and Time Display */}
       <div className="flex items-center gap-4">
-        {/* Back to Dashboard Button */}
-        {onBackToDashboard && (
-          <button
-            onClick={onBackToDashboard}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm"
-            title="Back to Dashboard"
-          >
-            <Home size={16} />
-            <span>Dashboard</span>
-          </button>
-        )}
-        
-        {/* Editor/Preview Mode Toggle */}
+        {/* Editor/Preview/Workspace Mode Toggle */}
         <div className="inline-flex rounded-md shadow-sm" role="group">
           <button
             type="button"
-            onClick={() => setViewMode('editor')}
+            onClick={() => {
+              setViewMode('editor');
+              if (setWorkspaceMode) setWorkspaceMode(false);
+            }}
             aria-label="Switch to Editor mode"
-            aria-pressed={viewMode === 'editor'}
+            aria-pressed={viewMode === 'editor' && !workspaceMode}
             className={`px-4 py-1.5 text-sm font-medium rounded-l-lg border transition-colors ${
-              viewMode === 'editor'
+              viewMode === 'editor' && !workspaceMode
                 ? 'bg-cyan-600 text-white border-cyan-600'
                 : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
@@ -80,7 +159,7 @@ export default function TopBar({
             onClick={() => setViewMode('preview')}
             aria-label="Switch to Preview mode"
             aria-pressed={viewMode === 'preview'}
-            className={`px-4 py-1.5 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+            className={`px-4 py-1.5 text-sm font-medium border-t border-b transition-colors ${
               viewMode === 'preview'
                 ? 'bg-cyan-600 text-white border-cyan-600'
                 : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
@@ -89,59 +168,23 @@ export default function TopBar({
           >
             ▶️ Preview
           </button>
-        </div>
-        
-        {/* File Menu Dropdown */}
-        <div className="relative file-menu-container">
           <button
-            onClick={() => setShowFileMenu(!showFileMenu)}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm"
-            title="File Menu"
+            type="button"
+            onClick={() => {
+              setViewMode('editor');
+              if (setWorkspaceMode) setWorkspaceMode(true);
+            }}
+            aria-label="Switch to Workspace mode"
+            aria-pressed={workspaceMode}
+            className={`px-4 py-1.5 text-sm font-medium rounded-r-lg border-t border-r border-b transition-colors ${
+              workspaceMode
+                ? 'bg-cyan-600 text-white border-cyan-600'
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+            }`}
+            title="Workspace mode - Manual 3D object editing"
           >
-            <Menu size={16} />
-            <span>File</span>
-            <ChevronDown size={14} className={`transition-transform ${showFileMenu ? 'rotate-180' : ''}`} />
+            🔨 Workspace
           </button>
-          
-          {/* Dropdown Menu */}
-          {showFileMenu && (
-            <div className="absolute top-full left-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[180px]">
-              <button
-                onClick={() => {
-                  handleNewProject();
-                  setShowFileMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-t-lg transition-colors"
-              >
-                <FilePlus size={16} />
-                <span className="text-sm">New Project</span>
-                <span className="ml-auto text-xs text-gray-400">Ctrl+N</span>
-              </button>
-              <button
-                onClick={() => {
-                  handleSaveProject();
-                  setShowFileMenu(false);
-                }}
-                disabled={isSaving}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Save size={16} />
-                <span className="text-sm">{isSaving ? 'Saving...' : 'Save Project'}</span>
-                <span className="ml-auto text-xs text-gray-400">Ctrl+S</span>
-              </button>
-              <button
-                onClick={() => {
-                  setShowProjectsModal(true);
-                  setShowFileMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-gray-700 flex items-center gap-2 text-white rounded-b-lg transition-colors"
-              >
-                <FolderOpen size={16} />
-                <span className="text-sm">Open Project</span>
-                <span className="ml-auto text-xs text-gray-400">Ctrl+O</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Time Display */}

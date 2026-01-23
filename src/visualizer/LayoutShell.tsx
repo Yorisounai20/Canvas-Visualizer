@@ -9,9 +9,10 @@ type LayoutShellProps = {
   top?: React.ReactNode;
   children: React.ReactNode; // canvas / main content
   viewMode?: 'editor' | 'preview'; // Add this prop
+  workspaceMode?: boolean; // Workspace mode flag
 };
 
-export default function LayoutShell({ left, inspector, timeline, top, children, viewMode = 'editor' }: LayoutShellProps) {
+export default function LayoutShell({ left, inspector, timeline, top, children, viewMode = 'editor', workspaceMode = false }: LayoutShellProps) {
   const [timelineHeight, setTimelineHeight] = useState(450); // Default 450px - increased for better visibility
   const [isResizing, setIsResizing] = useState(false);
   const [isFullHeight, setIsFullHeight] = useState(false);
@@ -72,52 +73,70 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         </main>
 
         {/* Left sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
-        <aside className={`absolute left-0 top-0 h-[45vh] w-24 border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+        <aside className={`absolute left-0 top-0 h-[45vh] border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        }`}>
-          <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
-            {left}
-          </PanelContainer>
+        } ${workspaceMode ? 'w-64' : 'w-24'}`}>
+          {workspaceMode ? (
+            // Workspace mode: Render left content directly without PanelContainer
+            <div className="h-full overflow-y-auto flex flex-col">
+              {left}
+            </div>
+          ) : (
+            // Editor mode: Wrap in PanelContainer
+            <PanelContainer name="🎨 Toolbox" defaultCollapsed={false} icon="🎨">
+              {left}
+            </PanelContainer>
+          )}
         </aside>
 
         {/* Right sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
-        <aside className={`absolute right-0 top-0 h-[45vh] w-56 border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
+        <aside className={`absolute right-0 top-0 h-[45vh] border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        }`}>
-          <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
-            {inspector}
-          </PanelContainer>
+        } w-56`}>
+          {workspaceMode ? (
+            // Workspace mode: Render inspector content directly without PanelContainer
+            <div className="h-full overflow-y-auto flex flex-col">
+              {inspector}
+            </div>
+          ) : (
+            // Editor mode: Wrap in PanelContainer
+            <PanelContainer name="🔍 Inspector" defaultCollapsed={false} icon="🔍">
+              {inspector}
+            </PanelContainer>
+          )}
         </aside>
       </div>
 
-      {/* Bottom timeline - hidden in preview mode using CSS to prevent unmounting/remounting */}
-      <footer 
-        className={`flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative ${
-          viewMode === 'preview' ? 'hidden' : ''
-        }`}
-        style={{ height: effectiveTimelineHeight }}
-      >
-        {/* Resize handle */}
-        <div
-          ref={resizeRef}
-          className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-cyan-500/50 transition-colors z-30"
-          onMouseDown={handleResizeStart}
-          title="Drag to resize timeline"
-        />
-        
-        {/* Full-height toggle button */}
-        <button
-          onClick={toggleFullHeight}
-          className="absolute top-2 right-2 z-30 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
-          title={isFullHeight ? 'Restore timeline size' : 'Maximize timeline'}
+      {/* Bottom timeline - hidden in preview mode or when timeline is undefined (workspace mode) */}
+      {timeline && (
+        <footer 
+          className={`flex-shrink-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 shadow-2xl relative ${
+            viewMode === 'preview' ? 'hidden' : ''
+          }`}
+          style={{ height: effectiveTimelineHeight }}
         >
-          {isFullHeight ? '⬇ Restore' : '⬆ Maximize'}
-        </button>
+          {/* Resize handle */}
+          <div
+            ref={resizeRef}
+            className="absolute top-0 left-0 right-0 h-1 cursor-ns-resize hover:bg-cyan-500/50 transition-colors z-30"
+            onMouseDown={handleResizeStart}
+            title="Drag to resize timeline"
+          />
+          
+          {/* Full-height toggle button */}
+          <button
+            onClick={toggleFullHeight}
+            className="absolute top-2 right-2 z-30 px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 transition-colors"
+            title={isFullHeight ? 'Restore timeline size' : 'Maximize timeline'}
+          >
+            {isFullHeight ? '⬇ Restore' : '⬆ Maximize'}
+          </button>
 
-        <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
-          {timeline}
-        </PanelContainer>
-      </footer>
+          <PanelContainer name="⏱️ Timeline" defaultCollapsed={false} icon="⏱️">
+            {timeline}
+          </PanelContainer>
+        </footer>
+      )}
     </div>
   );
 }
