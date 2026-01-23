@@ -312,7 +312,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
-  const [showFileMenu, setShowFileMenu] = useState(false);
   
   // NEW: Tab state
   const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
@@ -8124,8 +8123,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           setEditingEventId(null);
         } else if (showProjectsModal) {
           setShowProjectsModal(false);
-        } else if (showFileMenu) {
-          setShowFileMenu(false);
         }
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         // Save project
@@ -8172,25 +8169,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showFileMenu, showDebugConsole]);
-
-  // Close file menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (showFileMenu) {
-        const target = e.target as HTMLElement;
-        // Check if click is outside the file menu
-        if (!target.closest('.file-menu-container')) {
-          setShowFileMenu(false);
-        }
-      }
-    };
-
-    if (showFileMenu) {
-      document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
-    }
-  }, [showFileMenu]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showDebugConsole]);
 
   // Update workspace grid and axes visibility
   useEffect(() => {
@@ -8733,8 +8712,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const topBarJSX = (
     <TopBar
       onBackToDashboard={onBackToDashboard}
-      showFileMenu={showFileMenu}
-      setShowFileMenu={setShowFileMenu}
       handleNewProject={handleNewProject}
       handleSaveProject={handleSaveProject}
       setShowProjectsModal={setShowProjectsModal}
