@@ -11,7 +11,9 @@ import ProjectGrid from '../components/Projects/ProjectGrid';
 import SearchBar from '../components/Projects/SearchBar';
 import SortFilterBar from '../components/Projects/SortFilterBar';
 import ProjectContextMenu from '../components/Projects/ProjectContextMenu';
-import { loadProject, updateLastOpenedAt } from '../lib/database';
+import NewProjectModal from '../components/Modals/NewProjectModal';
+import { loadProject, updateLastOpenedAt, saveProject } from '../lib/database';
+import { ProjectSettings, ProjectState } from '../types';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -40,6 +42,8 @@ export default function ProjectsPage() {
     id: string;
     name: string;
   } | null>(null);
+
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
   const handleOpenProject = async (projectId: string) => {
     try {
@@ -124,7 +128,53 @@ export default function ProjectsPage() {
   };
 
   const handleNewProject = () => {
-    navigate('/software');
+    setShowNewProjectModal(true);
+  };
+
+  const handleCreateProject = async (settings: ProjectSettings, audioFile?: File) => {
+    try {
+      // Create initial project state
+      const initialState: ProjectState = {
+        settings,
+        sections: [],
+        presetKeyframes: [],
+        textKeyframes: [],
+        environmentKeyframes: [],
+        cameraDistance: 20,
+        cameraHeight: 0,
+        cameraRotation: 0,
+        cameraAutoRotate: false,
+        ambientLightIntensity: 0.5,
+        directionalLightIntensity: 1,
+        showBorder: false,
+        borderColor: '#00d4ff',
+        showLetterbox: false,
+        letterboxSize: 100,
+        bassColor: '#00d4ff',
+        midsColor: '#ff00ff',
+        highsColor: '#ffff00',
+        showSongName: false,
+        customSongName: '',
+        manualMode: false,
+      };
+
+      // Save the new project to database
+      const savedProject = await saveProject(initialState);
+      
+      // Close modal
+      setShowNewProjectModal(false);
+      
+      // Navigate to visualizer with the new project
+      sessionStorage.setItem('currentProjectId', savedProject.id);
+      if (audioFile) {
+        // Store audio file info for the visualizer to load
+        sessionStorage.setItem('pendingAudioFile', audioFile.name);
+      }
+      navigate('/software');
+    } catch (err) {
+      console.error('Failed to create project:', err);
+      alert('Failed to create project. Please try again.');
+    }
   };
 
   return (
@@ -291,6 +341,13 @@ export default function ProjectsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* New Project Modal */}
+      {showNewProjectModal && (
+        <NewProjectModal
+          onCreateProject={handleCreateProject}
+        />
       )}
     </div>
   );
