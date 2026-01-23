@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
+import ProjectsPage from './pages/ProjectsPage';
 
 // Lazy load the visualizer component for code splitting
 const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
@@ -64,6 +65,9 @@ function App() {
     <Routes>
       {/* Home/Dashboard route */}
       <Route path="/" element={<Home />} />
+
+      {/* Projects Page */}
+      <Route path="/projects" element={<ProjectsPage />} />
 
       {/* Software Mode - the only available mode */}
       <Route path="/software" element={<SoftwareMode />} />
