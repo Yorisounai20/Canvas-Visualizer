@@ -1237,6 +1237,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
+  // Move a Camera Rig (preserves duration)
+  const moveCameraRig = (id: string, newStartTime: number, newEndTime: number) => {
+    setCameraRigs(prev => prev.map(rig =>
+      rig.id === id ? { ...rig, startTime: newStartTime, endTime: newEndTime } : rig
+    ));
+    addLog(`Moved camera rig to ${newStartTime.toFixed(2)}s - ${newEndTime.toFixed(2)}s`, 'info');
+  };
+  
   const updateCameraRigKeyframeField = (id: string, field: string, value: any) => {
     setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
       kf.id === id ? { ...kf, [field]: value } : kf
@@ -8307,6 +8315,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       presetSpeedKeyframes={presetSpeedKeyframes}
       letterboxKeyframes={letterboxKeyframes}
       textAnimatorKeyframes={textAnimatorKeyframes}
+      cameraRigs={cameraRigs}
       cameraRigKeyframes={cameraRigKeyframes}
       cameraFXKeyframes={cameraFXKeyframes}
       particleEmitterKeyframes={particleEmitterKeyframes}
@@ -8340,6 +8349,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onUpdateParticleEmitterKeyframe={updateParticleEmitterKeyframe}
       onUpdateParameterEvent={updateParameterEvent}
       onUpdateTextAnimatorKeyframe={updateTextAnimatorKeyframe}
+      onUpdateCameraRig={updateCameraRig}
       onUpdateCameraRigKeyframe={updateCameraRigKeyframeField}
       onUpdateTextKeyframe={updateTextKeyframe}
       onUpdateEnvironmentKeyframe={updateEnvironmentKeyframe}
@@ -8349,6 +8359,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onMoveSpeedKeyframe={moveSpeedKeyframe}
       onMoveLetterboxKeyframe={moveLetterboxKeyframe}
       onMoveTextAnimatorKeyframe={moveTextAnimatorKeyframe}
+      onMoveCameraRig={moveCameraRig}
       onMoveCameraRigKeyframe={moveCameraRigKeyframe}
       onMoveCameraFXKeyframe={moveCameraFXKeyframe}
       onMoveParticleEmitterKeyframe={moveParticleEmitterKeyframe}
