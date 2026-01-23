@@ -5,13 +5,13 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderOpen, Plus, Search as SearchIcon } from 'lucide-react';
-import { useProjects } from '../../hooks/useProjects';
-import ProjectGrid from '../../components/Projects/ProjectGrid';
-import SearchBar from '../../components/Projects/SearchBar';
-import SortFilterBar from '../../components/Projects/SortFilterBar';
-import ProjectContextMenu from '../../components/Projects/ProjectContextMenu';
-import { loadProject, updateLastOpenedAt } from '../../lib/database';
+import { FolderOpen, Plus, Search as SearchIcon, ArrowLeft } from 'lucide-react';
+import { useProjects } from '../hooks/useProjects';
+import ProjectGrid from '../components/Projects/ProjectGrid';
+import SearchBar from '../components/Projects/SearchBar';
+import SortFilterBar from '../components/Projects/SortFilterBar';
+import ProjectContextMenu from '../components/Projects/ProjectContextMenu';
+import { loadProject, updateLastOpenedAt } from '../lib/database';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -133,9 +133,18 @@ export default function ProjectsPage() {
       <div className="border-b border-gray-800">
         <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <FolderOpen className="text-cyan-400" size={32} />
-              <h1 className="text-3xl font-bold">Projects</h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                title="Back to Home"
+              >
+                <ArrowLeft className="text-gray-400 hover:text-white" size={24} />
+              </button>
+              <div className="flex items-center gap-3">
+                <FolderOpen className="text-cyan-400" size={32} />
+                <h1 className="text-3xl font-bold">Projects</h1>
+              </div>
             </div>
             <button
               onClick={handleNewProject}

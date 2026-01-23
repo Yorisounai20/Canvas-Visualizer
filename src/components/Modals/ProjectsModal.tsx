@@ -18,23 +18,22 @@ export default function ProjectsModal({
   onLoadProject,
   currentProjectId
 }: ProjectsModalProps) {
+  const [projects, setProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // TODO: Get user from auth context when implemented
+  const user = undefined;
 
   useEffect(() => {
     loadProjects();
-  }, [user]);
+  }, []);
 
   const loadProjects = async () => {
     if (!isDatabaseAvailable()) {
       setError('Database is not configured. Please set VITE_DATABASE_URL in your .env file.');
       setLoading(false);
-      return;
-    }
-
-    // Wait for user to be loaded
-    if (user === undefined) {
       return;
     }
 
