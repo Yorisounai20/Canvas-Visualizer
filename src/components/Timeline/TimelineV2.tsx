@@ -233,6 +233,23 @@ export default function TimelineV2({
     return 'frame'; // Default to frame snapping
   });
   
+  // BPM state for beat snapping
+  const [bpm, setBpm] = useState<number>(() => {
+    // Load from localStorage
+    try {
+      const saved = localStorage.getItem('cv_timeline_bpm');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed > 0 && parsed <= 300) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load BPM from localStorage:', e);
+    }
+    return DEFAULT_BPM; // Default to 120 BPM
+  });
+  
   // Keyframe resize state
   const [isResizingKeyframe, setIsResizingKeyframe] = useState(false);
   const [resizingKeyframe, setResizingKeyframe] = useState<{
@@ -676,6 +693,15 @@ export default function TimelineV2({
       console.warn('Failed to save snap mode to localStorage:', e);
     }
   }, [snapMode]);
+  
+  // Persist BPM to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('cv_timeline_bpm', bpm.toString());
+    } catch (e) {
+      console.warn('Failed to save BPM to localStorage:', e);
+    }
+  }, [bpm]);
 
   // Handle timeline click for seeking
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -737,8 +763,9 @@ export default function TimelineV2({
       // Show every 1 second (multiple frames grouped for readability)
       secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
     } else if (snapMode === 'beat') {
-      // Show every beat (0.5s at 120 BPM) or every 2 beats for clarity
-      secondsInterval = zoomLevel < 1 ? 1.0 : 0.5;
+      // Show every beat or every 2 beats for clarity, using user's BPM
+      const beatDuration = 60 / bpm; // Duration of one beat in seconds
+      secondsInterval = zoomLevel < 1 ? beatDuration * 2 : beatDuration;
     } else if (snapMode === 'second') {
       // Show whole seconds
       secondsInterval = zoomLevel < 0.5 ? 10 : zoomLevel < 1 ? 5 : 1;
@@ -769,9 +796,9 @@ export default function TimelineV2({
   // Note: Frame rate and BPM are fixed constants for this timeline implementation
   // These match the default recording settings and common music tempo
   const applySnapping = (time: number): number => {
-    const BEATS_PER_SECOND = DEFAULT_BPM / 60; // 2 beats/sec at 120 BPM
-    // At 120 BPM: 1 beat = 0.5s, quarter note = 0.125s, so 8 quarter notes per second
-    const QUARTER_NOTES_PER_SECOND = BEATS_PER_SECOND * 4; // 8 quarter notes/sec
+    const BEATS_PER_SECOND = bpm / 60; // beats/sec based on user BPM
+    // At current BPM: 1 beat = (60/BPM)s, quarter note = (60/BPM)/4 s, so (BPM/60)*4 quarter notes per second
+    const QUARTER_NOTES_PER_SECOND = BEATS_PER_SECOND * 4; // quarter notes/sec
     
     switch (snapMode) {
       case 'none':
@@ -780,7 +807,7 @@ export default function TimelineV2({
         // Snap to 30fps frames (~0.033s per frame)
         return Math.round(time * DEFAULT_FPS) / DEFAULT_FPS;
       case 'beat':
-        // Snap to quarter notes (1/4 of a beat at 120 BPM = 0.125s)
+        // Snap to quarter notes (1/4 of a beat at user's BPM)
         return Math.round(time * QUARTER_NOTES_PER_SECOND) / QUARTER_NOTES_PER_SECOND;
       case 'second':
         // Snap to whole seconds
@@ -825,13 +852,15 @@ export default function TimelineV2({
         }
         break;
       case 'beat':
-        // Show beat subdivisions at higher zoom
+        // Show beat subdivisions at higher zoom, using user's BPM
+        const beatDuration = 60 / bpm; // Duration of one beat in seconds
+        const quarterNoteDuration = beatDuration / 4; // Quarter note duration
         if (zoomLevel >= 1.5) {
-          interval = 0.125; // Quarter note intervals (0.125s at 120 BPM)
+          interval = quarterNoteDuration; // Quarter note intervals
         } else if (zoomLevel >= 0.75) {
-          interval = 0.25; // Half beat intervals
+          interval = beatDuration / 2; // Half beat intervals
         } else {
-          interval = 0.5; // Full beat intervals
+          interval = beatDuration; // Full beat intervals
           showMinorLines = false;
         }
         break;
@@ -1594,6 +1623,37 @@ export default function TimelineV2({
             <span className="text-base">🧲</span>
             <span className="capitalize">{getSnapModeLabel(snapMode)}</span>
           </button>
+          
+          {/* BPM input (only shown when beat snap mode is active or for easy access) */}
+          {snapMode === 'beat' && (
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-700 rounded text-xs">
+              <span className="text-gray-400">BPM:</span>
+              <input
+                type="number"
+                min="30"
+                max="300"
+                step="1"
+                value={bpm}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value);
+                  if (!isNaN(value) && value > 0 && value <= 300) {
+                    setBpm(value);
+                  }
+                }}
+                onBlur={(e) => {
+                  // Clamp to valid range on blur
+                  const value = parseFloat(e.target.value);
+                  if (isNaN(value) || value < 30) {
+                    setBpm(30);
+                  } else if (value > 300) {
+                    setBpm(300);
+                  }
+                }}
+                className="w-16 px-1 py-0.5 bg-gray-800 border border-gray-600 rounded text-white text-center focus:outline-none focus:border-purple-500"
+                title="Beats Per Minute - Controls beat snapping interval"
+              />
+            </div>
+          )}
           
           <span className="text-xs text-gray-500 ml-4">
             💡 Space=Play, Shift+Wheel=Zoom, Right-click=Pan, Arrows=Step
