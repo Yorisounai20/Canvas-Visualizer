@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid } from 'lucide-react';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -12,6 +12,8 @@ interface WorkspaceControlsProps {
   onToggleGrid: () => void;
   showAxes: boolean;
   onToggleAxes: () => void;
+  useWorkspaceObjects: boolean;
+  onToggleVisualizationSource: () => void;
 }
 
 export default function WorkspaceControls({
@@ -19,11 +21,35 @@ export default function WorkspaceControls({
   showGrid,
   onToggleGrid,
   showAxes,
-  onToggleAxes
+  onToggleAxes,
+  useWorkspaceObjects,
+  onToggleVisualizationSource
 }: WorkspaceControlsProps) {
   return (
     <div className="absolute top-4 left-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 space-y-2 z-10">
       <div className="text-xs font-semibold text-gray-300 mb-2">Workspace</div>
+      
+      {/* Visualization Source Toggle */}
+      <div className="mb-3 pb-3 border-b border-gray-700">
+        <div className="text-xs text-gray-400 mb-2">Visualization Source</div>
+        <button
+          onClick={onToggleVisualizationSource}
+          className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors flex items-center justify-between ${
+            useWorkspaceObjects
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+          }`}
+          title={useWorkspaceObjects ? "Using Workspace Objects" : "Using Preset Shapes"}
+        >
+          <span className="flex items-center gap-2">
+            {useWorkspaceObjects ? <Cuboid className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+            {useWorkspaceObjects ? 'Workspace' : 'Presets'}
+          </span>
+          <span className="text-xs opacity-75">
+            {useWorkspaceObjects ? 'Manual' : 'Auto'}
+          </span>
+        </button>
+      </div>
       
       {/* Grid and Axes toggles */}
       <div className="flex gap-2 mb-3 pb-3 border-b border-gray-700">

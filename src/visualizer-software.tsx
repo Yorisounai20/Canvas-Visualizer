@@ -210,6 +210,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
+  const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
@@ -8395,14 +8396,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setShowAxes(prev => !prev);
   };
 
-  // Effect: Hide default audio-reactive shapes in workspace mode
+  const handleToggleVisualizationSource = () => {
+    setUseWorkspaceObjects(prev => !prev);
+  };
+
+  // Effect: Hide default audio-reactive shapes when using workspace objects
   useEffect(() => {
     if (!objectsRef.current) return;
     
     const { cubes, octas, tetras, sphere, toruses, planes } = objectsRef.current;
     
-    if (workspaceMode) {
-      // Hide all default shapes when entering workspace mode
+    if (useWorkspaceObjects) {
+      // Hide all default shapes when using workspace objects
       sphere.visible = false;
       cubes.forEach(cube => { cube.visible = false; });
       octas.forEach(octa => { octa.visible = false; });
@@ -8410,9 +8415,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = false; });
       if (planes) planes.forEach(plane => { plane.visible = false; });
       
-      addLog('Workspace mode: Default shapes hidden', 'info');
+      addLog('Using workspace objects: Default shapes hidden', 'info');
     } else {
-      // Show all default shapes when exiting workspace mode
+      // Show all default shapes when using presets
       sphere.visible = true;
       cubes.forEach(cube => { cube.visible = true; });
       octas.forEach(octa => { octa.visible = true; });
@@ -8420,9 +8425,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = true; });
       if (planes) planes.forEach(plane => { plane.visible = true; });
       
-      addLog('Editor mode: Default shapes visible', 'info');
+      addLog('Using preset shapes: Default shapes visible', 'info');
     }
-  }, [workspaceMode]);
+  }, [useWorkspaceObjects]);
 
   // Workspace mode panels
   const workspaceLeftPanelJSX = (
@@ -8691,6 +8696,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 onToggleGrid={handleToggleGrid}
                 showAxes={showAxes}
                 onToggleAxes={handleToggleAxes}
+                useWorkspaceObjects={useWorkspaceObjects}
+                onToggleVisualizationSource={handleToggleVisualizationSource}
               />
             </div>
           </div>
