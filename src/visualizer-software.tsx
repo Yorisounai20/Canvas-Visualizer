@@ -8218,7 +8218,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       scale: { x: 1, y: 1, z: 1 },
       color: '#8a2be2',
       wireframe: true,
-      visible: true
+      visible: true,
+      opacity: 1.0,
+      materialType: 'basic',
+      metalness: 0.5,
+      roughness: 0.5
     };
     
     // Create Three.js mesh
@@ -8286,12 +8290,66 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             if (updates.scale) {
               obj.mesh.scale.set(updates.scale.x, updates.scale.y, updates.scale.z);
             }
-            if (updates.color && obj.mesh.material) {
-              (obj.mesh.material as THREE.MeshBasicMaterial).color = new THREE.Color(updates.color);
+            
+            // Handle material changes - may need to recreate material
+            if (updates.materialType && updates.materialType !== obj.materialType) {
+              // Material type changed - create new material
+              const oldMaterial = obj.mesh.material;
+              let newMaterial: THREE.Material;
+              
+              const materialProps = {
+                color: new THREE.Color(updated.color),
+                wireframe: updated.wireframe,
+                transparent: (updated.opacity !== undefined && updated.opacity < 1),
+                opacity: updated.opacity !== undefined ? updated.opacity : 1
+              };
+              
+              switch (updates.materialType) {
+                case 'standard':
+                  newMaterial = new THREE.MeshStandardMaterial({
+                    ...materialProps,
+                    metalness: updated.metalness !== undefined ? updated.metalness : 0.5,
+                    roughness: updated.roughness !== undefined ? updated.roughness : 0.5
+                  });
+                  break;
+                case 'phong':
+                  newMaterial = new THREE.MeshPhongMaterial(materialProps);
+                  break;
+                case 'lambert':
+                  newMaterial = new THREE.MeshLambertMaterial(materialProps);
+                  break;
+                default:
+                  newMaterial = new THREE.MeshBasicMaterial(materialProps);
+              }
+              
+              obj.mesh.material = newMaterial;
+              if (oldMaterial) oldMaterial.dispose();
+            } else {
+              // Update existing material properties
+              if (obj.mesh.material) {
+                const mat = obj.mesh.material as any;
+                
+                if (updates.color) {
+                  mat.color = new THREE.Color(updates.color);
+                }
+                if (updates.wireframe !== undefined) {
+                  mat.wireframe = updates.wireframe;
+                }
+                if (updates.opacity !== undefined) {
+                  mat.opacity = updates.opacity;
+                  mat.transparent = updates.opacity < 1;
+                }
+                if (updates.metalness !== undefined && 'metalness' in mat) {
+                  mat.metalness = updates.metalness;
+                }
+                if (updates.roughness !== undefined && 'roughness' in mat) {
+                  mat.roughness = updates.roughness;
+                }
+                
+                mat.needsUpdate = true;
+              }
             }
-            if (updates.wireframe !== undefined && obj.mesh.material) {
-              (obj.mesh.material as THREE.MeshBasicMaterial).wireframe = updates.wireframe;
-            }
+            
             if (updates.visible !== undefined) {
               obj.mesh.visible = updates.visible;
             }

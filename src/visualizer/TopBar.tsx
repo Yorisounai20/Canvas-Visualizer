@@ -1,4 +1,5 @@
 import { Home, Menu, ChevronDown, BadgeHelp, Video, Save, FolderOpen, FilePlus } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 
 interface TopBarProps {
   onBackToDashboard?: () => void;
@@ -37,13 +38,100 @@ export default function TopBar({
   workspaceMode = false,
   setWorkspaceMode
 }: TopBarProps) {
+  const [showAppMenu, setShowAppMenu] = useState(false);
+  const appMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close app menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (appMenuRef.current && !appMenuRef.current.contains(e.target as Node)) {
+        setShowAppMenu(false);
+      }
+    };
+
+    if (showAppMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showAppMenu]);
+
   return (
     <div className="flex items-center justify-between px-4 py-2.5">
       {/* Left: Branding and Navigation */}
       <div className="flex items-center gap-3">
-        <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-          Canvas Visualizer
-        </h1>
+        {/* Canvas Visualizer Dropdown */}
+        <div className="relative" ref={appMenuRef}>
+          <button
+            onClick={() => setShowAppMenu(!showAppMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-gray-800 transition-colors"
+          >
+            <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              Canvas Visualizer
+            </h1>
+            <ChevronDown size={16} className="text-gray-400" />
+          </button>
+
+          {/* Dropdown Menu */}
+          {showAppMenu && (
+            <div className="absolute top-full left-0 mt-1 w-56 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 py-2 z-50">
+              {/* Back to Dashboard */}
+              {onBackToDashboard && (
+                <>
+                  <button
+                    onClick={() => {
+                      onBackToDashboard();
+                      setShowAppMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                  >
+                    <Home size={16} />
+                    <span>Back to Dashboard</span>
+                  </button>
+                  <div className="h-px bg-gray-700 my-2" />
+                </>
+              )}
+
+              {/* File Controls */}
+              <button
+                onClick={() => {
+                  handleNewProject();
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+              >
+                <FilePlus size={16} />
+                <span>New Project</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+N</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowProjectsModal(true);
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+              >
+                <FolderOpen size={16} />
+                <span>Open Project</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+O</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  handleSaveProject();
+                  setShowAppMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-3"
+                disabled={isSaving}
+              >
+                <Save size={16} />
+                <span>{isSaving ? 'Saving...' : 'Save Project'}</span>
+                <span className="ml-auto text-xs text-gray-500">Ctrl+S</span>
+              </button>
+            </div>
+          )}
+        </div>
+
         <span className="text-xs text-gray-500 border-l border-gray-700 pl-3">
           Audio-Reactive 3D Editor
         </span>
@@ -51,18 +139,6 @@ export default function TopBar({
 
       {/* Center: File Menu and Time Display */}
       <div className="flex items-center gap-4">
-        {/* Back to Dashboard Button */}
-        {onBackToDashboard && (
-          <button
-            onClick={onBackToDashboard}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm"
-            title="Back to Dashboard"
-          >
-            <Home size={16} />
-            <span>Dashboard</span>
-          </button>
-        )}
-        
         {/* Editor/Preview/Workspace Mode Toggle */}
         <div className="inline-flex rounded-md shadow-sm" role="group">
           <button
