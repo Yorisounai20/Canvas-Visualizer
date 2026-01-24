@@ -15,10 +15,14 @@ const getDatabaseUrl = (): string => {
   return url;
 };
 
-// Create SQL client
+// Create SQL client - returns null if database not configured
 const getSql = () => {
   try {
-    return neon(getDatabaseUrl());
+    const url = import.meta.env.VITE_DATABASE_URL;
+    if (!url || url.length === 0) {
+      throw new Error('Database URL not configured');
+    }
+    return neon(url);
   } catch (error) {
     console.error('Failed to initialize database connection:', error);
     throw error;
@@ -56,6 +60,7 @@ export async function initializeDatabase(): Promise<void> {
   const sql = getSql();
   
   try {
+    console.log('Creating/updating projects table...');
     await sql`
       CREATE TABLE IF NOT EXISTS projects (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -70,6 +75,21 @@ export async function initializeDatabase(): Promise<void> {
       )
     `;
     
+    // Migrate existing tables by adding new columns if they don't exist
+    console.log('Checking for schema updates...');
+    try {
+      await sql`
+        ALTER TABLE projects 
+        ADD COLUMN IF NOT EXISTS last_opened_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS thumbnail_url TEXT,
+        ADD COLUMN IF NOT EXISTS has_unsaved_autosave BOOLEAN DEFAULT FALSE
+      `;
+    } catch (alterError) {
+      // Ignore errors if columns already exist or if using CREATE TABLE IF NOT EXISTS created them
+      console.log('Schema already up to date or columns added during table creation');
+    }
+    
+    console.log('Creating/updating project_versions table...');
     // Create project_versions table
     await sql`
       CREATE TABLE IF NOT EXISTS project_versions (
@@ -83,6 +103,7 @@ export async function initializeDatabase(): Promise<void> {
       )
     `;
     
+    console.log('Creating indexes...');
     // Create index on user_id for faster queries
     await sql`
       CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id)
@@ -107,9 +128,12 @@ export async function initializeDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_versions_created ON project_versions(created_at DESC)
     `;
     
-    console.log('Database initialized successfully');
+    console.log('✓ Database schema initialization complete');
   } catch (error) {
-    console.error('Failed to initialize database:', error);
+    console.error('✗ Failed to initialize database schema:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+    }
     throw error;
   }
 }

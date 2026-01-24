@@ -53,18 +53,23 @@ function App() {
   // Initialize database on app start
   useEffect(() => {
     const setupDatabase = async () => {
-      if (isDatabaseAvailable()) {
-        try {
-          console.log('Initializing database schema...');
-          await initializeDatabase();
-          console.log('✅ Database initialized successfully');
-        } catch (error) {
-          console.error('❌ Failed to initialize database:', error);
-          // Don't block the app if database initialization fails
-          // User will see error messages in the UI when trying to use database features
+      try {
+        if (!isDatabaseAvailable()) {
+          console.warn('⚠️ Database not configured. Set VITE_DATABASE_URL in .env file to enable project persistence.');
+          return;
         }
-      } else {
-        console.warn('⚠️ Database not configured. Set VITE_DATABASE_URL in .env file to enable project persistence.');
+
+        console.log('Initializing database schema...');
+        await initializeDatabase();
+        console.log('✅ Database initialized successfully');
+      } catch (error) {
+        console.error('❌ Failed to initialize database:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+          console.error('Stack trace:', error.stack);
+        }
+        // Don't block the app if database initialization fails
+        // User will see error messages in the UI when trying to use database features
       }
     };
 
