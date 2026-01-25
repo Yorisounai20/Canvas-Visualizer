@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Home from './pages/Home';
+import ProjectsPage from './pages/ProjectsPage';
+import { initializeDatabase, isDatabaseAvailable } from './lib/database';
 
 // Lazy load the visualizer component for code splitting
 const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
@@ -42,11 +44,37 @@ function SoftwareMode() {
 }
 
 /**
- * App Component with mode persistence
+ * App Component with mode persistence and database initialization
  */
 function App() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Initialize database on app start
+  useEffect(() => {
+    const setupDatabase = async () => {
+      try {
+        if (!isDatabaseAvailable()) {
+          console.warn('⚠️ Database not configured. Set VITE_DATABASE_URL in .env file to enable project persistence.');
+          return;
+        }
+
+        console.log('Initializing database schema...');
+        await initializeDatabase();
+        console.log('✅ Database initialized successfully');
+      } catch (error) {
+        console.error('❌ Failed to initialize database:', error);
+        if (error instanceof Error) {
+          console.error('Error details:', error.message);
+          console.error('Stack trace:', error.stack);
+        }
+        // Don't block the app if database initialization fails
+        // User will see error messages in the UI when trying to use database features
+      }
+    };
+
+    setupDatabase();
+  }, []);
 
   // On initial load, check if there's a persisted mode and redirect to software
   useEffect(() => {
@@ -64,6 +92,9 @@ function App() {
     <Routes>
       {/* Home/Dashboard route */}
       <Route path="/" element={<Home />} />
+
+      {/* Projects Page */}
+      <Route path="/projects" element={<ProjectsPage />} />
 
       {/* Software Mode - the only available mode */}
       <Route path="/software" element={<SoftwareMode />} />
