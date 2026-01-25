@@ -64,6 +64,63 @@ export interface ProjectState {
   // Workspace mode settings
   workspaceMode?: boolean;
   useWorkspaceObjects?: boolean;
+  // Shape-specific material properties
+  cubeWireframe?: boolean;
+  cubeOpacity?: number;
+  cubeColor?: string;
+  cubeMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  cubeMetalness?: number;
+  cubeRoughness?: number;
+  octahedronWireframe?: boolean;
+  octahedronOpacity?: number;
+  octahedronColor?: string;
+  octahedronMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  octahedronMetalness?: number;
+  octahedronRoughness?: number;
+  tetrahedronWireframe?: boolean;
+  tetrahedronOpacity?: number;
+  tetrahedronColor?: string;
+  tetrahedronMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  tetrahedronMetalness?: number;
+  tetrahedronRoughness?: number;
+  sphereWireframe?: boolean;
+  sphereOpacity?: number;
+  sphereColor?: string;
+  sphereMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  sphereMetalness?: number;
+  sphereRoughness?: number;
+  planeWireframe?: boolean;
+  planeOpacity?: number;
+  planeColor?: string;
+  planeMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  planeMetalness?: number;
+  planeRoughness?: number;
+  torusWireframe?: boolean;
+  torusOpacity?: number;
+  torusColor?: string;
+  torusMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  torusMetalness?: number;
+  torusRoughness?: number;
+  // Text properties
+  textColor?: string;
+  textMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  textWireframe?: boolean;
+  textOpacity?: number;
+  textMetalness?: number;
+  textRoughness?: number;
+  // Skybox properties
+  skyboxType?: 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula';
+  skyboxGradientTop?: string;
+  skyboxGradientBottom?: string;
+  skyboxImageUrl?: string;
+  starCount?: number;
+  galaxyColor?: string;
+  nebulaColor1?: string;
+  nebulaColor2?: string;
+  // Audio gain properties
+  bassGain?: number;
+  midsGain?: number;
+  highsGain?: number;
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations
