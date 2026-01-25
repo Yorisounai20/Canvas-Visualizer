@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Film, Music } from 'lucide-react';
+import { Film } from 'lucide-react';
 import { ProjectSettings } from '../../types';
 
 interface NewProjectModalProps {
-  onCreateProject: (settings: ProjectSettings, audioFile?: File) => void;
+  onCreateProject: (settings: ProjectSettings) => void;
 }
 
 /**
@@ -18,7 +18,6 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
   const [height, setHeight] = useState(1080);
   const [fps, setFps] = useState(30);
   const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
-  const [audioFile, setAudioFile] = useState<File | null>(null);
 
   // Common resolution presets
   const resolutionPresets = [
@@ -40,17 +39,9 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
       backgroundColor,
       createdAt: new Date().toISOString(),
       lastModified: new Date().toISOString(),
-      audioFileName: audioFile?.name
     };
 
-    onCreateProject(settings, audioFile || undefined);
-  };
-
-  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type.startsWith('audio/')) {
-      setAudioFile(file);
-    }
+    onCreateProject(settings);
   };
 
   return (
@@ -180,33 +171,6 @@ export default function NewProjectModal({ onCreateProject }: NewProjectModalProp
                 className="flex-1 px-3 py-1.5 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-white focus:border-purple-500 focus:outline-none font-mono"
                 placeholder="#0a0a14"
               />
-            </div>
-          </div>
-
-          {/* Optional Audio */}
-          <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1.5 flex items-center gap-1.5">
-              <Music size={14} />
-              Audio File (Optional)
-            </label>
-            <div className="relative">
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioUpload}
-                className="hidden"
-                id="audio-upload"
-              />
-              <label
-                htmlFor="audio-upload"
-                className="flex items-center justify-center gap-2 w-full px-3 py-2 text-sm bg-[#1E1E1E] border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-700 cursor-pointer transition-colors"
-              >
-                {audioFile ? (
-                  <span className="text-cyan-400 truncate">{audioFile.name}</span>
-                ) : (
-                  <span>Click to upload (can add later)</span>
-                )}
-              </label>
             </div>
           </div>
         </div>

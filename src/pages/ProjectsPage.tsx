@@ -177,7 +177,7 @@ export default function ProjectsPage() {
     setShowNewProjectModal(true);
   };
 
-  const handleCreateProject = async (settings: ProjectSettings, audioFile?: File) => {
+  const handleCreateProject = async (settings: ProjectSettings) => {
     try {
       // Create initial project state with all required and optional fields
       const initialState: ProjectState = {
