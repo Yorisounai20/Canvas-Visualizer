@@ -1,14 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Home from './pages/Home';
 import ProjectsPage from './pages/ProjectsPage';
 import { initializeDatabase, isDatabaseAvailable } from './lib/database';
 
 // Lazy load the visualizer component for code splitting
 const ThreeDVisualizer = lazy(() => import('./visualizer-software'));
-
-// LocalStorage key for mode persistence
-const MODE_STORAGE_KEY = 'canvas-visualizer-selected-mode';
 
 /**
  * Loading component for lazy-loaded routes
@@ -31,8 +28,6 @@ function SoftwareMode() {
   const navigate = useNavigate();
   
   const handleBackToDashboard = () => {
-    // Clear the persisted mode when going back to dashboard
-    localStorage.removeItem(MODE_STORAGE_KEY);
     navigate('/');
   };
   
@@ -47,8 +42,6 @@ function SoftwareMode() {
  * App Component with mode persistence and database initialization
  */
 function App() {
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // Initialize database on app start
   useEffect(() => {
@@ -75,18 +68,6 @@ function App() {
 
     setupDatabase();
   }, []);
-
-  // On initial load, check if there's a persisted mode and redirect to software
-  useEffect(() => {
-    // Only redirect from root path
-    if (location.pathname === '/') {
-      const persistedMode = localStorage.getItem(MODE_STORAGE_KEY);
-      // Always redirect to software if mode is persisted
-      if (persistedMode === 'software') {
-        navigate('/software', { replace: true });
-      }
-    }
-  }, [location.pathname, navigate]);
 
   return (
     <Routes>
