@@ -1,4 +1,4 @@
-import { Home, ChevronDown, BadgeHelp, Video, Save, FolderOpen, FilePlus } from 'lucide-react';
+import { Home, ChevronDown, BadgeHelp, Video, Save, FolderOpen, FilePlus, Settings } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface TopBarProps {
@@ -8,6 +8,7 @@ interface TopBarProps {
   setShowProjectsModal: (show: boolean) => void;
   setShowKeyboardShortcuts: (show: boolean) => void;
   setShowExportModal: (show: boolean) => void;
+  setShowSettingsModal?: (show: boolean) => void;
   isSaving: boolean;
   currentTime: number;
   duration: number;
@@ -27,6 +28,7 @@ export default function TopBar({
   setShowProjectsModal,
   setShowKeyboardShortcuts,
   setShowExportModal,
+  setShowSettingsModal,
   isSaving,
   currentTime,
   duration,
@@ -220,6 +222,17 @@ export default function TopBar({
               </>
             ) : null}
           </div>
+        )}
+
+        {/* Settings Button */}
+        {setShowSettingsModal && (
+          <button
+            onClick={() => setShowSettingsModal(true)}
+            className="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-lg transition-colors"
+            title="Settings"
+          >
+            <Settings size={16} />
+          </button>
         )}
 
         {/* Keyboard Shortcuts Button */}

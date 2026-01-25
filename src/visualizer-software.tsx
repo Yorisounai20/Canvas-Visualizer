@@ -9,6 +9,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react';
 import ProjectsModal from './components/Modals/ProjectsModal';
 import NewProjectModal from './components/Modals/NewProjectModal';
+import SettingsModal from './components/Modals/SettingsModal';
 import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
 import { autosaveService } from './lib/autosaveService';
 import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, WorkspaceObject } from './types';
@@ -307,6 +308,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   // Save/Load project state
   const [showProjectsModal, setShowProjectsModal] = useState(false);
@@ -8182,6 +8184,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (e.key === 'Escape') {
         if (showKeyboardShortcuts) {
           setShowKeyboardShortcuts(false);
+        } else if (showSettingsModal) {
+          setShowSettingsModal(false);
         } else if (showExportModal) {
           setShowExportModal(false);
         } else if (showEventModal) {
@@ -8235,7 +8239,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showProjectsModal, showDebugConsole]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole]);
 
   // Update workspace grid and axes visibility
   useEffect(() => {
@@ -8783,6 +8787,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setShowProjectsModal={setShowProjectsModal}
       setShowKeyboardShortcuts={setShowKeyboardShortcuts}
       setShowExportModal={setShowExportModal}
+      setShowSettingsModal={setShowSettingsModal}
       isSaving={isSaving}
       currentTime={currentTime}
       duration={duration}
@@ -9785,6 +9790,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           onCreateProject={handleCreateNewProject}
         />
       )}
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+      />
 
       {/* Debug Console Modal - Toggled with ` key */}
       <DebugConsole 
