@@ -236,17 +236,6 @@ export default function ProjectsPage() {
       // Navigate to visualizer with the new project
       sessionStorage.setItem('currentProjectId', savedProject.id);
       
-      // Store audio file in session storage if provided
-      // Note: We can't directly pass the File object through sessionStorage,
-      // so we'll need to handle this differently in the visualizer
-      if (audioFile) {
-        // The visualizer will need to prompt for audio file on load
-        // or we could implement a file upload API
-        console.log('Audio file selected:', audioFile.name);
-        // For now, we'll just store the filename as a reference
-        sessionStorage.setItem('pendingAudioFileName', audioFile.name);
-      }
-      
       navigate('/software');
     } catch (err) {
       console.error('Failed to create project:', err);
