@@ -870,6 +870,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setCustomFontName('None (Upload Required)');
   }, []);
 
+  // Load project from sessionStorage on mount
+  useEffect(() => {
+    const projectId = sessionStorage.getItem('currentProjectId');
+    if (projectId) {
+      // Clear the sessionStorage to prevent loading on every refresh
+      sessionStorage.removeItem('currentProjectId');
+      
+      // Load the project after a short delay to ensure component is ready
+      setTimeout(() => {
+        handleLoadProject(projectId);
+      }, 500);
+    }
+  }, []);
+
   const toggleSongName = () => {
     const scene = sceneRef.current;
     if (!scene) {
