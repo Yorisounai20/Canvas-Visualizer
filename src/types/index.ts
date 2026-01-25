@@ -61,6 +61,9 @@ export interface ProjectState {
   cameraFXKeyframes?: CameraFXKeyframe[];
   maskRevealKeyframes?: MaskRevealKeyframe[];
   workspaceObjects?: WorkspaceObject[];
+  // Workspace mode settings
+  workspaceMode?: boolean;
+  useWorkspaceObjects?: boolean;
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations

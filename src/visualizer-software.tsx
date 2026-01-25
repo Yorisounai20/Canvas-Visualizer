@@ -605,7 +605,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       cameraFXClips,
       cameraFXKeyframes,
       maskRevealKeyframes,
-      workspaceObjects
+      workspaceObjects,
+      // Workspace mode settings
+      workspaceMode,
+      useWorkspaceObjects
     };
   };
 
@@ -696,6 +699,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (projectState.cameraFXKeyframes !== undefined) setCameraFXKeyframes(projectState.cameraFXKeyframes);
       if (projectState.maskRevealKeyframes !== undefined) setMaskRevealKeyframes(projectState.maskRevealKeyframes);
       if (projectState.workspaceObjects !== undefined) setWorkspaceObjects(projectState.workspaceObjects);
+      
+      // Restore workspace mode settings
+      if (projectState.workspaceMode !== undefined) setWorkspaceMode(projectState.workspaceMode);
+      if (projectState.useWorkspaceObjects !== undefined) setUseWorkspaceObjects(projectState.useWorkspaceObjects);
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
