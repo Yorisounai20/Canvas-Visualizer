@@ -99,7 +99,9 @@ interface ThreeDVisualizerProps {
 }
 
 export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
-  // Get authenticated user
+  // Get authenticated user (not implemented yet - placeholder for future auth integration)
+  const user = undefined;
+  
   const containerRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);

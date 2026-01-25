@@ -286,14 +286,29 @@ export async function deleteProject(projectId: string, userId?: string): Promise
 
 /**
  * Check if database is available and configured
- * Note: This only checks if the environment variable exists,
- * not if the connection is actually valid. Database operations
- * will handle connection errors appropriately.
+ * Note: This checks if the environment variable exists and is not a placeholder.
+ * Database operations will handle actual connection errors appropriately.
  */
 export function isDatabaseAvailable(): boolean {
   try {
     const url = import.meta.env.VITE_DATABASE_URL;
-    return !!url && url.length > 0;
+    if (!url || url.length === 0) {
+      return false;
+    }
+    
+    // Check for common placeholder values that indicate database is not configured
+    const placeholders = [
+      'your_user',
+      'your_password',
+      'your_host',
+      'your_database',
+      'postgresql://user:password@',
+    ];
+    
+    // If any placeholder is found in the URL, database is not properly configured
+    const hasPlaceholder = placeholders.some(placeholder => url.includes(placeholder));
+    
+    return !hasPlaceholder;
   } catch {
     return false;
   }
