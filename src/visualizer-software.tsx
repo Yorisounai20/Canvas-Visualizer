@@ -872,17 +872,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Load project from sessionStorage on mount
   useEffect(() => {
-    const projectId = sessionStorage.getItem('currentProjectId');
-    if (projectId) {
-      // Clear the sessionStorage to prevent loading on every refresh
-      sessionStorage.removeItem('currentProjectId');
-      
-      // Load the project after a short delay to ensure component is ready
-      setTimeout(() => {
-        handleLoadProject(projectId);
-      }, 500);
-    }
-  }, []);
+    const loadInitialProject = async () => {
+      const projectId = sessionStorage.getItem('currentProjectId');
+      if (projectId && isDatabaseAvailable()) {
+        // Clear the sessionStorage to prevent loading on every refresh
+        sessionStorage.removeItem('currentProjectId');
+        
+        try {
+          // Load the project
+          await handleLoadProject(projectId);
+        } catch (error) {
+          console.error('Failed to load project on mount:', error);
+          addLog('Failed to load project automatically. Please try opening it again.', 'error');
+        }
+      }
+    };
+    
+    loadInitialProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   const toggleSongName = () => {
     const scene = sceneRef.current;
