@@ -665,7 +665,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Audio gain properties
       bassGain,
       midsGain,
-      highsGain
+      highsGain,
+      // Particle emitter default settings
+      particleEmissionRate,
+      particleLifetime,
+      particleMaxCount,
+      particleSpawnX,
+      particleSpawnY,
+      particleSpawnZ,
+      particleSpawnRadius,
+      particleStartColor,
+      particleEndColor,
+      particleStartSize,
+      particleEndSize,
+      particleAudioTrack,
+      particleAudioAffects,
+      particleShape
     };
   };
 
@@ -821,6 +836,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (projectState.bassGain !== undefined) setBassGain(projectState.bassGain);
       if (projectState.midsGain !== undefined) setMidsGain(projectState.midsGain);
       if (projectState.highsGain !== undefined) setHighsGain(projectState.highsGain);
+      
+      // Restore particle emitter default settings
+      if (projectState.particleEmissionRate !== undefined) setParticleEmissionRate(projectState.particleEmissionRate);
+      if (projectState.particleLifetime !== undefined) setParticleLifetime(projectState.particleLifetime);
+      if (projectState.particleMaxCount !== undefined) setParticleMaxCount(projectState.particleMaxCount);
+      if (projectState.particleSpawnX !== undefined) setParticleSpawnX(projectState.particleSpawnX);
+      if (projectState.particleSpawnY !== undefined) setParticleSpawnY(projectState.particleSpawnY);
+      if (projectState.particleSpawnZ !== undefined) setParticleSpawnZ(projectState.particleSpawnZ);
+      if (projectState.particleSpawnRadius !== undefined) setParticleSpawnRadius(projectState.particleSpawnRadius);
+      if (projectState.particleStartColor !== undefined) setParticleStartColor(projectState.particleStartColor);
+      if (projectState.particleEndColor !== undefined) setParticleEndColor(projectState.particleEndColor);
+      if (projectState.particleStartSize !== undefined) setParticleStartSize(projectState.particleStartSize);
+      if (projectState.particleEndSize !== undefined) setParticleEndSize(projectState.particleEndSize);
+      if (projectState.particleAudioTrack !== undefined) setParticleAudioTrack(projectState.particleAudioTrack);
+      if (projectState.particleAudioAffects !== undefined) setParticleAudioAffects(projectState.particleAudioAffects);
+      if (projectState.particleShape !== undefined) setParticleShape(projectState.particleShape);
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
@@ -9217,19 +9248,31 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             particleEmissionRate={particleEmissionRate}
             particleLifetime={particleLifetime}
             particleMaxCount={particleMaxCount}
+            particleSpawnX={particleSpawnX}
+            particleSpawnY={particleSpawnY}
+            particleSpawnZ={particleSpawnZ}
+            particleSpawnRadius={particleSpawnRadius}
             particleStartColor={particleStartColor}
             particleEndColor={particleEndColor}
             particleStartSize={particleStartSize}
             particleEndSize={particleEndSize}
             particleShape={particleShape}
+            particleAudioTrack={particleAudioTrack}
+            particleAudioAffects={particleAudioAffects}
             setParticleEmissionRate={setParticleEmissionRate}
             setParticleLifetime={setParticleLifetime}
             setParticleMaxCount={setParticleMaxCount}
+            setParticleSpawnX={setParticleSpawnX}
+            setParticleSpawnY={setParticleSpawnY}
+            setParticleSpawnZ={setParticleSpawnZ}
+            setParticleSpawnRadius={setParticleSpawnRadius}
             setParticleStartColor={setParticleStartColor}
             setParticleEndColor={setParticleEndColor}
             setParticleStartSize={setParticleStartSize}
             setParticleEndSize={setParticleEndSize}
             setParticleShape={setParticleShape}
+            setParticleAudioTrack={setParticleAudioTrack}
+            setParticleAudioAffects={setParticleAudioAffects}
           />
         )}
         

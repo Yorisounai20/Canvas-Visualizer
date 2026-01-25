@@ -121,6 +121,21 @@ export interface ProjectState {
   bassGain?: number;
   midsGain?: number;
   highsGain?: number;
+  // Particle emitter default settings (template for new emitters)
+  particleEmissionRate?: number;
+  particleLifetime?: number;
+  particleMaxCount?: number;
+  particleSpawnX?: number;
+  particleSpawnY?: number;
+  particleSpawnZ?: number;
+  particleSpawnRadius?: number;
+  particleStartColor?: string;
+  particleEndColor?: string;
+  particleStartSize?: number;
+  particleEndSize?: number;
+  particleAudioTrack?: 'bass' | 'mids' | 'highs' | 'all';
+  particleAudioAffects?: string[];
+  particleShape?: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations
