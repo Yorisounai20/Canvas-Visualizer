@@ -219,6 +219,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
+  // PR 5: Preset Authoring Mode
+  const [presetAuthoringMode, setPresetAuthoringMode] = useState(false);
+  const [authoringPreset, setAuthoringPreset] = useState('orbit');
+  const [mockTime, setMockTime] = useState(0);
+  const [mockAudio, setMockAudio] = useState({ bass: 128, mids: 128, highs: 128 });
+  
   // NEW: Skybox controls
   const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
   const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
@@ -8694,6 +8700,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 useWorkspaceObjects={useWorkspaceObjects}
                 onToggleVisualizationSource={handleToggleVisualizationSource}
                 workspaceObjects={workspaceObjects}
+                // PR 5: Preset Authoring Mode
+                presetAuthoringMode={presetAuthoringMode}
+                onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+                selectedPreset={authoringPreset}
+                onSelectPreset={setAuthoringPreset}
+                mockTime={mockTime}
+                onMockTimeChange={setMockTime}
+                mockAudio={mockAudio}
+                onMockAudioChange={setMockAudio}
               />
             </div>
           </div>

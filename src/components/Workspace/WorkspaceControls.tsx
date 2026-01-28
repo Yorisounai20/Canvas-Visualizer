@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 
@@ -18,6 +18,15 @@ interface WorkspaceControlsProps {
   useWorkspaceObjects: boolean;
   onToggleVisualizationSource: () => void;
   workspaceObjects: WorkspaceObject[]; // PR 1: For pose snapshots
+  // PR 5: Preset Authoring Mode
+  presetAuthoringMode?: boolean;
+  onTogglePresetAuthoring?: () => void;
+  selectedPreset?: string;
+  onSelectPreset?: (preset: string) => void;
+  mockTime?: number;
+  onMockTimeChange?: (time: number) => void;
+  mockAudio?: { bass: number; mids: number; highs: number };
+  onMockAudioChange?: (audio: { bass: number; mids: number; highs: number }) => void;
 }
 
 export default function WorkspaceControls({
@@ -28,9 +37,30 @@ export default function WorkspaceControls({
   onToggleAxes,
   useWorkspaceObjects,
   onToggleVisualizationSource,
-  workspaceObjects
+  workspaceObjects,
+  // PR 5: Preset Authoring Mode props
+  presetAuthoringMode = false,
+  onTogglePresetAuthoring,
+  selectedPreset = 'orbit',
+  onSelectPreset,
+  mockTime = 0,
+  onMockTimeChange,
+  mockAudio = { bass: 128, mids: 128, highs: 128 },
+  onMockAudioChange
 }: WorkspaceControlsProps) {
   const [poseName, setPoseName] = useState('');
+
+  // Available presets for authoring mode
+  const availablePresets = [
+    { value: 'orbit', label: '🌀 Orbital Dance' },
+    { value: 'explosion', label: '💥 Explosion' },
+    { value: 'tunnel', label: '🚀 Tunnel Rush' },
+    { value: 'wave', label: '🌊 Wave Motion' },
+    { value: 'spiral', label: '🌌 Spiral Galaxy' },
+    { value: 'chill', label: '🎵 Chill Vibes' },
+    { value: 'pulse', label: '⚡ Pulse Grid' },
+    { value: 'vortex', label: '🌪️ Vortex Storm' },
+  ];
 
   const handleSavePose = () => {
     if (!poseName.trim()) {
@@ -145,6 +175,117 @@ export default function WorkspaceControls({
           </div>
         </div>
       </div>
+
+      {/* PR 5: Preset Authoring Mode */}
+      {onTogglePresetAuthoring && (
+        <div className="mb-3 pb-3 border-b border-gray-700">
+          <div className="text-xs font-semibold text-gray-400 mb-2">
+            <Palette className="w-3 h-3 inline mr-1" />
+            Preset Authoring Mode
+          </div>
+          
+          {/* Toggle */}
+          <button
+            onClick={onTogglePresetAuthoring}
+            className={`w-full px-3 py-2 rounded text-xs font-medium transition-colors mb-2 ${
+              presetAuthoringMode
+                ? 'bg-purple-600 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+            title="Preview preset animations in workspace"
+          >
+            {presetAuthoringMode ? '✓ Authoring Active' : 'Enable Authoring'}
+          </button>
+
+          {presetAuthoringMode && (
+            <div className="space-y-2 mt-2">
+              {/* Preset Selector */}
+              <div>
+                <div className="text-xs text-gray-400 mb-1">Preset</div>
+                <select
+                  value={selectedPreset}
+                  onChange={(e) => onSelectPreset?.(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:border-purple-500"
+                >
+                  {availablePresets.map(preset => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Time Slider */}
+              <div>
+                <div className="text-xs text-gray-400 mb-1">
+                  Time: {mockTime.toFixed(1)}s
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="60"
+                  step="0.1"
+                  value={mockTime}
+                  onChange={(e) => onMockTimeChange?.(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Audio Mock Sliders */}
+              <div className="space-y-1">
+                <div className="text-xs text-gray-400">Audio Mock</div>
+                
+                {/* Bass */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-12">Bass</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={mockAudio.bass}
+                    onChange={(e) => onMockAudioChange?.({ ...mockAudio, bass: parseInt(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-400 w-8">{mockAudio.bass}</span>
+                </div>
+
+                {/* Mids */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-12">Mids</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={mockAudio.mids}
+                    onChange={(e) => onMockAudioChange?.({ ...mockAudio, mids: parseInt(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-400 w-8">{mockAudio.mids}</span>
+                </div>
+
+                {/* Highs */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-12">Highs</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={mockAudio.highs}
+                    onChange={(e) => onMockAudioChange?.({ ...mockAudio, highs: parseInt(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-gray-400 w-8">{mockAudio.highs}</span>
+                </div>
+              </div>
+
+              {/* Info */}
+              <div className="text-xs text-gray-500 italic mt-2">
+                💡 Adjust sliders to preview motion. Changes are NOT saved to timeline.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Object creation buttons */}
       <div className="text-xs font-semibold text-gray-400 mb-2">
