@@ -85,7 +85,6 @@ import TimelineV2 from './components/Timeline/TimelineV2';
 import { SceneExplorer } from './components/Workspace/SceneExplorer';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
-import PosesPanel from './components/Workspace/PosesPanel';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -327,7 +326,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showDebugConsole, setShowDebugConsole] = useState(false);
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator', 'poses'] as const;
+  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -8640,19 +8639,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         <span className="text-2xl">📝</span>
         <span className="text-xs font-medium">Text</span>
       </button>
-      
-      <button
-        onClick={() => setActiveTab('poses')}
-        className={`flex flex-col items-center gap-2 px-3 py-4 rounded-lg transition-all ${
-          activeTab === 'poses'
-            ? 'bg-purple-600 text-white shadow-lg'
-            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-        }`}
-        title="Pose Snapshots"
-      >
-        <span className="text-2xl">🎯</span>
-        <span className="text-xs font-medium">Poses</span>
-      </button>
     </div>
   );
 
@@ -8761,6 +8747,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 onToggleAxes={handleToggleAxes}
                 useWorkspaceObjects={useWorkspaceObjects}
                 onToggleVisualizationSource={handleToggleVisualizationSource}
+                workspaceObjects={workspaceObjects}
               />
             </div>
           </div>
@@ -8831,7 +8818,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {activeTab === 'environments' && '🌍'}
             {activeTab === 'postfx' && '🎭'}
             {activeTab === 'textAnimator' && '📝'}
-            {activeTab === 'poses' && '🎯'}
           </span>
           <span>
             {activeTab === 'waveforms' && 'Waveforms'}
@@ -8844,7 +8830,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {activeTab === 'environments' && 'Environments'}
             {activeTab === 'postfx' && 'Post-FX'}
             {activeTab === 'textAnimator' && 'Text Animator'}
-            {activeTab === 'poses' && 'Poses'}
           </span>
         </p>
         
@@ -9196,12 +9181,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
               Note: Text keyframes are managed in the timeline
             </p>
           </div>
-        )}
-
-        {activeTab === 'poses' && (
-          <PosesPanel 
-            workspaceObjects={workspaceObjects}
-          />
         )}
       </div>
     </div>
