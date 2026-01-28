@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Lightbulb, Box, Circle, Square } from 'lucide-react';
+import { Camera, Lightbulb, Box, Circle, Square, Folder } from 'lucide-react';
 import type { WorkspaceObject } from '../../types';
 
 interface SceneExplorerProps {
@@ -13,6 +13,7 @@ interface SceneExplorerProps {
  * FINAL ARCHITECTURE: Scene Explorer/Outliner
  * Blender-like object hierarchy showing all scene objects
  * Click object to select and show properties in right panel
+ * PR 2: Enhanced with group display
  */
 export const SceneExplorer: React.FC<SceneExplorerProps> = ({
   objects,
@@ -70,7 +71,25 @@ export const SceneExplorer: React.FC<SceneExplorerProps> = ({
                 onClick={() => onSelectObject(obj.id)}
               >
                 <span className="flex-shrink-0">{getObjectIcon(obj.type)}</span>
-                <span className="flex-1 text-sm font-medium truncate">{obj.name}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{obj.name}</div>
+                  {/* PR 2: Show group/role if set */}
+                  {(obj.group || obj.role) && (
+                    <div className="flex items-center gap-1 text-xs opacity-75 mt-0.5">
+                      {obj.group && (
+                        <span className="flex items-center gap-0.5">
+                          <Folder className="w-3 h-3" />
+                          {obj.group}
+                        </span>
+                      )}
+                      {obj.role && (
+                        <span className="text-cyan-400">
+                          • {obj.role}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {!obj.visible && (
                   <span className="text-xs opacity-50">(hidden)</span>
                 )}

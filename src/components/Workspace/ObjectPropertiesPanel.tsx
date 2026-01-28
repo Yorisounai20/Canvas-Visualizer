@@ -96,6 +96,43 @@ export default function ObjectPropertiesPanel({
         </div>
       </div>
 
+      {/* PR 2: Object Grouping - Group and Role */}
+      <div className="bg-gray-800 rounded p-3 space-y-3">
+        <div className="text-sm font-semibold text-gray-300 mb-2">
+          Grouping (for Presets)
+        </div>
+        
+        {/* Group */}
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">Group</label>
+          <input
+            type="text"
+            value={selectedObject.group || ''}
+            onChange={(e) => onUpdateObject(selectedObject.id, { group: e.target.value || undefined })}
+            placeholder="e.g., head, body, fins"
+            className="w-full px-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Logical group for preset targeting
+          </p>
+        </div>
+        
+        {/* Role */}
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">Role</label>
+          <input
+            type="text"
+            value={selectedObject.role || ''}
+            onChange={(e) => onUpdateObject(selectedObject.id, { role: e.target.value || undefined })}
+            placeholder="e.g., fin_left, antenna_1"
+            className="w-full px-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Specific role within group
+          </p>
+        </div>
+      </div>
+
       {/* Position */}
       <div>
         <div className="text-sm font-semibold text-gray-300 mb-2">Position</div>

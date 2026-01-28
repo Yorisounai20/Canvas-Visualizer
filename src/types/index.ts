@@ -285,6 +285,7 @@ export interface CameraRigKeyframe {
 
 // PHASE 3: Workspace object schema for manual 3D object creation
 // FINAL ARCHITECTURE: Extended to support cameras and lights
+// PR 2: Extended with group and role for semantic targeting
 export interface WorkspaceObject {
   id: string;
   type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light';
@@ -309,6 +310,10 @@ export interface WorkspaceObject {
   // Letterbox properties (when type === 'camera')
   showLetterbox?: boolean;
   letterboxSize?: number; // 0-100 pixels
+  // PR 2: Object Grouping + Naming - Semantic targeting for presets
+  group?: string; // Logical group name (e.g., "head", "body", "fins")
+  role?: string;  // Specific role within group (e.g., "fin_left", "fin_right")
+}
 }
 
 // Camera FX System - Keyframe-based camera tiling effects
