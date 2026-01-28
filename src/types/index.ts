@@ -90,6 +90,33 @@ export interface PresetParameters {
   spread: number;     // Spatial distribution/radius (1-50)
 }
 
+// PR 6: Preset Descriptor - JSON-driven preset definitions
+export interface PresetDescriptor {
+  id: string;                              // Unique identifier
+  name: string;                            // Display name (e.g., "Orbital Dance")
+  solver: string;                          // Solver function name (e.g., "orbit")
+  basePose?: string;                       // Optional: Name of base pose to start from
+  parameters: Record<string, number>;      // Configurable numeric parameters
+  metadata?: {
+    description?: string;
+    author?: string;
+    created?: string;
+    tags?: string[];
+  };
+}
+
+// PR 6: Parameter Definition - Schema for UI generation
+export interface ParameterDefinition {
+  name: string;           // Parameter key
+  label: string;          // Display label
+  type: 'number';         // Type (only number for now)
+  defaultValue: number;   // Default value
+  min: number;            // Minimum value
+  max: number;            // Maximum value
+  step: number;           // Step size for slider
+  description?: string;   // Optional description
+}
+
 export interface Section {
   id: number;
   start: number;
