@@ -67,6 +67,8 @@ import tornadovortexPreset from './presets/tornadovortex';
 import stadiumPreset from './presets/stadium';
 import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
+// PR 4: Solver imports
+import { solveOrbit } from './presets/solvers/orbitSolver';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
 import { 
@@ -3613,88 +3615,32 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           t.material.opacity = 0;
         });
       } else if (type === 'orbit') {
-        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
-        const r = activeCameraDistance - f.bass * 5;
-        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
-        cam.lookAt(0,0,0);
-        obj.sphere.position.set(0, 0, 0);
-        const sunScale = 3 + f.bass * 2;
-        obj.sphere.scale.set(sunScale, sunScale, sunScale);
-        obj.sphere.rotation.x = 0;
-        obj.sphere.rotation.y += 0.01;
-        obj.sphere.rotation.z = 0;
-        obj.sphere.material.color.setStyle(sphereColor);
-        obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
-        obj.sphere.material.wireframe = false;
-        obj.cubes.forEach((planet, i) => {
-          const orbitRadius = 5 + i * 1.8;
-          const orbitSpeed = 0.8 / (1 + i * 0.3);
-          const angle = elScaled * orbitSpeed + i * 0.5;
-          const tilt = Math.sin(i) * 0.3;
-          planet.position.x = Math.cos(angle) * orbitRadius;
-          planet.position.z = Math.sin(angle) * orbitRadius;
-          planet.position.y = Math.sin(angle * 2) * tilt;
-          const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i];
-          const planetSize = sizeVariation + f.bass * 0.3;
-          planet.scale.set(planetSize, planetSize, planetSize);
-          planet.rotation.x = tilt;
-          planet.rotation.y += 0.02 + i * 0.005;
-          planet.rotation.z = 0;
-          planet.material.color.setStyle(cubeColor);
-          planet.material.opacity = (0.8 + f.bass * 0.2) * blend;
-          planet.material.wireframe = false;
-        });
-        obj.octas.slice(0, 24).forEach((moon, i) => {
-          const planetIndex = Math.floor(i / 3) % obj.cubes.length;
-          const planet = obj.cubes[planetIndex];
-          const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
-          const moonOrbitSpeed = 3 + (i % 3);
-          const moonAngle = elScaled * moonOrbitSpeed + i;
-          moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
-          moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
-          moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
-          const moonSize = 0.3 + f.mids * 0.2;
-          moon.scale.set(moonSize, moonSize, moonSize);
-          moon.rotation.x += 0.05;
-          moon.rotation.y += 0.03;
-          moon.rotation.z = 0;
-          moon.material.color.setStyle(octahedronColor);
-          moon.material.opacity = (0.6 + f.mids * 0.4) * blend;
-          moon.material.wireframe = false;
-        });
-        obj.octas.slice(24).forEach((rogue, i) => {
-          const layer = Math.floor(i / 6);
-          const posInLayer = i % 6;
-          const rogueDist = 25 + layer * 8;
-          const rogueAngle = (posInLayer / 6) * Math.PI * 2 + layer * 0.5;
-          rogue.position.x = Math.cos(rogueAngle) * rogueDist;
-          rogue.position.y = (posInLayer % 3 - 1) * 6;
-          rogue.position.z = Math.sin(rogueAngle) * rogueDist;
-          const rogueSize = 4 + layer * 2 + (i % 3);
-          rogue.scale.set(rogueSize, rogueSize, rogueSize);
-          rogue.rotation.x = elScaled * 0.05 + i;
-          rogue.rotation.y = elScaled * 0.03;
-          rogue.rotation.z = 0;
-          rogue.material.color.setStyle(octahedronColor);
-          rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
-          rogue.material.wireframe = true;
-        });
-        obj.tetras.forEach((asteroid, i) => {
-          const beltRadius = 11 + (i % 5) * 0.5;
-          const beltSpeed = 0.3;
-          const angle = elScaled * beltSpeed + i * 0.2;
-          const scatter = Math.sin(i * 10) * 2;
-          asteroid.position.x = Math.cos(angle) * (beltRadius + scatter);
-          asteroid.position.z = Math.sin(angle) * (beltRadius + scatter);
-          asteroid.position.y = Math.sin(angle * 3 + i) * 0.5 + f.highs * 0.5;
-          asteroid.rotation.x += 0.02;
-          asteroid.rotation.y += 0.03;
-          asteroid.rotation.z += 0.01;
-          const asteroidSize = 0.2 + f.highs * 0.3;
-          asteroid.scale.set(asteroidSize, asteroidSize, asteroidSize);
-          asteroid.material.color.setStyle(tetrahedronColor);
-          asteroid.material.opacity = (0.5 + f.highs * 0.4) * blend;
-          asteroid.material.wireframe = true;
+        // PR 4: Solver pattern - extracted to orbitSolver.ts
+        solveOrbit({
+          time: elScaled,
+          audio: { bass: f.bass, mids: f.mids, highs: f.highs },
+          poses: new Map(), // Empty for now (will use in PR 5-8)
+          pool: {
+            cubes: obj.cubes,
+            octahedrons: obj.octas,
+            tetrahedrons: obj.tetras,
+            toruses: obj.toruses,
+            planes: obj.planes,
+            sphere: obj.sphere
+          },
+          blend,
+          camera: cam,
+          rotationSpeed: KEYFRAME_ONLY_ROTATION_SPEED,
+          cameraDistance: activeCameraDistance,
+          cameraHeight: activeCameraHeight,
+          cameraRotation: activeCameraRotation,
+          shake: { x: shakeX, y: shakeY, z: shakeZ },
+          colors: {
+            cube: cubeColor,
+            octahedron: octahedronColor,
+            tetrahedron: tetrahedronColor,
+            sphere: sphereColor
+          }
         });
         
         // Hide unused toruses and planes

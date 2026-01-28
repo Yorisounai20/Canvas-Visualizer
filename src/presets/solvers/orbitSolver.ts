@@ -11,7 +11,7 @@
 import { SolverContext } from '../solverTypes';
 
 export function solveOrbit(ctx: SolverContext): void {
-  const { time, audio, pool, blend, camera, rotationSpeed, cameraDistance, cameraHeight, cameraRotation, shake } = ctx;
+  const { time, audio, pool, blend, camera, rotationSpeed, cameraDistance, cameraHeight, cameraRotation, shake, colors } = ctx;
   const { cubes, octahedrons: octas, tetrahedrons: tetras, sphere } = pool;
   const f = audio;
   const elScaled = time;
@@ -32,6 +32,9 @@ export function solveOrbit(ctx: SolverContext): void {
   sphere.rotation.x = 0;
   sphere.rotation.y += 0.01;
   sphere.rotation.z = 0;
+  if (colors?.sphere) {
+    sphere.material.color.setStyle(colors.sphere);
+  }
   sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
   sphere.material.wireframe = false;
   
@@ -54,6 +57,9 @@ export function solveOrbit(ctx: SolverContext): void {
     planet.rotation.y += 0.02 + i * 0.005;
     planet.rotation.z = 0;
     
+    if (colors?.cube) {
+      planet.material.color.setStyle(colors.cube);
+    }
     planet.material.opacity = (0.8 + f.bass * 0.2) * blend;
     planet.material.wireframe = false;
   });
@@ -77,6 +83,9 @@ export function solveOrbit(ctx: SolverContext): void {
     moon.rotation.y += 0.03;
     moon.rotation.z = 0;
     
+    if (colors?.octahedron) {
+      moon.material.color.setStyle(colors.octahedron);
+    }
     moon.material.opacity = (0.6 + f.mids * 0.4) * blend;
     moon.material.wireframe = false;
   });
@@ -99,6 +108,9 @@ export function solveOrbit(ctx: SolverContext): void {
     rogue.rotation.y = elScaled * 0.03;
     rogue.rotation.z = 0;
     
+    if (colors?.octahedron) {
+      rogue.material.color.setStyle(colors.octahedron);
+    }
     rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
     rogue.material.wireframe = true;
   });
@@ -121,6 +133,9 @@ export function solveOrbit(ctx: SolverContext): void {
     const asteroidSize = 0.2 + f.highs * 0.3;
     asteroid.scale.set(asteroidSize, asteroidSize, asteroidSize);
     
+    if (colors?.tetrahedron) {
+      asteroid.material.color.setStyle(colors.tetrahedron);
+    }
     asteroid.material.opacity = (0.5 + f.highs * 0.4) * blend;
     asteroid.material.wireframe = true;
   });

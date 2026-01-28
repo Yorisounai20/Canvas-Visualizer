@@ -46,6 +46,15 @@ export interface SolverContext {
   cameraRotation: number;            // Active camera rotation offset
   shake: { x: number; y: number; z: number }; // Camera shake
   workspaceObjects?: WorkspaceObject[]; // Optional workspace objects for pose-driven presets
+  // Colors (for material.color.setStyle())
+  colors?: {
+    cube?: string;
+    octahedron?: string;
+    tetrahedron?: string;
+    sphere?: string;
+    torus?: string;
+    plane?: string;
+  };
 }
 
 /**
