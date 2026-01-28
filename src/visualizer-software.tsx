@@ -7768,6 +7768,57 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         uniforms.tintB.value = colorTintB;
       }
 
+      // PR 5: Preset Authoring Mode - Apply solver transformations to workspace objects
+      if (workspaceMode && presetAuthoringMode && workspaceObjects.length > 0) {
+        // When authoring mode is enabled, apply selected preset's solver to workspace objects
+        // This provides live preview of how the preset would animate the objects
+        
+        // Convert workspace objects to a solver-compatible pool format
+        const mockPool = {
+          cubes: workspaceObjects.filter(obj => obj.type === 'box' && obj.mesh).map(obj => obj.mesh!),
+          octahedrons: workspaceObjects.filter(obj => obj.type === 'sphere' && obj.mesh).map(obj => obj.mesh!),
+          tetrahedrons: workspaceObjects.filter(obj => obj.type === 'torus' && obj.mesh).map(obj => obj.mesh!),
+          toruses: workspaceObjects.filter(obj => obj.type === 'torus' && obj.mesh).map(obj => obj.mesh!),
+          planes: workspaceObjects.filter(obj => obj.type === 'plane' && obj.mesh).map(obj => obj.mesh!),
+          sphere: workspaceObjects.find(obj => obj.type === 'sphere' && obj.mesh)?.mesh || obj.sphere
+        };
+
+        // Build solver context with mock values from UI
+        const authoringContext = {
+          time: mockTime,
+          audio: {
+            bass: mockAudio.bass / 255, // Normalize to 0-1
+            mids: mockAudio.mids / 255,
+            highs: mockAudio.highs / 255
+          },
+          poses: new Map(), // Empty for now
+          pool: mockPool,
+          blend: 1.0, // Full opacity
+          camera: cam,
+          rotationSpeed: 0,
+          cameraDistance: 20,
+          cameraHeight: 0,
+          cameraRotation: 0,
+          shake: { x: 0, y: 0, z: 0 },
+          colors: {
+            cube: cubeColor,
+            octahedron: octahedronColor,
+            tetrahedron: tetrahedronColor,
+            sphere: sphereColor
+          }
+        };
+
+        // Call the selected solver (currently only orbit is extracted)
+        if (authoringPreset === 'orbit' && mockPool.cubes.length > 0) {
+          try {
+            solveOrbit(authoringContext);
+          } catch (error) {
+            console.error('Authoring mode solver error:', error);
+          }
+        }
+        // More solvers will be added as they're extracted in PR 4
+      }
+
       // Camera FX Rendering
       const activeFXClips = cameraFXClips.filter(clip => 
         clip.enabled && t >= clip.startTime && t < clip.endTime
