@@ -1839,8 +1839,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setExportProgress(0);
       addLog('Starting automated video export...', 'info');
 
-      // Get audio duration
+      // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
+      setDuration(duration); // FIX: Ensure animation loop has correct duration
       
       // Reset playback state
       if (bufferSourceRef.current) {
@@ -2008,6 +2009,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }, 100);
 
       addLog(`Exporting ${duration.toFixed(1)}s video at ${exportResolution} as ${extension.toUpperCase()}...`, 'info');
+      addLog(`Video bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps, Frame rate: 30 FPS`, 'info');
 
     } catch (e) {
       const error = e as Error;
@@ -3301,7 +3303,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         f = getFreq(data);
       }
       const el = (Date.now() - startTimeRef.current) * 0.001;
-      const t = el % duration;
+      // FIX: Prevent NaN if duration is not set (safety check for export)
+      const t = duration > 0 ? (el % duration) : el;
       
       // Throttle timeline updates to 10 FPS (instead of 60 FPS) to improve performance
       // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS milliseconds
