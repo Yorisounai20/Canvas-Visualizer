@@ -1,5 +1,22 @@
 // Type definitions for the visualizer application
 
+// PR 1: Pose Snapshot System - Capture and restore shape state
+export interface PoseSnapshot {
+  id: string;
+  name: string;
+  timestamp: string;
+  objects: {
+    objectId: string;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scale: [number, number, number];
+    visible: boolean;
+    material: string;
+    color: string;
+    opacity: number;
+  }[];
+}
+
 // PHASE 2: Project state schema for save/load functionality
 export interface ProjectSettings {
   name: string;
@@ -61,6 +78,8 @@ export interface ProjectState {
   cameraFXKeyframes?: CameraFXKeyframe[];
   maskRevealKeyframes?: MaskRevealKeyframe[];
   workspaceObjects?: WorkspaceObject[];
+  // PR 1: Pose Snapshot System
+  poses?: PoseSnapshot[];
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations
