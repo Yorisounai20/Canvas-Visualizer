@@ -327,7 +327,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [showDebugConsole, setShowDebugConsole] = useState(false);
   
   // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
-  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator', 'workspace'] as const;
+  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator', 'poses'] as const;
   
   // Golden angle constant for natural spiral patterns (used in hourglass preset)
   const GOLDEN_ANGLE_DEGREES = 137.5;
@@ -8642,13 +8642,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       </button>
       
       <button
-        onClick={() => setActiveTab('workspace')}
+        onClick={() => setActiveTab('poses')}
         className={`flex flex-col items-center gap-2 px-3 py-4 rounded-lg transition-all ${
-          activeTab === 'workspace'
+          activeTab === 'poses'
             ? 'bg-purple-600 text-white shadow-lg'
             : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
         }`}
-        title="Workspace & Poses"
+        title="Pose Snapshots"
       >
         <span className="text-2xl">🎯</span>
         <span className="text-xs font-medium">Poses</span>
@@ -8831,7 +8831,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {activeTab === 'environments' && '🌍'}
             {activeTab === 'postfx' && '🎭'}
             {activeTab === 'textAnimator' && '📝'}
-            {activeTab === 'workspace' && '🎯'}
+            {activeTab === 'poses' && '🎯'}
           </span>
           <span>
             {activeTab === 'waveforms' && 'Waveforms'}
@@ -8844,7 +8844,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             {activeTab === 'environments' && 'Environments'}
             {activeTab === 'postfx' && 'Post-FX'}
             {activeTab === 'textAnimator' && 'Text Animator'}
-            {activeTab === 'workspace' && 'Workspace & Poses'}
+            {activeTab === 'poses' && 'Poses'}
           </span>
         </p>
         
@@ -9198,7 +9198,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           </div>
         )}
 
-        {activeTab === 'workspace' && (
+        {activeTab === 'poses' && (
           <PosesPanel 
             workspaceObjects={workspaceObjects}
           />
