@@ -78,10 +78,81 @@ export interface ProjectState {
   cameraFXKeyframes?: CameraFXKeyframe[];
   maskRevealKeyframes?: MaskRevealKeyframe[];
   workspaceObjects?: WorkspaceObject[];
-  // PR 1: Pose Snapshot System
-  poses?: PoseSnapshot[];
-  // PR 6: Preset Descriptor System
-  presetDescriptors?: PresetDescriptor[];
+  // Workspace mode settings
+  workspaceMode?: boolean;
+  useWorkspaceObjects?: boolean;
+  // Shape-specific material properties
+  cubeWireframe?: boolean;
+  cubeOpacity?: number;
+  cubeColor?: string;
+  cubeMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  cubeMetalness?: number;
+  cubeRoughness?: number;
+  octahedronWireframe?: boolean;
+  octahedronOpacity?: number;
+  octahedronColor?: string;
+  octahedronMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  octahedronMetalness?: number;
+  octahedronRoughness?: number;
+  tetrahedronWireframe?: boolean;
+  tetrahedronOpacity?: number;
+  tetrahedronColor?: string;
+  tetrahedronMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  tetrahedronMetalness?: number;
+  tetrahedronRoughness?: number;
+  sphereWireframe?: boolean;
+  sphereOpacity?: number;
+  sphereColor?: string;
+  sphereMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  sphereMetalness?: number;
+  sphereRoughness?: number;
+  planeWireframe?: boolean;
+  planeOpacity?: number;
+  planeColor?: string;
+  planeMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  planeMetalness?: number;
+  planeRoughness?: number;
+  torusWireframe?: boolean;
+  torusOpacity?: number;
+  torusColor?: string;
+  torusMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  torusMetalness?: number;
+  torusRoughness?: number;
+  // Text properties
+  textColor?: string;
+  textMaterialType?: 'basic' | 'standard' | 'phong' | 'lambert';
+  textWireframe?: boolean;
+  textOpacity?: number;
+  textMetalness?: number;
+  textRoughness?: number;
+  // Skybox properties
+  skyboxType?: 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula';
+  skyboxGradientTop?: string;
+  skyboxGradientBottom?: string;
+  skyboxImageUrl?: string;
+  starCount?: number;
+  galaxyColor?: string;
+  nebulaColor1?: string;
+  nebulaColor2?: string;
+  // Audio gain properties
+  bassGain?: number;
+  midsGain?: number;
+  highsGain?: number;
+  // Particle emitter default settings (template for new emitters)
+  particleEmissionRate?: number;
+  particleLifetime?: number;
+  particleMaxCount?: number;
+  particleSpawnX?: number;
+  particleSpawnY?: number;
+  particleSpawnZ?: number;
+  particleSpawnRadius?: number;
+  particleStartColor?: string;
+  particleEndColor?: string;
+  particleStartSize?: number;
+  particleEndSize?: number;
+  particleAudioTrack?: 'bass' | 'mids' | 'highs' | 'all';
+  particleAudioAffects?: string[];
+  particleShape?: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations

@@ -613,7 +613,82 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       cameraFXClips,
       cameraFXKeyframes,
       maskRevealKeyframes,
-      workspaceObjects
+      workspaceObjects,
+      // Workspace mode settings
+      workspaceMode,
+      useWorkspaceObjects,
+      // Shape-specific material properties
+      cubeWireframe,
+      cubeOpacity,
+      cubeColor,
+      cubeMaterialType,
+      cubeMetalness,
+      cubeRoughness,
+      octahedronWireframe,
+      octahedronOpacity,
+      octahedronColor,
+      octahedronMaterialType,
+      octahedronMetalness,
+      octahedronRoughness,
+      tetrahedronWireframe,
+      tetrahedronOpacity,
+      tetrahedronColor,
+      tetrahedronMaterialType,
+      tetrahedronMetalness,
+      tetrahedronRoughness,
+      sphereWireframe,
+      sphereOpacity,
+      sphereColor,
+      sphereMaterialType,
+      sphereMetalness,
+      sphereRoughness,
+      planeWireframe,
+      planeOpacity,
+      planeColor,
+      planeMaterialType,
+      planeMetalness,
+      planeRoughness,
+      torusWireframe,
+      torusOpacity,
+      torusColor,
+      torusMaterialType,
+      torusMetalness,
+      torusRoughness,
+      // Text properties
+      textColor,
+      textMaterialType,
+      textWireframe,
+      textOpacity,
+      textMetalness,
+      textRoughness,
+      // Skybox properties
+      skyboxType,
+      skyboxGradientTop,
+      skyboxGradientBottom,
+      skyboxImageUrl,
+      starCount,
+      galaxyColor,
+      nebulaColor1,
+      nebulaColor2,
+      // Audio gain properties
+      bassGain,
+      midsGain,
+      highsGain,
+      // Particle emitter default settings
+      particleEmissionRate,
+      particleLifetime,
+      particleMaxCount,
+      particleSpawnX,
+      particleSpawnY,
+      particleSpawnZ,
+      particleSpawnRadius,
+      particleStartColor,
+      particleEndColor,
+      particleStartSize,
+      particleEndSize,
+      particleAudioTrack,
+      particleAudioAffects,
+      particleShape
     };
   };
 
@@ -704,6 +779,87 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (projectState.cameraFXKeyframes !== undefined) setCameraFXKeyframes(projectState.cameraFXKeyframes);
       if (projectState.maskRevealKeyframes !== undefined) setMaskRevealKeyframes(projectState.maskRevealKeyframes);
       if (projectState.workspaceObjects !== undefined) setWorkspaceObjects(projectState.workspaceObjects);
+      
+      // Restore workspace mode settings
+      if (projectState.workspaceMode !== undefined) setWorkspaceMode(projectState.workspaceMode);
+      if (projectState.useWorkspaceObjects !== undefined) setUseWorkspaceObjects(projectState.useWorkspaceObjects);
+      
+      // Restore shape-specific material properties
+      if (projectState.cubeWireframe !== undefined) setCubeWireframe(projectState.cubeWireframe);
+      if (projectState.cubeOpacity !== undefined) setCubeOpacity(projectState.cubeOpacity);
+      if (projectState.cubeColor !== undefined) setCubeColor(projectState.cubeColor);
+      if (projectState.cubeMaterialType !== undefined) setCubeMaterialType(projectState.cubeMaterialType);
+      if (projectState.cubeMetalness !== undefined) setCubeMetalness(projectState.cubeMetalness);
+      if (projectState.cubeRoughness !== undefined) setCubeRoughness(projectState.cubeRoughness);
+      if (projectState.octahedronWireframe !== undefined) setOctahedronWireframe(projectState.octahedronWireframe);
+      if (projectState.octahedronOpacity !== undefined) setOctahedronOpacity(projectState.octahedronOpacity);
+      if (projectState.octahedronColor !== undefined) setOctahedronColor(projectState.octahedronColor);
+      if (projectState.octahedronMaterialType !== undefined) setOctahedronMaterialType(projectState.octahedronMaterialType);
+      if (projectState.octahedronMetalness !== undefined) setOctahedronMetalness(projectState.octahedronMetalness);
+      if (projectState.octahedronRoughness !== undefined) setOctahedronRoughness(projectState.octahedronRoughness);
+      if (projectState.tetrahedronWireframe !== undefined) setTetrahedronWireframe(projectState.tetrahedronWireframe);
+      if (projectState.tetrahedronOpacity !== undefined) setTetrahedronOpacity(projectState.tetrahedronOpacity);
+      if (projectState.tetrahedronColor !== undefined) setTetrahedronColor(projectState.tetrahedronColor);
+      if (projectState.tetrahedronMaterialType !== undefined) setTetrahedronMaterialType(projectState.tetrahedronMaterialType);
+      if (projectState.tetrahedronMetalness !== undefined) setTetrahedronMetalness(projectState.tetrahedronMetalness);
+      if (projectState.tetrahedronRoughness !== undefined) setTetrahedronRoughness(projectState.tetrahedronRoughness);
+      if (projectState.sphereWireframe !== undefined) setSphereWireframe(projectState.sphereWireframe);
+      if (projectState.sphereOpacity !== undefined) setSphereOpacity(projectState.sphereOpacity);
+      if (projectState.sphereColor !== undefined) setSphereColor(projectState.sphereColor);
+      if (projectState.sphereMaterialType !== undefined) setSphereMaterialType(projectState.sphereMaterialType);
+      if (projectState.sphereMetalness !== undefined) setSphereMetalness(projectState.sphereMetalness);
+      if (projectState.sphereRoughness !== undefined) setSphereRoughness(projectState.sphereRoughness);
+      if (projectState.planeWireframe !== undefined) setPlaneWireframe(projectState.planeWireframe);
+      if (projectState.planeOpacity !== undefined) setPlaneOpacity(projectState.planeOpacity);
+      if (projectState.planeColor !== undefined) setPlaneColor(projectState.planeColor);
+      if (projectState.planeMaterialType !== undefined) setPlaneMaterialType(projectState.planeMaterialType);
+      if (projectState.planeMetalness !== undefined) setPlaneMetalness(projectState.planeMetalness);
+      if (projectState.planeRoughness !== undefined) setPlaneRoughness(projectState.planeRoughness);
+      if (projectState.torusWireframe !== undefined) setTorusWireframe(projectState.torusWireframe);
+      if (projectState.torusOpacity !== undefined) setTorusOpacity(projectState.torusOpacity);
+      if (projectState.torusColor !== undefined) setTorusColor(projectState.torusColor);
+      if (projectState.torusMaterialType !== undefined) setTorusMaterialType(projectState.torusMaterialType);
+      if (projectState.torusMetalness !== undefined) setTorusMetalness(projectState.torusMetalness);
+      if (projectState.torusRoughness !== undefined) setTorusRoughness(projectState.torusRoughness);
+      
+      // Restore text properties
+      if (projectState.textColor !== undefined) setTextColor(projectState.textColor);
+      if (projectState.textMaterialType !== undefined) setTextMaterialType(projectState.textMaterialType);
+      if (projectState.textWireframe !== undefined) setTextWireframe(projectState.textWireframe);
+      if (projectState.textOpacity !== undefined) setTextOpacity(projectState.textOpacity);
+      if (projectState.textMetalness !== undefined) setTextMetalness(projectState.textMetalness);
+      if (projectState.textRoughness !== undefined) setTextRoughness(projectState.textRoughness);
+      
+      // Restore skybox properties
+      if (projectState.skyboxType !== undefined) setSkyboxType(projectState.skyboxType);
+      if (projectState.skyboxGradientTop !== undefined) setSkyboxGradientTop(projectState.skyboxGradientTop);
+      if (projectState.skyboxGradientBottom !== undefined) setSkyboxGradientBottom(projectState.skyboxGradientBottom);
+      if (projectState.skyboxImageUrl !== undefined) setSkyboxImageUrl(projectState.skyboxImageUrl);
+      if (projectState.starCount !== undefined) setStarCount(projectState.starCount);
+      if (projectState.galaxyColor !== undefined) setGalaxyColor(projectState.galaxyColor);
+      if (projectState.nebulaColor1 !== undefined) setNebulaColor1(projectState.nebulaColor1);
+      if (projectState.nebulaColor2 !== undefined) setNebulaColor2(projectState.nebulaColor2);
+      
+      // Restore audio gain properties
+      if (projectState.bassGain !== undefined) setBassGain(projectState.bassGain);
+      if (projectState.midsGain !== undefined) setMidsGain(projectState.midsGain);
+      if (projectState.highsGain !== undefined) setHighsGain(projectState.highsGain);
+      
+      // Restore particle emitter default settings
+      if (projectState.particleEmissionRate !== undefined) setParticleEmissionRate(projectState.particleEmissionRate);
+      if (projectState.particleLifetime !== undefined) setParticleLifetime(projectState.particleLifetime);
+      if (projectState.particleMaxCount !== undefined) setParticleMaxCount(projectState.particleMaxCount);
+      if (projectState.particleSpawnX !== undefined) setParticleSpawnX(projectState.particleSpawnX);
+      if (projectState.particleSpawnY !== undefined) setParticleSpawnY(projectState.particleSpawnY);
+      if (projectState.particleSpawnZ !== undefined) setParticleSpawnZ(projectState.particleSpawnZ);
+      if (projectState.particleSpawnRadius !== undefined) setParticleSpawnRadius(projectState.particleSpawnRadius);
+      if (projectState.particleStartColor !== undefined) setParticleStartColor(projectState.particleStartColor);
+      if (projectState.particleEndColor !== undefined) setParticleEndColor(projectState.particleEndColor);
+      if (projectState.particleStartSize !== undefined) setParticleStartSize(projectState.particleStartSize);
+      if (projectState.particleEndSize !== undefined) setParticleEndSize(projectState.particleEndSize);
+      if (projectState.particleAudioTrack !== undefined) setParticleAudioTrack(projectState.particleAudioTrack);
+      if (projectState.particleAudioAffects !== undefined) setParticleAudioAffects(projectState.particleAudioAffects);
+      if (projectState.particleShape !== undefined) setParticleShape(projectState.particleShape);
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
@@ -870,6 +1026,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     addLog('Font system ready - upload custom font to use text', 'info');
     setCustomFontName('None (Upload Required)');
   }, []);
+
+  // Load project from sessionStorage on mount
+  useEffect(() => {
+    const loadInitialProject = async () => {
+      const projectId = sessionStorage.getItem('currentProjectId');
+      if (projectId && isDatabaseAvailable()) {
+        // Clear the sessionStorage to prevent loading on every refresh
+        sessionStorage.removeItem('currentProjectId');
+        
+        try {
+          // Load the project
+          await handleLoadProject(projectId);
+        } catch (error) {
+          console.error('Failed to load project on mount:', error);
+          addLog('Failed to load project automatically. Please try opening it again.', 'error');
+        }
+      }
+    };
+    
+    loadInitialProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
 
   const toggleSongName = () => {
     const scene = sceneRef.current;
@@ -9086,19 +9264,31 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             particleEmissionRate={particleEmissionRate}
             particleLifetime={particleLifetime}
             particleMaxCount={particleMaxCount}
+            particleSpawnX={particleSpawnX}
+            particleSpawnY={particleSpawnY}
+            particleSpawnZ={particleSpawnZ}
+            particleSpawnRadius={particleSpawnRadius}
             particleStartColor={particleStartColor}
             particleEndColor={particleEndColor}
             particleStartSize={particleStartSize}
             particleEndSize={particleEndSize}
             particleShape={particleShape}
+            particleAudioTrack={particleAudioTrack}
+            particleAudioAffects={particleAudioAffects}
             setParticleEmissionRate={setParticleEmissionRate}
             setParticleLifetime={setParticleLifetime}
             setParticleMaxCount={setParticleMaxCount}
+            setParticleSpawnX={setParticleSpawnX}
+            setParticleSpawnY={setParticleSpawnY}
+            setParticleSpawnZ={setParticleSpawnZ}
+            setParticleSpawnRadius={setParticleSpawnRadius}
             setParticleStartColor={setParticleStartColor}
             setParticleEndColor={setParticleEndColor}
             setParticleStartSize={setParticleStartSize}
             setParticleEndSize={setParticleEndSize}
             setParticleShape={setParticleShape}
+            setParticleAudioTrack={setParticleAudioTrack}
+            setParticleAudioAffects={setParticleAudioAffects}
           />
         )}
         

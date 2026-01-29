@@ -42,19 +42,31 @@ interface EnvironmentsTabProps {
   particleEmissionRate: number;
   particleLifetime: number;
   particleMaxCount: number;
+  particleSpawnX: number;
+  particleSpawnY: number;
+  particleSpawnZ: number;
+  particleSpawnRadius: number;
   particleStartColor: string;
   particleEndColor: string;
   particleStartSize: number;
   particleEndSize: number;
   particleShape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
+  particleAudioTrack: 'bass' | 'mids' | 'highs' | 'all';
+  particleAudioAffects: string[];
   setParticleEmissionRate: (rate: number) => void;
   setParticleLifetime: (lifetime: number) => void;
   setParticleMaxCount: (count: number) => void;
+  setParticleSpawnX: (x: number) => void;
+  setParticleSpawnY: (y: number) => void;
+  setParticleSpawnZ: (z: number) => void;
+  setParticleSpawnRadius: (radius: number) => void;
   setParticleStartColor: (color: string) => void;
   setParticleEndColor: (color: string) => void;
   setParticleStartSize: (size: number) => void;
   setParticleEndSize: (size: number) => void;
   setParticleShape: (shape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron') => void;
+  setParticleAudioTrack: (track: 'bass' | 'mids' | 'highs' | 'all') => void;
+  setParticleAudioAffects: (affects: string[]) => void;
 }
 
 /**
@@ -375,6 +387,111 @@ export default function EnvironmentsTab(props: EnvironmentsTabProps) {
                 {shape === 'sphere' ? '🔮' : shape === 'cube' ? '🟪' : shape === 'tetrahedron' ? '🔷' : '💠'}
               </button>
             ))}
+          </div>
+        </div>
+        
+        {/* Spawn Position Controls */}
+        <div className="space-y-2 border-t border-gray-600 pt-3">
+          <label className="text-xs text-gray-400 block font-semibold">Spawn Position</label>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">X: {props.particleSpawnX.toFixed(1)}</label>
+              <input
+                type="range"
+                min="-20"
+                max="20"
+                step="0.5"
+                value={props.particleSpawnX}
+                onChange={(e) => props.setParticleSpawnX(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Y: {props.particleSpawnY.toFixed(1)}</label>
+              <input
+                type="range"
+                min="-20"
+                max="20"
+                step="0.5"
+                value={props.particleSpawnY}
+                onChange={(e) => props.setParticleSpawnY(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Z: {props.particleSpawnZ.toFixed(1)}</label>
+              <input
+                type="range"
+                min="-20"
+                max="20"
+                step="0.5"
+                value={props.particleSpawnZ}
+                onChange={(e) => props.setParticleSpawnZ(parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">
+              Spawn Radius: {props.particleSpawnRadius.toFixed(1)}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="0.5"
+              value={props.particleSpawnRadius}
+              onChange={(e) => props.setParticleSpawnRadius(parseFloat(e.target.value))}
+              className="w-full"
+            />
+          </div>
+        </div>
+        
+        {/* Audio Reactivity Controls */}
+        <div className="space-y-2 border-t border-gray-600 pt-3">
+          <label className="text-xs text-gray-400 block font-semibold">Audio Reactivity</label>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Audio Track</label>
+            <div className="grid grid-cols-4 gap-1">
+              {(['bass', 'mids', 'highs', 'all'] as const).map((track) => (
+                <button
+                  key={track}
+                  onClick={() => props.setParticleAudioTrack(track)}
+                  className={`px-2 py-1.5 rounded text-xs capitalize ${
+                    props.particleAudioTrack === track
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  {track}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Affects</label>
+            <div className="grid grid-cols-3 gap-1">
+              {['size', 'speed', 'color'].map((affect) => (
+                <button
+                  key={affect}
+                  onClick={() => {
+                    const current = props.particleAudioAffects;
+                    if (current.includes(affect)) {
+                      props.setParticleAudioAffects(current.filter(a => a !== affect));
+                    } else {
+                      props.setParticleAudioAffects([...current, affect]);
+                    }
+                  }}
+                  className={`px-2 py-1.5 rounded text-xs capitalize ${
+                    props.particleAudioAffects.includes(affect)
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                  }`}
+                >
+                  {affect}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
