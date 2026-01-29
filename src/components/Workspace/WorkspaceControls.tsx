@@ -310,11 +310,6 @@ export default function WorkspaceControls({
           )}
         </div>
       </div>
-          <div className="text-xs text-gray-500 text-center">
-            {listPoses().length} pose{listPoses().length !== 1 ? 's' : ''} saved
-          </div>
-        </div>
-      </div>
 
       {/* PR 5: Preset Authoring Mode */}
       {onTogglePresetAuthoring && (
