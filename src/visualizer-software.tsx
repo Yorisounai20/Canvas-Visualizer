@@ -67,6 +67,8 @@ import tornadovortexPreset from './presets/tornadovortex';
 import stadiumPreset from './presets/stadium';
 import kaleidoscope2Preset from './presets/kaleidoscope2';
 import emptyPreset from './presets/empty';
+// PR 4: Solver imports
+import { solveOrbit } from './presets/solvers/orbitSolver';
 import LayoutShell from './visualizer/LayoutShell';
 import TopBar from './visualizer/TopBar';
 import { 
@@ -216,6 +218,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
+  
+  // PR 5: Preset Authoring Mode
+  const [presetAuthoringMode, setPresetAuthoringMode] = useState(false);
+  const [authoringPreset, setAuthoringPreset] = useState('orbit');
+  const [mockTime, setMockTime] = useState(0);
+  const [mockAudio, setMockAudio] = useState({ bass: 128, mids: 128, highs: 128 });
   
   // NEW: Skybox controls
   const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
@@ -2009,8 +2017,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setExportProgress(0);
       addLog('Starting automated video export...', 'info');
 
-      // Get audio duration
+      // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
+      setDuration(duration); // FIX: Ensure animation loop has correct duration
       
       // Reset playback state
       if (bufferSourceRef.current) {
@@ -2178,6 +2187,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }, 100);
 
       addLog(`Exporting ${duration.toFixed(1)}s video at ${exportResolution} as ${extension.toUpperCase()}...`, 'info');
+      addLog(`Video bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps, Frame rate: 30 FPS`, 'info');
 
     } catch (e) {
       const error = e as Error;
@@ -3471,7 +3481,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         f = getFreq(data);
       }
       const el = (Date.now() - startTimeRef.current) * 0.001;
-      const t = el % duration;
+      // FIX: Prevent NaN if duration is not set (safety check for export)
+      const t = duration > 0 ? (el % duration) : el;
       
       // Throttle timeline updates to 10 FPS (instead of 60 FPS) to improve performance
       // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS milliseconds
@@ -3791,88 +3802,32 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           t.material.opacity = 0;
         });
       } else if (type === 'orbit') {
-        const rotationSpeed = KEYFRAME_ONLY_ROTATION_SPEED;
-        const r = activeCameraDistance - f.bass * 5;
-        cam.position.set(Math.cos(rotationSpeed + activeCameraRotation)*r + shakeX, 10 + activeCameraHeight + shakeY, Math.sin(rotationSpeed + activeCameraRotation)*r + shakeZ);
-        cam.lookAt(0,0,0);
-        obj.sphere.position.set(0, 0, 0);
-        const sunScale = 3 + f.bass * 2;
-        obj.sphere.scale.set(sunScale, sunScale, sunScale);
-        obj.sphere.rotation.x = 0;
-        obj.sphere.rotation.y += 0.01;
-        obj.sphere.rotation.z = 0;
-        obj.sphere.material.color.setStyle(sphereColor);
-        obj.sphere.material.opacity = (0.9 + f.bass * 0.1) * blend;
-        obj.sphere.material.wireframe = false;
-        obj.cubes.forEach((planet, i) => {
-          const orbitRadius = 5 + i * 1.8;
-          const orbitSpeed = 0.8 / (1 + i * 0.3);
-          const angle = elScaled * orbitSpeed + i * 0.5;
-          const tilt = Math.sin(i) * 0.3;
-          planet.position.x = Math.cos(angle) * orbitRadius;
-          planet.position.z = Math.sin(angle) * orbitRadius;
-          planet.position.y = Math.sin(angle * 2) * tilt;
-          const sizeVariation = [0.8, 0.6, 1.0, 0.7, 2.5, 2.2, 1.8, 1.6][i];
-          const planetSize = sizeVariation + f.bass * 0.3;
-          planet.scale.set(planetSize, planetSize, planetSize);
-          planet.rotation.x = tilt;
-          planet.rotation.y += 0.02 + i * 0.005;
-          planet.rotation.z = 0;
-          planet.material.color.setStyle(cubeColor);
-          planet.material.opacity = (0.8 + f.bass * 0.2) * blend;
-          planet.material.wireframe = false;
-        });
-        obj.octas.slice(0, 24).forEach((moon, i) => {
-          const planetIndex = Math.floor(i / 3) % obj.cubes.length;
-          const planet = obj.cubes[planetIndex];
-          const moonOrbitRadius = 1.2 + (i % 3) * 0.3;
-          const moonOrbitSpeed = 3 + (i % 3);
-          const moonAngle = elScaled * moonOrbitSpeed + i;
-          moon.position.x = planet.position.x + Math.cos(moonAngle) * moonOrbitRadius;
-          moon.position.y = planet.position.y + Math.sin(moonAngle) * moonOrbitRadius * 0.5;
-          moon.position.z = planet.position.z + Math.sin(moonAngle) * moonOrbitRadius;
-          const moonSize = 0.3 + f.mids * 0.2;
-          moon.scale.set(moonSize, moonSize, moonSize);
-          moon.rotation.x += 0.05;
-          moon.rotation.y += 0.03;
-          moon.rotation.z = 0;
-          moon.material.color.setStyle(octahedronColor);
-          moon.material.opacity = (0.6 + f.mids * 0.4) * blend;
-          moon.material.wireframe = false;
-        });
-        obj.octas.slice(24).forEach((rogue, i) => {
-          const layer = Math.floor(i / 6);
-          const posInLayer = i % 6;
-          const rogueDist = 25 + layer * 8;
-          const rogueAngle = (posInLayer / 6) * Math.PI * 2 + layer * 0.5;
-          rogue.position.x = Math.cos(rogueAngle) * rogueDist;
-          rogue.position.y = (posInLayer % 3 - 1) * 6;
-          rogue.position.z = Math.sin(rogueAngle) * rogueDist;
-          const rogueSize = 4 + layer * 2 + (i % 3);
-          rogue.scale.set(rogueSize, rogueSize, rogueSize);
-          rogue.rotation.x = elScaled * 0.05 + i;
-          rogue.rotation.y = elScaled * 0.03;
-          rogue.rotation.z = 0;
-          rogue.material.color.setStyle(octahedronColor);
-          rogue.material.opacity = (0.4 + f.mids * 0.2) * blend;
-          rogue.material.wireframe = true;
-        });
-        obj.tetras.forEach((asteroid, i) => {
-          const beltRadius = 11 + (i % 5) * 0.5;
-          const beltSpeed = 0.3;
-          const angle = elScaled * beltSpeed + i * 0.2;
-          const scatter = Math.sin(i * 10) * 2;
-          asteroid.position.x = Math.cos(angle) * (beltRadius + scatter);
-          asteroid.position.z = Math.sin(angle) * (beltRadius + scatter);
-          asteroid.position.y = Math.sin(angle * 3 + i) * 0.5 + f.highs * 0.5;
-          asteroid.rotation.x += 0.02;
-          asteroid.rotation.y += 0.03;
-          asteroid.rotation.z += 0.01;
-          const asteroidSize = 0.2 + f.highs * 0.3;
-          asteroid.scale.set(asteroidSize, asteroidSize, asteroidSize);
-          asteroid.material.color.setStyle(tetrahedronColor);
-          asteroid.material.opacity = (0.5 + f.highs * 0.4) * blend;
-          asteroid.material.wireframe = true;
+        // PR 4: Solver pattern - extracted to orbitSolver.ts
+        solveOrbit({
+          time: elScaled,
+          audio: { bass: f.bass, mids: f.mids, highs: f.highs },
+          poses: new Map(), // Empty for now (will use in PR 5-8)
+          pool: {
+            cubes: obj.cubes,
+            octahedrons: obj.octas,
+            tetrahedrons: obj.tetras,
+            toruses: obj.toruses,
+            planes: obj.planes,
+            sphere: obj.sphere
+          },
+          blend,
+          camera: cam,
+          rotationSpeed: KEYFRAME_ONLY_ROTATION_SPEED,
+          cameraDistance: activeCameraDistance,
+          cameraHeight: activeCameraHeight,
+          cameraRotation: activeCameraRotation,
+          shake: { x: shakeX, y: shakeY, z: shakeZ },
+          colors: {
+            cube: cubeColor,
+            octahedron: octahedronColor,
+            tetrahedron: tetrahedronColor,
+            sphere: sphereColor
+          }
         });
         
         // Hide unused toruses and planes
@@ -7994,6 +7949,57 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         uniforms.tintB.value = colorTintB;
       }
 
+      // PR 5: Preset Authoring Mode - Apply solver transformations to workspace objects
+      if (workspaceMode && presetAuthoringMode && workspaceObjects.length > 0) {
+        // When authoring mode is enabled, apply selected preset's solver to workspace objects
+        // This provides live preview of how the preset would animate the objects
+        
+        // Convert workspace objects to a solver-compatible pool format
+        const mockPool = {
+          cubes: workspaceObjects.filter(obj => obj.type === 'box' && obj.mesh).map(obj => obj.mesh!),
+          octahedrons: workspaceObjects.filter(obj => obj.type === 'sphere' && obj.mesh).map(obj => obj.mesh!),
+          tetrahedrons: workspaceObjects.filter(obj => obj.type === 'torus' && obj.mesh).map(obj => obj.mesh!),
+          toruses: workspaceObjects.filter(obj => obj.type === 'torus' && obj.mesh).map(obj => obj.mesh!),
+          planes: workspaceObjects.filter(obj => obj.type === 'plane' && obj.mesh).map(obj => obj.mesh!),
+          sphere: workspaceObjects.find(obj => obj.type === 'sphere' && obj.mesh)?.mesh || obj.sphere
+        };
+
+        // Build solver context with mock values from UI
+        const authoringContext = {
+          time: mockTime,
+          audio: {
+            bass: mockAudio.bass / 255, // Normalize to 0-1
+            mids: mockAudio.mids / 255,
+            highs: mockAudio.highs / 255
+          },
+          poses: new Map(), // Empty for now
+          pool: mockPool,
+          blend: 1.0, // Full opacity
+          camera: cam,
+          rotationSpeed: 0,
+          cameraDistance: 20,
+          cameraHeight: 0,
+          cameraRotation: 0,
+          shake: { x: 0, y: 0, z: 0 },
+          colors: {
+            cube: cubeColor,
+            octahedron: octahedronColor,
+            tetrahedron: tetrahedronColor,
+            sphere: sphereColor
+          }
+        };
+
+        // Call the selected solver (currently only orbit is extracted)
+        if (authoringPreset === 'orbit' && mockPool.cubes.length > 0) {
+          try {
+            solveOrbit(authoringContext);
+          } catch (error) {
+            console.error('Authoring mode solver error:', error);
+          }
+        }
+        // More solvers will be added as they're extracted in PR 4
+      }
+
       // Camera FX Rendering
       const activeFXClips = cameraFXClips.filter(clip => 
         clip.enabled && t >= clip.startTime && t < clip.endTime
@@ -8925,6 +8931,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 onToggleAxes={handleToggleAxes}
                 useWorkspaceObjects={useWorkspaceObjects}
                 onToggleVisualizationSource={handleToggleVisualizationSource}
+                workspaceObjects={workspaceObjects}
+                // PR 5: Preset Authoring Mode
+                presetAuthoringMode={presetAuthoringMode}
+                onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+                selectedPreset={authoringPreset}
+                onSelectPreset={setAuthoringPreset}
+                mockTime={mockTime}
+                onMockTimeChange={setMockTime}
+                mockAudio={mockAudio}
+                onMockAudioChange={setMockAudio}
               />
             </div>
           </div>
