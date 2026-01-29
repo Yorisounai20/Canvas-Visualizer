@@ -80,6 +80,8 @@ export interface ProjectState {
   workspaceObjects?: WorkspaceObject[];
   // PR 1: Pose Snapshot System
   poses?: PoseSnapshot[];
+  // PR 6: Preset Descriptor System
+  presetDescriptors?: PresetDescriptor[];
 }
 
 // PHASE 4: Preset parameters for parameter-driven animations
