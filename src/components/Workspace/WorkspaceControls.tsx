@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
+import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -27,6 +28,78 @@ interface WorkspaceControlsProps {
   onMockTimeChange?: (time: number) => void;
   mockAudio?: { bass: number; mids: number; highs: number };
   onMockAudioChange?: (audio: { bass: number; mids: number; highs: number }) => void;
+}
+
+/**
+ * PR 6: Preset Parameters Editor Component
+ * Allows editing preset descriptor parameters in real-time
+ */
+interface PresetParametersEditorProps {
+  presetName: string;
+}
+
+function PresetParametersEditor({ presetName }: PresetParametersEditorProps) {
+  const descriptor = getDescriptorBySolver(presetName);
+  
+  if (!descriptor) {
+    return null;
+  }
+
+  const handleParameterChange = (paramName: string, value: number) => {
+    updateDescriptorParameters(descriptor.id, { [paramName]: value });
+  };
+
+  // Define parameter ranges (could be stored in descriptor metadata in future)
+  const parameterRanges: Record<string, { min: number; max: number; step: number }> = {
+    speed: { min: 0.1, max: 5.0, step: 0.1 },
+    radius: { min: 1, max: 50, step: 1 },
+    planetScale: { min: 0.1, max: 3.0, step: 0.1 },
+    moonScale: { min: 0.1, max: 2.0, step: 0.1 },
+    asteroidSpeed: { min: 0.1, max: 10.0, step: 0.1 },
+    sunPulse: { min: 0, max: 3.0, step: 0.1 },
+    audioReactivity: { min: 0, max: 3.0, step: 0.1 }
+  };
+
+  return (
+    <div className="mb-3 pb-3 border-b border-gray-700">
+      <div className="text-xs font-semibold text-gray-400 mb-2">
+        <Sliders className="w-3 h-3 inline mr-1" />
+        Preset Parameters
+      </div>
+      
+      <div className="text-xs text-gray-500 mb-2">
+        {descriptor.name}
+      </div>
+
+      <div className="space-y-2">
+        {Object.entries(descriptor.parameters).map(([paramName, paramValue]) => {
+          const range = parameterRanges[paramName] || { min: 0, max: 10, step: 0.1 };
+          
+          return (
+            <div key={paramName}>
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span className="capitalize">{paramName.replace(/([A-Z])/g, ' $1').trim()}</span>
+                <span>{paramValue.toFixed(1)}</span>
+              </div>
+              <input
+                type="range"
+                min={range.min}
+                max={range.max}
+                step={range.step}
+                value={paramValue}
+                onChange={(e) => handleParameterChange(paramName, parseFloat(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-xs text-gray-500 italic mt-2">
+        🎨 Adjust parameters to customize preset motion
+      </div>
+    </div>
+  );
 }
 
 export default function WorkspaceControls({
@@ -285,6 +358,13 @@ export default function WorkspaceControls({
             </div>
           )}
         </div>
+      )}
+
+      {/* PR 6: Preset Parameters Editor */}
+      {presetAuthoringMode && selectedPreset && (
+        <PresetParametersEditor
+          presetName={selectedPreset}
+        />
       )}
 
       {/* Object creation buttons */}
