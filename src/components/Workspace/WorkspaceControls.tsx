@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
+import { exportWorkspaceAsPreset, canExportWorkspace, getAvailableSolvers } from '../../lib/workspaceExport';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -122,6 +123,9 @@ export default function WorkspaceControls({
   onMockAudioChange
 }: WorkspaceControlsProps) {
   const [poseName, setPoseName] = useState('');
+  // PR 8: Export state
+  const [exportPresetName, setExportPresetName] = useState('');
+  const [exportSolver, setExportSolver] = useState('orbit');
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -166,6 +170,22 @@ export default function WorkspaceControls({
     savePoseToStore(poseName.trim(), snapshot);
     setPoseName('');
     alert(`Pose "${poseName.trim()}" saved! (${workspaceObjects.length} objects)`);
+  };
+
+  // PR 8: Handle preset export
+  const handleExportPreset = () => {
+    const result = exportWorkspaceAsPreset(workspaceObjects, {
+      presetName: exportPresetName.trim(),
+      solverName: exportSolver,
+      includeParameters: true
+    });
+
+    if (result.success) {
+      alert(result.message);
+      setExportPresetName('');
+    } else {
+      alert(`Error: ${result.message}`);
+    }
   };
 
   return (
@@ -243,6 +263,53 @@ export default function WorkspaceControls({
             <Save className="w-3 h-3" />
             Save ({workspaceObjects.length} obj)
           </button>
+          <div className="text-xs text-gray-500 text-center">
+            {listPoses().length} pose{listPoses().length !== 1 ? 's' : ''} saved
+          </div>
+        </div>
+      </div>
+
+      {/* PR 8: Export as Preset */}
+      <div className="mb-3 pb-3 border-b border-gray-700">
+        <div className="text-xs font-semibold text-gray-400 mb-2">
+          <Download className="w-3 h-3 inline mr-1" />
+          Export as Preset
+        </div>
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={exportPresetName}
+            onChange={(e) => setExportPresetName(e.target.value)}
+            placeholder="Preset name..."
+            className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-xs text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+          />
+          <select
+            value={exportSolver}
+            onChange={(e) => setExportSolver(e.target.value)}
+            className="w-full px-2 py-1.5 bg-gray-700 border border-gray-600 rounded text-xs text-white focus:outline-none focus:border-purple-500"
+          >
+            {getAvailableSolvers().map(solver => (
+              <option key={solver} value={solver}>
+                {solver.charAt(0).toUpperCase() + solver.slice(1)}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleExportPreset}
+            disabled={!exportPresetName.trim() || !canExportWorkspace(workspaceObjects).valid}
+            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 rounded text-xs font-medium text-white transition-colors flex items-center justify-center gap-2"
+            title="Create reusable preset from workspace"
+          >
+            <Download className="w-3 h-3" />
+            Export Preset
+          </button>
+          {!canExportWorkspace(workspaceObjects).valid && (
+            <div className="text-xs text-red-400 text-center">
+              {canExportWorkspace(workspaceObjects).reason}
+            </div>
+          )}
+        </div>
+      </div>
           <div className="text-xs text-gray-500 text-center">
             {listPoses().length} pose{listPoses().length !== 1 ? 's' : ''} saved
           </div>
