@@ -4,6 +4,8 @@ import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
 import { exportWorkspaceAsPreset, canExportWorkspace, getAvailableSolvers } from '../../lib/workspaceExport';
+import { WorkspaceActions } from './WorkspaceActions';
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -29,6 +31,17 @@ interface WorkspaceControlsProps {
   onMockTimeChange?: (time: number) => void;
   mockAudio?: { bass: number; mids: number; highs: number };
   onMockAudioChange?: (audio: { bass: number; mids: number; highs: number }) => void;
+  // Blender-like Actions
+  selectedObjectId?: string | null;
+  onDuplicateObject?: () => void;
+  onDeleteObject?: () => void;
+  onSelectAll?: () => void;
+  onDeselectAll?: () => void;
+  onToggleObjectVisibility?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 /**
@@ -120,12 +133,25 @@ export default function WorkspaceControls({
   mockTime = 0,
   onMockTimeChange,
   mockAudio = { bass: 128, mids: 128, highs: 128 },
-  onMockAudioChange
+  onMockAudioChange,
+  // Blender-like Actions
+  selectedObjectId = null,
+  onDuplicateObject,
+  onDeleteObject,
+  onSelectAll,
+  onDeselectAll,
+  onToggleObjectVisibility,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo
 }: WorkspaceControlsProps) {
   const [poseName, setPoseName] = useState('');
   // PR 8: Export state
   const [exportPresetName, setExportPresetName] = useState('');
   const [exportSolver, setExportSolver] = useState('orbit');
+  // Keyboard shortcuts help
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -191,6 +217,29 @@ export default function WorkspaceControls({
   return (
     <div className="absolute top-4 left-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 space-y-2 z-10">
       <div className="text-xs font-semibold text-gray-300 mb-2">Workspace</div>
+      
+      {/* Blender-like Actions */}
+      {onDuplicateObject && onDeleteObject && onUndo && onRedo && (
+        <WorkspaceActions
+          selectedObjectId={selectedObjectId}
+          workspaceObjects={workspaceObjects}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onDuplicate={onDuplicateObject}
+          onDelete={onDeleteObject}
+          onUndo={onUndo}
+          onRedo={onRedo}
+          onSelectAll={onSelectAll || (() => {})}
+          onDeselectAll={onDeselectAll || (() => {})}
+          onToggleVisibility={onToggleObjectVisibility || (() => {})}
+          onShowHelp={() => setShowShortcutsHelp(true)}
+        />
+      )}
+      
+      {/* Keyboard Shortcuts Help Modal */}
+      {showShortcutsHelp && (
+        <KeyboardShortcutsHelp onClose={() => setShowShortcutsHelp(false)} />
+      )}
       
       {/* Visualization Source Toggle */}
       <div className="mb-3 pb-3 border-b border-gray-700">
