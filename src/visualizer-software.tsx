@@ -227,6 +227,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // Performance monitoring (PR 9: Guardrails)
   const [showPerformanceOverlay, setShowPerformanceOverlay] = useState(false);
   const perfMonitorRef = useRef<PerformanceMonitor | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false); // Track if typing in input to prevent shortcuts
   const [authoringPreset, setAuthoringPreset] = useState('orbit');
   const [mockTime, setMockTime] = useState(0);
   const [mockAudio, setMockAudio] = useState({ bass: 128, mids: 128, highs: 128 });
@@ -3021,6 +3022,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       autosaveService.stop();
     };
   }, []); // Empty dependency array - only run once on mount
+
+  // Track input focus to prevent keyboard shortcuts while typing
+  useEffect(() => {
+    const handleFocus = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.isContentEditable) {
+        setIsInputFocused(true);
+      }
+    };
+
+    const handleBlur = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.isContentEditable) {
+        setIsInputFocused(false);
+      }
+    };
+
+    document.addEventListener('focusin', handleFocus);
+    document.addEventListener('focusout', handleBlur);
+
+    return () => {
+      document.removeEventListener('focusin', handleFocus);
+      document.removeEventListener('focusout', handleBlur);
+    };
+  }, []);
 
   // Autosave integration - start/stop based on project ID
   useEffect(() => {
