@@ -1440,17 +1440,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
   
   // Update handler for text animator fields - supports both field-based and object-based updates
-  const updateTextAnimatorKeyframe = (id: string, fieldOrUpdates: string | Partial<any>, value?: any) => {
+  const updateTextAnimatorKeyframe = (id: string, fieldOrUpdate: string | Partial<TextAnimatorKeyframe>, value?: any) => {
     setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf => {
       if (kf.id !== id) return kf;
       
-      // If fieldOrUpdates is a string, it's the old field-based API
-      if (typeof fieldOrUpdates === 'string') {
-        return { ...kf, [fieldOrUpdates]: value };
+      // If fieldOrUpdate is a string, it's the old field-based API
+      if (typeof fieldOrUpdate === 'string') {
+        return { ...kf, [fieldOrUpdate]: value };
       }
       
       // Otherwise it's the new object-based API
-      return { ...kf, ...fieldOrUpdates };
+      return { ...kf, ...fieldOrUpdate };
     }).sort((a, b) => a.time - b.time));
   };
   
@@ -7676,9 +7676,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 case 'left': slideOffset.x = distance; break;
                 case 'right': slideOffset.x = -distance; break;
               }
-              charMesh.position.x = baseX + slideOffset.x * (1 - progress);
-              charMesh.position.y = baseY + slideOffset.y * (1 - progress);
-              charMesh.position.z = baseZ + slideOffset.z * (1 - progress);
+              charMesh.position.set(
+                baseX + slideOffset.x * (1 - progress),
+                baseY + slideOffset.y * (1 - progress),
+                baseZ + slideOffset.z * (1 - progress)
+              );
               (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
               break;
             }
@@ -9748,7 +9750,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-xs text-gray-400 block mb-1">
-                          Size: {(kf.size ?? 1).toFixed(1)}
+                          Size: {(kf.size ?? 1).toFixed(2)}
                         </label>
                         <input
                           type="range"
