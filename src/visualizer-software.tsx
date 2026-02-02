@@ -10179,8 +10179,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         <PerformanceOverlay
           visible={showPerformanceOverlay}
           metrics={perfMonitorRef.current.getCurrentMetrics()}
-          averages={perfMonitorRef.current.getAverages()}
-          warnings={perfMonitorRef.current.getWarnings()}
+          averages={perfMonitorRef.current.getAverageMetrics()}
+          warnings={perfMonitorRef.current.getRecentWarnings()}
         />
       )}
     </LayoutShell>
