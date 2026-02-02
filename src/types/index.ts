@@ -414,7 +414,6 @@ export interface WorkspaceObject {
   group?: string; // Logical group name (e.g., "head", "body", "fins")
   role?: string;  // Specific role within group (e.g., "fin_left", "fin_right")
 }
-}
 
 // Camera FX System - Keyframe-based camera tiling effects
 export type CameraFXType = 'grid' | 'kaleidoscope' | 'pip';

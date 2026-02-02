@@ -83,6 +83,8 @@ import {
   CameraRigTab 
 } from './components/Inspector';
 import DebugConsole from './components/Debug/DebugConsole';
+import { PerformanceOverlay } from './components/Performance/PerformanceOverlay';
+import { PerformanceMonitor } from './lib/performanceMonitor';
 import TimelineV2 from './components/Timeline/TimelineV2';
 import { SceneExplorer } from './components/Workspace/SceneExplorer';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
@@ -221,6 +223,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   
   // PR 5: Preset Authoring Mode
   const [presetAuthoringMode, setPresetAuthoringMode] = useState(false);
+  
+  // Performance monitoring (PR 9: Guardrails)
+  const [showPerformanceOverlay, setShowPerformanceOverlay] = useState(false);
+  const perfMonitorRef = useRef<PerformanceMonitor | null>(null);
   const [authoringPreset, setAuthoringPreset] = useState('orbit');
   const [mockTime, setMockTime] = useState(0);
   const [mockAudio, setMockAudio] = useState({ bass: 128, mids: 128, highs: 128 });
@@ -2773,6 +2779,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       scene = new THREE.Scene();
       scene.fog = new THREE.Fog(0x0a0a14, 10, 50);
       sceneRef.current = scene;
+      
+      // Initialize performance monitor (PR 9: Guardrails)
+      if (!perfMonitorRef.current) {
+        perfMonitorRef.current = new PerformanceMonitor();
+      }
+      
       camera = new THREE.PerspectiveCamera(75, 960/540, 0.1, 1000);
       camera.position.z = 15;
       cameraRef.current = camera;
@@ -8406,6 +8418,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
           setWorkspaceMode(prev => !prev);
         }
+      } else if (e.key === 'p' || e.key === 'P') {
+        // Toggle performance overlay (PR 9: Guardrails)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          setShowPerformanceOverlay(prev => !prev);
+        }
       } else if (e.key === '`') {
         // Toggle debug console
         setShowDebugConsole(prev => !prev);
@@ -10156,6 +10173,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         isOpen={showDebugConsole} 
         onToggle={() => setShowDebugConsole(prev => !prev)} 
       />
+
+      {/* Performance Overlay - PR 9: Guardrails - Toggle with P key */}
+      {perfMonitorRef.current && (
+        <PerformanceOverlay
+          visible={showPerformanceOverlay}
+          metrics={perfMonitorRef.current.getCurrentMetrics()}
+          averages={perfMonitorRef.current.getAverages()}
+          warnings={perfMonitorRef.current.getWarnings()}
+        />
+      )}
     </LayoutShell>
   );
 }
