@@ -89,6 +89,8 @@ import TimelineV2 from './components/Timeline/TimelineV2';
 import { SceneExplorer } from './components/Workspace/SceneExplorer';
 import WorkspaceControls from './components/Workspace/WorkspaceControls';
 import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
+import WorkspaceLeftPanel from './components/Workspace/WorkspaceLeftPanel';
+import WorkspaceRightPanel from './components/Workspace/WorkspaceRightPanel';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -8912,16 +8914,31 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Workspace mode panels
   const workspaceLeftPanelJSX = (
-    <SceneExplorer
-      objects={workspaceObjects}
+    <WorkspaceLeftPanel
+      workspaceObjects={workspaceObjects}
       selectedObjectId={selectedObjectId}
       onSelectObject={handleSelectObject}
       onDeleteObject={handleDeleteObject}
+      onCreateObject={handleCreateObject}
+      showGrid={showGrid}
+      onToggleGrid={handleToggleGrid}
+      showAxes={showAxes}
+      onToggleAxes={handleToggleAxes}
+      useWorkspaceObjects={useWorkspaceObjects}
+      onToggleVisualizationSource={handleToggleVisualizationSource}
+      onUpdateObjects={setWorkspaceObjects}
+      presetAuthoringMode={presetAuthoringMode}
+      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+      selectedPreset={authoringPreset}
+      onSelectPreset={setAuthoringPreset}
+      currentTime={currentTime}
     />
   );
 
   const workspaceRightPanelJSX = (
-    <ObjectPropertiesPanel
+    <WorkspaceRightPanel
+      workspaceObjects={workspaceObjects}
+      selectedObjectId={selectedObjectId}
       selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
       onUpdateObject={handleUpdateObject}
       onDeleteObject={handleDeleteObject}
@@ -8935,6 +8952,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       letterboxSize={letterboxSize}
       onSetShowLetterbox={setShowLetterbox}
       onSetLetterboxSize={setLetterboxSize}
+      onDuplicateObject={handleDuplicateObject}
+      onDeleteSelectedObject={handleDeleteSelectedObject}
+      onSelectAll={handleSelectAllObjects}
+      onDeselectAll={handleDeselectAll}
+      onToggleObjectVisibility={handleToggleObjectVisibility}
+      canUndo={false}
+      canRedo={false}
+      onUndo={handleUndo}
+      onRedo={handleRedo}
     />
   );
 
@@ -9167,43 +9193,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         
-        {/* Workspace Controls overlay */}
-        {workspaceMode && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="pointer-events-auto">
-              <WorkspaceControls
-                onCreateObject={handleCreateObject}
-                showGrid={showGrid}
-                onToggleGrid={handleToggleGrid}
-                showAxes={showAxes}
-                onToggleAxes={handleToggleAxes}
-                useWorkspaceObjects={useWorkspaceObjects}
-                onToggleVisualizationSource={handleToggleVisualizationSource}
-                workspaceObjects={workspaceObjects}
-                // PR 5: Preset Authoring Mode
-                presetAuthoringMode={presetAuthoringMode}
-                onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-                selectedPreset={authoringPreset}
-                onSelectPreset={setAuthoringPreset}
-                mockTime={mockTime}
-                onMockTimeChange={setMockTime}
-                mockAudio={mockAudio}
-                onMockAudioChange={setMockAudio}
-                // Phase 1 Part 2: Blender-like Actions
-                selectedObjectId={selectedObjectId}
-                onDuplicateObject={handleDuplicateObject}
-                onDeleteObject={handleDeleteSelectedObject}
-                onSelectAll={handleSelectAllObjects}
-                onDeselectAll={handleDeselectAll}
-                onToggleObjectVisibility={handleToggleObjectVisibility}
-                canUndo={false} // TODO: Wire to UndoRedoManager
-                canRedo={false} // TODO: Wire to UndoRedoManager
-                onUndo={handleUndo}
-                onRedo={handleRedo}
-              />
-            </div>
-          </div>
-        )}
+        {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
         
         {/* Playback controls overlay for Preview mode */}
         {viewMode === 'preview' && (
