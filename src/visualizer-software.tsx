@@ -8633,6 +8633,142 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setUseWorkspaceObjects(prev => !prev);
   };
 
+  // Workspace action handlers (Phase 1 Part 2)
+  const handleDuplicateObject = () => {
+    if (!selectedObjectId || !sceneRef.current) {
+      addLog('No object selected to duplicate', 'error');
+      return;
+    }
+    
+    const selectedObj = workspaceObjects.find(obj => obj.id === selectedObjectId);
+    if (!selectedObj) return;
+    
+    const id = `workspace-${selectedObj.type}-${Date.now()}`;
+    const duplicatedObject: WorkspaceObject = {
+      ...selectedObj,
+      id,
+      name: `${selectedObj.name} Copy`,
+      position: {
+        x: selectedObj.position.x + 2, // Offset by 2 units
+        y: selectedObj.position.y,
+        z: selectedObj.position.z
+      },
+      mesh: undefined // Will create new mesh
+    };
+    
+    // Create Three.js mesh
+    let geometry: THREE.BufferGeometry;
+    switch (selectedObj.type) {
+      case 'sphere':
+        geometry = new THREE.SphereGeometry(1, 32, 32);
+        break;
+      case 'box':
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+        break;
+      case 'plane':
+        geometry = new THREE.PlaneGeometry(2, 2);
+        break;
+      case 'torus':
+        geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+      default:
+        geometry = new THREE.BoxGeometry(1, 1, 1);
+    }
+    
+    // Create material matching original
+    let material: THREE.Material;
+    const materialProps = {
+      color: new THREE.Color(duplicatedObject.color),
+      wireframe: duplicatedObject.wireframe,
+      transparent: duplicatedObject.opacity < 1,
+      opacity: duplicatedObject.opacity
+    };
+    
+    switch (duplicatedObject.materialType) {
+      case 'standard':
+        material = new THREE.MeshStandardMaterial({
+          ...materialProps,
+          metalness: duplicatedObject.metalness,
+          roughness: duplicatedObject.roughness
+        });
+        break;
+      case 'phong':
+        material = new THREE.MeshPhongMaterial(materialProps);
+        break;
+      case 'lambert':
+        material = new THREE.MeshLambertMaterial(materialProps);
+        break;
+      default:
+        material = new THREE.MeshBasicMaterial(materialProps);
+    }
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(duplicatedObject.position.x, duplicatedObject.position.y, duplicatedObject.position.z);
+    mesh.rotation.set(
+      duplicatedObject.rotation.x * Math.PI / 180,
+      duplicatedObject.rotation.y * Math.PI / 180,
+      duplicatedObject.rotation.z * Math.PI / 180
+    );
+    mesh.scale.set(duplicatedObject.scale.x, duplicatedObject.scale.y, duplicatedObject.scale.z);
+    mesh.visible = duplicatedObject.visible;
+    
+    sceneRef.current.add(mesh);
+    duplicatedObject.mesh = mesh;
+    
+    setWorkspaceObjects(prev => [...prev, duplicatedObject]);
+    setSelectedObjectId(id);
+    
+    addLog(`Duplicated object: ${duplicatedObject.name}`, 'success');
+  };
+  
+  const handleDeleteSelectedObject = () => {
+    if (!selectedObjectId) {
+      addLog('No object selected to delete', 'error');
+      return;
+    }
+    handleDeleteObject(selectedObjectId);
+  };
+  
+  const handleSelectAllObjects = () => {
+    if (workspaceObjects.length === 0) {
+      addLog('No objects to select', 'info');
+      return;
+    }
+    // For now, just select the first object
+    // TODO: Implement multi-select in future
+    setSelectedObjectId(workspaceObjects[0].id);
+    addLog(`Selected ${workspaceObjects.length} objects (multi-select coming soon)`, 'info');
+  };
+  
+  const handleDeselectAll = () => {
+    setSelectedObjectId(null);
+    addLog('Deselected all objects', 'info');
+  };
+  
+  const handleToggleObjectVisibility = () => {
+    if (!selectedObjectId) {
+      addLog('No object selected', 'error');
+      return;
+    }
+    
+    const selectedObj = workspaceObjects.find(obj => obj.id === selectedObjectId);
+    if (!selectedObj) return;
+    
+    handleUpdateObject(selectedObjectId, { visible: !selectedObj.visible });
+    addLog(`Object visibility: ${!selectedObj.visible ? 'visible' : 'hidden'}`, 'info');
+  };
+  
+  // Undo/Redo placeholders (will implement with UndoRedoManager later)
+  const handleUndo = () => {
+    addLog('Undo functionality coming soon', 'info');
+    // TODO: Implement undo with UndoRedoManager
+  };
+  
+  const handleRedo = () => {
+    addLog('Redo functionality coming soon', 'info');
+    // TODO: Implement redo with UndoRedoManager
+  };
+
   // Effect: Hide default audio-reactive shapes when using workspace objects
   useEffect(() => {
     if (!objectsRef.current) return;
@@ -8941,6 +9077,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 onMockTimeChange={setMockTime}
                 mockAudio={mockAudio}
                 onMockAudioChange={setMockAudio}
+                // Phase 1 Part 2: Blender-like Actions
+                selectedObjectId={selectedObjectId}
+                onDuplicateObject={handleDuplicateObject}
+                onDeleteObject={handleDeleteSelectedObject}
+                onSelectAll={handleSelectAllObjects}
+                onDeselectAll={handleDeselectAll}
+                onToggleObjectVisibility={handleToggleObjectVisibility}
+                canUndo={false} // TODO: Wire to UndoRedoManager
+                canRedo={false} // TODO: Wire to UndoRedoManager
+                onUndo={handleUndo}
+                onRedo={handleRedo}
               />
             </div>
           </div>
