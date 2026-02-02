@@ -75,10 +75,10 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         {/* Left sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
         <aside className={`absolute left-0 top-0 h-[45vh] border-r border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        } ${workspaceMode ? 'w-64' : 'w-24'}`}>
+        } ${workspaceMode ? 'w-80' : 'w-24'}`}>
           {workspaceMode ? (
             // Workspace mode: Render left content directly without PanelContainer
-            <div className="h-full overflow-y-auto flex flex-col">
+            <div className="h-full overflow-hidden flex flex-col">
               {left}
             </div>
           ) : (
@@ -92,10 +92,10 @@ export default function LayoutShell({ left, inspector, timeline, top, children, 
         {/* Right sidebar - hidden in preview mode using CSS to prevent unmounting/remounting */}
         <aside className={`absolute right-0 top-0 h-[45vh] border-l border-gray-800 bg-gray-900/95 backdrop-blur-sm flex flex-col z-10 shadow-2xl ${
           viewMode === 'preview' ? 'hidden' : ''
-        } w-56`}>
+        } ${workspaceMode ? 'w-72' : 'w-56'}`}>
           {workspaceMode ? (
             // Workspace mode: Render inspector content directly without PanelContainer
-            <div className="h-full overflow-y-auto flex flex-col">
+            <div className="h-full overflow-hidden flex flex-col">
               {inspector}
             </div>
           ) : (
