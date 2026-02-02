@@ -1,5 +1,22 @@
 // Type definitions for the visualizer application
 
+// PR 1: Pose Snapshot System - Capture and restore shape state
+export interface PoseSnapshot {
+  id: string;
+  name: string;
+  timestamp: string;
+  objects: {
+    objectId: string;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    scale: [number, number, number];
+    visible: boolean;
+    material: string;
+    color: string;
+    opacity: number;
+  }[];
+}
+
 // PHASE 2: Project state schema for save/load functionality
 export interface ProjectSettings {
   name: string;
@@ -144,6 +161,33 @@ export interface PresetParameters {
   speed: number;      // Animation speed multiplier (0.1-10.0)
   intensity: number;  // Audio reactivity strength (0-3.0)
   spread: number;     // Spatial distribution/radius (1-50)
+}
+
+// PR 6: Preset Descriptor - JSON-driven preset definitions
+export interface PresetDescriptor {
+  id: string;                              // Unique identifier
+  name: string;                            // Display name (e.g., "Orbital Dance")
+  solver: string;                          // Solver function name (e.g., "orbit")
+  basePose?: string;                       // Optional: Name of base pose to start from
+  parameters: Record<string, number>;      // Configurable numeric parameters
+  metadata?: {
+    description?: string;
+    author?: string;
+    created?: string;
+    tags?: string[];
+  };
+}
+
+// PR 6: Parameter Definition - Schema for UI generation
+export interface ParameterDefinition {
+  name: string;           // Parameter key
+  label: string;          // Display label
+  type: 'number';         // Type (only number for now)
+  defaultValue: number;   // Default value
+  min: number;            // Minimum value
+  max: number;            // Maximum value
+  step: number;           // Step size for slider
+  description?: string;   // Optional description
 }
 
 export interface Section {
@@ -341,6 +385,7 @@ export interface CameraRigKeyframe {
 
 // PHASE 3: Workspace object schema for manual 3D object creation
 // FINAL ARCHITECTURE: Extended to support cameras and lights
+// PR 2: Extended with group and role for semantic targeting
 export interface WorkspaceObject {
   id: string;
   type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light';
@@ -365,6 +410,9 @@ export interface WorkspaceObject {
   // Letterbox properties (when type === 'camera')
   showLetterbox?: boolean;
   letterboxSize?: number; // 0-100 pixels
+  // PR 2: Object Grouping + Naming - Semantic targeting for presets
+  group?: string; // Logical group name (e.g., "head", "body", "fins")
+  role?: string;  // Specific role within group (e.g., "fin_left", "fin_right")
 }
 
 // Camera FX System - Keyframe-based camera tiling effects
