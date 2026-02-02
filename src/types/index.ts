@@ -294,6 +294,10 @@ export interface TextAnimatorKeyframe {
   stagger: number; // Delay between each character (in seconds)
   duration: number; // Duration per character animation
   characterOffsets?: CharacterOffset[]; // Per-character position/rotation/scale
+  // Position controls for multi-text support
+  position?: { x: number; y: number; z: number };
+  size?: number; // Font size multiplier
+  color?: string; // Hex color
 }
 
 export interface CharacterOffset {

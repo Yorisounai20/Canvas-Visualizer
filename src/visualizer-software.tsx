@@ -1435,11 +1435,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
-  // Update handler for text animator fields (including duration)
-  const updateTextAnimatorKeyframe = (id: string, field: string, value: any) => {
-    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
-      kf.id === id ? { ...kf, [field]: value } : kf
-    ).sort((a, b) => a.time - b.time));
+  // Update handler for text animator fields - supports both field-based and object-based updates
+  const updateTextAnimatorKeyframe = (id: string, fieldOrUpdates: string | Partial<any>, value?: any) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf => {
+      if (kf.id !== id) return kf;
+      
+      // If fieldOrUpdates is a string, it's the old field-based API
+      if (typeof fieldOrUpdates === 'string') {
+        return { ...kf, [fieldOrUpdates]: value };
+      }
+      
+      // Otherwise it's the new object-based API
+      return { ...kf, ...fieldOrUpdates };
+    }).sort((a, b) => a.time - b.time));
   };
   
   // REMOVED: Mask reveal handler (orphaned feature)
@@ -2233,7 +2241,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       direction: 'up' as const,
       stagger: 0.05, // 50ms between characters
       duration: 0.5, // 500ms per character
-      characterOffsets: []
+      characterOffsets: [],
+      position: { x: 0, y: 5, z: 0 }, // Default position
+      size: 1, // Default size
+      color: '#00ffff' // Default cyan color
     };
     setTextAnimatorKeyframes(prev => [...prev, newKeyframe]);
     addLog(`Created text animator keyframe at ${formatTime(time)}`, 'success');
@@ -7531,32 +7542,69 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       textAnimatorKeyframes.forEach(textKf => {
         if (!fontRef.current) return;
         
+        // Get keyframe-specific properties with defaults
+        const kfPosition = textKf.position ?? { x: 0, y: 5, z: 0 };
+        const kfSize = textKf.size ?? 1;
+        const kfColor = textKf.color ?? '#00ffff';
+        
+        const existingMeshes = textCharacterMeshesRef.current.get(textKf.id);
+        
+        // Check if we need to recreate meshes (text or size changed)
+        const needsRecreate = existingMeshes && (
+          existingMeshes.length !== textKf.text.length ||
+          (existingMeshes[0]?.userData.textSize !== kfSize)
+        );
+        
+        if (needsRecreate && existingMeshes) {
+          // Clean up old meshes
+          existingMeshes.forEach(mesh => {
+            scene.remove(mesh);
+            if (mesh.geometry) mesh.geometry.dispose();
+            if (mesh.material) {
+              if (Array.isArray(mesh.material)) {
+                mesh.material.forEach(m => m.dispose());
+              } else {
+                mesh.material.dispose();
+              }
+            }
+          });
+          textCharacterMeshesRef.current.delete(textKf.id);
+        }
+        
         // Create character meshes if they don't exist
         if (!textCharacterMeshesRef.current.has(textKf.id)) {
           const characterMeshes: THREE.Mesh[] = [];
           const chars = textKf.text.split('');
-          let xOffset = -(textKf.text.length * 0.6) / 2; // Center text
+          const charSpacing = 0.6 * kfSize; // Scale spacing with size
+          let xOffset = -(textKf.text.length * charSpacing) / 2; // Center text
           
           chars.forEach((char, index) => {
             const textGeometry = new TextGeometry(char, {
               font: fontRef.current,
-              size: 1,
-              height: 0.2,
+              size: 1 * kfSize, // Apply size multiplier
+              height: 0.2 * kfSize,
               curveSegments: 12,
               bevelEnabled: true,
-              bevelThickness: 0.03,
-              bevelSize: 0.02,
+              bevelThickness: 0.03 * kfSize,
+              bevelSize: 0.02 * kfSize,
               bevelSegments: 5
             });
             
             const textMaterial = new THREE.MeshBasicMaterial({
-              color: bassColor,
+              color: kfColor, // Use keyframe color
               transparent: true,
               opacity: 0
             });
             
             const charMesh = new THREE.Mesh(textGeometry, textMaterial);
-            charMesh.position.set(xOffset, 5, 0);
+            // Use keyframe position instead of hardcoded (5, 0)
+            charMesh.position.set(kfPosition.x + xOffset, kfPosition.y, kfPosition.z);
+            
+            // Store base position and size for animation and change detection
+            charMesh.userData.baseX = kfPosition.x + xOffset;
+            charMesh.userData.baseY = kfPosition.y;
+            charMesh.userData.baseZ = kfPosition.z;
+            charMesh.userData.textSize = kfSize;
             
             // Apply character-specific offsets if defined
             const offset = textKf.characterOffsets?.find((o: any) => o.index === index);
@@ -7570,7 +7618,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             
             scene.add(charMesh);
             characterMeshes.push(charMesh);
-            xOffset += 0.6; // Spacing between characters
+            xOffset += charSpacing; // Spacing between characters
           });
           
           textCharacterMeshesRef.current.set(textKf.id, characterMeshes);
@@ -7602,10 +7650,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           // Calculate animation progress (0 to 1)
           const progress = Math.min(charAnimTime / textKf.duration, 1);
           
+          // Get base positions from userData
+          const baseX = charMesh.userData.baseX ?? 0;
+          const baseY = charMesh.userData.baseY ?? 5;
+          const baseZ = charMesh.userData.baseZ ?? 0;
+          
           // Apply animation based on type
           switch (textKf.animation) {
             case 'fade':
               (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
+              // Reset position to base
+              charMesh.position.set(baseX, baseY, baseZ);
               break;
             
             case 'slide': {
@@ -7617,9 +7672,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 case 'left': slideOffset.x = distance; break;
                 case 'right': slideOffset.x = -distance; break;
               }
-              const baseY = 5;
+              charMesh.position.x = baseX + slideOffset.x * (1 - progress);
               charMesh.position.y = baseY + slideOffset.y * (1 - progress);
-              charMesh.position.x += slideOffset.x * (1 - progress);
+              charMesh.position.z = baseZ + slideOffset.z * (1 - progress);
               (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
               break;
             }
@@ -7627,23 +7682,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             case 'scale': {
               const scale = progress;
               charMesh.scale.setScalar(scale);
+              charMesh.position.set(baseX, baseY, baseZ);
               (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
               break;
             }
             
             case 'bounce': {
               const bounceHeight = Math.abs(Math.sin(progress * Math.PI)) * 2;
-              charMesh.position.y = 5 + bounceHeight;
+              charMesh.position.x = baseX;
+              charMesh.position.y = baseY + bounceHeight;
+              charMesh.position.z = baseZ;
               (charMesh.material as THREE.MeshBasicMaterial).opacity = progress;
               break;
             }
             
             default:
               (charMesh.material as THREE.MeshBasicMaterial).opacity = textKf.visible ? 1 : 0;
+              charMesh.position.set(baseX, baseY, baseZ);
           }
           
-          // Update color
-          (charMesh.material as THREE.MeshBasicMaterial).color.setStyle(bassColor);
+          // Update color to use keyframe-specific color
+          (charMesh.material as THREE.MeshBasicMaterial).color.setStyle(kfColor);
         });
       });
 

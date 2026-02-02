@@ -2,7 +2,7 @@ import React from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 
 interface TextAnimatorKeyframe {
-  id: number;
+  id: string;
   time: number;
   text: string;
   animation: string;
@@ -10,6 +10,9 @@ interface TextAnimatorKeyframe {
   stagger: number;
   duration: number;
   visible: boolean;
+  position?: { x: number; y: number; z: number };
+  size?: number;
+  color?: string;
 }
 
 interface TextAnimatorTabProps {
@@ -35,8 +38,8 @@ interface TextAnimatorTabProps {
   setTextMetalness: (metalness: number) => void;
   setTextRoughness: (roughness: number) => void;
   createTextAnimatorKeyframe: (time: number) => void;
-  deleteTextAnimatorKeyframe: (id: number) => void;
-  updateTextAnimatorKeyframe: (id: number, updates: Partial<TextAnimatorKeyframe>) => void;
+  deleteTextAnimatorKeyframe: (id: string) => void;
+  updateTextAnimatorKeyframe: (id: string, updates: Partial<TextAnimatorKeyframe>) => void;
   formatTime: (time: number) => string;
 }
 
@@ -268,6 +271,86 @@ export default function TextAnimatorTab({
                   </select>
                 </div>
               )}
+
+              {/* Position Controls */}
+              <div className="mb-3 p-3 bg-gray-600 rounded">
+                <label className="text-xs text-gray-400 block mb-2 font-semibold">Position</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">X</label>
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      value={kf.position?.x ?? 0}
+                      onChange={(e) => updateTextAnimatorKeyframe(kf.id, { 
+                        position: { 
+                          x: parseFloat(e.target.value) || 0, 
+                          y: kf.position?.y ?? 5, 
+                          z: kf.position?.z ?? 0 
+                        } 
+                      })}
+                      className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Y</label>
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      value={kf.position?.y ?? 5}
+                      onChange={(e) => updateTextAnimatorKeyframe(kf.id, { 
+                        position: { 
+                          x: kf.position?.x ?? 0, 
+                          y: parseFloat(e.target.value) || 5, 
+                          z: kf.position?.z ?? 0 
+                        } 
+                      })}
+                      className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Z</label>
+                    <input 
+                      type="number" 
+                      step="0.5"
+                      value={kf.position?.z ?? 0}
+                      onChange={(e) => updateTextAnimatorKeyframe(kf.id, { 
+                        position: { 
+                          x: kf.position?.x ?? 0, 
+                          y: kf.position?.y ?? 5, 
+                          z: parseFloat(e.target.value) || 0 
+                        } 
+                      })}
+                      className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Size and Color Controls */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Size: {(kf.size ?? 1).toFixed(2)}</label>
+                  <input 
+                    type="range" 
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={kf.size ?? 1}
+                    onChange={(e) => updateTextAnimatorKeyframe(kf.id, { size: parseFloat(e.target.value) })}
+                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Color</label>
+                  <input 
+                    type="color" 
+                    value={kf.color ?? '#00ffff'}
+                    onChange={(e) => updateTextAnimatorKeyframe(kf.id, { color: e.target.value })}
+                    className="w-full h-8 rounded cursor-pointer"
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
