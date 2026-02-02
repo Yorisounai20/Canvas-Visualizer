@@ -363,6 +363,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [parameterSettingsExpanded, setParameterSettingsExpanded] = useState(false); // Collapsible settings
   
+  // Text Animator edit modal
+  const [showTextAnimatorModal, setShowTextAnimatorModal] = useState(false);
+  const [editingTextAnimatorId, setEditingTextAnimatorId] = useState<string | null>(null);
+  
   // PHASE 4: Active parameter effect values (stored in refs for performance)
   const activeBackgroundFlashRef = useRef(0);
   const activeVignettePulseRef = useRef(0);
@@ -9633,6 +9637,152 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   </div>
                 </>
               )}
+            </div>
+            
+            {/* Text Animator Keyframes Section */}
+            <div className="bg-gray-700 rounded p-3 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs text-gray-400 uppercase font-semibold">📝 Text Animator Keyframes</h4>
+                <button
+                  onClick={() => {
+                    createTextAnimatorKeyframe(currentTime);
+                    addLog(`Created text animator keyframe at ${formatTime(currentTime)}`, 'success');
+                  }}
+                  disabled={!fontLoaded}
+                  className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-xs flex items-center gap-1"
+                >
+                  <span>➕</span> Add Keyframe
+                </button>
+              </div>
+              
+              {!fontLoaded && (
+                <div className="bg-yellow-900 bg-opacity-30 border border-yellow-600 rounded p-2">
+                  <p className="text-yellow-400 text-xs">⚠️ Font not loaded. Upload a font to use text animator.</p>
+                </div>
+              )}
+              
+              {textAnimatorKeyframes.length === 0 && fontLoaded && (
+                <div className="text-center text-gray-500 py-4 text-xs">
+                  No text keyframes yet. Click "Add Keyframe" to create one.
+                </div>
+              )}
+              
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {textAnimatorKeyframes.map(kf => (
+                  <div key={kf.id} className="bg-gray-800 rounded p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-cyan-400 font-mono text-xs">{formatTime(kf.time)}</span>
+                      <button
+                        onClick={() => deleteTextAnimatorKeyframe(kf.id)}
+                        className="text-red-400 hover:text-red-300 text-xs"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                    
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">Text</label>
+                      <input
+                        type="text"
+                        value={kf.text}
+                        onChange={(e) => updateTextAnimatorKeyframe(kf.id, { text: e.target.value })}
+                        className="w-full bg-gray-700 text-white text-xs px-2 py-1 rounded"
+                      />
+                    </div>
+                    
+                    {/* Position Controls */}
+                    <div className="bg-gray-700 rounded p-2">
+                      <label className="text-xs text-gray-400 block mb-1 font-semibold">Position</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        <div>
+                          <label className="text-xs text-gray-500">X</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={kf.position?.x ?? 0}
+                            onChange={(e) => updateTextAnimatorKeyframe(kf.id, {
+                              position: {
+                                x: parseFloat(e.target.value) || 0,
+                                y: kf.position?.y ?? 5,
+                                z: kf.position?.z ?? 0
+                              }
+                            })}
+                            className="w-full bg-gray-600 text-white text-xs px-1 py-0.5 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">Y</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={kf.position?.y ?? 5}
+                            onChange={(e) => updateTextAnimatorKeyframe(kf.id, {
+                              position: {
+                                x: kf.position?.x ?? 0,
+                                y: parseFloat(e.target.value) || 5,
+                                z: kf.position?.z ?? 0
+                              }
+                            })}
+                            className="w-full bg-gray-600 text-white text-xs px-1 py-0.5 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500">Z</label>
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={kf.position?.z ?? 0}
+                            onChange={(e) => updateTextAnimatorKeyframe(kf.id, {
+                              position: {
+                                x: kf.position?.x ?? 0,
+                                y: kf.position?.y ?? 5,
+                                z: parseFloat(e.target.value) || 0
+                              }
+                            })}
+                            className="w-full bg-gray-600 text-white text-xs px-1 py-0.5 rounded"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">
+                          Size: {(kf.size ?? 1).toFixed(1)}
+                        </label>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="3"
+                          step="0.1"
+                          value={kf.size ?? 1}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { size: parseFloat(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Color</label>
+                        <input
+                          type="color"
+                          value={kf.color ?? '#00ffff'}
+                          onChange={(e) => updateTextAnimatorKeyframe(kf.id, { color: e.target.value })}
+                          className="w-full h-6 rounded cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-400">Visible</label>
+                      <input
+                        type="checkbox"
+                        checked={kf.visible}
+                        onChange={(e) => updateTextAnimatorKeyframe(kf.id, { visible: e.target.checked })}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             
             <p className="text-xs text-gray-500 italic">
