@@ -138,16 +138,17 @@ export default function WorkspaceRightPanel({
         <div className="border-b border-gray-800 p-2">
           <WorkspaceActions
             selectedObjectId={selectedObjectId}
-            objectCount={workspaceObjects.length}
-            onDuplicateObject={onDuplicateObject}
-            onDeleteObject={onDeleteSelectedObject}
-            onSelectAll={onSelectAll}
-            onDeselectAll={onDeselectAll}
-            onToggleObjectVisibility={onToggleObjectVisibility}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            onUndo={onUndo}
-            onRedo={onRedo}
+            workspaceObjects={workspaceObjects || []}
+            canUndo={canUndo || false}
+            canRedo={canRedo || false}
+            onDuplicate={onDuplicateObject || (() => {})}
+            onDelete={onDeleteSelectedObject || (() => {})}
+            onUndo={onUndo || (() => {})}
+            onRedo={onRedo || (() => {})}
+            onSelectAll={onSelectAll || (() => {})}
+            onDeselectAll={onDeselectAll || (() => {})}
+            onToggleVisibility={onToggleObjectVisibility || (() => {})}
+            onShowHelp={() => {}}
           />
         </div>
       )}
@@ -174,7 +175,7 @@ export default function WorkspaceRightPanel({
 
         {activeTab === 'templates' && (
           <TemplatesPanel
-            workspaceObjects={workspaceObjects}
+            workspaceObjects={workspaceObjects || []}
             presetAuthoringMode={presetAuthoringMode}
             onTogglePresetAuthoring={onTogglePresetAuthoring}
             selectedPreset={selectedPreset}
@@ -184,7 +185,7 @@ export default function WorkspaceRightPanel({
 
         {activeTab === 'poses' && (
           <PosesPanel
-            workspaceObjects={workspaceObjects}
+            workspaceObjects={workspaceObjects || []}
             onApplyPose={onApplyPose}
           />
         )}
