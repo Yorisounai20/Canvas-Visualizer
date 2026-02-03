@@ -9894,6 +9894,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
       </div>
     </div>
+  );
   // --- End constants ---
 
   // Use custom workspace layout when in workspace mode
