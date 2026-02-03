@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Circle, Square, Torus, Grid3x3 } from 'lucide-react';
+import { Box, Circle, Square, Torus } from 'lucide-react';
 import { SceneExplorer } from './SceneExplorer';
 import { WorkspaceObject } from '../../types';
 
@@ -75,40 +75,18 @@ export default function ScenePanel({
           </button>
         </div>
 
-        {/* Scene Options */}
-        <div className="mt-3 space-y-2">
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-300 transition-colors">
-            <input
-              type="checkbox"
-              checked={showGrid}
-              onChange={onToggleGrid}
-              className="w-4 h-4 rounded"
-            />
-            <Grid3x3 size={14} />
-            <span>Show Grid</span>
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-300 transition-colors">
-            <input
-              type="checkbox"
-              checked={showAxes}
-              onChange={onToggleAxes}
-              className="w-4 h-4 rounded"
-            />
-            <span>Show Axes</span>
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-gray-300 transition-colors">
-            <input
-              type="checkbox"
-              checked={useWorkspaceObjects}
-              onChange={onToggleVisualizationSource}
-              className="w-4 h-4 rounded"
-            />
-            <span>Use Workspace Objects</span>
-          </label>
+        {/* Scene Options - Moved to keyboard shortcuts (G, A, U) */}
+        <div className="mt-3 p-2 bg-gray-800 rounded text-xs text-gray-400">
+          <div className="font-semibold mb-1 text-gray-300">Keyboard Shortcuts:</div>
+          <div className="space-y-0.5">
+            <div><kbd className="px-1 py-0.5 bg-gray-700 rounded text-gray-200">G</kbd> Toggle Grid {showGrid && '✓'}</div>
+            <div><kbd className="px-1 py-0.5 bg-gray-700 rounded text-gray-200">A</kbd> Toggle Axes {showAxes && '✓'}</div>
+            <div><kbd className="px-1 py-0.5 bg-gray-700 rounded text-gray-200">U</kbd> Use Workspace Objects {useWorkspaceObjects && '✓'}</div>
+          </div>
         </div>
       </div>
 
-      {/* Scene Explorer - Object Hierarchy */}
+      {/* Scene Explorer - Now has more space */}
       <div className="flex-1 overflow-y-auto">
         <SceneExplorer
           objects={workspaceObjects}
@@ -118,11 +96,9 @@ export default function ScenePanel({
         />
       </div>
 
-      {/* Object Count Footer */}
-      <div className="p-2 border-t border-gray-800 bg-gray-850">
-        <div className="text-xs text-gray-500 text-center">
-          {workspaceObjects.length} {workspaceObjects.length === 1 ? 'object' : 'objects'} in scene
-        </div>
+      {/* Object count footer */}
+      <div className="px-3 py-2 border-t border-gray-800 bg-gray-850 text-xs text-gray-500 text-center">
+        {workspaceObjects.length} object{workspaceObjects.length !== 1 ? 's' : ''} in scene
       </div>
     </div>
   );

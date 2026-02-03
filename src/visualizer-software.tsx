@@ -8515,8 +8515,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         e.preventDefault();
         setViewMode('preview');
       } else if (e.key === 'g' || e.key === 'G') {
-        // Toggle camera rig hints
-        setShowRigHints(prev => !prev);
+        // Toggle camera rig hints in editor mode, or toggle grid in workspace mode
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          if (workspaceMode) {
+            setShowGrid(prev => !prev);
+          } else {
+            setShowRigHints(prev => !prev);
+          }
+        }
+      } else if (e.key === 'a' || e.key === 'A') {
+        // Toggle axes in workspace mode (only when no modifiers)
+        if (workspaceMode && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          setShowAxes(prev => !prev);
+        }
+      } else if (e.key === 'u' || e.key === 'U') {
+        // Toggle use workspace objects in workspace mode
+        if (workspaceMode && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          setUseWorkspaceObjects(prev => !prev);
+        }
       } else if (e.key === 'w' || e.key === 'W') {
         // Toggle workspace mode
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -8544,7 +8561,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole, workspaceMode]);
 
   // Update workspace grid and axes visibility
   useEffect(() => {

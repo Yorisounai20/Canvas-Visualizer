@@ -110,45 +110,6 @@ export default function TemplatesPanel({
         </div>
       </div>
 
-      {/* Preset Authoring Mode */}
-      {onTogglePresetAuthoring && (
-        <div className="p-3 border-b border-gray-800">
-          <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-2">
-            <Sparkles size={14} />
-            Authoring Mode
-          </div>
-          
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={presetAuthoringMode}
-              onChange={onTogglePresetAuthoring}
-              className="w-4 h-4 rounded"
-            />
-            <span>Enable Live Preview</span>
-          </label>
-          
-          <p className="text-xs text-gray-500 mt-2">
-            Preview preset animations on workspace objects in real-time
-          </p>
-
-          {presetAuthoringMode && onSelectPreset && (
-            <select
-              value={selectedPreset || ''}
-              onChange={(e) => onSelectPreset(e.target.value)}
-              className="w-full mt-2 px-2 py-1.5 text-xs bg-gray-800 text-white rounded border border-gray-700 focus:border-cyan-500 focus:outline-none"
-            >
-              <option value="">Select preset...</option>
-              {availableSolvers.map(solver => (
-                <option key={solver} value={solver}>
-                  {solver.charAt(0).toUpperCase() + solver.slice(1)}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
       {/* Saved Descriptors */}
       <div className="flex-1 overflow-y-auto p-3">
         <div className="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-2">

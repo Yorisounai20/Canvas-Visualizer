@@ -42,6 +42,10 @@ export const WORKSPACE_SHORTCUTS: ShortcutAction[] = [
   // View
   { key: 'f', description: 'Focus on selected object', category: 'View' },
   { key: 'Home', description: 'Frame all objects', category: 'View' },
+  { key: 'g', description: 'Toggle grid (in workspace mode)', category: 'View' },
+  { key: 'a', description: 'Toggle axes (in workspace mode)', category: 'View' },
+  { key: 'u', description: 'Toggle use workspace objects', category: 'View' },
+  { key: 'p', description: 'Toggle performance overlay', category: 'View' },
   
   // Add Objects
   { key: 'a', shift: true, description: 'Quick add menu', category: 'Add' },
