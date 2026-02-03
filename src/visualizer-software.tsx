@@ -9037,10 +9037,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       useWorkspaceObjects={useWorkspaceObjects}
       onToggleVisualizationSource={handleToggleVisualizationSource}
       onUpdateObjects={setWorkspaceObjects}
-      presetAuthoringMode={presetAuthoringMode}
-      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-      selectedPreset={authoringPreset}
-      onSelectPreset={setAuthoringPreset}
       currentTime={currentTime}
     />
   );
@@ -9071,6 +9067,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       canRedo={false}
       onUndo={handleUndo}
       onRedo={handleRedo}
+      presetAuthoringMode={presetAuthoringMode}
+      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+      selectedPreset={authoringPreset}
+      onSelectPreset={setAuthoringPreset}
     />
   );
 

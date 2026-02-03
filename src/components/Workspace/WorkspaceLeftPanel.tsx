@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
-import { Box, Circle, Square, Torus, Grid3x3, Layers, Clock, FileText } from 'lucide-react';
+import { Box, Circle, Square, Torus, Grid3x3, Layers, Clock } from 'lucide-react';
 import { SceneExplorer } from './SceneExplorer';
 import SequencerPanel from './SequencerPanel';
-import TemplatesPanel from './TemplatesPanel';
 import { WorkspaceObject } from '../../types';
 
 /**
  * Workspace Left Panel with Tab System
- * Three tabs: Objects, Sequencer, Templates
+ * Two tabs: Objects, Sequencer
  */
 
-type WorkspaceTab = 'objects' | 'sequencer' | 'templates';
+type WorkspaceTab = 'objects' | 'sequencer';
 
 interface WorkspaceLeftPanelProps {
   // Objects Tab
@@ -26,12 +25,6 @@ interface WorkspaceLeftPanelProps {
   useWorkspaceObjects: boolean;
   onToggleVisualizationSource: () => void;
   onUpdateObjects: (objects: WorkspaceObject[]) => void;
-  
-  // Templates/Authoring Mode
-  presetAuthoringMode?: boolean;
-  onTogglePresetAuthoring?: () => void;
-  selectedPreset?: string;
-  onSelectPreset?: (preset: string) => void;
   
   // Sequencer
   currentTime?: number;
@@ -50,10 +43,6 @@ export default function WorkspaceLeftPanel({
   useWorkspaceObjects,
   onToggleVisualizationSource,
   onUpdateObjects,
-  presetAuthoringMode,
-  onTogglePresetAuthoring,
-  selectedPreset,
-  onSelectPreset,
   currentTime
 }: WorkspaceLeftPanelProps) {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('objects');
@@ -86,19 +75,6 @@ export default function WorkspaceLeftPanel({
         >
           <Clock size={14} />
           <span>Sequencer</span>
-        </button>
-        
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-medium transition-colors ${
-            activeTab === 'templates'
-              ? 'bg-gray-800 text-cyan-400 border-b-2 border-cyan-400'
-              : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
-          }`}
-          title="Animation Templates"
-        >
-          <FileText size={14} />
-          <span>Templates</span>
         </button>
       </div>
 
@@ -194,16 +170,6 @@ export default function WorkspaceLeftPanel({
             workspaceObjects={workspaceObjects}
             onUpdateObjects={onUpdateObjects}
             currentTime={currentTime}
-          />
-        )}
-
-        {activeTab === 'templates' && (
-          <TemplatesPanel
-            workspaceObjects={workspaceObjects}
-            presetAuthoringMode={presetAuthoringMode}
-            onTogglePresetAuthoring={onTogglePresetAuthoring}
-            selectedPreset={selectedPreset}
-            onSelectPreset={onSelectPreset}
           />
         )}
       </div>
