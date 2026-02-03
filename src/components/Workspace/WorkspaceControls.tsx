@@ -124,7 +124,7 @@ export default function WorkspaceControls({
   onToggleAxes,
   useWorkspaceObjects,
   onToggleVisualizationSource,
-  workspaceObjects,
+  workspaceObjects = [],
   // PR 5: Preset Authoring Mode props
   presetAuthoringMode = false,
   onTogglePresetAuthoring,

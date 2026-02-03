@@ -16,7 +16,7 @@ interface SequencerPanelProps {
 }
 
 export default function SequencerPanel({
-  workspaceObjects,
+  workspaceObjects = [],
   onUpdateObjects,
   currentTime = 0
 }: SequencerPanelProps) {

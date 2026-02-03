@@ -16,7 +16,7 @@ interface WorkspaceStatusBarProps {
 }
 
 export default function WorkspaceStatusBar({
-  workspaceObjects,
+  workspaceObjects = [],
   selectedObjectId,
   fps = 60,
   memoryUsage = 0,
