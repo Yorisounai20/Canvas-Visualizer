@@ -24,7 +24,7 @@ interface WorkspaceActionsProps {
 
 export function WorkspaceActions({
   selectedObjectId,
-  workspaceObjects,
+  workspaceObjects = [],
   canUndo,
   canRedo,
   onDuplicate,
