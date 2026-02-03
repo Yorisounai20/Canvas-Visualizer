@@ -18,7 +18,6 @@ interface WorkspaceLayoutProps {
   
   // Bottom
   timelinePanel?: React.ReactNode;
-  actionsBar: React.ReactNode;
   statusBar: React.ReactNode;
   
   // Main Content
@@ -32,7 +31,6 @@ export default function WorkspaceLayout({
   templatesPanel,
   authoringPanel,
   timelinePanel,
-  actionsBar,
   statusBar,
   children
 }: WorkspaceLayoutProps) {
@@ -99,13 +97,8 @@ export default function WorkspaceLayout({
           </button>
         )}
 
-        {/* CENTER - Canvas + Actions/Status */}
+        {/* CENTER - Canvas + Status */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Actions Bar */}
-          <div className="flex-shrink-0 border-b border-gray-800 bg-gray-850">
-            {actionsBar}
-          </div>
-
           {/* Main Canvas Area */}
           <div className="flex-1 overflow-hidden">
             {children}

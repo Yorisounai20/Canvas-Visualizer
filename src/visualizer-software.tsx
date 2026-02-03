@@ -97,7 +97,6 @@ import SequencerPanel from './components/Workspace/SequencerPanel';
 import TemplatesPanel from './components/Workspace/TemplatesPanel';
 import AuthoringPanel from './components/Workspace/AuthoringPanel';
 import WorkspaceStatusBar from './components/Workspace/WorkspaceStatusBar';
-import { WorkspaceActions } from './components/Workspace/WorkspaceActions';
 
 // Export video quality constants
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
@@ -9061,21 +9060,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           <div className="text-xs">Pose sequencer timeline will appear here</div>
           <div className="text-xs mt-1">Drag and sequence pose keyframes along a timeline</div>
         </div>
-      }
-      actionsBar={
-        <WorkspaceActions
-          selectedObjectId={selectedObjectId}
-          objectCount={workspaceObjects.length}
-          onDuplicateObject={handleDuplicateObject}
-          onDeleteObject={handleDeleteSelectedObject}
-          onSelectAll={handleSelectAllObjects}
-          onDeselectAll={handleDeselectAll}
-          onToggleObjectVisibility={handleToggleObjectVisibility}
-          canUndo={false}
-          canRedo={false}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-        />
       }
       statusBar={
         <WorkspaceStatusBar
