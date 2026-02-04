@@ -1077,6 +1077,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     if (showSongName) {
+      // Clean up existing text meshes
       songNameMeshesRef.current.forEach(mesh => {
         scene.remove(mesh);
         if (mesh.geometry) mesh.geometry.dispose();
@@ -1090,6 +1091,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         alert('Font not loaded yet, please wait...');
         addLog('Font not ready yet!', 'error');
         return;
+      }
+
+      // IMPORTANT: Clean up any existing meshes before creating new ones
+      // This prevents text stacking when toggle is called multiple times
+      if (songNameMeshesRef.current.length > 0) {
+        songNameMeshesRef.current.forEach(mesh => {
+          scene.remove(mesh);
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) mesh.material.dispose();
+        });
+        songNameMeshesRef.current = [];
       }
 
       try {
@@ -1158,20 +1170,117 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             
             scene.add(mesh);
             meshes.push(mesh);
-            console.log('Added mesh at position:', mesh.position, 'Scene children:', scene.children.length);
           });
         });
         
         songNameMeshesRef.current = meshes;
         setShowSongName(true);
-        addLog(`Created ${meshes.length} text meshes at visible position`, 'success');
-        console.log('All song name meshes:', scene.children.filter((c: THREE.Object3D) => c.userData.isText));
+        addLog(`Created ${meshes.length} text meshes`, 'success');
       } catch (e) {
         const error = e as Error;
         addLog(`Text creation error: ${error.message}`, 'error');
       }
     }
   };
+
+  // Helper function to recreate text when properties change
+  const recreateSongNameText = () => {
+    const scene = sceneRef.current;
+    if (!scene || !showSongName || !fontRef.current) {
+      return;
+    }
+
+    // Clean up existing meshes
+    songNameMeshesRef.current.forEach(mesh => {
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) mesh.material.dispose();
+    });
+    songNameMeshesRef.current = [];
+
+    try {
+      const text = customSongName || audioFileName || 'SONG NAME';
+      const words = text.toUpperCase().split(' ');
+      const meshes: THREE.Mesh[] = [];
+
+      words.forEach((word, wordIndex) => {
+        [...word].forEach((char, charIndex) => {
+          const textGeo = new TextGeometry(char, {
+            font: fontRef.current,
+            size: 1.5,
+            height: 0.3,
+            curveSegments: 8
+          });
+          
+          textGeo.computeBoundingBox();
+          
+          const freqIndex = (wordIndex + charIndex) % 3;
+          
+          // Create material based on selected type
+          let material: THREE.Material;
+          const baseColor = new THREE.Color(textColor);
+          const commonProps = {
+            color: baseColor,
+            wireframe: textWireframe,
+            transparent: true,
+            opacity: textOpacity
+          };
+          
+          switch (textMaterialType) {
+            case 'standard':
+              material = new THREE.MeshStandardMaterial({
+                ...commonProps,
+                metalness: textMetalness,
+                roughness: textRoughness
+              });
+              break;
+            case 'phong':
+              material = new THREE.MeshPhongMaterial({
+                ...commonProps,
+                shininess: 30
+              });
+              break;
+            case 'lambert':
+              material = new THREE.MeshLambertMaterial(commonProps);
+              break;
+            case 'basic':
+            default:
+              material = new THREE.MeshBasicMaterial(commonProps);
+          }
+          
+          const mesh = new THREE.Mesh(textGeo, material);
+          
+          const xPos = (charIndex - word.length / 2) * 2 + (wordIndex - words.length / 2) * (word.length * 2 + 3);
+          mesh.position.set(xPos, -6, 5);
+          mesh.userData.baseY = -6;
+          mesh.userData.baseX = xPos;
+          mesh.userData.baseZ = 5;
+          mesh.userData.isText = true;
+          mesh.userData.charIndex = charIndex + wordIndex * 10;
+          mesh.userData.freqIndex = freqIndex;
+          
+          mesh.scale.set(2, 2, 2);
+          
+          scene.add(mesh);
+          meshes.push(mesh);
+        });
+      });
+      
+      songNameMeshesRef.current = meshes;
+      addLog(`Recreated ${meshes.length} text meshes with updated properties`, 'info');
+    } catch (e) {
+      const error = e as Error;
+      addLog(`Text recreation error: ${error.message}`, 'error');
+    }
+  };
+
+  // Recreate text when properties change (but only if text is already showing)
+  useEffect(() => {
+    if (showSongName && fontRef.current && sceneRef.current) {
+      recreateSongNameText();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customSongName, textColor, textMaterialType, textWireframe, textMetalness, textRoughness]);
 
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
   
@@ -3033,6 +3142,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           console.error('Cleanup error:', e);
         }
       }
+      
+      // Clean up text meshes
+      songNameMeshesRef.current.forEach(mesh => {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+      });
+      songNameMeshesRef.current = [];
+      
+      textCharacterMeshesRef.current.forEach((meshes) => {
+        meshes.forEach(mesh => {
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach(m => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
+          }
+        });
+      });
+      textCharacterMeshesRef.current.clear();
+      
       // Clear refs to help garbage collection
       sceneRef.current = null;
       cameraRef.current = null;
@@ -7562,10 +7693,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         const existingMeshes = textCharacterMeshesRef.current.get(textKf.id);
         
-        // Check if we need to recreate meshes (text or size changed)
+        // Check if we need to recreate meshes (text, size, position, or color changed)
         const needsRecreate = existingMeshes && (
           existingMeshes.length !== textKf.text.length ||
-          (existingMeshes[0]?.userData.textSize !== kfSize)
+          (existingMeshes[0]?.userData.textSize !== kfSize) ||
+          (existingMeshes[0]?.userData.baseX !== (kfPosition.x - (textKf.text.length * 0.6 * kfSize) / 2)) ||
+          (existingMeshes[0]?.userData.baseY !== kfPosition.y) ||
+          (existingMeshes[0]?.userData.baseZ !== kfPosition.z)
         );
         
         if (needsRecreate && existingMeshes) {
@@ -9684,7 +9818,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                   type="checkbox"
                   id="showSongName"
                   checked={showSongName}
-                  onChange={(e) => setShowSongName(e.target.checked)}
+                  onChange={toggleSongName}
                   disabled={!fontLoaded}
                   className="w-4 h-4 cursor-pointer"
                 />
