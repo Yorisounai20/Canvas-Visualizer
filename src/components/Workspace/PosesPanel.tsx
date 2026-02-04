@@ -14,7 +14,7 @@ interface PosesPanelProps {
 }
 
 export default function PosesPanel({
-  workspaceObjects,
+  workspaceObjects = [],
   onApplyPose
 }: PosesPanelProps) {
   const [poseName, setPoseName] = useState('');

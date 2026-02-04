@@ -23,7 +23,7 @@ interface ScenePanelProps {
 }
 
 export default function ScenePanel({
-  workspaceObjects,
+  workspaceObjects = [],
   selectedObjectId,
   onSelectObject,
   onDeleteObject,

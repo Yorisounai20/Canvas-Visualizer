@@ -18,7 +18,7 @@ interface TemplatesPanelProps {
 }
 
 export default function TemplatesPanel({
-  workspaceObjects,
+  workspaceObjects = [],
   presetAuthoringMode = false,
   onTogglePresetAuthoring,
   selectedPreset,
