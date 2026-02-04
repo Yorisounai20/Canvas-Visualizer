@@ -1063,7 +1063,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setFontLoaded(false);
       }
     );
-  }, [addLog, setFontLoaded, setSelectedPresetFont, setCustomFontName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - state setters are stable, addLog is non-critical
 
   useEffect(() => {
     // Load default preset font on mount
