@@ -28,7 +28,10 @@ interface TextAnimatorTabProps {
   fontLoaded: boolean;
   currentTime: number;
   textAnimatorKeyframes: TextAnimatorKeyframe[];
+  selectedPresetFont: string;
+  presetFonts: Array<{ value: string; label: string; url: string }>;
   loadCustomFont: (file: File) => void;
+  loadPresetFont: (fontValue: string) => void;
   setCustomSongName: (name: string) => void;
   toggleSongName: () => void;
   setTextColor: (color: string) => void;
@@ -65,7 +68,10 @@ export default function TextAnimatorTab({
   fontLoaded,
   currentTime,
   textAnimatorKeyframes,
+  selectedPresetFont,
+  presetFonts,
   loadCustomFont,
+  loadPresetFont,
   setCustomSongName,
   toggleSongName,
   setTextColor,
@@ -84,16 +90,36 @@ export default function TextAnimatorTab({
       {/* Song Name Overlay Section */}
       <div className="mb-4 bg-gray-700 rounded-lg p-3">
         <h3 className="text-sm font-semibold text-cyan-400 mb-3">🎤 Song Name Overlay</h3>
+        
+        {/* Font Selection */}
         <div className="mb-3 pb-3 border-b border-gray-600">
-          <label className="text-xs text-gray-400 block mb-2">Custom Font (.typeface.json)</label>
-          <input 
-            type="file" 
-            accept=".json,.typeface.json" 
-            onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} 
-            className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" 
-          />
-          <p className="text-xs text-gray-500 mt-1">Current: {customFontName}</p>
+          <label className="text-xs text-gray-400 block mb-2">Font Selection</label>
+          <select
+            value={selectedPresetFont}
+            onChange={(e) => loadPresetFont(e.target.value)}
+            className="w-full bg-gray-600 text-white text-sm px-3 py-2 rounded mb-2 cursor-pointer"
+          >
+            {presetFonts.map(font => (
+              <option key={font.value} value={font.value}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+          
+          <div className="flex flex-col gap-2">
+            <label className="text-xs text-gray-400">Or upload custom font (.typeface.json)</label>
+            <input 
+              type="file" 
+              accept=".json,.typeface.json" 
+              onChange={(e) => { if (e.target.files && e.target.files[0]) loadCustomFont(e.target.files[0]); }} 
+              className="block flex-1 text-sm text-gray-300 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer" 
+            />
+            {!selectedPresetFont && customFontName && (
+              <p className="text-xs text-cyan-400">Custom: {customFontName}</p>
+            )}
+          </div>
         </div>
+        
         <div className="flex gap-2 mb-2">
           <input 
             type="text" 

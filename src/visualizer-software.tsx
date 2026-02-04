@@ -108,6 +108,20 @@ const EXPORT_PIXELS_FULLHD = 1920 * 1080;
 const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
 const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
 
+// Preset fonts available from Three.js examples
+const PRESET_FONTS = [
+  { value: 'helvetiker_regular', label: 'Helvetiker Regular', url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json' },
+  { value: 'helvetiker_bold', label: 'Helvetiker Bold', url: 'https://threejs.org/examples/fonts/helvetiker_bold.typeface.json' },
+  { value: 'optimer_regular', label: 'Optimer Regular', url: 'https://threejs.org/examples/fonts/optimer_regular.typeface.json' },
+  { value: 'optimer_bold', label: 'Optimer Bold', url: 'https://threejs.org/examples/fonts/optimer_bold.typeface.json' },
+  { value: 'gentilis_regular', label: 'Gentilis Regular', url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json' },
+  { value: 'gentilis_bold', label: 'Gentilis Bold', url: 'https://threejs.org/examples/fonts/gentilis_bold.typeface.json' },
+  { value: 'droid_sans_regular', label: 'Droid Sans Regular', url: 'https://threejs.org/examples/fonts/droid/droid_sans_regular.typeface.json' },
+  { value: 'droid_sans_bold', label: 'Droid Sans Bold', url: 'https://threejs.org/examples/fonts/droid/droid_sans_bold.typeface.json' },
+  { value: 'droid_serif_regular', label: 'Droid Serif Regular', url: 'https://threejs.org/examples/fonts/droid/droid_serif_regular.typeface.json' },
+  { value: 'droid_serif_bold', label: 'Droid Serif Bold', url: 'https://threejs.org/examples/fonts/droid/droid_serif_bold.typeface.json' },
+];
+
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
 }
@@ -174,6 +188,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [textOpacity, setTextOpacity] = useState(0.9);
   const [textMetalness, setTextMetalness] = useState(0.5);
   const [textRoughness, setTextRoughness] = useState(0.5);
+  const [selectedPresetFont, setSelectedPresetFont] = useState('helvetiker_regular');
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
   const fontRef = useRef<any>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -1010,6 +1025,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       fontRef.current = font;
       setFontLoaded(true);
       setCustomFontName(file.name);
+      setSelectedPresetFont(''); // Clear preset selection when custom font is loaded
       addLog(`Custom font "${file.name}" loaded successfully!`, 'success');
     } catch (e) {
       const error = e as Error;
@@ -1018,33 +1034,41 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  useEffect(() => {
-    addLog('Starting font load...', 'info');
+  const loadPresetFont = (fontValue: string) => {
+    const presetFont = PRESET_FONTS.find(f => f.value === fontValue);
+    if (!presetFont) return;
+
+    addLog(`Loading preset font: ${presetFont.label}...`, 'info');
+    setFontLoaded(false);
+    
     const loader = new FontLoader();
     loader.load(
-      'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
+      presetFont.url,
       (font: any) => {
-        console.log('Font loaded successfully!');
-        addLog('Font loaded successfully!', 'success');
         fontRef.current = font;
         setFontLoaded(true);
+        setSelectedPresetFont(fontValue);
+        setCustomFontName(presetFont.label);
+        addLog(`Preset font "${presetFont.label}" loaded successfully!`, 'success');
       },
       (progress: any) => {
         if (progress.total > 0) {
           const percent = Math.round((progress.loaded / progress.total) * 100);
-          console.log('Font loading progress:', percent + '%');
-          addLog(`Font loading: ${percent}%`, 'info');
+          addLog(`Loading ${presetFont.label}: ${percent}%`, 'info');
         }
       },
       (error: Error) => {
-        console.error('Font loading error:', error);
-        addLog(`Font load failed - upload custom font instead`, 'error');
+        console.error('Preset font loading error:', error);
+        addLog(`Failed to load ${presetFont.label}`, 'error');
+        setFontLoaded(false);
       }
     );
-    // Skip automatic font loading to avoid CORS errors
-    // Users can upload their own .typeface.json font file
-    addLog('Font system ready - upload custom font to use text', 'info');
-    setCustomFontName('None (Upload Required)');
+  };
+
+  useEffect(() => {
+    // Load default preset font on mount
+    loadPresetFont('helvetiker_regular');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load project from sessionStorage on mount
@@ -9812,6 +9836,39 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           <div className="space-y-3">
             <div className="bg-gray-700 rounded p-3 space-y-3">
               <h4 className="text-xs text-gray-400 uppercase font-semibold">3D Text Settings</h4>
+              
+              {/* Font Selection */}
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 block">Font Selection</label>
+                <select
+                  value={selectedPresetFont}
+                  onChange={(e) => loadPresetFont(e.target.value)}
+                  className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none cursor-pointer"
+                >
+                  {PRESET_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Or upload custom font:</span>
+                  <input 
+                    type="file" 
+                    accept=".json,.typeface.json" 
+                    onChange={(e) => { 
+                      if (e.target.files && e.target.files[0]) {
+                        loadCustomFont(e.target.files[0]);
+                      }
+                    }} 
+                    className="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" 
+                  />
+                </div>
+                {!selectedPresetFont && customFontName && (
+                  <p className="text-xs text-purple-400">Custom: {customFontName}</p>
+                )}
+              </div>
               
               <div className="flex items-center gap-2">
                 <input
