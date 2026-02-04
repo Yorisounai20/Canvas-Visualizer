@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
@@ -1034,7 +1034,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  const loadPresetFont = (fontValue: string) => {
+  const loadPresetFont = useCallback((fontValue: string) => {
     const presetFont = PRESET_FONTS.find(f => f.value === fontValue);
     if (!presetFont) return;
 
@@ -1063,7 +1063,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setFontLoaded(false);
       }
     );
-  };
+  }, [addLog, setFontLoaded, setSelectedPresetFont, setCustomFontName]);
 
   useEffect(() => {
     // Load default preset font on mount
@@ -1115,17 +1115,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         alert('Font not loaded yet, please wait...');
         addLog('Font not ready yet!', 'error');
         return;
-      }
-
-      // IMPORTANT: Clean up any existing meshes before creating new ones
-      // This prevents text stacking when toggle is called multiple times
-      if (songNameMeshesRef.current.length > 0) {
-        songNameMeshesRef.current.forEach(mesh => {
-          scene.remove(mesh);
-          if (mesh.geometry) mesh.geometry.dispose();
-          if (mesh.material) mesh.material.dispose();
-        });
-        songNameMeshesRef.current = [];
       }
 
       try {
@@ -1304,7 +1293,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       recreateSongNameText();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customSongName, textColor, textMaterialType, textWireframe, textMetalness, textRoughness]);
+  }, [customSongName, textColor, textMaterialType, textWireframe, textOpacity, textMetalness, textRoughness]);
 
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
   
@@ -10087,7 +10076,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  // --- End constants ---
+  // --- End JSX constants (inspectorJSX, leftPanelJSX, timelinePanelJSX, topBarJSX) ---
 
   // Use custom workspace layout when in workspace mode
   if (workspaceMode) {
