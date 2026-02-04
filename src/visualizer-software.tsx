@@ -8562,6 +8562,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole, workspaceMode]);
 
+  // Initialize workspace mode defaults when entering workspace mode
+  useEffect(() => {
+    if (workspaceMode) {
+      // Enable grid, axes, and workspace objects by default in workspace mode
+      setShowGrid(true);
+      setShowAxes(true);
+      setUseWorkspaceObjects(true);
+      addLog('Workspace mode enabled: Grid, axes, and workspace objects are now visible', 'info');
+    }
+  }, [workspaceMode]);
+
   // Update workspace grid and axes visibility
   useEffect(() => {
     if (gridHelperRef.current) {
