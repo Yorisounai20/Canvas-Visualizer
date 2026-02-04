@@ -9947,8 +9947,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             isSaving={isSaving}
           />
         )}
-        {showDebugConsole && debugLogs.length > 0 && (
-          <DebugConsole logs={debugLogs} onClose={() => setShowDebugConsole(false)} />
+        {showDebugConsole && errorLog.length > 0 && (
+          <DebugConsole logs={errorLog} onClose={() => setShowDebugConsole(false)} />
         )}
       </>
     );
