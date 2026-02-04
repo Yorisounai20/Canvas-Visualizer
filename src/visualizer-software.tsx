@@ -8570,6 +8570,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setShowAxes(true);
       setUseWorkspaceObjects(true);
       addLog('Workspace mode enabled: Grid, axes, and workspace objects are now visible', 'info');
+    } else {
+      // When exiting workspace mode, switch back to using preset shapes
+      setUseWorkspaceObjects(false);
+      addLog('Workspace mode disabled: Preset shapes are now visible', 'info');
     }
   }, [workspaceMode]);
 
