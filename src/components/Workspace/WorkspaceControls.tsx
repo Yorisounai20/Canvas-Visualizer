@@ -215,8 +215,13 @@ export default function WorkspaceControls({
   };
 
   return (
-    <div className="absolute top-4 left-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 space-y-2 z-10">
-      <div className="text-xs font-semibold text-gray-300 mb-2">Workspace</div>
+    <div className="h-full flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
+      <div className="p-3 border-b border-gray-700 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+          🔨 Workspace Controls
+        </h3>
+      </div>
+      <div className="p-3 space-y-2">{/* Content container */}
       
       {/* Blender-like Actions */}
       {onDuplicateObject && onDeleteObject && onUndo && onRedo && (
@@ -528,6 +533,7 @@ export default function WorkspaceControls({
         <Copy className="w-4 h-4" />
         Instances
       </button>
+      </div>{/* End content container */}
     </div>
   );
 }

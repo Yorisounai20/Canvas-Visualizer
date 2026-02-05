@@ -9120,32 +9120,44 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  // Workspace mode panels with WorkspaceControls integrated into left panel
+  // Workspace mode panels - New Blender-style layout
+  // Left: WorkspaceControls (full height)
+  // Right: SceneExplorer (top) + ObjectPropertiesPanel (bottom)
   const workspaceLeftPanelJSX = (
+    <WorkspaceControls
+      onCreateObject={handleCreateObject}
+      showGrid={showGrid}
+      onToggleGrid={handleToggleGrid}
+      showAxes={showAxes}
+      onToggleAxes={handleToggleAxes}
+      useWorkspaceObjects={useWorkspaceObjects}
+      onToggleVisualizationSource={handleToggleVisualizationSource}
+      workspaceObjects={workspaceObjects}
+      presetAuthoringMode={presetAuthoringMode}
+      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+      selectedPreset={authoringPreset}
+      onSelectPreset={setAuthoringPreset}
+      mockTime={mockTime}
+      onMockTimeChange={setMockTime}
+      mockAudio={mockAudio}
+      onMockAudioChange={setMockAudio}
+      selectedObjectId={selectedObjectId}
+      onDuplicateObject={handleDuplicateObject}
+      onDeleteObject={handleDeleteSelectedObject}
+      onSelectAll={handleSelectAllObjects}
+      onDeselectAll={handleDeselectAll}
+      onToggleObjectVisibility={handleToggleObjectVisibility}
+      canUndo={false}
+      canRedo={false}
+      onUndo={handleUndo}
+      onRedo={handleRedo}
+    />
+  );
+
+  const workspaceRightPanelJSX = (
     <div className="h-full flex flex-col bg-gray-900">
-      {/* WorkspaceControls at the top */}
-      <div className="flex-shrink-0 overflow-y-auto border-b border-gray-700">
-        <WorkspaceControls
-          onCreateObject={handleCreateObject}
-          showGrid={showGrid}
-          onToggleGrid={handleToggleGrid}
-          showAxes={showAxes}
-          onToggleAxes={handleToggleAxes}
-          useWorkspaceObjects={useWorkspaceObjects}
-          onToggleVisualizationSource={handleToggleVisualizationSource}
-          workspaceObjects={workspaceObjects}
-          presetAuthoringMode={presetAuthoringMode}
-          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-          selectedPreset={authoringPreset}
-          onSelectPreset={setAuthoringPreset}
-          mockTime={mockTime}
-          onMockTimeChange={setMockTime}
-          mockAudio={mockAudio}
-          onMockAudioChange={setMockAudio}
-        />
-      </div>
-      {/* SceneExplorer below */}
-      <div className="flex-1 min-h-0">
+      {/* SceneExplorer - top half */}
+      <div className="flex-1 min-h-0 border-b border-gray-700">
         <SceneExplorer
           objects={workspaceObjects}
           selectedObjectId={selectedObjectId}
@@ -9153,25 +9165,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           onDeleteObject={handleDeleteObject}
         />
       </div>
+      {/* ObjectPropertiesPanel - bottom half */}
+      <div className="flex-1 min-h-0">
+        <ObjectPropertiesPanel
+          selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
+          onUpdateObject={handleUpdateObject}
+          onDeleteObject={handleDeleteObject}
+          cameraDistance={cameraDistance}
+          cameraHeight={cameraHeight}
+          cameraRotation={cameraRotation}
+          onSetCameraDistance={setCameraDistance}
+          onSetCameraHeight={setCameraHeight}
+          onSetCameraRotation={setCameraRotation}
+          showLetterbox={showLetterbox}
+          letterboxSize={letterboxSize}
+          onSetShowLetterbox={setShowLetterbox}
+          onSetLetterboxSize={setLetterboxSize}
+        />
+      </div>
     </div>
-  );
-
-  const workspaceRightPanelJSX = (
-    <ObjectPropertiesPanel
-      selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
-      onUpdateObject={handleUpdateObject}
-      onDeleteObject={handleDeleteObject}
-      cameraDistance={cameraDistance}
-      cameraHeight={cameraHeight}
-      cameraRotation={cameraRotation}
-      onSetCameraDistance={setCameraDistance}
-      onSetCameraHeight={setCameraHeight}
-      onSetCameraRotation={setCameraRotation}
-      showLetterbox={showLetterbox}
-      letterboxSize={letterboxSize}
-      onSetShowLetterbox={setShowLetterbox}
-      onSetLetterboxSize={setLetterboxSize}
-    />
   );
 
   // --- Extracted panel DOM constants ---
