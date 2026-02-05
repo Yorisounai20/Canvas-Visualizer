@@ -9067,6 +9067,58 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   }, [useWorkspaceObjects]);
 
+  // Canvas area JSX - shared by both workspace and editor modes
+  const canvasAreaJSX = (
+    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
+      viewMode === 'preview' ? 'py-0' : 'py-4'
+    }`}>
+      <div className="relative">
+        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
+        {showLetterbox && (() => {
+          // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
+          // We need to map this to actual bar heights using the configurable maxLetterboxHeight
+          // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
+          const actualBarHeight = activeLetterboxInvert 
+            ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
+            : letterboxSize;
+          return (
+            <>
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+            </>
+          );
+        })()}
+        {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        
+        {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
+        
+        {/* Playback controls overlay for Preview mode */}
+        {viewMode === 'preview' && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
+            <button 
+              onClick={() => {
+                if (isPlaying) {
+                  if (audioTracks.length > 0) stopMultiTrackAudio();
+                  else stopAudio();
+                } else {
+                  if (audioTracks.length > 0) playMultiTrackAudio();
+                  else playAudio();
+                }
+              }}
+              className="text-white hover:text-cyan-400 transition-colors p-1"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            </button>
+            <span className="text-white text-sm font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // Workspace mode - Multi-panel layout
   const workspaceContentJSX = workspaceMode ? (
     <WorkspaceLayout
@@ -9144,16 +9196,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       actionsBar={
         <WorkspaceActions
           selectedObjectId={selectedObjectId}
-          objectCount={workspaceObjects.length}
-          onDuplicateObject={handleDuplicateObject}
-          onDeleteObject={handleDeleteSelectedObject}
+          workspaceObjects={workspaceObjects}
+          onDuplicate={handleDuplicateObject}
+          onDelete={handleDeleteSelectedObject}
           onSelectAll={handleSelectAllObjects}
           onDeselectAll={handleDeselectAll}
-          onToggleObjectVisibility={handleToggleObjectVisibility}
+          onToggleVisibility={handleToggleObjectVisibility}
           canUndo={false}
           canRedo={false}
           onUndo={handleUndo}
           onRedo={handleRedo}
+          onShowHelp={() => setShowKeyboardShortcuts(true)}
         />
       }
       statusBar={
@@ -9427,57 +9480,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onDeleteCameraFXClip={deleteCameraFXClip}
       onAddCameraFXClip={addCameraFXClip}
     />
-  );
-
-  const canvasAreaJSX = (
-    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
-      viewMode === 'preview' ? 'py-0' : 'py-4'
-    }`}>
-      <div className="relative">
-        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-        {showLetterbox && (() => {
-          // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
-          // We need to map this to actual bar heights using the configurable maxLetterboxHeight
-          // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
-          const actualBarHeight = activeLetterboxInvert 
-            ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
-            : letterboxSize;
-          return (
-            <>
-              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-            </>
-          );
-        })()}
-        {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-        
-        {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
-        
-        {/* Playback controls overlay for Preview mode */}
-        {viewMode === 'preview' && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
-            <button 
-              onClick={() => {
-                if (isPlaying) {
-                  if (audioTracks.length > 0) stopMultiTrackAudio();
-                  else stopAudio();
-                } else {
-                  if (audioTracks.length > 0) playMultiTrackAudio();
-                  else playAudio();
-                }
-              }}
-              className="text-white hover:text-cyan-400 transition-colors p-1"
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            >
-              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-            </button>
-            <span className="text-white text-sm font-mono">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
   );
 
   const topBarJSX = (
