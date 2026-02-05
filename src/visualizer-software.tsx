@@ -8629,6 +8629,64 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
 
+      // Workspace-specific shortcuts (only when in workspace mode)
+      if (workspaceMode) {
+        // Duplicate (Shift+D)
+        if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          if (selectedObjectId) handleDuplicateObject();
+          return;
+        }
+        // Delete (X or Delete)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === 'x' || e.key === 'Delete')) {
+          e.preventDefault();
+          if (selectedObjectId) handleDeleteSelectedObject();
+          return;
+        }
+        // Hide/Unhide (H / Alt+H)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          if (e.altKey) {
+            // Unhide all objects
+            workspaceObjects.forEach(obj => {
+              if (!obj.visible) {
+                handleUpdateObject(obj.id, { visible: true });
+              }
+            });
+          } else if (selectedObjectId) {
+            // Toggle selected object visibility
+            handleToggleObjectVisibility();
+          }
+          return;
+        }
+        // Select All (Ctrl+A)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          handleSelectAllObjects();
+          return;
+        }
+        // Deselect All (Alt+A)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          handleDeselectAll();
+          return;
+        }
+        // Show keyboard shortcuts (?)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key === '?') {
+          e.preventDefault();
+          setShowKeyboardShortcuts(true);
+          return;
+        }
+        // Quick add menu (Shift+A)
+        if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          // Could open a quick add menu - for now just create a sphere
+          handleCreateObject('sphere');
+          return;
+        }
+      }
+
+      // Global shortcuts
       if (e.key === 'Escape') {
         if (showKeyboardShortcuts) {
           setShowKeyboardShortcuts(false);
@@ -8663,8 +8721,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         e.preventDefault();
         setViewMode('preview');
       } else if (e.key === 'g' || e.key === 'G') {
-        // Toggle camera rig hints
-        setShowRigHints(prev => !prev);
+        // Toggle camera rig hints (only if not in workspace mode to avoid conflict)
+        if (!workspaceMode) {
+          setShowRigHints(prev => !prev);
+        }
       } else if (e.key === 'w' || e.key === 'W') {
         // Toggle workspace mode
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -8672,19 +8732,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       } else if (e.key === 'p' || e.key === 'P') {
         // Toggle performance overlay (PR 9: Guardrails)
-        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && !workspaceMode) {
           setShowPerformanceOverlay(prev => !prev);
         }
       } else if (e.key === '`') {
         // Toggle debug console
         setShowDebugConsole(prev => !prev);
-      } else if (e.key >= '1' && e.key <= '9') {
-        // Number keys 1-9 for tab navigation
+      } else if (e.key >= '1' && e.key <= '9' && !workspaceMode) {
+        // Number keys 1-9 for tab navigation (only in editor mode)
         const tabIndex = parseInt(e.key) - 1;
         if (tabIndex < TAB_ORDER.length) {
           setActiveTab(TAB_ORDER[tabIndex]);
         }
-      } else if (e.key === '0') {
+      } else if (e.key === '0' && !workspaceMode) {
         // Number key 0 for the 10th tab (last tab in TAB_ORDER)
         setActiveTab(TAB_ORDER[TAB_ORDER.length - 1]);
       }
@@ -8692,7 +8752,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole, workspaceMode, selectedObjectId, workspaceObjects]);
 
   // Update workspace grid and axes visibility
   useEffect(() => {

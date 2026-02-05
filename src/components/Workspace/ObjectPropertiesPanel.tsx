@@ -42,8 +42,15 @@ export default function ObjectPropertiesPanel({
 }: ObjectPropertiesPanelProps) {
   if (!selectedObject) {
     return (
-      <div className="p-4 text-gray-400 text-sm">
-        Select an object to edit its properties
+      <div className="h-full flex flex-col bg-gray-900">
+        <div className="p-3 border-b border-gray-700">
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+            Properties
+          </h2>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 text-gray-400 text-sm">
+          Select an object to edit its properties
+        </div>
       </div>
     );
   }
@@ -67,7 +74,13 @@ export default function ObjectPropertiesPanel({
   };
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="h-full flex flex-col bg-gray-900">
+      <div className="p-3 border-b border-gray-700">
+        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+          Properties
+        </h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
       {/* Object header */}
       <div className="flex items-center justify-between pb-3 border-b border-gray-700">
         <div>
@@ -407,6 +420,7 @@ export default function ObjectPropertiesPanel({
           </div>
         </div>
       )}
+      </div>{/* End scrollable content */}
     </div>
   );
 }
