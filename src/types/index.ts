@@ -418,6 +418,10 @@ export interface WorkspaceObject {
   textContent?: string;
   fontSize?: number; // Font size
   textDepth?: number; // Extrusion depth for 3D text
+  // Animation/Movement properties
+  animationType?: 'none' | 'spin' | 'orbit' | 'bounce' | 'wave' | 'pulse';
+  animationSpeed?: number; // Speed multiplier (0.1 to 5)
+  animationAxis?: 'x' | 'y' | 'z'; // Axis for rotation/movement
   // PR 2: Object Grouping + Naming - Semantic targeting for presets
   group?: string; // Logical group name (e.g., "head", "body", "fins")
   role?: string;  // Specific role within group (e.g., "fin_left", "fin_right")
