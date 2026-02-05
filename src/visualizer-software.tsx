@@ -9069,9 +9069,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Canvas area JSX - shared by both workspace and editor modes
   const canvasAreaJSX = (
-    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
-      viewMode === 'preview' ? 'py-0' : 'py-4'
-    }`}>
+    <div className={`flex items-center justify-center w-full h-full ${
+      workspaceMode ? 'bg-gray-900' : 'bg-gray-950'
+    } ${viewMode === 'preview' && !workspaceMode ? 'py-0' : 'py-4'}`}>
       <div className="relative">
         <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
         {showLetterbox && (() => {
@@ -9093,14 +9093,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
         
         {/* Playback controls overlay for Preview mode */}
-        {viewMode === 'preview' && (
+        {viewMode === 'preview' && !workspaceMode && (
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
             <button 
               onClick={() => {
                 if (isPlaying) {
                   if (audioTracks.length > 0) stopMultiTrackAudio();
                   else stopAudio();
-                } else {
+                }
+                else {
                   if (audioTracks.length > 0) playMultiTrackAudio();
                   else playAudio();
                 }
