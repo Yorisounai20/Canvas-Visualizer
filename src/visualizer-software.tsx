@@ -9148,59 +9148,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     />
   );
 
-  // Old workspace panels for fallback
-  const workspaceLeftPanelJSX = (
-    <WorkspaceLeftPanel
-      workspaceObjects={workspaceObjects}
-      selectedObjectId={selectedObjectId}
-      onSelectObject={handleSelectObject}
-      onDeleteObject={handleDeleteObject}
-      onCreateObject={handleCreateObject}
-      showGrid={showGrid}
-      onToggleGrid={handleToggleGrid}
-      showAxes={showAxes}
-      onToggleAxes={handleToggleAxes}
-      useWorkspaceObjects={useWorkspaceObjects}
-      onToggleVisualizationSource={handleToggleVisualizationSource}
-      onUpdateObjects={setWorkspaceObjects}
-      presetAuthoringMode={presetAuthoringMode}
-      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-      selectedPreset={authoringPreset}
-      onSelectPreset={setAuthoringPreset}
-      currentTime={currentTime}
-    />
-  );
-
-  const workspaceRightPanelJSX = (
-    <WorkspaceRightPanel
-      workspaceObjects={workspaceObjects}
-      selectedObjectId={selectedObjectId}
-      selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
-      onUpdateObject={handleUpdateObject}
-      onDeleteObject={handleDeleteObject}
-      cameraDistance={cameraDistance}
-      cameraHeight={cameraHeight}
-      cameraRotation={cameraRotation}
-      onSetCameraDistance={setCameraDistance}
-      onSetCameraHeight={setCameraHeight}
-      onSetCameraRotation={setCameraRotation}
-      showLetterbox={showLetterbox}
-      letterboxSize={letterboxSize}
-      onSetShowLetterbox={setShowLetterbox}
-      onSetLetterboxSize={setLetterboxSize}
-      onDuplicateObject={handleDuplicateObject}
-      onDeleteSelectedObject={handleDeleteSelectedObject}
-      onSelectAll={handleSelectAllObjects}
-      onDeselectAll={handleDeselectAll}
-      onToggleObjectVisibility={handleToggleObjectVisibility}
-      canUndo={false}
-      canRedo={false}
-      onUndo={handleUndo}
-      onRedo={handleRedo}
-    />
-  );
-
-
   // --- Extracted panel DOM constants ---
   const leftPanelJSX = (
     <div className="flex flex-col gap-1 py-2">
