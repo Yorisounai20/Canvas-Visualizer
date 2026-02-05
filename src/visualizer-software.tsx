@@ -9090,7 +9090,31 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         
-        {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
+        {/* Workspace Controls overlay - from commit 87e2cf7 */}
+        {workspaceMode && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="pointer-events-auto">
+              <WorkspaceControls
+                onCreateObject={handleCreateObject}
+                showGrid={showGrid}
+                onToggleGrid={handleToggleGrid}
+                showAxes={showAxes}
+                onToggleAxes={handleToggleAxes}
+                useWorkspaceObjects={useWorkspaceObjects}
+                onToggleVisualizationSource={handleToggleVisualizationSource}
+                workspaceObjects={workspaceObjects}
+                presetAuthoringMode={presetAuthoringMode}
+                onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+                selectedPreset={authoringPreset}
+                onSelectPreset={setAuthoringPreset}
+                mockTime={mockTime}
+                onMockTimeChange={setMockTime}
+                mockAudio={mockAudio}
+                onMockAudioChange={setMockAudio}
+              />
+            </div>
+          </div>
+        )}
         
         {/* Playback controls overlay for Preview mode */}
         {viewMode === 'preview' && !workspaceMode && (
@@ -9120,109 +9144,33 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  // Correct workspace with WorkspaceLayout, pose management, and all features
-  const workspaceContentJSX = workspaceMode ? (
-    <WorkspaceLayout
-      // Left Side Panels
-      scenePanel={
-        <ScenePanel
-          workspaceObjects={workspaceObjects}
-          selectedObjectId={selectedObjectId}
-          onSelectObject={handleSelectObject}
-          onDeleteObject={handleDeleteObject}
-          onCreateObject={handleCreateObject}
-          showGrid={showGrid}
-          onToggleGrid={handleToggleGrid}
-          showAxes={showAxes}
-          onToggleAxes={handleToggleAxes}
-          useWorkspaceObjects={useWorkspaceObjects}
-          onToggleVisualizationSource={handleToggleVisualizationSource}
-        />
-      }
-      posesPanel={
-        <SequencerPanel
-          workspaceObjects={workspaceObjects}
-          onUpdateObjects={setWorkspaceObjects}
-          currentTime={currentTime}
-        />
-      }
-      
-      // Right Side Panels
-      propertiesPanel={
-        <ObjectPropertiesPanel
-          selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
-          onUpdateObject={handleUpdateObject}
-          onDeleteObject={handleDeleteObject}
-          cameraDistance={cameraDistance}
-          cameraHeight={cameraHeight}
-          cameraRotation={cameraRotation}
-          onSetCameraDistance={setCameraDistance}
-          onSetCameraHeight={setCameraHeight}
-          onSetCameraRotation={setCameraRotation}
-          showLetterbox={showLetterbox}
-          letterboxSize={letterboxSize}
-          onSetShowLetterbox={setShowLetterbox}
-          onSetLetterboxSize={setLetterboxSize}
-        />
-      }
-      templatesPanel={
-        <TemplatesPanel
-          workspaceObjects={workspaceObjects}
-          presetAuthoringMode={presetAuthoringMode}
-          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-          selectedPreset={authoringPreset}
-          onSelectPreset={setAuthoringPreset}
-        />
-      }
-      authoringPanel={
-        <AuthoringPanel
-          presetAuthoringMode={presetAuthoringMode}
-          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-          selectedPreset={authoringPreset}
-          onSelectPreset={setAuthoringPreset}
-          mockTime={mockTime}
-          onMockTimeChange={setMockTime}
-          mockAudio={mockAudio}
-          onMockAudioChange={setMockAudio}
-        />
-      }
-      
-      // Bottom & Status
-      timelinePanel={
-        <div className="p-4 text-center text-gray-500">
-          <div className="text-xs">Pose sequencer timeline will appear here</div>
-          <div className="text-xs mt-1">Drag and sequence pose keyframes along a timeline</div>
-        </div>
-      }
-      actionsBar={
-        <WorkspaceActions
-          selectedObjectId={selectedObjectId}
-          workspaceObjects={workspaceObjects}
-          onDuplicate={handleDuplicateObject}
-          onDelete={handleDeleteSelectedObject}
-          onSelectAll={handleSelectAllObjects}
-          onDeselectAll={handleDeselectAll}
-          onToggleVisibility={handleToggleObjectVisibility}
-          canUndo={false}
-          canRedo={false}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onShowHelp={() => setShowKeyboardShortcuts(true)}
-        />
-      }
-      statusBar={
-        <WorkspaceStatusBar
-          workspaceObjects={workspaceObjects}
-          selectedObjectId={selectedObjectId}
-          fps={60}
-          memoryUsage={0}
-          performanceMode="balanced"
-        />
-      }
-    >
-      {canvasAreaJSX}
-    </WorkspaceLayout>
-  ) : null;
+  // Workspace mode panels - simple version from commit 87e2cf7
+  const workspaceLeftPanelJSX = (
+    <SceneExplorer
+      objects={workspaceObjects}
+      selectedObjectId={selectedObjectId}
+      onSelectObject={handleSelectObject}
+      onDeleteObject={handleDeleteObject}
+    />
+  );
+
+  const workspaceRightPanelJSX = (
+    <ObjectPropertiesPanel
+      selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
+      onUpdateObject={handleUpdateObject}
+      onDeleteObject={handleDeleteObject}
+      cameraDistance={cameraDistance}
+      cameraHeight={cameraHeight}
+      cameraRotation={cameraRotation}
+      onSetCameraDistance={setCameraDistance}
+      onSetCameraHeight={setCameraHeight}
+      onSetCameraRotation={setCameraRotation}
+      showLetterbox={showLetterbox}
+      letterboxSize={letterboxSize}
+      onSetShowLetterbox={setShowLetterbox}
+      onSetLetterboxSize={setLetterboxSize}
+    />
+  );
 
   // --- Extracted panel DOM constants ---
   const leftPanelJSX = (
@@ -10029,52 +9977,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // --- End JSX constants (inspectorJSX, leftPanelJSX, timelinePanelJSX, topBarJSX) ---
 
-  // Use custom workspace layout when in workspace mode
-  if (workspaceMode) {
-    return (
-      <>
-        {topBarJSX}
-        {workspaceContentJSX}
-        
-        {/* Export Modal */}
-        <VideoExportModal
-          showExportModal={showExportModal}
-          setShowExportModal={setShowExportModal}
-          exportResolution={exportResolution}
-          setExportResolution={setExportResolution}
-          exportFormat={exportFormat}
-          setExportFormat={setExportFormat}
-          isExporting={isExporting}
-          audioReady={audioReady}
-          exportProgress={exportProgress}
-          handleExportAndCloseModal={handleExportAndCloseModal}
-        />
-
-        {/* Other modals remain the same */}
-        {showKeyboardShortcuts && <KeyboardShortcutsHelp onClose={() => setShowKeyboardShortcuts(false)} />}
-        {showSettingsModal && <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />}
-        {showProjectsModal && (
-          <ProjectsModal
-            isOpen={showProjectsModal}
-            onClose={() => setShowProjectsModal(false)}
-            onSaveProject={handleSaveProject}
-            onLoadProject={handleLoadProject}
-            isSaving={isSaving}
-          />
-        )}
-        {showDebugConsole && debugLogs.length > 0 && (
-          <DebugConsole logs={debugLogs} onClose={() => setShowDebugConsole(false)} />
-        )}
-      </>
-    );
-  }
-
-  // Default editor mode layout
+  // Unified layout using LayoutShell for both editor and workspace modes
   return (
     <LayoutShell
-      left={leftPanelJSX}
-      inspector={inspectorJSX}
-      timeline={timelinePanelJSX}
+      left={workspaceMode ? workspaceLeftPanelJSX : leftPanelJSX}
+      inspector={workspaceMode ? workspaceRightPanelJSX : inspectorJSX}
+      timeline={workspaceMode ? undefined : timelinePanelJSX}
       top={topBarJSX}
       viewMode={viewMode}
       workspaceMode={workspaceMode}
