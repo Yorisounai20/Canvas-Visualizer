@@ -9090,31 +9090,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         })()}
         {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
         
-        {/* Workspace Controls overlay - from commit 87e2cf7 */}
-        {workspaceMode && (
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="pointer-events-auto">
-              <WorkspaceControls
-                onCreateObject={handleCreateObject}
-                showGrid={showGrid}
-                onToggleGrid={handleToggleGrid}
-                showAxes={showAxes}
-                onToggleAxes={handleToggleAxes}
-                useWorkspaceObjects={useWorkspaceObjects}
-                onToggleVisualizationSource={handleToggleVisualizationSource}
-                workspaceObjects={workspaceObjects}
-                presetAuthoringMode={presetAuthoringMode}
-                onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-                selectedPreset={authoringPreset}
-                onSelectPreset={setAuthoringPreset}
-                mockTime={mockTime}
-                onMockTimeChange={setMockTime}
-                mockAudio={mockAudio}
-                onMockAudioChange={setMockAudio}
-              />
-            </div>
-          </div>
-        )}
+        {/* WorkspaceControls moved to left panel - no longer on canvas overlay */}
         
         {/* Playback controls overlay for Preview mode */}
         {viewMode === 'preview' && !workspaceMode && (
@@ -9144,14 +9120,40 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     </div>
   );
 
-  // Workspace mode panels - simple version from commit 87e2cf7
+  // Workspace mode panels with WorkspaceControls integrated into left panel
   const workspaceLeftPanelJSX = (
-    <SceneExplorer
-      objects={workspaceObjects}
-      selectedObjectId={selectedObjectId}
-      onSelectObject={handleSelectObject}
-      onDeleteObject={handleDeleteObject}
-    />
+    <div className="h-full flex flex-col bg-gray-900">
+      {/* WorkspaceControls at the top */}
+      <div className="flex-shrink-0 overflow-y-auto border-b border-gray-700">
+        <WorkspaceControls
+          onCreateObject={handleCreateObject}
+          showGrid={showGrid}
+          onToggleGrid={handleToggleGrid}
+          showAxes={showAxes}
+          onToggleAxes={handleToggleAxes}
+          useWorkspaceObjects={useWorkspaceObjects}
+          onToggleVisualizationSource={handleToggleVisualizationSource}
+          workspaceObjects={workspaceObjects}
+          presetAuthoringMode={presetAuthoringMode}
+          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+          selectedPreset={authoringPreset}
+          onSelectPreset={setAuthoringPreset}
+          mockTime={mockTime}
+          onMockTimeChange={setMockTime}
+          mockAudio={mockAudio}
+          onMockAudioChange={setMockAudio}
+        />
+      </div>
+      {/* SceneExplorer below */}
+      <div className="flex-1 min-h-0">
+        <SceneExplorer
+          objects={workspaceObjects}
+          selectedObjectId={selectedObjectId}
+          onSelectObject={handleSelectObject}
+          onDeleteObject={handleDeleteObject}
+        />
+      </div>
+    </div>
   );
 
   const workspaceRightPanelJSX = (
