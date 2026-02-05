@@ -9197,16 +9197,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       actionsBar={
         <WorkspaceActions
           selectedObjectId={selectedObjectId}
-          objectCount={workspaceObjects.length}
-          onDuplicateObject={handleDuplicateObject}
-          onDeleteObject={handleDeleteSelectedObject}
+          workspaceObjects={workspaceObjects}
+          onDuplicate={handleDuplicateObject}
+          onDelete={handleDeleteSelectedObject}
           onSelectAll={handleSelectAllObjects}
           onDeselectAll={handleDeselectAll}
-          onToggleObjectVisibility={handleToggleObjectVisibility}
+          onToggleVisibility={handleToggleObjectVisibility}
           canUndo={false}
           canRedo={false}
           onUndo={handleUndo}
           onRedo={handleRedo}
+          onShowHelp={() => setShowKeyboardShortcuts(true)}
         />
       }
       statusBar={
