@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download, Type } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
@@ -14,11 +14,15 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
  */
 
 interface WorkspaceControlsProps {
-  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => void;
+  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'text') => void;
   showGrid: boolean;
   onToggleGrid: () => void;
   showAxes: boolean;
   onToggleAxes: () => void;
+  gridSize?: number;
+  gridDivisions?: number;
+  onGridSizeChange?: (size: number) => void;
+  onGridDivisionsChange?: (divisions: number) => void;
   useWorkspaceObjects: boolean;
   onToggleVisualizationSource: () => void;
   workspaceObjects: WorkspaceObject[]; // PR 1: For pose snapshots
@@ -122,6 +126,10 @@ export default function WorkspaceControls({
   onToggleGrid,
   showAxes,
   onToggleAxes,
+  gridSize = 40,
+  gridDivisions = 40,
+  onGridSizeChange,
+  onGridDivisionsChange,
   useWorkspaceObjects,
   onToggleVisualizationSource,
   workspaceObjects,
@@ -293,6 +301,47 @@ export default function WorkspaceControls({
           XYZ
         </button>
       </div>
+
+      {/* Grid size controls */}
+      {showGrid && onGridSizeChange && onGridDivisionsChange && (
+        <div className="mb-3 pb-3 border-b border-gray-700 space-y-2">
+          <div className="text-xs font-semibold text-gray-400 mb-2">Grid Settings</div>
+          
+          {/* Grid Size */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Size</span>
+              <span>{gridSize}</span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="1000"
+              step="10"
+              value={gridSize}
+              onChange={(e) => onGridSizeChange(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+            />
+          </div>
+          
+          {/* Grid Divisions */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Divisions</span>
+              <span>{gridDivisions}</span>
+            </div>
+            <input
+              type="range"
+              min="4"
+              max="1024"
+              step="4"
+              value={gridDivisions}
+              onChange={(e) => onGridDivisionsChange(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+            />
+          </div>
+        </div>
+      )}
 
       {/* PR 1: Save Pose Section */}
       <div className="mb-3 pb-3 border-b border-gray-700">
@@ -528,10 +577,19 @@ export default function WorkspaceControls({
       <button
         onClick={() => onCreateObject('instances')}
         className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
-        title="Add Instanced Mesh"
+        title="Add Instanced Mesh (creates multiple copies efficiently)"
       >
         <Copy className="w-4 h-4" />
         Instances
+      </button>
+
+      <button
+        onClick={() => onCreateObject('text')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add 3D Text"
+      >
+        <Type className="w-4 h-4" />
+        Text
       </button>
       </div>{/* End content container */}
     </div>

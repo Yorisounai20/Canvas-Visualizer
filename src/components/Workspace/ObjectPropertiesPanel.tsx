@@ -155,8 +155,8 @@ export default function ObjectPropertiesPanel({
               <label className="text-xs text-gray-400 w-6 uppercase">{axis}</label>
               <input
                 type="range"
-                min="-20"
-                max="20"
+                min="-100"
+                max="100"
                 step="0.1"
                 value={selectedObject.position[axis]}
                 onChange={(e) => handlePositionChange(axis, parseFloat(e.target.value))}
@@ -211,20 +211,20 @@ export default function ObjectPropertiesPanel({
               <label className="text-xs text-gray-400 w-6 uppercase">{axis}</label>
               <input
                 type="range"
-                min="0.1"
-                max="5"
-                step="0.1"
+                min="0.01"
+                max="10"
+                step="0.01"
                 value={selectedObject.scale[axis]}
                 onChange={(e) => handleScaleChange(axis, parseFloat(e.target.value))}
                 className="flex-1"
               />
               <input
                 type="number"
-                value={selectedObject.scale[axis].toFixed(1)}
-                onChange={(e) => handleScaleChange(axis, parseFloat(e.target.value) || 0.1)}
+                value={selectedObject.scale[axis].toFixed(2)}
+                onChange={(e) => handleScaleChange(axis, parseFloat(e.target.value) || 0.01)}
                 className="w-16 px-2 py-1 bg-gray-700 rounded text-xs text-white"
-                step="0.1"
-                min="0.1"
+                step="0.01"
+                min="0.01"
               />
             </div>
           ))}
@@ -241,6 +241,74 @@ export default function ObjectPropertiesPanel({
           className="w-full h-10 rounded cursor-pointer"
         />
       </div>
+
+      {/* Text Properties (only for text type) */}
+      {selectedObject.type === 'text' && (
+        <div className="pt-4 border-t border-gray-700 space-y-3">
+          <div className="text-sm font-semibold text-gray-300 mb-2">Text Properties</div>
+          
+          {/* Text Content */}
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Text Content</label>
+            <input
+              type="text"
+              value={selectedObject.textContent || 'Text'}
+              onChange={(e) => onUpdateObject(selectedObject.id, { textContent: e.target.value })}
+              className="w-full px-3 py-1.5 bg-gray-700 border border-gray-600 rounded text-sm text-white focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          
+          {/* Font Size */}
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Font Size: {(selectedObject.fontSize || 1).toFixed(1)}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0.1"
+                max="5"
+                step="0.1"
+                value={selectedObject.fontSize || 1}
+                onChange={(e) => onUpdateObject(selectedObject.id, { fontSize: parseFloat(e.target.value) })}
+                className="flex-1"
+              />
+              <input
+                type="number"
+                value={(selectedObject.fontSize || 1).toFixed(1)}
+                onChange={(e) => onUpdateObject(selectedObject.id, { fontSize: parseFloat(e.target.value) || 1 })}
+                className="w-16 px-2 py-1 bg-gray-700 rounded text-xs text-white"
+                step="0.1"
+              />
+            </div>
+          </div>
+          
+          {/* Text Depth */}
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">
+              Depth/Extrusion: {(selectedObject.textDepth || 0.2).toFixed(2)}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.05"
+                value={selectedObject.textDepth || 0.2}
+                onChange={(e) => onUpdateObject(selectedObject.id, { textDepth: parseFloat(e.target.value) })}
+                className="flex-1"
+              />
+              <input
+                type="number"
+                value={(selectedObject.textDepth || 0.2).toFixed(2)}
+                onChange={(e) => onUpdateObject(selectedObject.id, { textDepth: parseFloat(e.target.value) || 0.2 })}
+                className="w-16 px-2 py-1 bg-gray-700 rounded text-xs text-white"
+                step="0.05"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wireframe toggle */}
       <div className="flex items-center justify-between">

@@ -392,7 +392,7 @@ export interface CameraRigKeyframe {
 // PR 2: Extended with group and role for semantic targeting
 export interface WorkspaceObject {
   id: string;
-  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light';
+  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light' | 'text';
   name: string;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
@@ -414,6 +414,10 @@ export interface WorkspaceObject {
   // Letterbox properties (when type === 'camera')
   showLetterbox?: boolean;
   letterboxSize?: number; // 0-100 pixels
+  // Text-specific properties (when type === 'text')
+  textContent?: string;
+  fontSize?: number; // Font size
+  textDepth?: number; // Extrusion depth for 3D text
   // PR 2: Object Grouping + Naming - Semantic targeting for presets
   group?: string; // Logical group name (e.g., "head", "body", "fins")
   role?: string;  // Specific role within group (e.g., "fin_left", "fin_right")

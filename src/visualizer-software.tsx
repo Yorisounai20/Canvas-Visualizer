@@ -241,6 +241,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
+  const [gridSize, setGridSize] = useState(40); // Grid size
+  const [gridDivisions, setGridDivisions] = useState(40); // Grid divisions
   const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
@@ -3056,7 +3058,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     lightsRef.current.directional = directionalLight;
     
     // Workspace mode: Grid and Axes helpers
-    const workspaceGrid = new THREE.GridHelper(40, 40, 0x00ffff, 0x444444);
+    const workspaceGrid = new THREE.GridHelper(gridSize, gridDivisions, 0x00ffff, 0x444444);
     workspaceGrid.visible = showGrid;
     scene.add(workspaceGrid);
     gridHelperRef.current = workspaceGrid;
@@ -8767,8 +8769,30 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   }, [showAxes]);
 
+  // Update workspace grid when size or divisions change
+  useEffect(() => {
+    if (gridHelperRef.current && sceneRef.current) {
+      // Remove old grid
+      sceneRef.current.remove(gridHelperRef.current);
+      gridHelperRef.current.geometry.dispose();
+      if (gridHelperRef.current.material) {
+        if (Array.isArray(gridHelperRef.current.material)) {
+          gridHelperRef.current.material.forEach(m => m.dispose());
+        } else {
+          gridHelperRef.current.material.dispose();
+        }
+      }
+      
+      // Create new grid with updated size/divisions
+      const newGrid = new THREE.GridHelper(gridSize, gridDivisions, 0x00ffff, 0x444444);
+      newGrid.visible = showGrid;
+      sceneRef.current.add(newGrid);
+      gridHelperRef.current = newGrid;
+    }
+  }, [gridSize, gridDivisions, showGrid]);
+
   // Workspace object management callbacks
-  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => {
+  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'text') => {
     if (!sceneRef.current) return;
     
     const id = `workspace-${type}-${Date.now()}`;
@@ -8788,6 +8812,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       roughness: 0.5
     };
     
+    // Add text-specific properties
+    if (type === 'text') {
+      newObject.textContent = 'Text';
+      newObject.fontSize = 1;
+      newObject.textDepth = 0.2;
+      newObject.wireframe = false; // Text looks better without wireframe by default
+    }
+    
     // Create Three.js mesh
     let geometry: THREE.BufferGeometry;
     switch (type) {
@@ -8806,6 +8838,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       case 'instances':
         // Create instanced mesh (simplified for now)
         geometry = new THREE.SphereGeometry(0.5, 16, 16);
+        break;
+      case 'text':
+        // Create text geometry
+        if (fontRef.current) {
+          geometry = new TextGeometry(newObject.textContent || 'Text', {
+            font: fontRef.current,
+            size: newObject.fontSize || 1,
+            height: newObject.textDepth || 0.2,
+            curveSegments: 12,
+            bevelEnabled: false
+          });
+          geometry.center(); // Center the text geometry
+        } else {
+          // Fallback to box if font not loaded
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+          addLog('Font not loaded, creating box instead. Load a font first.', 'error');
+        }
         break;
       default:
         geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -8910,6 +8959,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 }
                 
                 mat.needsUpdate = true;
+              }
+            }
+            
+            // Handle text geometry recreation (when text properties change)
+            if (obj.type === 'text' && (updates.textContent !== undefined || updates.fontSize !== undefined || updates.textDepth !== undefined)) {
+              if (fontRef.current && sceneRef.current) {
+                // Dispose old geometry
+                if (obj.mesh.geometry) {
+                  obj.mesh.geometry.dispose();
+                }
+                
+                // Create new text geometry
+                const textGeometry = new TextGeometry(updated.textContent || 'Text', {
+                  font: fontRef.current,
+                  size: updated.fontSize || 1,
+                  height: updated.textDepth || 0.2,
+                  curveSegments: 12,
+                  bevelEnabled: false
+                });
+                textGeometry.center();
+                obj.mesh.geometry = textGeometry;
               }
             }
             
@@ -9190,6 +9260,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       onToggleGrid={handleToggleGrid}
       showAxes={showAxes}
       onToggleAxes={handleToggleAxes}
+      gridSize={gridSize}
+      gridDivisions={gridDivisions}
+      onGridSizeChange={setGridSize}
+      onGridDivisionsChange={setGridDivisions}
       useWorkspaceObjects={useWorkspaceObjects}
       onToggleVisualizationSource={handleToggleVisualizationSource}
       workspaceObjects={workspaceObjects}
