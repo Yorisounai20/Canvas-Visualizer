@@ -392,7 +392,7 @@ export interface CameraRigKeyframe {
 // PR 2: Extended with group and role for semantic targeting
 export interface WorkspaceObject {
   id: string;
-  type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'camera' | 'light' | 'text';
+  type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'camera' | 'light' | 'text';
   name: string;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };

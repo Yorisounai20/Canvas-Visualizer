@@ -8633,6 +8633,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       // Workspace-specific shortcuts (only when in workspace mode)
       if (workspaceMode) {
+        // Undo (Ctrl+Z)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          handleUndo();
+          return;
+        }
+        // Redo (Ctrl+Y or Ctrl+Shift+Z)
+        if (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') ||
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
         // Duplicate (Shift+D)
         if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'd') {
           e.preventDefault();
@@ -8658,6 +8671,54 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           } else if (selectedObjectId) {
             // Toggle selected object visibility
             handleToggleObjectVisibility();
+          }
+          return;
+        }
+        // Transform mode: Grab/Move (G)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'g') {
+          e.preventDefault();
+          // TODO: Enter transform mode - move/grab
+          addLog('Transform mode (Grab): Move selected object - Coming soon', 'info');
+          return;
+        }
+        // Transform mode: Rotate (R)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          // TODO: Enter transform mode - rotate
+          addLog('Transform mode (Rotate): Rotate selected object - Coming soon', 'info');
+          return;
+        }
+        // Transform mode: Scale (S)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          // TODO: Enter transform mode - scale
+          addLog('Transform mode (Scale): Scale selected object - Coming soon', 'info');
+          return;
+        }
+        // Reset position (Alt+G)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'g') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { position: { x: 0, y: 0, z: 0 } });
+            addLog('Reset position to origin', 'success');
+          }
+          return;
+        }
+        // Reset rotation (Alt+R)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { rotation: { x: 0, y: 0, z: 0 } });
+            addLog('Reset rotation to zero', 'success');
+          }
+          return;
+        }
+        // Reset scale (Alt+S)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { scale: { x: 1, y: 1, z: 1 } });
+            addLog('Reset scale to 1', 'success');
           }
           return;
         }
@@ -8792,7 +8853,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   }, [gridSize, gridDivisions, showGrid]);
 
   // Workspace object management callbacks
-  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'text') => {
+  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'text') => {
     if (!sceneRef.current) return;
     
     const id = `workspace-${type}-${Date.now()}`;
@@ -8834,6 +8895,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         break;
       case 'torus':
         geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
+        break;
+      case 'tetrahedron':
+        geometry = new THREE.TetrahedronGeometry(1);
+        break;
+      case 'octahedron':
+        geometry = new THREE.OctahedronGeometry(1);
         break;
       case 'instances':
         // Create instanced mesh (simplified for now)

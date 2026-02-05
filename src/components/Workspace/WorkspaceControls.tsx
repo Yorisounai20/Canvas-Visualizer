@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download, Type } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download, Type, Triangle, Hexagon } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
@@ -14,7 +14,7 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
  */
 
 interface WorkspaceControlsProps {
-  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances' | 'text') => void;
+  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'text') => void;
   showGrid: boolean;
   onToggleGrid: () => void;
   showAxes: boolean;
@@ -160,6 +160,16 @@ export default function WorkspaceControls({
   const [exportSolver, setExportSolver] = useState('orbit');
   // Keyboard shortcuts help
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
+  // Ref for height logging
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Log the WorkspaceControls height for user reference
+  useEffect(() => {
+    if (containerRef.current) {
+      const height = containerRef.current.offsetHeight;
+      console.log(`📏 WorkspaceControls Panel Height: ${height}px (h-full = auto-height based on content)`);
+    }
+  }, []);
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -223,7 +233,7 @@ export default function WorkspaceControls({
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
+    <div ref={containerRef} className="h-full flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
       <div className="p-3 border-b border-gray-700 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           🔨 Workspace Controls
@@ -572,6 +582,24 @@ export default function WorkspaceControls({
       >
         <Torus className="w-4 h-4" />
         Torus
+      </button>
+
+      <button
+        onClick={() => onCreateObject('tetrahedron')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add Tetrahedron"
+      >
+        <Triangle className="w-4 h-4" />
+        Tetrahedron
+      </button>
+
+      <button
+        onClick={() => onCreateObject('octahedron')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add Octahedron"
+      >
+        <Hexagon className="w-4 h-4" />
+        Octahedron
       </button>
 
       <button
