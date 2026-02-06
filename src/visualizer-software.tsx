@@ -245,6 +245,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [gridDivisions, setGridDivisions] = useState(40); // Grid divisions
   const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const lastObjectCreationRef = useRef<{ type: string; time: number } | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
   // PR 5: Preset Authoring Mode
@@ -1303,6 +1304,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // Get current preset from keyframes (finds active preset segment at current time)
   const getCurrentPreset = () => {
     const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    
+    // Debug: Log keyframes periodically (every 2 seconds of playback)
+    if (Math.floor(currentTime) % 2 === 0 && Math.floor(currentTime * 10) % 20 === 0) {
+      console.log('🎬 Current time:', currentTime.toFixed(2), 'Keyframes:', sorted.map(kf => `${kf.preset} (${kf.time}-${kf.endTime})`).join(', '));
+    }
+    
     // Find the preset segment that contains current time
     for (let i = 0; i < sorted.length; i++) {
       if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
@@ -8856,7 +8863,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'text') => {
     if (!sceneRef.current) return;
     
-    const id = `workspace-${type}-${Date.now()}`;
+    // Prevent duplicate creation within 300ms (debounce)
+    const now = Date.now();
+    if (lastObjectCreationRef.current && 
+        lastObjectCreationRef.current.type === type && 
+        now - lastObjectCreationRef.current.time < 300) {
+      console.log(`⏱️ Prevented duplicate ${type} creation (within 300ms)`);
+      return;
+    }
+    lastObjectCreationRef.current = { type, time: now };
+    
+    const id = `workspace-${type}-${now}`;
     const newObject: WorkspaceObject = {
       id,
       type,

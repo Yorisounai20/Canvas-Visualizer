@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download, Type, Triangle, Hexagon } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
@@ -160,16 +160,6 @@ export default function WorkspaceControls({
   const [exportSolver, setExportSolver] = useState('orbit');
   // Keyboard shortcuts help
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
-  // Ref for height logging
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Log the WorkspaceControls height for user reference
-  useEffect(() => {
-    if (containerRef.current) {
-      const height = containerRef.current.offsetHeight;
-      console.log(`📏 WorkspaceControls Panel Height: ${height}px (h-full = auto-height based on content)`);
-    }
-  }, []);
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -233,7 +223,7 @@ export default function WorkspaceControls({
   };
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
+    <div className="h-[160px] flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
       <div className="p-3 border-b border-gray-700 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
           🔨 Workspace Controls
