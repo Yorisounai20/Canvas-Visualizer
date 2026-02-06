@@ -1722,7 +1722,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const playAudio = () => {
     if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
-    if (bufferSourceRef.current) bufferSourceRef.current.stop();
+    
+    // Stop and clean up any existing audio source to prevent duplicates
+    if (bufferSourceRef.current) {
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
+      bufferSourceRef.current = null;
+    }
+    
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
     src.connect(analyserRef.current);
@@ -1751,19 +1761,39 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const stopAudio = () => {
     if (bufferSourceRef.current) {
       pauseTimeRef.current = currentTime;
-      bufferSourceRef.current.stop();
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
       bufferSourceRef.current = null;
     }
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
     setIsPlaying(false);
   };
 
   const seekTo = (t: number) => {
-    const play = isPlaying;
-    if (play) stopAudio();
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop audio to prevent duplicates
+    if (wasPlaying) {
+      stopAudio();
+    }
+    
+    // Set new position
     pauseTimeRef.current = t;
     setCurrentTime(t);
-    if (play) playAudio();
+    
+    // Restart if it was playing, using microtask to ensure cleanup completes
+    if (wasPlaying) {
+      Promise.resolve().then(() => {
+        playAudio();
+      });
+    }
   };
 
   // PHASE 4: Multi-track audio functions
