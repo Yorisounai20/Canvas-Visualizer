@@ -7739,6 +7739,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       textAnimatorKeyframes.forEach(textKf => {
         if (!fontRef.current) return;
         
+        // Calculate when this keyframe ends (start time + duration + stagger for all characters)
+        const textKfEndTime = textKf.time + textKf.duration + (textKf.text.length * textKf.stagger);
+        
+        // Only process keyframe if current time is within its active range
+        if (t < textKf.time || t > textKfEndTime) {
+          // Outside time range - hide meshes if they exist
+          const existingMeshes = textCharacterMeshesRef.current.get(textKf.id);
+          if (existingMeshes) {
+            existingMeshes.forEach(mesh => {
+              mesh.visible = false;
+            });
+          }
+          return;
+        }
+        
         // Get keyframe-specific properties with defaults
         const kfPosition = textKf.position ?? { x: 0, y: 5, z: 0 };
         const kfSize = textKf.size ?? 1;
