@@ -901,6 +901,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
+      
+      // Force update visualization source after a short delay to ensure scene is ready
+      setTimeout(() => {
+        if (projectState.useWorkspaceObjects !== undefined) {
+          console.log('🔄 Force applying visualization source:', projectState.useWorkspaceObjects ? 'workspace' : 'presets');
+          setUseWorkspaceObjects(projectState.useWorkspaceObjects);
+        }
+      }, 100);
+      
       addLog(`Project "${projectState.settings.name}" loaded successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to load project:', error);
@@ -9299,9 +9308,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Effect: Hide default audio-reactive shapes when using workspace objects
   useEffect(() => {
-    if (!objectsRef.current) return;
+    if (!objectsRef.current) {
+      console.log('⚠️ objectsRef.current is null - shapes not initialized yet');
+      return;
+    }
     
     const { cubes, octas, tetras, sphere, toruses, planes } = objectsRef.current;
+    
+    // Safety check: ensure all arrays exist
+    if (!cubes || !octas || !tetras || !sphere) {
+      console.log('⚠️ Shape arrays not fully initialized');
+      return;
+    }
     
     if (useWorkspaceObjects) {
       // Hide all default shapes when using workspace objects
@@ -9312,6 +9330,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = false; });
       if (planes) planes.forEach(plane => { plane.visible = false; });
       
+      console.log('✅ Using workspace objects: Default shapes hidden');
       addLog('Using workspace objects: Default shapes hidden', 'info');
     } else {
       // Show all default shapes when using presets
@@ -9322,6 +9341,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = true; });
       if (planes) planes.forEach(plane => { plane.visible = true; });
       
+      console.log('✅ Using preset shapes: Default shapes visible', {
+        sphere: sphere.visible,
+        cubeCount: cubes.length,
+        octaCount: octas.length,
+        tetraCount: tetras.length
+      });
       addLog('Using preset shapes: Default shapes visible', 'info');
     }
   }, [useWorkspaceObjects]);
