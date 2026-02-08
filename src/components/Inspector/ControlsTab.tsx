@@ -660,14 +660,13 @@ export default function ControlsTab(props: ControlsTabProps) {
               </button>
             </div>
             
-            {props.letterboxKeyframes.map((kf) => (
+            {props.letterboxKeyframes.filter(kf => kf.id !== undefined).map((kf) => (
               <div key={kf.id} className="bg-gray-800 rounded p-2 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-white">Time: {kf.time.toFixed(2)}s</span>
                   <button
-                    onClick={() => kf.id && props.onDeleteLetterboxKeyframe?.(kf.id)}
+                    onClick={() => props.onDeleteLetterboxKeyframe?.(kf.id!)}
                     className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
-                    disabled={!kf.id}
                   >
                     Delete
                   </button>
@@ -680,7 +679,7 @@ export default function ControlsTab(props: ControlsTabProps) {
                     max="100"
                     step="1"
                     value={kf.targetSize}
-                    onChange={(e) => kf.id && props.onUpdateLetterboxKeyframe?.(kf.id, 'targetSize', Number(e.target.value))}
+                    onChange={(e) => props.onUpdateLetterboxKeyframe?.(kf.id!, 'targetSize', Number(e.target.value))}
                     className="w-full"
                   />
                 </div>
@@ -692,7 +691,7 @@ export default function ControlsTab(props: ControlsTabProps) {
                     max="5"
                     step="0.1"
                     value={kf.duration}
-                    onChange={(e) => kf.id && props.onUpdateLetterboxKeyframe?.(kf.id, 'duration', Number(e.target.value))}
+                    onChange={(e) => props.onUpdateLetterboxKeyframe?.(kf.id!, 'duration', Number(e.target.value))}
                     className="w-full"
                   />
                 </div>
