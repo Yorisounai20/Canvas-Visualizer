@@ -1730,7 +1730,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
+    console.log('🎵 playAudio() called');
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) {
+      console.log('❌ playAudio: Missing audio context, buffer, or analyser');
+      return;
+    }
     
     // Stop and clean up any existing audio source to prevent duplicates
     if (bufferSourceRef.current) {
@@ -1764,6 +1768,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
     startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+    console.log('✅ playAudio: Setting isPlaying to true');
     setIsPlaying(true);
   };
 
@@ -3704,14 +3709,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   }, [cameraRigs, cameraRigKeyframes, duration]);
 
   useEffect(() => {
-    if (!isPlaying || !rendererRef.current) return;
+    console.log('🎬 Animation useEffect triggered, isPlaying:', isPlaying, 'rendererRef:', !!rendererRef.current);
+    if (!isPlaying || !rendererRef.current) {
+      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'renderer:', !!rendererRef.current);
+      return;
+    }
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
     const analyser = analyserRef.current;
     const obj = objectsRef.current;
-    if (!obj) return;
+    if (!obj) {
+      console.log('⏸️ Animation useEffect early return - objectsRef is null');
+      return;
+    }
 
+    console.log('✅ Starting animation loop');
     const anim = () => {
-      if (!isPlaying) return;
+      if (!isPlaying) {
+        console.log('⏸️ Animation frame cancelled - isPlaying is false');
+        return;
+      }
       animationRef.current = requestAnimationFrame(anim);
       
       try {
@@ -8558,8 +8574,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
     };
 
+    console.log('🚀 Calling anim() to start animation loop');
     anim();
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+    return () => { 
+      console.log('🛑 Animation useEffect cleanup - cancelling animation frame');
+      if (animationRef.current) cancelAnimationFrame(animationRef.current); 
+    };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
 
   // Draw waveform on canvas - optimized with throttling
