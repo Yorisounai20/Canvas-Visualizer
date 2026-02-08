@@ -1592,7 +1592,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setLetterboxKeyframes(letterboxKeyframes.filter(kf => kf.id !== id));
   };
   
-  const handleUpdateLetterboxKeyframe = (id: number, field: string, value: any) => {
+  const handleUpdateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
     setLetterboxKeyframes(letterboxKeyframes.map(kf =>
       kf.id === id ? { ...kf, [field]: value } : kf
     ).sort((a, b) => a.time - b.time));
@@ -1610,7 +1610,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
   
   // Update handler for letterbox keyframe fields (including duration) - legacy alias
-  const updateLetterboxKeyframe = (id: number, field: string, value: any) => {
+  const updateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
     handleUpdateLetterboxKeyframe(id, field, value);
   };
   
