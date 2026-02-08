@@ -1311,22 +1311,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
   
   // Get current preset from keyframes (finds active preset segment at current time)
-  const getCurrentPreset = () => {
+  const getCurrentPreset = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
     const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
     
     // Debug: Log keyframes periodically (every 2 seconds of playback)
-    if (Math.floor(currentTime) % 2 === 0 && Math.floor(currentTime * 10) % 20 === 0) {
-      console.log('🎬 Current time:', currentTime.toFixed(2), 'Keyframes:', sorted.map(kf => `${kf.preset} (${kf.time}-${kf.endTime})`).join(', '));
+    if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+      console.log('🎬 Current time:', t.toFixed(2), 'Keyframes:', sorted.map(kf => `${kf.preset} (${kf.time}-${kf.endTime})`).join(', '));
     }
     
     // Find the preset segment that contains current time
     for (let i = 0; i < sorted.length; i++) {
-      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
+      if (t >= sorted[i].time && t < sorted[i].endTime) {
         return sorted[i].preset;
       }
     }
     // If after all segments or before first, use the first or last preset
-    if (currentTime < sorted[0]?.time) {
+    if (t < sorted[0]?.time) {
       return sorted[0]?.preset || 'orbit';
     }
     // After all segments, use the last preset
@@ -1334,16 +1335,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
   
   // Get current preset speed multiplier with keyframe interpolation
-  const getCurrentPresetSpeed = () => {
+  const getCurrentPresetSpeed = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
     // Sort speed keyframes by time
     const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
     
     // If no keyframes or before first keyframe, return first keyframe speed or default
     if (sorted.length === 0) return 1.0;
-    if (currentTime <= sorted[0].time) return sorted[0].speed;
+    if (t <= sorted[0].time) return sorted[0].speed;
     
     // If after last keyframe, return last keyframe speed
-    if (currentTime >= sorted[sorted.length - 1].time) {
+    if (t >= sorted[sorted.length - 1].time) {
       return sorted[sorted.length - 1].speed;
     }
     
@@ -1352,10 +1354,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const kf1 = sorted[i];
       const kf2 = sorted[i + 1];
       
-      if (currentTime >= kf1.time && currentTime < kf2.time) {
+      if (t >= kf1.time && t < kf2.time) {
         // Interpolate between the two keyframes
-        const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
-        const easedT = applyEasing(t, kf1.easing);
+        const tProgress = (t - kf1.time) / (kf2.time - kf1.time);
+        const easedT = applyEasing(tProgress, kf1.easing);
         return kf1.speed + (kf2.speed - kf1.speed) * easedT;
       }
     }
@@ -3767,8 +3769,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         lastTimelineUpdateRef.current = now;
       }
       
-      const type = getCurrentPreset(); // Use keyframe-based preset switching
-      const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
+      const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
+      const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
       
       // Debug: Comprehensive keyframe status logging every 2 seconds
