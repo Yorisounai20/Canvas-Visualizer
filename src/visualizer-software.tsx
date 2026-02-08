@@ -9509,6 +9509,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       canRedo={false}
       onUndo={handleUndo}
       onRedo={handleRedo}
+      onShowHelp={() => setShowKeyboardShortcuts(true)}
     />
   );
 

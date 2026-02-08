@@ -5,7 +5,6 @@ import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
 import { exportWorkspaceAsPreset, canExportWorkspace, getAvailableSolvers } from '../../lib/workspaceExport';
 import { WorkspaceActions } from './WorkspaceActions';
-import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -46,6 +45,7 @@ interface WorkspaceControlsProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onShowHelp?: () => void;
 }
 
 /**
@@ -152,14 +152,13 @@ export default function WorkspaceControls({
   canUndo = false,
   canRedo = false,
   onUndo,
-  onRedo
+  onRedo,
+  onShowHelp
 }: WorkspaceControlsProps) {
   const [poseName, setPoseName] = useState('');
   // PR 8: Export state
   const [exportPresetName, setExportPresetName] = useState('');
   const [exportSolver, setExportSolver] = useState('orbit');
-  // Keyboard shortcuts help
-  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -245,13 +244,8 @@ export default function WorkspaceControls({
           onSelectAll={onSelectAll || (() => {})}
           onDeselectAll={onDeselectAll || (() => {})}
           onToggleVisibility={onToggleObjectVisibility || (() => {})}
-          onShowHelp={() => setShowShortcutsHelp(true)}
+          onShowHelp={onShowHelp || (() => {})}
         />
-      )}
-      
-      {/* Keyboard Shortcuts Help Modal */}
-      {showShortcutsHelp && (
-        <KeyboardShortcutsHelp onClose={() => setShowShortcutsHelp(false)} />
       )}
       
       {/* Visualization Source Toggle */}
