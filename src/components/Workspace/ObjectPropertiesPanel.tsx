@@ -286,24 +286,26 @@ export default function ObjectPropertiesPanel({
           {/* Text Depth */}
           <div>
             <label className="text-xs text-gray-400 block mb-1">
-              Depth/Extrusion: {(selectedObject.textDepth || 0.2).toFixed(2)}
+              Depth/Extrusion: {(selectedObject.textDepth || 0.1).toFixed(2)}
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="range"
                 min="0"
-                max="2"
-                step="0.05"
-                value={selectedObject.textDepth || 0.2}
+                max="0.5"
+                step="0.01"
+                value={selectedObject.textDepth || 0.1}
                 onChange={(e) => onUpdateObject(selectedObject.id, { textDepth: parseFloat(e.target.value) })}
                 className="flex-1"
               />
               <input
                 type="number"
-                value={(selectedObject.textDepth || 0.2).toFixed(2)}
-                onChange={(e) => onUpdateObject(selectedObject.id, { textDepth: parseFloat(e.target.value) || 0.2 })}
+                value={(selectedObject.textDepth || 0.1).toFixed(2)}
+                onChange={(e) => onUpdateObject(selectedObject.id, { textDepth: parseFloat(e.target.value) || 0.1 })}
                 className="w-16 px-2 py-1 bg-gray-700 rounded text-xs text-white"
-                step="0.05"
+                step="0.01"
+                min="0"
+                max="0.5"
               />
             </div>
           </div>

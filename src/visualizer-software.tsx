@@ -8939,7 +8939,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     if (type === 'text') {
       newObject.textContent = 'Text';
       newObject.fontSize = 1;
-      newObject.textDepth = 0.2;
+      newObject.textDepth = 0.1;
       newObject.wireframe = false; // Text looks better without wireframe by default
     }
     
@@ -8974,7 +8974,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           geometry = new TextGeometry(newObject.textContent || 'Text', {
             font: fontRef.current,
             size: newObject.fontSize || 1,
-            height: newObject.textDepth || 0.2,
+            height: newObject.textDepth || 0.1,
             curveSegments: 12,
             bevelEnabled: false
           });
@@ -9103,7 +9103,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 const textGeometry = new TextGeometry(updated.textContent || 'Text', {
                   font: fontRef.current,
                   size: updated.fontSize || 1,
-                  height: updated.textDepth || 0.2,
+                  height: updated.textDepth || 0.1,
                   curveSegments: 12,
                   bevelEnabled: false
                 });
