@@ -3771,6 +3771,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
       
+      // Debug: Comprehensive keyframe status logging every 2 seconds
+      if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+        console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's:');
+        console.log('  Preset:', type, '(speed:', presetSpeed + ')');
+        console.log('  Preset keyframes:', presetKeyframes.length, presetKeyframes.map(kf => `${kf.preset}@${kf.time}-${kf.endTime}`).join(', '));
+        console.log('  PresetSpeed keyframes:', presetSpeedKeyframes.length);
+        console.log('  Camera keyframes:', cameraKeyframes.length);
+        console.log('  CameraRig keyframes:', cameraRigKeyframes.length);
+        console.log('  CameraFX clips:', cameraFXClips.length, cameraFXClips.filter(c => c.enabled && t >= c.startTime && t < c.endTime).length, 'active');
+        console.log('  Text keyframes:', textKeyframes.length);
+        console.log('  TextAnimator keyframes:', textAnimatorKeyframes.length, textAnimatorKeyframes.filter(kf => {
+          const endTime = kf.time + kf.duration + (kf.text.length * kf.stagger);
+          return t >= kf.time && t <= endTime;
+        }).length, 'active');
+        console.log('  Letterbox keyframes:', letterboxKeyframes.length);
+        console.log('  ParamEvents:', parameterEvents.length);
+        console.log('  Environment keyframes:', environmentKeyframes.length);
+      }
+      
       // REMOVED: Global camera keyframes interpolation (orphaned feature)
       // Use direct camera settings
       const activeCameraDistance = cameraDistance;
