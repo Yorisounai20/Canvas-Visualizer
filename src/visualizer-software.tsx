@@ -267,9 +267,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
   const starFieldRef = useRef<THREE.Points | null>(null);
   const [starCount, setStarCount] = useState(5000);
+  const [starSize, setStarSize] = useState(2.0);
+  const [starColor, setStarColor] = useState('#ffffff');
   const [galaxyColor, setGalaxyColor] = useState('#8a2be2');
+  const [galaxyColor1, setGalaxyColor1] = useState('#8a2be2');
+  const [galaxyColor2, setGalaxyColor2] = useState('#4169e1');
+  const [galaxyRotationSpeed, setGalaxyRotationSpeed] = useState(0.5);
   const [nebulaColor1, setNebulaColor1] = useState('#ff1493');
   const [nebulaColor2, setNebulaColor2] = useState('#4169e1');
+  const [nebulaColor3, setNebulaColor3] = useState('#9370db');
+  const [gradientStart, setGradientStart] = useState('#1a1a3e');
+  const [gradientEnd, setGradientEnd] = useState('#0a0a14');
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
@@ -1567,6 +1575,29 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
   
+  // Letterbox keyframe handlers
+  const handleAddLetterboxKeyframe = () => {
+    const newKeyframe = {
+      id: nextLetterboxKeyframeId.current++,
+      time: currentTime,
+      targetSize: letterboxSize,
+      duration: 1.0,
+      mode: 'smooth' as const,
+      invert: false
+    };
+    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeleteLetterboxKeyframe = (id: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.filter(kf => kf.id !== id));
+  };
+  
+  const handleUpdateLetterboxKeyframe = (id: number, field: string, value: any) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
   // Move handlers for all keyframe types (for timeline dragging)
   const moveSpeedKeyframe = (id: number, newTime: number) => {
     handleUpdateSpeedKeyframe(id, 'time', newTime);
@@ -1578,11 +1609,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
-  // Update handler for letterbox keyframe fields (including duration)
+  // Update handler for letterbox keyframe fields (including duration) - legacy alias
   const updateLetterboxKeyframe = (id: number, field: string, value: any) => {
-    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
-      kf.id === id ? { ...kf, [field]: value } : kf
-    ).sort((a, b) => a.time - b.time));
+    handleUpdateLetterboxKeyframe(id, field, value);
   };
   
   const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
@@ -9816,6 +9845,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setSkyboxType={setSkyboxType}
             setBackgroundColor={setBackgroundColor}
             setBorderColor={setBorderColor}
+            // Detailed background settings
+            starCount={starCount}
+            starSize={starSize}
+            starColor={starColor}
+            setStarCount={setStarCount}
+            setStarSize={setStarSize}
+            setStarColor={setStarColor}
+            galaxyColor1={galaxyColor1}
+            galaxyColor2={galaxyColor2}
+            galaxyRotationSpeed={galaxyRotationSpeed}
+            setGalaxyColor1={setGalaxyColor1}
+            setGalaxyColor2={setGalaxyColor2}
+            setGalaxyRotationSpeed={setGalaxyRotationSpeed}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            nebulaColor3={nebulaColor3}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setNebulaColor3={setNebulaColor3}
+            gradientStart={gradientStart}
+            gradientEnd={gradientEnd}
+            setGradientStart={setGradientStart}
+            setGradientEnd={setGradientEnd}
+            // Letterbox controls
+            letterboxSize={letterboxSize}
+            letterboxKeyframes={letterboxKeyframes}
+            onAddLetterboxKeyframe={handleAddLetterboxKeyframe}
+            onDeleteLetterboxKeyframe={handleDeleteLetterboxKeyframe}
+            onUpdateLetterboxKeyframe={handleUpdateLetterboxKeyframe}
             // Global colors (kept for compatibility)
             bassColor={bassColor}
             midsColor={midsColor}

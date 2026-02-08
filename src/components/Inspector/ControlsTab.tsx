@@ -12,6 +12,37 @@ interface ControlsTabProps {
   setBackgroundColor?: (color: string) => void;
   setBorderColor?: (color: string) => void;
   
+  // Detailed Background Settings
+  starCount?: number;
+  starSize?: number;
+  starColor?: string;
+  setStarCount?: (count: number) => void;
+  setStarSize?: (size: number) => void;
+  setStarColor?: (color: string) => void;
+  galaxyColor1?: string;
+  galaxyColor2?: string;
+  galaxyRotationSpeed?: number;
+  setGalaxyColor1?: (color: string) => void;
+  setGalaxyColor2?: (color: string) => void;
+  setGalaxyRotationSpeed?: (speed: number) => void;
+  nebulaColor1?: string;
+  nebulaColor2?: string;
+  nebulaColor3?: string;
+  setNebulaColor1?: (color: string) => void;
+  setNebulaColor2?: (color: string) => void;
+  setNebulaColor3?: (color: string) => void;
+  gradientStart?: string;
+  gradientEnd?: string;
+  setGradientStart?: (color: string) => void;
+  setGradientEnd?: (color: string) => void;
+  
+  // Letterbox Controls
+  letterboxSize?: number;
+  letterboxKeyframes?: Array<{id?: number, time: number, targetSize: number, duration: number, mode: 'instant' | 'smooth', invert: boolean}>;
+  onAddLetterboxKeyframe?: () => void;
+  onDeleteLetterboxKeyframe?: (id: number) => void;
+  onUpdateLetterboxKeyframe?: (id: number, field: string, value: any) => void;
+  
   // Global Colors (DEPRECATED - keeping for backwards compatibility but hidden from UI)
   bassColor: string;
   midsColor: string;
@@ -347,6 +378,138 @@ export default function ControlsTab(props: ControlsTabProps) {
             </div>
           )}
           
+          {/* Stars Background Settings */}
+          {props.skyboxType === 'stars' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Star Count: {props.starCount}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2000"
+                  step="100"
+                  value={props.starCount || 1000}
+                  onChange={(e) => props.setStarCount?.(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Star Size: {props.starSize?.toFixed(1)}</label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="5"
+                  step="0.1"
+                  value={props.starSize || 2.0}
+                  onChange={(e) => props.setStarSize?.(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Star Color</label>
+                <input
+                  type="color"
+                  value={props.starColor || '#ffffff'}
+                  onChange={(e) => props.setStarColor?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Galaxy Background Settings */}
+          {props.skyboxType === 'galaxy' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Galaxy Color 1</label>
+                <input
+                  type="color"
+                  value={props.galaxyColor1 || '#8a2be2'}
+                  onChange={(e) => props.setGalaxyColor1?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Galaxy Color 2</label>
+                <input
+                  type="color"
+                  value={props.galaxyColor2 || '#4169e1'}
+                  onChange={(e) => props.setGalaxyColor2?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Galaxy Rotation Speed: {props.galaxyRotationSpeed?.toFixed(1)}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={props.galaxyRotationSpeed || 0.5}
+                  onChange={(e) => props.setGalaxyRotationSpeed?.(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Nebula Background Settings */}
+          {props.skyboxType === 'nebula' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Nebula Color 1</label>
+                <input
+                  type="color"
+                  value={props.nebulaColor1 || '#ff1493'}
+                  onChange={(e) => props.setNebulaColor1?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Nebula Color 2</label>
+                <input
+                  type="color"
+                  value={props.nebulaColor2 || '#4169e1'}
+                  onChange={(e) => props.setNebulaColor2?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Nebula Color 3</label>
+                <input
+                  type="color"
+                  value={props.nebulaColor3 || '#9370db'}
+                  onChange={(e) => props.setNebulaColor3?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+          
+          {/* Gradient Background Settings */}
+          {props.skyboxType === 'gradient' && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Gradient Start Color</label>
+                <input
+                  type="color"
+                  value={props.gradientStart || '#1a1a3e'}
+                  onChange={(e) => props.setGradientStart?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Gradient End Color</label>
+                <input
+                  type="color"
+                  value={props.gradientEnd || '#0a0a14'}
+                  onChange={(e) => props.setGradientEnd?.(e.target.value)}
+                  className="w-full h-10 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+          )}
+          
           {/* Border Color */}
           {props.borderColor !== undefined && (
             <div>
@@ -475,6 +638,67 @@ export default function ControlsTab(props: ControlsTabProps) {
         props.setTorusMaterialType,
         props.setTorusMetalness,
         props.setTorusRoughness
+      )}
+      
+      {/* Letterbox Controls */}
+      {props.letterboxSize !== undefined && props.letterboxKeyframes !== undefined && (
+        <div className="bg-gray-700 rounded-lg p-3 space-y-3 mt-4">
+          <h4 className="text-sm font-semibold text-cyan-400">📐 Letterbox</h4>
+          
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Current Size: {props.letterboxSize}px</label>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Keyframes ({props.letterboxKeyframes.length})</span>
+              <button
+                onClick={() => props.onAddLetterboxKeyframe?.()}
+                className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded"
+              >
+                + Add
+              </button>
+            </div>
+            
+            {props.letterboxKeyframes.map((kf) => (
+              <div key={kf.id} className="bg-gray-800 rounded p-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white">Time: {kf.time.toFixed(2)}s</span>
+                  <button
+                    onClick={() => props.onDeleteLetterboxKeyframe?.(kf.id!)}
+                    className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Target Size: {kf.targetSize}px</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={kf.targetSize}
+                    onChange={(e) => props.onUpdateLetterboxKeyframe?.(kf.id!, 'targetSize', Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Duration: {kf.duration.toFixed(1)}s</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="5"
+                    step="0.1"
+                    value={kf.duration}
+                    onChange={(e) => props.onUpdateLetterboxKeyframe?.(kf.id!, 'duration', Number(e.target.value))}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
