@@ -21,6 +21,12 @@ interface EffectsTabProps {
   setNebulaColor1: (color: string) => void;
   setNebulaColor2: (color: string) => void;
   setBorderColor: (color: string) => void;
+  // Letterbox controls
+  letterboxSize: number;
+  letterboxKeyframes: Array<{id?: number, time: number, targetSize: number, duration: number, mode: 'instant' | 'smooth', invert: boolean}>;
+  onAddLetterboxKeyframe: () => void;
+  onDeleteLetterboxKeyframe: (id: number) => void;
+  onUpdateLetterboxKeyframe: (id: number, field: string, value: number | boolean | string) => void;
 }
 
 /**
@@ -52,7 +58,12 @@ export default function EffectsTab({
   setGalaxyColor,
   setNebulaColor1,
   setNebulaColor2,
-  setBorderColor
+  setBorderColor,
+  letterboxSize,
+  letterboxKeyframes,
+  onAddLetterboxKeyframe,
+  onDeleteLetterboxKeyframe,
+  onUpdateLetterboxKeyframe
 }: EffectsTabProps) {
   return (
     <div>
@@ -260,6 +271,65 @@ export default function EffectsTab({
               className="w-full h-10 rounded cursor-pointer" 
             />
           </div>
+        </div>
+      </div>
+      
+      {/* Letterbox Controls */}
+      <div className="bg-gray-700 rounded-lg p-3 space-y-3 mt-4">
+        <h4 className="text-sm font-semibold text-cyan-400">📐 Letterbox</h4>
+        
+        <div>
+          <label className="text-xs text-gray-400 block mb-1">Current Size: {letterboxSize}px</label>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Keyframes ({letterboxKeyframes.length})</span>
+            <button
+              onClick={() => onAddLetterboxKeyframe()}
+              className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs rounded"
+            >
+              + Add
+            </button>
+          </div>
+          
+          {letterboxKeyframes.filter(kf => kf.id !== undefined).map((kf) => (
+            <div key={kf.id} className="bg-gray-800 rounded p-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-white">Time: {kf.time.toFixed(2)}s</span>
+                <button
+                  onClick={() => onDeleteLetterboxKeyframe(kf.id!)}
+                  className="px-2 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded"
+                >
+                  Delete
+                </button>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Target Size: {kf.targetSize}px</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={kf.targetSize}
+                  onChange={(e) => onUpdateLetterboxKeyframe(kf.id!, 'targetSize', Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 block mb-1">Duration: {kf.duration.toFixed(1)}s</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={kf.duration}
+                  onChange={(e) => onUpdateLetterboxKeyframe(kf.id!, 'duration', Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

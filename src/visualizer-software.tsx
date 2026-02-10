@@ -516,6 +516,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const lastTimelineUpdateRef = useRef<number>(0);
   const TIMELINE_UPDATE_INTERVAL_MS = 100; // 10 FPS (100ms between updates)
   
+  // Track preset changes for debugging
+  const previousPresetRef = useRef<string>('');
+  
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -3801,6 +3804,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
       const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
+      
+      // Track and log preset changes
+      if (previousPresetRef.current !== type) {
+        console.log('🔄 PRESET CHANGED from', previousPresetRef.current || '(none)', 'to', type, 'at time', t.toFixed(2) + 's');
+        previousPresetRef.current = type;
+      }
       
       // Debug: Comprehensive keyframe status logging every 2 seconds
       if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
@@ -10046,15 +10055,33 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
-            <p className="text-xs text-gray-400 mb-3">
-              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
-            </p>
-            <p className="text-xs text-gray-500 italic">
-              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
-            </p>
-          </div>
+          <EffectsTab
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            skyboxGradientTop={skyboxGradientTop}
+            skyboxGradientBottom={skyboxGradientBottom}
+            skyboxImageUrl={skyboxImageUrl}
+            starCount={starCount}
+            galaxyColor={galaxyColor}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setSkyboxGradientTop={setSkyboxGradientTop}
+            setSkyboxGradientBottom={setSkyboxGradientBottom}
+            setSkyboxImageUrl={setSkyboxImageUrl}
+            setStarCount={setStarCount}
+            setGalaxyColor={setGalaxyColor}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setBorderColor={setBorderColor}
+            letterboxSize={letterboxSize}
+            letterboxKeyframes={letterboxKeyframes}
+            onAddLetterboxKeyframe={handleAddLetterboxKeyframe}
+            onDeleteLetterboxKeyframe={handleDeleteLetterboxKeyframe}
+            onUpdateLetterboxKeyframe={handleUpdateLetterboxKeyframe}
+          />
         )}
         
         {activeTab === 'environments' && (
