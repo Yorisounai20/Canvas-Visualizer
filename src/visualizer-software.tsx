@@ -517,7 +517,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const TIMELINE_UPDATE_INTERVAL_MS = 100; // 10 FPS (100ms between updates)
   
   // Track preset changes for debugging
-  const previousPresetRef = useRef<string>('');
+  const previousPresetRef = useRef<string>('(none)');
   
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -3807,7 +3807,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       // Track and log preset changes
       if (previousPresetRef.current !== type) {
-        console.log('🔄 PRESET CHANGED from', previousPresetRef.current || '(none)', 'to', type, 'at time', t.toFixed(2) + 's');
+        console.log('🔄 PRESET CHANGED from', previousPresetRef.current, 'to', type, 'at time', t.toFixed(2) + 's');
         previousPresetRef.current = type;
       }
       

@@ -1,5 +1,14 @@
 import React from 'react';
 
+interface LetterboxKeyframe {
+  id?: number;
+  time: number;
+  targetSize: number;
+  duration: number;
+  mode: 'instant' | 'smooth';
+  invert: boolean;
+}
+
 interface EffectsTabProps {
   skyboxType: 'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula';
   backgroundColor: string;
@@ -23,7 +32,7 @@ interface EffectsTabProps {
   setBorderColor: (color: string) => void;
   // Letterbox controls
   letterboxSize: number;
-  letterboxKeyframes: Array<{id?: number, time: number, targetSize: number, duration: number, mode: 'instant' | 'smooth', invert: boolean}>;
+  letterboxKeyframes: LetterboxKeyframe[];
   onAddLetterboxKeyframe: () => void;
   onDeleteLetterboxKeyframe: (id: number) => void;
   onUpdateLetterboxKeyframe: (id: number, field: string, value: number | boolean | string) => void;
