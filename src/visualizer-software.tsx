@@ -103,8 +103,12 @@ import { WorkspaceActions } from './components/Workspace/WorkspaceActions';
 const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
 const EXPORT_BITRATE_HD = 12000000;     // 12 Mbps for 1280x720
 const EXPORT_BITRATE_FULLHD = 20000000; // 20 Mbps for 1920x1080
+const EXPORT_BITRATE_QHD = 30000000;    // 30 Mbps for 2560x1440
+const EXPORT_BITRATE_4K = 50000000;     // 50 Mbps for 3840x2160
 const EXPORT_PIXELS_HD = 1280 * 720;
 const EXPORT_PIXELS_FULLHD = 1920 * 1080;
+const EXPORT_PIXELS_QHD = 2560 * 1440;
+const EXPORT_PIXELS_4K = 3840 * 2160;
 const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
 const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
 
@@ -354,7 +358,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Video export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportFormat, setExportFormat] = useState('webm'); // 'webm' or 'mp4'
+  const [exportFormat, setExportFormat] = useState('webm-vp9'); // 'webm-vp9', 'webm-vp8', or 'mp4'
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
@@ -2257,16 +2261,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
-      setDuration(duration); // FIX: Ensure animation loop has correct duration
+      setDuration(duration);
       
-      // Reset playback state
-      if (bufferSourceRef.current) {
-        bufferSourceRef.current.stop();
-        bufferSourceRef.current = null;
-      }
-      pauseTimeRef.current = 0;
-      setCurrentTime(0);
-
       // Parse export resolution
       const [exportWidth, exportHeight] = exportResolution.split('x').map(Number);
       
@@ -2282,10 +2278,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       addLog(`Rendering at ${exportResolution} for export`, 'info');
 
-      // Set up streams with higher frame rate for better quality
-      const canvasStream = rendererRef.current.domElement.captureStream(30);
+      // FIX: Create a SEPARATE gain node to split the audio signal properly
+      // This prevents the analyser connection conflict that was causing the 8-second freeze
+      const exportGainNode = audioContextRef.current.createGain();
+      exportGainNode.gain.value = 1.0;
+      
+      // Create audio destination for recording (separate from analyser)
       const audioDestination = audioContextRef.current.createMediaStreamDestination();
-      analyserRef.current.connect(audioDestination);
+      
+      // Connect: source → exportGain → audioDestination (for recording)
+      // The analyser will be connected separately from the buffer source below
+      exportGainNode.connect(audioDestination);
+      
+      // Set up video stream
+      const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioStream = audioDestination.stream;
       
       const combinedStream = new MediaStream([
@@ -2293,24 +2299,36 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         ...audioStream.getAudioTracks()
       ]);
       
-      // Determine MIME type based on format
+      // Determine MIME type and codec based on format
       let mimeType = 'video/webm;codecs=vp9,opus';
       let extension = 'webm';
       
-      if (exportFormat === 'mp4') {
+      if (exportFormat === 'webm-vp8') {
+        mimeType = 'video/webm;codecs=vp8,opus';
+        extension = 'webm';
+      } else if (exportFormat === 'webm-vp9') {
+        mimeType = 'video/webm;codecs=vp9,opus';
+        extension = 'webm';
+      } else if (exportFormat === 'mp4') {
         // Note: MP4 export depends on browser support
         if (MediaRecorder.isTypeSupported('video/mp4')) {
           mimeType = 'video/mp4';
           extension = 'mp4';
         } else {
-          addLog('MP4 not supported, using WebM', 'info');
+          addLog('MP4 not supported, falling back to WebM VP9', 'info');
+          mimeType = 'video/webm;codecs=vp9,opus';
+          extension = 'webm';
         }
       }
       
       // Calculate bitrate based on resolution for better quality
       const pixelCount = exportWidth * exportHeight;
       let videoBitrate = EXPORT_BITRATE_SD; // Default 8Mbps for 960x540
-      if (pixelCount >= EXPORT_PIXELS_FULLHD) {
+      if (pixelCount >= EXPORT_PIXELS_4K) {
+        videoBitrate = EXPORT_BITRATE_4K; // 50Mbps for 4K
+      } else if (pixelCount >= EXPORT_PIXELS_QHD) {
+        videoBitrate = EXPORT_BITRATE_QHD; // 30Mbps for 1440p
+      } else if (pixelCount >= EXPORT_PIXELS_FULLHD) {
         videoBitrate = EXPORT_BITRATE_FULLHD; // 20Mbps for 1080p
       } else if (pixelCount >= EXPORT_PIXELS_HD) {
         videoBitrate = EXPORT_BITRATE_HD; // 12Mbps for 720p
@@ -2330,6 +2348,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       };
       
       recorder.onstop = () => {
+        // Cleanup: disconnect the export gain node
+        exportGainNode.disconnect();
+        
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2350,14 +2371,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           cameraRef.current.updateProjectionMatrix();
         }
         
-        // Reset playback state
-        pauseTimeRef.current = 0;
-        setCurrentTime(0);
+        // FIX: Don't reset playback state - keep current position
+        // This prevents camera distortion and preserves user's timeline position
         setIsPlaying(false);
       };
       
       // Start recording with timeslice to capture data periodically
-      // This helps prevent memory issues and ensures consistent capture
       recorder.start(EXPORT_TIMESLICE_MS);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
@@ -2367,15 +2386,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const AUDIO_END_THRESHOLD = 0.1;
       const FINAL_FRAME_DELAY = 500;
       
-      // Auto-play the audio using Web Audio API
+      // FIX: Create audio source with proper routing to avoid analyser conflicts
+      // Connect: bufferSource → analyser → destination (for visualization)
+      //                       → exportGain → audioDestination (for recording)
       const src = audioContextRef.current.createBufferSource();
       src.buffer = audioBufferRef.current;
+      
+      // Connect to analyser for visualization (existing path)
       src.connect(analyserRef.current);
       analyserRef.current.connect(audioContextRef.current.destination);
       
-      // Add onended handler as backup to ensure recording stops
+      // ALSO connect to export gain for recording (new separate path)
+      src.connect(exportGainNode);
+      
+      // Add onended handler to ensure recording stops
       src.onended = () => {
-        // Give a small delay to capture final frames
         setTimeout(() => {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
             mediaRecorderRef.current.stop();
@@ -2386,9 +2411,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }, FINAL_FRAME_DELAY);
       };
       
+      // FIX: Reset timing BEFORE starting playback to prevent camera distortion
+      pauseTimeRef.current = 0;
+      setCurrentTime(0);
+      startTimeRef.current = Date.now();
+      
+      // Start audio playback
       src.start(0, 0);
       bufferSourceRef.current = src;
-      startTimeRef.current = Date.now();
+      
+      // FIX: Set isPlaying AFTER all setup is complete to prevent race conditions
       setIsPlaying(true);
       
       // Request data periodically to ensure consistent recording
