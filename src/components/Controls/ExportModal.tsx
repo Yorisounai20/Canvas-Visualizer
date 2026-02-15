@@ -14,14 +14,6 @@ interface ExportModalProps {
   onSetResolution: (resolution: string) => void;
 }
 
-// Quality presets with estimated file sizes
-const QUALITY_PRESETS = {
-  'low': { bitrate: 4, label: 'Low Quality', suffix: '~2MB/min' },
-  'medium': { bitrate: 8, label: 'Medium Quality', suffix: '~4MB/min' },
-  'high': { bitrate: 12, label: 'High Quality', suffix: '~6MB/min' },
-  'ultra': { bitrate: 20, label: 'Ultra Quality', suffix: '~10MB/min' },
-};
-
 /**
  * ExportModal Component - Video export settings modal
  * Allows user to configure export settings and initiate rendering
@@ -124,7 +116,7 @@ export default function ExportModal({
               <option value="mp4">MP4 (H.264) - If Supported</option>
             </select>
             <p className="text-xs text-gray-400 mt-1">
-              {exportFormat.startsWith('webm') 
+              {exportFormat === 'webm-vp9' || exportFormat === 'webm-vp8'
                 ? '✓ Best compression & quality ratio' 
                 : '⚠ Browser support may vary'}
             </p>
