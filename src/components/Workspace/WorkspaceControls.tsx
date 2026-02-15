@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download } from 'lucide-react';
+import { Plus, Box, Circle, Square, Torus, Grid3x3, Copy, Sparkles, Cuboid, Save, Play, Palette, Sliders, Download, Type, Triangle, Hexagon } from 'lucide-react';
 import { PoseSnapshot, WorkspaceObject } from '../../types';
 import { savePose as savePoseToStore, listPoses } from '../../lib/poseStore';
 import { getDescriptorBySolver, updateDescriptorParameters } from '../../lib/descriptorStore';
 import { exportWorkspaceAsPreset, canExportWorkspace, getAvailableSolvers } from '../../lib/workspaceExport';
 import { WorkspaceActions } from './WorkspaceActions';
-import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 
 /**
  * PHASE 3: Workspace Controls Component
@@ -14,11 +13,15 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
  */
 
 interface WorkspaceControlsProps {
-  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => void;
+  onCreateObject: (type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'text') => void;
   showGrid: boolean;
   onToggleGrid: () => void;
   showAxes: boolean;
   onToggleAxes: () => void;
+  gridSize?: number;
+  gridDivisions?: number;
+  onGridSizeChange?: (size: number) => void;
+  onGridDivisionsChange?: (divisions: number) => void;
   useWorkspaceObjects: boolean;
   onToggleVisualizationSource: () => void;
   workspaceObjects: WorkspaceObject[]; // PR 1: For pose snapshots
@@ -42,6 +45,7 @@ interface WorkspaceControlsProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onShowHelp?: () => void;
 }
 
 /**
@@ -122,6 +126,10 @@ export default function WorkspaceControls({
   onToggleGrid,
   showAxes,
   onToggleAxes,
+  gridSize = 40,
+  gridDivisions = 40,
+  onGridSizeChange,
+  onGridDivisionsChange,
   useWorkspaceObjects,
   onToggleVisualizationSource,
   workspaceObjects,
@@ -144,14 +152,13 @@ export default function WorkspaceControls({
   canUndo = false,
   canRedo = false,
   onUndo,
-  onRedo
+  onRedo,
+  onShowHelp
 }: WorkspaceControlsProps) {
   const [poseName, setPoseName] = useState('');
   // PR 8: Export state
   const [exportPresetName, setExportPresetName] = useState('');
   const [exportSolver, setExportSolver] = useState('orbit');
-  // Keyboard shortcuts help
-  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
   // Available presets for authoring mode
   const availablePresets = [
@@ -215,8 +222,13 @@ export default function WorkspaceControls({
   };
 
   return (
-    <div className="absolute top-4 left-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 space-y-2 z-10">
-      <div className="text-xs font-semibold text-gray-300 mb-2">Workspace</div>
+    <div className="h-[160px] flex flex-col bg-gray-900 border-r border-gray-700 overflow-y-auto">
+      <div className="p-3 border-b border-gray-700 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
+          🔨 Workspace Controls
+        </h3>
+      </div>
+      <div className="p-3 space-y-2">{/* Content container */}
       
       {/* Blender-like Actions */}
       {onDuplicateObject && onDeleteObject && onUndo && onRedo && (
@@ -232,13 +244,8 @@ export default function WorkspaceControls({
           onSelectAll={onSelectAll || (() => {})}
           onDeselectAll={onDeselectAll || (() => {})}
           onToggleVisibility={onToggleObjectVisibility || (() => {})}
-          onShowHelp={() => setShowShortcutsHelp(true)}
+          onShowHelp={onShowHelp || (() => {})}
         />
-      )}
-      
-      {/* Keyboard Shortcuts Help Modal */}
-      {showShortcutsHelp && (
-        <KeyboardShortcutsHelp onClose={() => setShowShortcutsHelp(false)} />
       )}
       
       {/* Visualization Source Toggle */}
@@ -288,6 +295,47 @@ export default function WorkspaceControls({
           XYZ
         </button>
       </div>
+
+      {/* Grid size controls */}
+      {showGrid && onGridSizeChange && onGridDivisionsChange && (
+        <div className="mb-3 pb-3 border-b border-gray-700 space-y-2">
+          <div className="text-xs font-semibold text-gray-400 mb-2">Grid Settings</div>
+          
+          {/* Grid Size */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Size</span>
+              <span>{gridSize}</span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="1000"
+              step="10"
+              value={gridSize}
+              onChange={(e) => onGridSizeChange(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+            />
+          </div>
+          
+          {/* Grid Divisions */}
+          <div>
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Divisions</span>
+              <span>{gridDivisions}</span>
+            </div>
+            <input
+              type="range"
+              min="4"
+              max="1024"
+              step="4"
+              value={gridDivisions}
+              onChange={(e) => onGridDivisionsChange(parseInt(e.target.value))}
+              className="w-full h-2 rounded-full appearance-none cursor-pointer bg-gray-600"
+            />
+          </div>
+        </div>
+      )}
 
       {/* PR 1: Save Pose Section */}
       <div className="mb-3 pb-3 border-b border-gray-700">
@@ -521,13 +569,41 @@ export default function WorkspaceControls({
       </button>
 
       <button
+        onClick={() => onCreateObject('tetrahedron')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add Tetrahedron"
+      >
+        <Triangle className="w-4 h-4" />
+        Tetrahedron
+      </button>
+
+      <button
+        onClick={() => onCreateObject('octahedron')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add Octahedron"
+      >
+        <Hexagon className="w-4 h-4" />
+        Octahedron
+      </button>
+
+      <button
         onClick={() => onCreateObject('instances')}
         className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
-        title="Add Instanced Mesh"
+        title="Add Instanced Mesh (creates multiple copies efficiently)"
       >
         <Copy className="w-4 h-4" />
         Instances
       </button>
+
+      <button
+        onClick={() => onCreateObject('text')}
+        className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs font-medium text-gray-200 transition-colors flex items-center gap-2"
+        title="Add 3D Text"
+      >
+        <Type className="w-4 h-4" />
+        Text
+      </button>
+      </div>{/* End content container */}
     </div>
   );
 }

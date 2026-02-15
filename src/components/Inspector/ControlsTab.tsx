@@ -12,6 +12,37 @@ interface ControlsTabProps {
   setBackgroundColor?: (color: string) => void;
   setBorderColor?: (color: string) => void;
   
+  // Detailed Background Settings
+  starCount?: number;
+  starSize?: number;
+  starColor?: string;
+  setStarCount?: (count: number) => void;
+  setStarSize?: (size: number) => void;
+  setStarColor?: (color: string) => void;
+  galaxyColor1?: string;
+  galaxyColor2?: string;
+  galaxyRotationSpeed?: number;
+  setGalaxyColor1?: (color: string) => void;
+  setGalaxyColor2?: (color: string) => void;
+  setGalaxyRotationSpeed?: (speed: number) => void;
+  nebulaColor1?: string;
+  nebulaColor2?: string;
+  nebulaColor3?: string;
+  setNebulaColor1?: (color: string) => void;
+  setNebulaColor2?: (color: string) => void;
+  setNebulaColor3?: (color: string) => void;
+  gradientStart?: string;
+  gradientEnd?: string;
+  setGradientStart?: (color: string) => void;
+  setGradientEnd?: (color: string) => void;
+  
+  // Letterbox Controls
+  letterboxSize?: number;
+  letterboxKeyframes?: Array<{id?: number, time: number, targetSize: number, duration: number, mode: 'instant' | 'smooth', invert: boolean}>;
+  onAddLetterboxKeyframe?: () => void;
+  onDeleteLetterboxKeyframe?: (id: number) => void;
+  onUpdateLetterboxKeyframe?: (id: number, field: string, value: number | boolean | string) => void;
+  
   // Global Colors (DEPRECATED - keeping for backwards compatibility but hidden from UI)
   bassColor: string;
   midsColor: string;
@@ -342,19 +373,6 @@ export default function ControlsTab(props: ControlsTabProps) {
                 type="color" 
                 value={props.backgroundColor} 
                 onChange={(e) => props.setBackgroundColor!(e.target.value)} 
-                className="w-full h-10 rounded cursor-pointer" 
-              />
-            </div>
-          )}
-          
-          {/* Border Color */}
-          {props.borderColor !== undefined && (
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Border Color</label>
-              <input 
-                type="color" 
-                value={props.borderColor} 
-                onChange={(e) => props.setBorderColor!(e.target.value)} 
                 className="w-full h-10 rounded cursor-pointer" 
               />
             </div>

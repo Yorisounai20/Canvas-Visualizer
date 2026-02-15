@@ -15,8 +15,14 @@ export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
   const shortcutsByCategory = getShortcutsByCategory();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-75"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl max-w-2xl max-h-[80vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">

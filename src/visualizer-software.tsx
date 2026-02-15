@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
@@ -108,6 +108,20 @@ const EXPORT_PIXELS_FULLHD = 1920 * 1080;
 const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
 const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
 
+// Preset fonts available from Three.js examples
+const PRESET_FONTS = [
+  { value: 'helvetiker_regular', label: 'Helvetiker Regular', url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json' },
+  { value: 'helvetiker_bold', label: 'Helvetiker Bold', url: 'https://threejs.org/examples/fonts/helvetiker_bold.typeface.json' },
+  { value: 'optimer_regular', label: 'Optimer Regular', url: 'https://threejs.org/examples/fonts/optimer_regular.typeface.json' },
+  { value: 'optimer_bold', label: 'Optimer Bold', url: 'https://threejs.org/examples/fonts/optimer_bold.typeface.json' },
+  { value: 'gentilis_regular', label: 'Gentilis Regular', url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json' },
+  { value: 'gentilis_bold', label: 'Gentilis Bold', url: 'https://threejs.org/examples/fonts/gentilis_bold.typeface.json' },
+  { value: 'droid_sans_regular', label: 'Droid Sans Regular', url: 'https://threejs.org/examples/fonts/droid/droid_sans_regular.typeface.json' },
+  { value: 'droid_sans_bold', label: 'Droid Sans Bold', url: 'https://threejs.org/examples/fonts/droid/droid_sans_bold.typeface.json' },
+  { value: 'droid_serif_regular', label: 'Droid Serif Regular', url: 'https://threejs.org/examples/fonts/droid/droid_serif_regular.typeface.json' },
+  { value: 'droid_serif_bold', label: 'Droid Serif Bold', url: 'https://threejs.org/examples/fonts/droid/droid_serif_bold.typeface.json' },
+];
+
 interface ThreeDVisualizerProps {
   onBackToDashboard?: () => void;
 }
@@ -174,6 +188,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [textOpacity, setTextOpacity] = useState(0.9);
   const [textMetalness, setTextMetalness] = useState(0.5);
   const [textRoughness, setTextRoughness] = useState(0.5);
+  const [selectedPresetFont, setSelectedPresetFont] = useState('helvetiker_regular');
   const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
   const fontRef = useRef<any>(null);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -226,8 +241,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
+  const [gridSize, setGridSize] = useState(40); // Grid size
+  const [gridDivisions, setGridDivisions] = useState(40); // Grid divisions
   const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
   const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const lastObjectCreationRef = useRef<{ type: string; time: number } | null>(null);
   const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
   
   // PR 5: Preset Authoring Mode
@@ -249,9 +267,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
   const starFieldRef = useRef<THREE.Points | null>(null);
   const [starCount, setStarCount] = useState(5000);
+  const [starSize, setStarSize] = useState(2.0);
+  const [starColor, setStarColor] = useState('#ffffff');
   const [galaxyColor, setGalaxyColor] = useState('#8a2be2');
+  const [galaxyColor1, setGalaxyColor1] = useState('#8a2be2');
+  const [galaxyColor2, setGalaxyColor2] = useState('#4169e1');
+  const [galaxyRotationSpeed, setGalaxyRotationSpeed] = useState(0.5);
   const [nebulaColor1, setNebulaColor1] = useState('#ff1493');
   const [nebulaColor2, setNebulaColor2] = useState('#4169e1');
+  const [nebulaColor3, setNebulaColor3] = useState('#9370db');
+  const [gradientStart, setGradientStart] = useState('#1a1a3e');
+  const [gradientEnd, setGradientEnd] = useState('#0a0a14');
   const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
   const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
   
@@ -489,6 +515,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // Timeline update throttling (reduce from 60 FPS to 10 FPS for better performance)
   const lastTimelineUpdateRef = useRef<number>(0);
   const TIMELINE_UPDATE_INTERVAL_MS = 100; // 10 FPS (100ms between updates)
+  
+  // Track preset changes for debugging
+  const previousPresetRef = useRef<string>('(none)');
   
   // Waveform state
   const [waveformData, setWaveformData] = useState<number[]>([]);
@@ -883,6 +912,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       setCurrentProjectId(projectId);
       setShowProjectsModal(false);
+      
+      // Force update visualization source after a short delay to ensure scene is ready
+      setTimeout(() => {
+        if (projectState.useWorkspaceObjects !== undefined) {
+          console.log('🔄 Force applying visualization source:', projectState.useWorkspaceObjects ? 'workspace' : 'presets');
+          setUseWorkspaceObjects(projectState.useWorkspaceObjects);
+        }
+      }, 100);
+      
       addLog(`Project "${projectState.settings.name}" loaded successfully with all timeline features`, 'success');
     } catch (error) {
       console.error('Failed to load project:', error);
@@ -1010,6 +1048,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       fontRef.current = font;
       setFontLoaded(true);
       setCustomFontName(file.name);
+      setSelectedPresetFont(''); // Clear preset selection when custom font is loaded
       addLog(`Custom font "${file.name}" loaded successfully!`, 'success');
     } catch (e) {
       const error = e as Error;
@@ -1018,33 +1057,42 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  useEffect(() => {
-    addLog('Starting font load...', 'info');
+  const loadPresetFont = useCallback((fontValue: string) => {
+    const presetFont = PRESET_FONTS.find(f => f.value === fontValue);
+    if (!presetFont) return;
+
+    addLog(`Loading preset font: ${presetFont.label}...`, 'info');
+    setFontLoaded(false);
+    
     const loader = new FontLoader();
     loader.load(
-      'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
+      presetFont.url,
       (font: any) => {
-        console.log('Font loaded successfully!');
-        addLog('Font loaded successfully!', 'success');
         fontRef.current = font;
         setFontLoaded(true);
+        setSelectedPresetFont(fontValue);
+        setCustomFontName(presetFont.label);
+        addLog(`Preset font "${presetFont.label}" loaded successfully!`, 'success');
       },
       (progress: any) => {
         if (progress.total > 0) {
           const percent = Math.round((progress.loaded / progress.total) * 100);
-          console.log('Font loading progress:', percent + '%');
-          addLog(`Font loading: ${percent}%`, 'info');
+          addLog(`Loading ${presetFont.label}: ${percent}%`, 'info');
         }
       },
       (error: Error) => {
-        console.error('Font loading error:', error);
-        addLog(`Font load failed - upload custom font instead`, 'error');
+        console.error('Preset font loading error:', error);
+        addLog(`Failed to load ${presetFont.label}`, 'error');
+        setFontLoaded(false);
       }
     );
-    // Skip automatic font loading to avoid CORS errors
-    // Users can upload their own .typeface.json font file
-    addLog('Font system ready - upload custom font to use text', 'info');
-    setCustomFontName('None (Upload Required)');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - state setters are stable, addLog is non-critical
+
+  useEffect(() => {
+    // Load default preset font on mount
+    loadPresetFont('helvetiker_regular');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load project from sessionStorage on mount
@@ -1077,6 +1125,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     if (showSongName) {
+      // Clean up existing text meshes
       songNameMeshesRef.current.forEach(mesh => {
         scene.remove(mesh);
         if (mesh.geometry) mesh.geometry.dispose();
@@ -1158,14 +1207,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             
             scene.add(mesh);
             meshes.push(mesh);
-            console.log('Added mesh at position:', mesh.position, 'Scene children:', scene.children.length);
           });
         });
         
         songNameMeshesRef.current = meshes;
         setShowSongName(true);
-        addLog(`Created ${meshes.length} text meshes at visible position`, 'success');
-        console.log('All song name meshes:', scene.children.filter((c: THREE.Object3D) => c.userData.isText));
+        addLog(`Created ${meshes.length} text meshes`, 'success');
       } catch (e) {
         const error = e as Error;
         addLog(`Text creation error: ${error.message}`, 'error');
@@ -1173,19 +1220,125 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
+  // Helper function to recreate text when properties change
+  const recreateSongNameText = () => {
+    const scene = sceneRef.current;
+    if (!scene || !showSongName || !fontRef.current) {
+      return;
+    }
+
+    // Clean up existing meshes
+    songNameMeshesRef.current.forEach(mesh => {
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) mesh.material.dispose();
+    });
+    songNameMeshesRef.current = [];
+
+    try {
+      const text = customSongName || audioFileName || 'SONG NAME';
+      const words = text.toUpperCase().split(' ');
+      const meshes: THREE.Mesh[] = [];
+
+      words.forEach((word, wordIndex) => {
+        [...word].forEach((char, charIndex) => {
+          const textGeo = new TextGeometry(char, {
+            font: fontRef.current,
+            size: 1.5,
+            height: 0.3,
+            curveSegments: 8
+          });
+          
+          textGeo.computeBoundingBox();
+          
+          const freqIndex = (wordIndex + charIndex) % 3;
+          
+          // Create material based on selected type
+          let material: THREE.Material;
+          const baseColor = new THREE.Color(textColor);
+          const commonProps = {
+            color: baseColor,
+            wireframe: textWireframe,
+            transparent: true,
+            opacity: textOpacity
+          };
+          
+          switch (textMaterialType) {
+            case 'standard':
+              material = new THREE.MeshStandardMaterial({
+                ...commonProps,
+                metalness: textMetalness,
+                roughness: textRoughness
+              });
+              break;
+            case 'phong':
+              material = new THREE.MeshPhongMaterial({
+                ...commonProps,
+                shininess: 30
+              });
+              break;
+            case 'lambert':
+              material = new THREE.MeshLambertMaterial(commonProps);
+              break;
+            case 'basic':
+            default:
+              material = new THREE.MeshBasicMaterial(commonProps);
+          }
+          
+          const mesh = new THREE.Mesh(textGeo, material);
+          
+          const xPos = (charIndex - word.length / 2) * 2 + (wordIndex - words.length / 2) * (word.length * 2 + 3);
+          mesh.position.set(xPos, -6, 5);
+          mesh.userData.baseY = -6;
+          mesh.userData.baseX = xPos;
+          mesh.userData.baseZ = 5;
+          mesh.userData.isText = true;
+          mesh.userData.charIndex = charIndex + wordIndex * 10;
+          mesh.userData.freqIndex = freqIndex;
+          
+          mesh.scale.set(2, 2, 2);
+          
+          scene.add(mesh);
+          meshes.push(mesh);
+        });
+      });
+      
+      songNameMeshesRef.current = meshes;
+      addLog(`Recreated ${meshes.length} text meshes with updated properties`, 'info');
+    } catch (e) {
+      const error = e as Error;
+      addLog(`Text recreation error: ${error.message}`, 'error');
+    }
+  };
+
+  // Recreate text when properties change (but only if text is already showing)
+  useEffect(() => {
+    if (showSongName && fontRef.current && sceneRef.current) {
+      recreateSongNameText();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customSongName, textColor, textMaterialType, textWireframe, textOpacity, textMetalness, textRoughness]);
+
   const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
   
   // Get current preset from keyframes (finds active preset segment at current time)
-  const getCurrentPreset = () => {
+  const getCurrentPreset = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
     const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    
+    // Debug: Log keyframes periodically (every 2 seconds of playback)
+    if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+      console.log('🎬 Current time:', t.toFixed(2), 'Keyframes:', sorted.map(kf => `${kf.preset} (${kf.time}-${kf.endTime})`).join(', '));
+    }
+    
     // Find the preset segment that contains current time
     for (let i = 0; i < sorted.length; i++) {
-      if (currentTime >= sorted[i].time && currentTime < sorted[i].endTime) {
+      if (t >= sorted[i].time && t < sorted[i].endTime) {
         return sorted[i].preset;
       }
     }
     // If after all segments or before first, use the first or last preset
-    if (currentTime < sorted[0]?.time) {
+    if (t < sorted[0]?.time) {
       return sorted[0]?.preset || 'orbit';
     }
     // After all segments, use the last preset
@@ -1193,16 +1346,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
   
   // Get current preset speed multiplier with keyframe interpolation
-  const getCurrentPresetSpeed = () => {
+  const getCurrentPresetSpeed = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
     // Sort speed keyframes by time
     const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
     
     // If no keyframes or before first keyframe, return first keyframe speed or default
     if (sorted.length === 0) return 1.0;
-    if (currentTime <= sorted[0].time) return sorted[0].speed;
+    if (t <= sorted[0].time) return sorted[0].speed;
     
     // If after last keyframe, return last keyframe speed
-    if (currentTime >= sorted[sorted.length - 1].time) {
+    if (t >= sorted[sorted.length - 1].time) {
       return sorted[sorted.length - 1].speed;
     }
     
@@ -1211,10 +1365,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const kf1 = sorted[i];
       const kf2 = sorted[i + 1];
       
-      if (currentTime >= kf1.time && currentTime < kf2.time) {
+      if (t >= kf1.time && t < kf2.time) {
         // Interpolate between the two keyframes
-        const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
-        const easedT = applyEasing(t, kf1.easing);
+        const tProgress = (t - kf1.time) / (kf2.time - kf1.time);
+        const easedT = applyEasing(tProgress, kf1.easing);
         return kf1.speed + (kf2.speed - kf1.speed) * easedT;
       }
     }
@@ -1424,6 +1578,29 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }).sort((a, b) => a.time - b.time)); // Re-sort after time update
   };
   
+  // Letterbox keyframe handlers
+  const handleAddLetterboxKeyframe = () => {
+    const newKeyframe = {
+      id: nextLetterboxKeyframeId.current++,
+      time: currentTime,
+      targetSize: letterboxSize,
+      duration: 1.0,
+      mode: 'smooth' as const,
+      invert: false
+    };
+    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeleteLetterboxKeyframe = (id: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.filter(kf => kf.id !== id));
+  };
+  
+  const handleUpdateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
   // Move handlers for all keyframe types (for timeline dragging)
   const moveSpeedKeyframe = (id: number, newTime: number) => {
     handleUpdateSpeedKeyframe(id, 'time', newTime);
@@ -1435,11 +1612,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     ).sort((a, b) => a.time - b.time));
   };
   
-  // Update handler for letterbox keyframe fields (including duration)
-  const updateLetterboxKeyframe = (id: number, field: string, value: any) => {
-    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
-      kf.id === id ? { ...kf, [field]: value } : kf
-    ).sort((a, b) => a.time - b.time));
+  // Update handler for letterbox keyframe fields (including duration) - legacy alias
+  const updateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
+    handleUpdateLetterboxKeyframe(id, field, value);
   };
   
   const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
@@ -1589,8 +1764,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) return;
-    if (bufferSourceRef.current) bufferSourceRef.current.stop();
+    console.log('🎵 playAudio() called');
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) {
+      console.log('❌ playAudio: Missing audio context, buffer, or analyser');
+      return;
+    }
+    
+    // Stop and clean up any existing audio source to prevent duplicates
+    if (bufferSourceRef.current) {
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
+      bufferSourceRef.current = null;
+    }
+    
     const src = audioContextRef.current.createBufferSource();
     src.buffer = audioBufferRef.current;
     src.connect(analyserRef.current);
@@ -1613,25 +1802,46 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     src.start(0, pauseTimeRef.current);
     bufferSourceRef.current = src;
     startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+    console.log('✅ playAudio: Setting isPlaying to true');
     setIsPlaying(true);
   };
 
   const stopAudio = () => {
     if (bufferSourceRef.current) {
       pauseTimeRef.current = currentTime;
-      bufferSourceRef.current.stop();
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
       bufferSourceRef.current = null;
     }
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
     setIsPlaying(false);
   };
 
   const seekTo = (t: number) => {
-    const play = isPlaying;
-    if (play) stopAudio();
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop audio to prevent duplicates
+    if (wasPlaying) {
+      stopAudio();
+    }
+    
+    // Set new position
     pauseTimeRef.current = t;
     setCurrentTime(t);
-    if (play) playAudio();
+    
+    // Restart if it was playing, using microtask to ensure cleanup completes
+    if (wasPlaying) {
+      Promise.resolve().then(() => {
+        playAudio();
+      });
+    }
   };
 
   // PHASE 4: Multi-track audio functions
@@ -2933,7 +3143,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     lightsRef.current.directional = directionalLight;
     
     // Workspace mode: Grid and Axes helpers
-    const workspaceGrid = new THREE.GridHelper(40, 40, 0x00ffff, 0x444444);
+    const workspaceGrid = new THREE.GridHelper(gridSize, gridDivisions, 0x00ffff, 0x444444);
     workspaceGrid.visible = showGrid;
     scene.add(workspaceGrid);
     gridHelperRef.current = workspaceGrid;
@@ -3033,6 +3243,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           console.error('Cleanup error:', e);
         }
       }
+      
+      // Clean up text meshes
+      songNameMeshesRef.current.forEach(mesh => {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+      });
+      songNameMeshesRef.current = [];
+      
+      textCharacterMeshesRef.current.forEach((meshes) => {
+        meshes.forEach(mesh => {
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach(m => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
+          }
+        });
+      });
+      textCharacterMeshesRef.current.clear();
+      
       // Clear refs to help garbage collection
       sceneRef.current = null;
       cameraRef.current = null;
@@ -3511,14 +3743,25 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   }, [cameraRigs, cameraRigKeyframes, duration]);
 
   useEffect(() => {
-    if (!isPlaying || !rendererRef.current) return;
+    console.log('🎬 Animation useEffect triggered, isPlaying:', isPlaying, 'rendererRef:', !!rendererRef.current);
+    if (!isPlaying || !rendererRef.current) {
+      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'renderer:', !!rendererRef.current);
+      return;
+    }
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
     const analyser = analyserRef.current;
     const obj = objectsRef.current;
-    if (!obj) return;
+    if (!obj) {
+      console.log('⏸️ Animation useEffect early return - objectsRef is null');
+      return;
+    }
 
+    console.log('✅ Starting animation loop');
     const anim = () => {
-      if (!isPlaying) return;
+      if (!isPlaying) {
+        console.log('⏸️ Animation frame cancelled - isPlaying is false');
+        return;
+      }
       animationRef.current = requestAnimationFrame(anim);
       
       try {
@@ -3558,9 +3801,34 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         lastTimelineUpdateRef.current = now;
       }
       
-      const type = getCurrentPreset(); // Use keyframe-based preset switching
-      const presetSpeed = getCurrentPresetSpeed(); // Get speed multiplier for current preset
+      const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
+      const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
       const elScaled = el * presetSpeed; // Apply speed multiplier to animations
+      
+      // Track and log preset changes
+      if (previousPresetRef.current !== type) {
+        console.log('🔄 PRESET CHANGED from', previousPresetRef.current, 'to', type, 'at time', t.toFixed(2) + 's');
+        previousPresetRef.current = type;
+      }
+      
+      // Debug: Comprehensive keyframe status logging every 2 seconds
+      if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+        console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's:');
+        console.log('  Preset:', type, '(speed:', presetSpeed + ')');
+        console.log('  Preset keyframes:', presetKeyframes.length, presetKeyframes.map(kf => `${kf.preset}@${kf.time}-${kf.endTime}`).join(', '));
+        console.log('  PresetSpeed keyframes:', presetSpeedKeyframes.length);
+        console.log('  Camera: direct settings (no keyframes)');
+        console.log('  CameraRig keyframes:', cameraRigKeyframes.length);
+        console.log('  CameraFX clips:', cameraFXClips.length, '(' + cameraFXClips.filter(c => c.enabled && t >= c.startTime && t < c.endTime).length + ' active)');
+        console.log('  Text keyframes:', textKeyframes.length);
+        console.log('  TextAnimator keyframes:', textAnimatorKeyframes.length, '(' + textAnimatorKeyframes.filter(kf => {
+          const endTime = kf.time + kf.duration + (kf.text.length * kf.stagger);
+          return t >= kf.time && t <= endTime;
+        }).length + ' active)');
+        console.log('  Letterbox keyframes:', letterboxKeyframes.length);
+        console.log('  ParamEvents:', parameterEvents.length);
+        console.log('  Environment keyframes:', environmentKeyframes.length, '(endTime not used - always active when found)');
+      }
       
       // REMOVED: Global camera keyframes interpolation (orphaned feature)
       // Use direct camera settings
@@ -7555,6 +7823,21 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       textAnimatorKeyframes.forEach(textKf => {
         if (!fontRef.current) return;
         
+        // Calculate when this keyframe ends (start time + duration + stagger for all characters)
+        const textKfEndTime = textKf.time + textKf.duration + (textKf.text.length * textKf.stagger);
+        
+        // Only process keyframe if current time is within its active range
+        if (t < textKf.time || t > textKfEndTime) {
+          // Outside time range - hide meshes if they exist
+          const existingMeshes = textCharacterMeshesRef.current.get(textKf.id);
+          if (existingMeshes) {
+            existingMeshes.forEach(mesh => {
+              mesh.visible = false;
+            });
+          }
+          return;
+        }
+        
         // Get keyframe-specific properties with defaults
         const kfPosition = textKf.position ?? { x: 0, y: 5, z: 0 };
         const kfSize = textKf.size ?? 1;
@@ -7562,10 +7845,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         const existingMeshes = textCharacterMeshesRef.current.get(textKf.id);
         
-        // Check if we need to recreate meshes (text or size changed)
+        // Check if we need to recreate meshes (text, size, position, or color changed)
         const needsRecreate = existingMeshes && (
           existingMeshes.length !== textKf.text.length ||
-          (existingMeshes[0]?.userData.textSize !== kfSize)
+          (existingMeshes[0]?.userData.textSize !== kfSize) ||
+          (existingMeshes[0]?.userData.baseX !== (kfPosition.x - (textKf.text.length * 0.6 * kfSize) / 2)) ||
+          (existingMeshes[0]?.userData.baseY !== kfPosition.y) ||
+          (existingMeshes[0]?.userData.baseZ !== kfPosition.z)
         );
         
         if (needsRecreate && existingMeshes) {
@@ -8347,8 +8633,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
     };
 
+    console.log('🚀 Calling anim() to start animation loop');
     anim();
-    return () => { if (animationRef.current) cancelAnimationFrame(animationRef.current); };
+    return () => { 
+      console.log('🛑 Animation useEffect cleanup - cancelling animation frame');
+      if (animationRef.current) cancelAnimationFrame(animationRef.current); 
+    };
   }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
 
   // Draw waveform on canvas - optimized with throttling
@@ -8481,6 +8771,125 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
 
+      // Workspace-specific shortcuts (only when in workspace mode)
+      if (workspaceMode) {
+        // Undo (Ctrl+Z)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          handleUndo();
+          return;
+        }
+        // Redo (Ctrl+Y or Ctrl+Shift+Z)
+        if (((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') ||
+            ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+          e.preventDefault();
+          handleRedo();
+          return;
+        }
+        // Duplicate (Shift+D)
+        if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          if (selectedObjectId) handleDuplicateObject();
+          return;
+        }
+        // Delete (X or Delete)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.key.toLowerCase() === 'x' || e.key === 'Delete')) {
+          e.preventDefault();
+          if (selectedObjectId) handleDeleteSelectedObject();
+          return;
+        }
+        // Hide/Unhide (H / Alt+H)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          if (e.altKey) {
+            // Unhide all objects
+            workspaceObjects.forEach(obj => {
+              if (!obj.visible) {
+                handleUpdateObject(obj.id, { visible: true });
+              }
+            });
+          } else if (selectedObjectId) {
+            // Toggle selected object visibility
+            handleToggleObjectVisibility();
+          }
+          return;
+        }
+        // Transform mode: Grab/Move (G)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'g') {
+          e.preventDefault();
+          // TODO: Enter transform mode - move/grab
+          addLog('Transform mode (Grab): Move selected object - Coming soon', 'info');
+          return;
+        }
+        // Transform mode: Rotate (R)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          // TODO: Enter transform mode - rotate
+          addLog('Transform mode (Rotate): Rotate selected object - Coming soon', 'info');
+          return;
+        }
+        // Transform mode: Scale (S)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          // TODO: Enter transform mode - scale
+          addLog('Transform mode (Scale): Scale selected object - Coming soon', 'info');
+          return;
+        }
+        // Reset position (Alt+G)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'g') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { position: { x: 0, y: 0, z: 0 } });
+            addLog('Reset position to origin', 'success');
+          }
+          return;
+        }
+        // Reset rotation (Alt+R)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { rotation: { x: 0, y: 0, z: 0 } });
+            addLog('Reset rotation to zero', 'success');
+          }
+          return;
+        }
+        // Reset scale (Alt+S)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          if (selectedObjectId) {
+            handleUpdateObject(selectedObjectId, { scale: { x: 1, y: 1, z: 1 } });
+            addLog('Reset scale to 1', 'success');
+          }
+          return;
+        }
+        // Select All (Ctrl+A)
+        if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          handleSelectAllObjects();
+          return;
+        }
+        // Deselect All (Alt+A)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          handleDeselectAll();
+          return;
+        }
+        // Show keyboard shortcuts (?)
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.key === '?') {
+          e.preventDefault();
+          setShowKeyboardShortcuts(true);
+          return;
+        }
+        // Quick add menu (Shift+A)
+        if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          // Could open a quick add menu - for now just create a sphere
+          handleCreateObject('sphere');
+          return;
+        }
+      }
+
+      // Global shortcuts
       if (e.key === 'Escape') {
         if (showKeyboardShortcuts) {
           setShowKeyboardShortcuts(false);
@@ -8515,8 +8924,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         e.preventDefault();
         setViewMode('preview');
       } else if (e.key === 'g' || e.key === 'G') {
-        // Toggle camera rig hints
-        setShowRigHints(prev => !prev);
+        // Toggle camera rig hints (only if not in workspace mode to avoid conflict)
+        if (!workspaceMode) {
+          setShowRigHints(prev => !prev);
+        }
       } else if (e.key === 'w' || e.key === 'W') {
         // Toggle workspace mode
         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -8524,19 +8935,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       } else if (e.key === 'p' || e.key === 'P') {
         // Toggle performance overlay (PR 9: Guardrails)
-        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && !workspaceMode) {
           setShowPerformanceOverlay(prev => !prev);
         }
       } else if (e.key === '`') {
         // Toggle debug console
         setShowDebugConsole(prev => !prev);
-      } else if (e.key >= '1' && e.key <= '9') {
-        // Number keys 1-9 for tab navigation
+      } else if (e.key >= '1' && e.key <= '9' && !workspaceMode) {
+        // Number keys 1-9 for tab navigation (only in editor mode)
         const tabIndex = parseInt(e.key) - 1;
         if (tabIndex < TAB_ORDER.length) {
           setActiveTab(TAB_ORDER[tabIndex]);
         }
-      } else if (e.key === '0') {
+      } else if (e.key === '0' && !workspaceMode) {
         // Number key 0 for the 10th tab (last tab in TAB_ORDER)
         setActiveTab(TAB_ORDER[TAB_ORDER.length - 1]);
       }
@@ -8544,7 +8955,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole]);
+  }, [showExportModal, showEventModal, showKeyboardShortcuts, showSettingsModal, showProjectsModal, showDebugConsole, workspaceMode, selectedObjectId, workspaceObjects]);
 
   // Update workspace grid and axes visibility
   useEffect(() => {
@@ -8559,11 +8970,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   }, [showAxes]);
 
+  // Update workspace grid when size or divisions change
+  useEffect(() => {
+    if (gridHelperRef.current && sceneRef.current) {
+      // Remove old grid
+      sceneRef.current.remove(gridHelperRef.current);
+      gridHelperRef.current.geometry.dispose();
+      if (gridHelperRef.current.material) {
+        if (Array.isArray(gridHelperRef.current.material)) {
+          gridHelperRef.current.material.forEach(m => m.dispose());
+        } else {
+          gridHelperRef.current.material.dispose();
+        }
+      }
+      
+      // Create new grid with updated size/divisions
+      const newGrid = new THREE.GridHelper(gridSize, gridDivisions, 0x00ffff, 0x444444);
+      newGrid.visible = showGrid;
+      sceneRef.current.add(newGrid);
+      gridHelperRef.current = newGrid;
+    }
+  }, [gridSize, gridDivisions, showGrid]);
+
   // Workspace object management callbacks
-  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'instances') => {
+  const handleCreateObject = (type: 'sphere' | 'box' | 'plane' | 'torus' | 'tetrahedron' | 'octahedron' | 'instances' | 'text') => {
     if (!sceneRef.current) return;
     
-    const id = `workspace-${type}-${Date.now()}`;
+    // Prevent duplicate creation within 300ms (debounce)
+    const now = Date.now();
+    if (lastObjectCreationRef.current && 
+        lastObjectCreationRef.current.type === type && 
+        now - lastObjectCreationRef.current.time < 300) {
+      console.log(`⏱️ Prevented duplicate ${type} creation (within 300ms)`);
+      return;
+    }
+    lastObjectCreationRef.current = { type, time: now };
+    
+    const id = `workspace-${type}-${now}`;
     const newObject: WorkspaceObject = {
       id,
       type,
@@ -8580,6 +9023,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       roughness: 0.5
     };
     
+    // Add text-specific properties
+    if (type === 'text') {
+      newObject.textContent = 'Text';
+      newObject.fontSize = 1;
+      newObject.textDepth = 0.1;
+      newObject.wireframe = false; // Text looks better without wireframe by default
+    }
+    
     // Create Three.js mesh
     let geometry: THREE.BufferGeometry;
     switch (type) {
@@ -8595,9 +9046,32 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       case 'torus':
         geometry = new THREE.TorusGeometry(1, 0.4, 16, 100);
         break;
+      case 'tetrahedron':
+        geometry = new THREE.TetrahedronGeometry(1);
+        break;
+      case 'octahedron':
+        geometry = new THREE.OctahedronGeometry(1);
+        break;
       case 'instances':
         // Create instanced mesh (simplified for now)
         geometry = new THREE.SphereGeometry(0.5, 16, 16);
+        break;
+      case 'text':
+        // Create text geometry
+        if (fontRef.current) {
+          geometry = new TextGeometry(newObject.textContent || 'Text', {
+            font: fontRef.current,
+            size: newObject.fontSize || 1,
+            height: newObject.textDepth || 0.1,
+            curveSegments: 12,
+            bevelEnabled: false
+          });
+          geometry.center(); // Center the text geometry
+        } else {
+          // Fallback to box if font not loaded
+          geometry = new THREE.BoxGeometry(1, 1, 1);
+          addLog('Font not loaded, creating box instead. Load a font first.', 'error');
+        }
         break;
       default:
         geometry = new THREE.BoxGeometry(1, 1, 1);
@@ -8702,6 +9176,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
                 }
                 
                 mat.needsUpdate = true;
+              }
+            }
+            
+            // Handle text geometry recreation (when text properties change)
+            if (obj.type === 'text' && (updates.textContent !== undefined || updates.fontSize !== undefined || updates.textDepth !== undefined)) {
+              if (fontRef.current && sceneRef.current) {
+                // Dispose old geometry
+                if (obj.mesh.geometry) {
+                  obj.mesh.geometry.dispose();
+                }
+                
+                // Create new text geometry
+                const textGeometry = new TextGeometry(updated.textContent || 'Text', {
+                  font: fontRef.current,
+                  size: updated.fontSize || 1,
+                  height: updated.textDepth || 0.1,
+                  curveSegments: 12,
+                  bevelEnabled: false
+                });
+                textGeometry.center();
+                obj.mesh.geometry = textGeometry;
               }
             }
             
@@ -8892,9 +9387,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   // Effect: Hide default audio-reactive shapes when using workspace objects
   useEffect(() => {
-    if (!objectsRef.current) return;
+    if (!objectsRef.current) {
+      console.log('⚠️ objectsRef.current is null - shapes not initialized yet');
+      return;
+    }
     
     const { cubes, octas, tetras, sphere, toruses, planes } = objectsRef.current;
+    
+    // Safety check: ensure all arrays exist
+    if (!cubes || !octas || !tetras || !sphere) {
+      console.log('⚠️ Shape arrays not fully initialized');
+      return;
+    }
     
     if (useWorkspaceObjects) {
       // Hide all default shapes when using workspace objects
@@ -8905,6 +9409,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = false; });
       if (planes) planes.forEach(plane => { plane.visible = false; });
       
+      console.log('✅ Using workspace objects: Default shapes hidden');
       addLog('Using workspace objects: Default shapes hidden', 'info');
     } else {
       // Show all default shapes when using presets
@@ -8915,39 +9420,121 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (toruses) toruses.forEach(torus => { torus.visible = true; });
       if (planes) planes.forEach(plane => { plane.visible = true; });
       
+      console.log('✅ Using preset shapes: Default shapes visible', {
+        sphere: sphere.visible,
+        cubeCount: cubes.length,
+        octaCount: octas.length,
+        tetraCount: tetras.length
+      });
       addLog('Using preset shapes: Default shapes visible', 'info');
     }
   }, [useWorkspaceObjects]);
 
-  // Workspace mode - Multi-panel layout
-  const workspaceContentJSX = workspaceMode ? (
-    <WorkspaceLayout
-      // Left Side Panels
-      scenePanel={
-        <ScenePanel
-          workspaceObjects={workspaceObjects}
+  // Canvas area JSX - shared by both workspace and editor modes
+  const canvasAreaJSX = (
+    <div className={`flex items-center justify-center w-full h-full ${
+      workspaceMode ? 'bg-gray-900' : 'bg-gray-950'
+    } ${viewMode === 'preview' && !workspaceMode ? 'py-0' : 'py-4'}`}>
+      <div className="relative">
+        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
+        {showLetterbox && (() => {
+          // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
+          // We need to map this to actual bar heights using the configurable maxLetterboxHeight
+          // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
+          const actualBarHeight = activeLetterboxInvert 
+            ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
+            : letterboxSize;
+          return (
+            <>
+              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
+            </>
+          );
+        })()}
+        {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
+        
+        {/* WorkspaceControls moved to left panel - no longer on canvas overlay */}
+        
+        {/* Playback controls overlay for Preview mode */}
+        {viewMode === 'preview' && !workspaceMode && (
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
+            <button 
+              onClick={() => {
+                if (isPlaying) {
+                  if (audioTracks.length > 0) stopMultiTrackAudio();
+                  else stopAudio();
+                }
+                else {
+                  if (audioTracks.length > 0) playMultiTrackAudio();
+                  else playAudio();
+                }
+              }}
+              className="text-white hover:text-cyan-400 transition-colors p-1"
+              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+            >
+              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+            </button>
+            <span className="text-white text-sm font-mono">
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Workspace mode panels - New Blender-style layout
+  // Left: WorkspaceControls (full height)
+  // Right: SceneExplorer (top) + ObjectPropertiesPanel (bottom)
+  const workspaceLeftPanelJSX = (
+    <WorkspaceControls
+      onCreateObject={handleCreateObject}
+      showGrid={showGrid}
+      onToggleGrid={handleToggleGrid}
+      showAxes={showAxes}
+      onToggleAxes={handleToggleAxes}
+      gridSize={gridSize}
+      gridDivisions={gridDivisions}
+      onGridSizeChange={setGridSize}
+      onGridDivisionsChange={setGridDivisions}
+      useWorkspaceObjects={useWorkspaceObjects}
+      onToggleVisualizationSource={handleToggleVisualizationSource}
+      workspaceObjects={workspaceObjects}
+      presetAuthoringMode={presetAuthoringMode}
+      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
+      selectedPreset={authoringPreset}
+      onSelectPreset={setAuthoringPreset}
+      mockTime={mockTime}
+      onMockTimeChange={setMockTime}
+      mockAudio={mockAudio}
+      onMockAudioChange={setMockAudio}
+      selectedObjectId={selectedObjectId}
+      onDuplicateObject={handleDuplicateObject}
+      onDeleteObject={handleDeleteSelectedObject}
+      onSelectAll={handleSelectAllObjects}
+      onDeselectAll={handleDeselectAll}
+      onToggleObjectVisibility={handleToggleObjectVisibility}
+      canUndo={false}
+      canRedo={false}
+      onUndo={handleUndo}
+      onRedo={handleRedo}
+      onShowHelp={() => setShowKeyboardShortcuts(true)}
+    />
+  );
+
+  const workspaceRightPanelJSX = (
+    <div className="h-full flex flex-col bg-gray-900">
+      {/* SceneExplorer - top half */}
+      <div className="flex-1 min-h-0 border-b border-gray-700">
+        <SceneExplorer
+          objects={workspaceObjects}
           selectedObjectId={selectedObjectId}
           onSelectObject={handleSelectObject}
           onDeleteObject={handleDeleteObject}
-          onCreateObject={handleCreateObject}
-          showGrid={showGrid}
-          onToggleGrid={handleToggleGrid}
-          showAxes={showAxes}
-          onToggleAxes={handleToggleAxes}
-          useWorkspaceObjects={useWorkspaceObjects}
-          onToggleVisualizationSource={handleToggleVisualizationSource}
         />
-      }
-      posesPanel={
-        <SequencerPanel
-          workspaceObjects={workspaceObjects}
-          onUpdateObjects={setWorkspaceObjects}
-          currentTime={currentTime}
-        />
-      }
-      
-      // Right Side Panels
-      propertiesPanel={
+      </div>
+      {/* ObjectPropertiesPanel - bottom half */}
+      <div className="flex-1 min-h-0">
         <ObjectPropertiesPanel
           selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
           onUpdateObject={handleUpdateObject}
@@ -8963,117 +9550,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           onSetShowLetterbox={setShowLetterbox}
           onSetLetterboxSize={setLetterboxSize}
         />
-      }
-      templatesPanel={
-        <TemplatesPanel
-          workspaceObjects={workspaceObjects}
-          presetAuthoringMode={presetAuthoringMode}
-          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-          selectedPreset={authoringPreset}
-          onSelectPreset={setAuthoringPreset}
-        />
-      }
-      authoringPanel={
-        <AuthoringPanel
-          presetAuthoringMode={presetAuthoringMode}
-          onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-          selectedPreset={authoringPreset}
-          onSelectPreset={setAuthoringPreset}
-          mockTime={mockTime}
-          onMockTimeChange={setMockTime}
-          mockAudio={mockAudio}
-          onMockAudioChange={setMockAudio}
-        />
-      }
-      
-      // Bottom & Status
-      timelinePanel={
-        <div className="p-4 text-center text-gray-500">
-          <div className="text-xs">Pose sequencer timeline will appear here</div>
-          <div className="text-xs mt-1">Drag and sequence pose keyframes along a timeline</div>
-        </div>
-      }
-      actionsBar={
-        <WorkspaceActions
-          selectedObjectId={selectedObjectId}
-          objectCount={workspaceObjects.length}
-          onDuplicateObject={handleDuplicateObject}
-          onDeleteObject={handleDeleteSelectedObject}
-          onSelectAll={handleSelectAllObjects}
-          onDeselectAll={handleDeselectAll}
-          onToggleObjectVisibility={handleToggleObjectVisibility}
-          canUndo={false}
-          canRedo={false}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-        />
-      }
-      statusBar={
-        <WorkspaceStatusBar
-          workspaceObjects={workspaceObjects}
-          selectedObjectId={selectedObjectId}
-          fps={60}
-          memoryUsage={0}
-          performanceMode="balanced"
-        />
-      }
-    >
-      {canvasAreaJSX}
-    </WorkspaceLayout>
-  ) : null;
-
-  // Old workspace panels for fallback
-  const workspaceLeftPanelJSX = (
-    <WorkspaceLeftPanel
-      workspaceObjects={workspaceObjects}
-      selectedObjectId={selectedObjectId}
-      onSelectObject={handleSelectObject}
-      onDeleteObject={handleDeleteObject}
-      onCreateObject={handleCreateObject}
-      showGrid={showGrid}
-      onToggleGrid={handleToggleGrid}
-      showAxes={showAxes}
-      onToggleAxes={handleToggleAxes}
-      useWorkspaceObjects={useWorkspaceObjects}
-      onToggleVisualizationSource={handleToggleVisualizationSource}
-      onUpdateObjects={setWorkspaceObjects}
-      presetAuthoringMode={presetAuthoringMode}
-      onTogglePresetAuthoring={() => setPresetAuthoringMode(!presetAuthoringMode)}
-      selectedPreset={authoringPreset}
-      onSelectPreset={setAuthoringPreset}
-      currentTime={currentTime}
-    />
+      </div>
+    </div>
   );
-
-  const workspaceRightPanelJSX = (
-    <WorkspaceRightPanel
-      workspaceObjects={workspaceObjects}
-      selectedObjectId={selectedObjectId}
-      selectedObject={workspaceObjects.find(obj => obj.id === selectedObjectId) || null}
-      onUpdateObject={handleUpdateObject}
-      onDeleteObject={handleDeleteObject}
-      cameraDistance={cameraDistance}
-      cameraHeight={cameraHeight}
-      cameraRotation={cameraRotation}
-      onSetCameraDistance={setCameraDistance}
-      onSetCameraHeight={setCameraHeight}
-      onSetCameraRotation={setCameraRotation}
-      showLetterbox={showLetterbox}
-      letterboxSize={letterboxSize}
-      onSetShowLetterbox={setShowLetterbox}
-      onSetLetterboxSize={setLetterboxSize}
-      onDuplicateObject={handleDuplicateObject}
-      onDeleteSelectedObject={handleDeleteSelectedObject}
-      onSelectAll={handleSelectAllObjects}
-      onDeselectAll={handleDeselectAll}
-      onToggleObjectVisibility={handleToggleObjectVisibility}
-      canUndo={false}
-      canRedo={false}
-      onUndo={handleUndo}
-      onRedo={handleRedo}
-    />
-  );
-
 
   // --- Extracted panel DOM constants ---
   const leftPanelJSX = (
@@ -9281,57 +9760,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     />
   );
 
-  const canvasAreaJSX = (
-    <div className={`flex items-center justify-center w-full h-full bg-gray-950 ${
-      viewMode === 'preview' ? 'py-0' : 'py-4'
-    }`}>
-      <div className="relative">
-        <div ref={containerRef} className={`rounded-lg shadow-2xl overflow-hidden ${showBorder ? 'border-2' : ''}`} style={{width:'960px',height:'540px',borderColor:borderColor}} />
-        {showLetterbox && (() => {
-          // When invert=true: targetSize goes from 100 (fully closed) to 0 (fully open)
-          // We need to map this to actual bar heights using the configurable maxLetterboxHeight
-          // When invert=false: targetSize is direct pixel height: 100 -> 100px, 0 -> 0px
-          const actualBarHeight = activeLetterboxInvert 
-            ? Math.round((letterboxSize / 100) * maxLetterboxHeight)  // Scale to max height (both top and bottom)
-            : letterboxSize;
-          return (
-            <>
-              <div className="absolute top-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-              <div className="absolute bottom-0 left-0 right-0 bg-black pointer-events-none" style={{height: `${actualBarHeight}px`}} />
-            </>
-          );
-        })()}
-        {showFilename && audioFileName && <div className="absolute text-white text-sm bg-black bg-opacity-70 px-3 py-2 rounded font-semibold" style={{top: `${showLetterbox ? (activeLetterboxInvert ? Math.round((letterboxSize / 100) * maxLetterboxHeight) : letterboxSize) + 16 : 16}px`, left: '16px'}}>{audioFileName}</div>}
-        
-        {/* Workspace Controls moved to WorkspaceLeftPanel - no longer needed as floating overlay */}
-        
-        {/* Playback controls overlay for Preview mode */}
-        {viewMode === 'preview' && (
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900/90 backdrop-blur-sm rounded-lg px-6 py-3 flex items-center gap-4 z-30 shadow-2xl border border-gray-700">
-            <button 
-              onClick={() => {
-                if (isPlaying) {
-                  if (audioTracks.length > 0) stopMultiTrackAudio();
-                  else stopAudio();
-                } else {
-                  if (audioTracks.length > 0) playMultiTrackAudio();
-                  else playAudio();
-                }
-              }}
-              className="text-white hover:text-cyan-400 transition-colors p-1"
-              title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            >
-              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
-            </button>
-            <span className="text-white text-sm font-mono">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   const topBarJSX = (
     <TopBar
       onBackToDashboard={onBackToDashboard}
@@ -9427,6 +9855,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             setSkyboxType={setSkyboxType}
             setBackgroundColor={setBackgroundColor}
             setBorderColor={setBorderColor}
+            // Detailed background settings
+            starCount={starCount}
+            starSize={starSize}
+            starColor={starColor}
+            setStarCount={setStarCount}
+            setStarSize={setStarSize}
+            setStarColor={setStarColor}
+            galaxyColor1={galaxyColor1}
+            galaxyColor2={galaxyColor2}
+            galaxyRotationSpeed={galaxyRotationSpeed}
+            setGalaxyColor1={setGalaxyColor1}
+            setGalaxyColor2={setGalaxyColor2}
+            setGalaxyRotationSpeed={setGalaxyRotationSpeed}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            nebulaColor3={nebulaColor3}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setNebulaColor3={setNebulaColor3}
+            gradientStart={gradientStart}
+            gradientEnd={gradientEnd}
+            setGradientStart={setGradientStart}
+            setGradientEnd={setGradientEnd}
+            // Letterbox controls
+            letterboxSize={letterboxSize}
+            letterboxKeyframes={letterboxKeyframes}
+            onAddLetterboxKeyframe={handleAddLetterboxKeyframe}
+            onDeleteLetterboxKeyframe={handleDeleteLetterboxKeyframe}
+            onUpdateLetterboxKeyframe={handleUpdateLetterboxKeyframe}
             // Global colors (kept for compatibility)
             bassColor={bassColor}
             midsColor={midsColor}
@@ -9598,15 +10055,33 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
         
         {activeTab === 'effects' && (
-          <div className="bg-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-cyan-400 mb-2">✨ Visual Effects</h3>
-            <p className="text-xs text-gray-400 mb-3">
-              Background controls have been moved to the <span className="text-cyan-400 font-semibold">Controls</span> tab.
-            </p>
-            <p className="text-xs text-gray-500 italic">
-              This tab is reserved for future visual effect features like fog, bloom, particles, and other scene effects.
-            </p>
-          </div>
+          <EffectsTab
+            skyboxType={skyboxType}
+            backgroundColor={backgroundColor}
+            skyboxGradientTop={skyboxGradientTop}
+            skyboxGradientBottom={skyboxGradientBottom}
+            skyboxImageUrl={skyboxImageUrl}
+            starCount={starCount}
+            galaxyColor={galaxyColor}
+            nebulaColor1={nebulaColor1}
+            nebulaColor2={nebulaColor2}
+            borderColor={borderColor}
+            setSkyboxType={setSkyboxType}
+            setBackgroundColor={setBackgroundColor}
+            setSkyboxGradientTop={setSkyboxGradientTop}
+            setSkyboxGradientBottom={setSkyboxGradientBottom}
+            setSkyboxImageUrl={setSkyboxImageUrl}
+            setStarCount={setStarCount}
+            setGalaxyColor={setGalaxyColor}
+            setNebulaColor1={setNebulaColor1}
+            setNebulaColor2={setNebulaColor2}
+            setBorderColor={setBorderColor}
+            letterboxSize={letterboxSize}
+            letterboxKeyframes={letterboxKeyframes}
+            onAddLetterboxKeyframe={handleAddLetterboxKeyframe}
+            onDeleteLetterboxKeyframe={handleDeleteLetterboxKeyframe}
+            onUpdateLetterboxKeyframe={handleUpdateLetterboxKeyframe}
+          />
         )}
         
         {activeTab === 'environments' && (
@@ -9679,12 +10154,45 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             <div className="bg-gray-700 rounded p-3 space-y-3">
               <h4 className="text-xs text-gray-400 uppercase font-semibold">3D Text Settings</h4>
               
+              {/* Font Selection */}
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 block">Font Selection</label>
+                <select
+                  value={selectedPresetFont}
+                  onChange={(e) => loadPresetFont(e.target.value)}
+                  className="w-full bg-gray-800 text-white text-sm px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none cursor-pointer"
+                >
+                  {PRESET_FONTS.map(font => (
+                    <option key={font.value} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                </select>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Or upload custom font:</span>
+                  <input 
+                    type="file" 
+                    accept=".json,.typeface.json" 
+                    onChange={(e) => { 
+                      if (e.target.files && e.target.files[0]) {
+                        loadCustomFont(e.target.files[0]);
+                      }
+                    }} 
+                    className="text-xs text-gray-400 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-purple-600 file:text-white hover:file:bg-purple-700 cursor-pointer" 
+                  />
+                </div>
+                {!selectedPresetFont && customFontName && (
+                  <p className="text-xs text-purple-400">Custom: {customFontName}</p>
+                )}
+              </div>
+              
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="showSongName"
                   checked={showSongName}
-                  onChange={(e) => setShowSongName(e.target.checked)}
+                  onChange={toggleSongName}
                   disabled={!fontLoaded}
                   className="w-4 h-4 cursor-pointer"
                 />
@@ -9894,54 +10402,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         )}
       </div>
     </div>
-  // --- End constants ---
+  );
 
-  // Use custom workspace layout when in workspace mode
-  if (workspaceMode) {
-    return (
-      <>
-        {topBarJSX}
-        {workspaceContentJSX}
-        
-        {/* Export Modal */}
-        <VideoExportModal
-          showExportModal={showExportModal}
-          setShowExportModal={setShowExportModal}
-          exportResolution={exportResolution}
-          setExportResolution={setExportResolution}
-          exportFormat={exportFormat}
-          setExportFormat={setExportFormat}
-          isExporting={isExporting}
-          audioReady={audioReady}
-          exportProgress={exportProgress}
-          handleExportAndCloseModal={handleExportAndCloseModal}
-        />
+  // --- End JSX constants (inspectorJSX, leftPanelJSX, timelinePanelJSX, topBarJSX) ---
 
-        {/* Other modals remain the same */}
-        {showKeyboardShortcuts && <KeyboardShortcutsHelp onClose={() => setShowKeyboardShortcuts(false)} />}
-        {showSettingsModal && <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />}
-        {showProjectsModal && (
-          <ProjectsModal
-            isOpen={showProjectsModal}
-            onClose={() => setShowProjectsModal(false)}
-            onSaveProject={handleSaveProject}
-            onLoadProject={handleLoadProject}
-            isSaving={isSaving}
-          />
-        )}
-        {showDebugConsole && debugLogs.length > 0 && (
-          <DebugConsole logs={debugLogs} onClose={() => setShowDebugConsole(false)} />
-        )}
-      </>
-    );
-  }
-
-  // Default editor mode layout
+  // Unified layout using LayoutShell for both editor and workspace modes
   return (
     <LayoutShell
-      left={leftPanelJSX}
-      inspector={inspectorJSX}
-      timeline={timelinePanelJSX}
+      left={workspaceMode ? workspaceLeftPanelJSX : leftPanelJSX}
+      inspector={workspaceMode ? workspaceRightPanelJSX : inspectorJSX}
+      timeline={workspaceMode ? undefined : timelinePanelJSX}
       top={topBarJSX}
       viewMode={viewMode}
       workspaceMode={workspaceMode}
