@@ -2264,6 +2264,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setExportProgress(0);
       addLog('Starting automated video export...', 'info');
 
+      // Request wake lock to prevent screen sleep during long exports (8+ minutes)
+      let wakeLock: any = null;
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+          addLog('Screen wake lock active - display will stay on during export', 'info');
+        } catch (e) {
+          // Wake lock failed, but continue anyway
+          console.log('Wake lock not available or denied:', e);
+        }
+      }
+
       // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
       
@@ -2416,9 +2428,28 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       recordedChunksRef.current = [];
       
+      // Memory monitoring for long exports (8+ minutes)
+      let chunkCount = 0;
+      let totalBytes = 0;
+      const MAX_SAFE_SIZE = 1500000000; // 1.5 GB warning threshold
+      
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           recordedChunksRef.current.push(e.data);
+          chunkCount++;
+          totalBytes += e.data.size;
+          
+          // Log for monitoring (useful for debugging long exports)
+          const chunkSizeMB = (e.data.size / 1024 / 1024).toFixed(2);
+          const totalSizeMB = (totalBytes / 1024 / 1024).toFixed(2);
+          
+          console.log(`[Export Chunk ${chunkCount}] ${chunkSizeMB} MB | Total: ${totalSizeMB} MB`);
+          
+          // Warning if approaching browser memory limits
+          if (totalBytes > MAX_SAFE_SIZE) {
+            console.warn('⚠️ Export size exceeding 1.5 GB - may approach browser limits');
+            addLog('Large file size - this is normal for long videos', 'warning');
+          }
         }
       };
       
@@ -2468,6 +2499,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         setIsExporting(false);
         setExportProgress(100);
+        
+        // Release wake lock
+        if (wakeLock) {
+          wakeLock.release();
+          addLog('Screen wake lock released', 'info');
+        }
         
         // Restore original canvas size
         if (rendererRef.current) {
@@ -2576,6 +2613,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }, 5000); // 5 seconds instead of 2 seconds for less encoding interruption
       
       let lastUpdatePercent = 0;
+      let lastLoggedPercent = -1;
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
         const progress = (elapsed / duration) * 100;
@@ -2585,6 +2623,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         if (currentPercent !== lastUpdatePercent) {
           setExportProgress(Math.min(currentPercent, 99));
           lastUpdatePercent = currentPercent;
+        }
+        
+        // Log every 10% for long exports (helps track progress on 8+ minute videos)
+        if (currentPercent % 10 === 0 && currentPercent !== lastLoggedPercent && currentPercent > 0) {
+          const timeRemaining = duration - elapsed;
+          const minutesRemaining = Math.floor(timeRemaining / 60);
+          const secondsRemaining = Math.floor(timeRemaining % 60);
+          
+          addLog(
+            `Export ${currentPercent}% complete - ${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')} remaining`,
+            'info'
+          );
+          lastLoggedPercent = currentPercent;
         }
         
         // Don't update currentTime during export to avoid triggering timeline
@@ -2618,6 +2669,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.error('Export error:', e);
       setIsExporting(false);
       setExportProgress(0);
+      
+      // Release wake lock on error
+      if (wakeLock) {
+        wakeLock.release();
+      }
       
       // MODE RESTORATION REMOVED
       
