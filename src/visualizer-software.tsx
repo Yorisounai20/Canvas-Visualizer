@@ -2262,6 +2262,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
+      
+      // IMPORTANT: Check if duration is valid
+      if (!duration || duration <= 0) {
+        addLog('Export failed: Audio duration is invalid or zero', 'error');
+        setIsExporting(false);
+        setExportProgress(0);
+        return;
+      }
+      
+      addLog(`Audio duration: ${duration.toFixed(2)} seconds`, 'info');
       setDuration(duration);
       
       // Parse export resolution
@@ -2451,7 +2461,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         recorder.start(EXPORT_TIMESLICE_MS);
         mediaRecorderRef.current = recorder;
         setIsRecording(true);
-        addLog('Recording started', 'success');
+        addLog('Recording started successfully', 'success');
+        addLog(`Recorder state: ${recorder.state}`, 'info');
       } catch (error) {
         addLog(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         setIsExporting(false);
@@ -2462,6 +2473,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Track progress
       const AUDIO_END_THRESHOLD = 0.1;
       const FINAL_FRAME_DELAY = 500;
+      
+      addLog(`Will record for ${duration.toFixed(2)} seconds`, 'info');
       
       // FIX: Create audio source with proper routing to avoid analyser conflicts
       // Connect: bufferSource → analyser → destination (for visualization)
@@ -2517,12 +2530,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setExportProgress(Math.min(progress, 99));
         setCurrentTime(elapsed);
         
+        // Log progress every 5 seconds
+        if (Math.floor(elapsed) % 5 === 0 && Math.floor(elapsed) > 0) {
+          addLog(`Recording progress: ${elapsed.toFixed(1)}s / ${duration.toFixed(1)}s (${progress.toFixed(0)}%)`, 'info');
+        }
+        
         // Stop when audio ends
         if (elapsed >= duration - AUDIO_END_THRESHOLD) {
+          addLog(`Stopping recording - duration reached: ${elapsed.toFixed(2)}s`, 'info');
           clearInterval(progressInterval);
           clearInterval(dataRequestInterval);
           setTimeout(() => {
             if (mediaRecorderRef.current) {
+              addLog(`Final recorder state before stop: ${mediaRecorderRef.current.state}`, 'info');
               mediaRecorderRef.current.stop();
               if (bufferSourceRef.current) {
                 bufferSourceRef.current.stop();
