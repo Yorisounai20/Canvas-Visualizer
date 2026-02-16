@@ -99,12 +99,12 @@ import AuthoringPanel from './components/Workspace/AuthoringPanel';
 import WorkspaceStatusBar from './components/Workspace/WorkspaceStatusBar';
 import { WorkspaceActions } from './components/Workspace/WorkspaceActions';
 
-// Export video quality constants
-const EXPORT_BITRATE_SD = 8000000;      // 8 Mbps for 960x540
-const EXPORT_BITRATE_HD = 12000000;     // 12 Mbps for 1280x720
-const EXPORT_BITRATE_FULLHD = 20000000; // 20 Mbps for 1920x1080
-const EXPORT_BITRATE_QHD = 30000000;    // 30 Mbps for 2560x1440
-const EXPORT_BITRATE_4K = 50000000;     // 50 Mbps for 3840x2160
+// Export video quality constants (optimized for real-time encoding performance)
+const EXPORT_BITRATE_SD = 5000000;      // 5 Mbps for 960x540
+const EXPORT_BITRATE_HD = 6000000;      // 6 Mbps for 1280x720
+const EXPORT_BITRATE_FULLHD = 8000000;  // 8 Mbps for 1920x1080 (reduced from 20 for better performance)
+const EXPORT_BITRATE_QHD = 12000000;    // 12 Mbps for 2560x1440 (reduced from 30 for better performance)
+const EXPORT_BITRATE_4K = 18000000;     // 18 Mbps for 3840x2160 (reduced from 50 for better performance)
 const EXPORT_PIXELS_HD = 1280 * 720;
 const EXPORT_PIXELS_FULLHD = 1920 * 1080;
 const EXPORT_PIXELS_QHD = 2560 * 1440;
@@ -358,9 +358,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Video export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportFormat, setExportFormat] = useState('webm-vp9'); // 'webm-vp9', 'webm-vp8', or 'mp4'
+  const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for better performance
   const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
   const [showExportModal, setShowExportModal] = useState(false);
+  const [preExportMode, setPreExportMode] = useState<'editor' | 'preview' | null>(null);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
@@ -2256,9 +2257,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
 
     try {
+      // AUTO-SWITCH TO PREVIEW MODE FOR PERFORMANCE
+      setPreExportMode(viewMode); // Save current mode
+      setViewMode('preview'); // Switch to preview mode
+      
+      // Small delay to let mode switch complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       setIsExporting(true);
       setExportProgress(0);
       addLog('Starting automated video export...', 'info');
+      addLog('Switched to Preview mode for optimal performance', 'info');
 
       // Get audio duration and update state to prevent animation loop issues
       const duration = audioBufferRef.current.duration;
@@ -2310,25 +2319,24 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         ...audioStream.getAudioTracks()
       ]);
       
-      // Determine MIME type and codec based on format
-      let mimeType = 'video/webm;codecs=vp9,opus';
+      // USE VP8 FOR FASTER ENCODING (especially at 1080p+)
+      let mimeType = 'video/webm;codecs=vp8,opus';
       let extension = 'webm';
       
-      if (exportFormat === 'webm-vp8') {
+      // Only use VP9 for lower resolutions where encoding is easier
+      if (exportFormat === 'webm-vp9' && exportWidth <= 1280) {
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
+          mimeType = 'video/webm;codecs=vp9,opus';
+        }
+      } else if (exportFormat === 'webm-vp8') {
         mimeType = 'video/webm;codecs=vp8,opus';
-        extension = 'webm';
-      } else if (exportFormat === 'webm-vp9') {
-        mimeType = 'video/webm;codecs=vp9,opus';
-        extension = 'webm';
       } else if (exportFormat === 'mp4') {
-        // Note: MP4 export depends on browser support
         if (MediaRecorder.isTypeSupported('video/mp4')) {
           mimeType = 'video/mp4';
           extension = 'mp4';
         } else {
-          addLog('MP4 not supported, falling back to WebM VP9', 'info');
-          mimeType = 'video/webm;codecs=vp9,opus';
-          extension = 'webm';
+          addLog('MP4 not supported, using WebM VP8', 'info');
+          mimeType = 'video/webm;codecs=vp8,opus';
         }
       }
       
@@ -2377,6 +2385,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog(`Export failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`, 'error');
           setIsExporting(false);
           setExportProgress(0);
+          // Restore original mode on error
+          if (preExportMode) {
+            setViewMode(preExportMode);
+            setPreExportMode(null);
+          }
           return;
         }
       }
@@ -2392,6 +2405,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       recorder.onstop = () => {
         // Cleanup: disconnect the export gain node
         exportGainNode.disconnect();
+        
+        // RESTORE ORIGINAL MODE
+        if (preExportMode) {
+          setViewMode(preExportMode);
+          setPreExportMode(null);
+          addLog(`Restored ${preExportMode} mode`, 'info');
+        }
         
         // Check if we have any recorded data
         if (recordedChunksRef.current.length === 0) {
@@ -2454,11 +2474,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setIsExporting(false);
         setExportProgress(0);
         setIsRecording(false);
+        // Restore original mode on error
+        if (preExportMode) {
+          setViewMode(preExportMode);
+          setPreExportMode(null);
+        }
       };
       
-      // Start recording with timeslice to capture data periodically
+      // Start recording (removed timeslice parameter for smoother encoding)
       try {
-        recorder.start(EXPORT_TIMESLICE_MS);
+        recorder.start(); // Let browser manage chunk timing
         mediaRecorderRef.current = recorder;
         setIsRecording(true);
         addLog('Recording started successfully', 'success');
@@ -2467,6 +2492,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         addLog(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         setIsExporting(false);
         setExportProgress(0);
+        // Restore original mode on error
+        if (preExportMode) {
+          setViewMode(preExportMode);
+          setPreExportMode(null);
+        }
         return;
       }
 
@@ -2513,7 +2543,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // FIX: Set isPlaying AFTER all setup is complete to prevent race conditions
       setIsPlaying(true);
       
-      // Request data periodically to ensure consistent recording
+      // Request data periodically to ensure consistent recording (reduced frequency)
       const dataRequestInterval = setInterval(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
           try {
@@ -2522,18 +2552,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             console.warn('Failed to request data from recorder:', e);
           }
         }
-      }, EXPORT_DATA_REQUEST_INTERVAL_MS);
+      }, 5000); // 5 seconds instead of 2 seconds for less encoding interruption
       
+      let lastUpdatePercent = 0;
       const progressInterval = setInterval(() => {
         const elapsed = (Date.now() - startTimeRef.current) / 1000;
         const progress = (elapsed / duration) * 100;
-        setExportProgress(Math.min(progress, 99));
-        setCurrentTime(elapsed);
+        const currentPercent = Math.floor(progress);
         
-        // Log progress every 5 seconds
-        if (Math.floor(elapsed) % 5 === 0 && Math.floor(elapsed) > 0) {
-          addLog(`Recording progress: ${elapsed.toFixed(1)}s / ${duration.toFixed(1)}s (${progress.toFixed(0)}%)`, 'info');
+        // Only update when whole percentage changes (reduces React re-renders)
+        if (currentPercent !== lastUpdatePercent) {
+          setExportProgress(Math.min(currentPercent, 99));
+          lastUpdatePercent = currentPercent;
         }
+        
+        // Don't update currentTime during export to avoid triggering timeline
+        // setCurrentTime(elapsed); // Commented out to reduce UI overhead
         
         // Stop when audio ends
         if (elapsed >= duration - AUDIO_END_THRESHOLD) {
@@ -2551,7 +2585,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             }
           }, FINAL_FRAME_DELAY);
         }
-      }, 100);
+      }, 500); // 500ms instead of 100ms for less frequent updates
 
       addLog(`Exporting ${duration.toFixed(1)}s video at ${exportResolution} as ${extension.toUpperCase()}...`, 'info');
       addLog(`Video bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps, Frame rate: 30 FPS`, 'info');
@@ -2562,6 +2596,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.error('Export error:', e);
       setIsExporting(false);
       setExportProgress(0);
+      
+      // Restore original mode on error
+      if (preExportMode) {
+        setViewMode(preExportMode);
+        setPreExportMode(null);
+      }
       
       // Restore original canvas size on error
       const originalWidth = 960;

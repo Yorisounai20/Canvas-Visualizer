@@ -96,13 +96,15 @@ export function VideoExportModal({
               onChange={(e) => setExportFormat(e.target.value)}
               disabled={isExporting}
               className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
-              <option value="webm-vp9">WebM (VP9 + Opus) - Recommended</option>
-              <option value="webm-vp8">WebM (VP8 + Opus) - Compatible</option>
+              <option value="webm-vp8">WebM (VP8 + Opus) - Recommended for 1080p</option>
+              <option value="webm-vp9">WebM (VP9 + Opus) - Best Quality (slower)</option>
               <option value="mp4">MP4 (H.264) - If Supported</option>
             </select>
             <p className="text-xs text-gray-400 mt-1">
-              {exportFormat === 'webm-vp9' || exportFormat === 'webm-vp8'
-                ? '✓ Best compression & quality ratio' 
+              {exportFormat === 'webm-vp8' 
+                ? '✓ Fast encoding, great quality' 
+                : exportFormat === 'webm-vp9'
+                ? '✓ Best compression (slower encoding)'
                 : '⚠ Browser support may vary'}
             </p>
           </div>
@@ -142,6 +144,13 @@ export function VideoExportModal({
           {/* Progress Bar */}
           {isExporting && (
             <div className="mt-4 space-y-2">
+              {/* Preview Mode Notice */}
+              <div className="bg-blue-900/20 border border-blue-700/30 rounded p-2 mb-3">
+                <p className="text-xs text-blue-300 text-center">
+                  📹 Preview mode active for optimal performance
+                </p>
+              </div>
+              
               <div className="flex justify-between text-xs text-gray-400">
                 <span>Rendering Progress</span>
                 <span className="font-mono">{exportProgress.toFixed(0)}%</span>
