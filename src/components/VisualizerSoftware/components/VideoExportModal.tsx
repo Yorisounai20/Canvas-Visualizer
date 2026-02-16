@@ -12,6 +12,7 @@ interface VideoExportModalProps {
   audioReady: boolean;
   exportProgress: number;
   handleExportAndCloseModal: () => void;
+  duration: number;
 }
 
 export function VideoExportModal({
@@ -24,7 +25,8 @@ export function VideoExportModal({
   isExporting,
   audioReady,
   exportProgress,
-  handleExportAndCloseModal
+  handleExportAndCloseModal,
+  duration
 }: VideoExportModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -129,6 +131,17 @@ export function VideoExportModal({
                   <li>• Captures all presets, camera movements & keyframes</li>
                 </ul>
               </div>
+            </div>
+          )}
+
+          {/* Warning for long exports */}
+          {audioReady && duration > 300 && (
+            <div className="bg-yellow-900/20 border border-yellow-700/30 rounded p-3">
+              <p className="text-sm text-yellow-300 font-semibold">⚠️ Long Export Notice</p>
+              <p className="text-xs text-yellow-400 mt-1">
+                This {Math.floor(duration / 60)}-minute video will take 15-30 minutes to export.
+                Keep this tab active and visible during the entire process.
+              </p>
             </div>
           )}
 

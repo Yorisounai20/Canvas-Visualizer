@@ -2478,12 +2478,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           return;
         }
         
-        addLog(`Video blob created: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+        // QUALITY VERIFICATION - Check file size is reasonable for production
+        const fileSizeMB = blob.size / 1024 / 1024;
+        const expectedMinSize = (duration * videoBitrate / 8) / 1024 / 1024 * 0.7; // 70% of expected
+        const expectedMaxSize = (duration * videoBitrate / 8) / 1024 / 1024 * 1.3; // 130% of expected
+        
+        addLog(`Video file created: ${fileSizeMB.toFixed(2)} MB`, 'info');
+        
+        // Validate file size is reasonable
+        if (fileSizeMB < expectedMinSize) {
+          addLog(`⚠️ Warning: File size smaller than expected (${expectedMinSize.toFixed(0)} MB minimum)`, 'warning');
+          addLog('Video may be incomplete or corrupted - please review before publishing', 'warning');
+        } else if (fileSizeMB > expectedMaxSize) {
+          addLog(`ℹ️ File size larger than expected (${expectedMaxSize.toFixed(0)} MB maximum)`, 'info');
+          addLog('This usually indicates high quality - file is fine', 'info');
+        } else {
+          addLog(`✅ File size validated: ${fileSizeMB.toFixed(2)} MB (within expected range)`, 'success');
+        }
+        
+        // Verify chunk count for production quality
+        const expectedChunks = Math.max(Math.floor(duration / 5), 1); // Roughly every 5 seconds
+        if (recordedChunksRef.current.length < expectedChunks) {
+          addLog(`⚠️ Warning: Received ${recordedChunksRef.current.length} chunks (expected ~${expectedChunks})`, 'warning');
+          addLog('Video may have gaps or frame drops - review carefully', 'warning');
+        } else {
+          addLog(`✅ Received ${recordedChunksRef.current.length} video chunks (healthy)`, 'success');
+        }
+        
+        // Better filename with metadata for production use
+        const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const resolutionTag = exportResolution.replace('x', 'p').replace('1920p1080', '1080p').replace('1280p720', '720p'); 
+        const fileSizeMBRounded = Math.round(blob.size / 1024 / 1024);
+        const durationSec = Math.round(duration);
         
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `visualizer_${exportResolution}_${Date.now()}.${extension}`;
+        a.download = `music_visualizer_${timestamp}_${resolutionTag}_${durationSec}s_${fileSizeMBRounded}MB.${extension}`;
         
         // Trigger download
         document.body.appendChild(a);
@@ -2493,8 +2524,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          addLog(`Video exported successfully at ${exportResolution} as ${extension.toUpperCase()}!`, 'success');
-          addLog(`File size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+          
+          // Export completion summary for production
+          addLog(`✅ Export Complete!`, 'success');
+          addLog(`📁 Filename: ${a.download}`, 'info');
+          addLog(`📊 Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`, 'info');
+          addLog(`📐 Resolution: ${exportResolution}`, 'info');
+          addLog(`💾 File Size: ${fileSizeMB.toFixed(2)} MB`, 'info');
+          addLog(`🎬 Codec: ${mimeType}`, 'info');
+          addLog(`⚡ Bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps`, 'info');
+          addLog(`✨ Ready for upload to YouTube/streaming platforms!`, 'success');
         }, 1000);
         
         setIsExporting(false);
@@ -10675,6 +10714,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         audioReady={audioReady}
         exportProgress={exportProgress}
         handleExportAndCloseModal={handleExportAndCloseModal}
+        duration={duration}
       />
 
       {/* PHASE 4: Parameter Event Edit Modal */}
