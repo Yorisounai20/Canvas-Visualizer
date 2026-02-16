@@ -56,11 +56,13 @@ export function VideoExportModal({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-purple-400 flex items-center gap-2">
             <Video size={24} />
-            Video Export
+            {isExporting ? 'Exporting Video...' : 'Video Export'}
           </h2>
           <button
             onClick={() => setShowExportModal(false)}
-            className="text-gray-400 hover:text-white transition-colors p-1"
+            disabled={isExporting}
+            className={`text-gray-400 hover:text-white transition-colors p-1 ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={isExporting ? 'Please wait for export to complete' : 'Close'}
           >
             <X size={24} />
           </button>
@@ -157,10 +159,30 @@ export function VideoExportModal({
                 <span className="ml-2">Rendering video...</span>
               </div>
               <p className="text-xs text-gray-400 text-center">Please keep this tab active during export</p>
+              
+              {/* Show completion message when at 100% */}
+              {exportProgress === 100 && (
+                <div className="mt-4 bg-green-900/20 border border-green-700/30 rounded p-3">
+                  <p className="text-sm text-green-300 text-center font-semibold">✅ Export Complete!</p>
+                  <p className="text-xs text-green-400 text-center mt-1">Your video file should now be downloading</p>
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    className="mt-3 w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
             </div>
           )}
           
-          {!isExporting && (
+          {!isExporting && exportProgress === 100 && (
+            <div className="bg-green-900/20 border border-green-700/30 rounded p-3">
+              <p className="text-sm text-green-300 text-center">✅ Export Complete! Check your downloads folder.</p>
+            </div>
+          )}
+          
+          {!isExporting && exportProgress !== 100 && (
             <div className="bg-blue-900/20 border border-blue-700/30 rounded p-3">
               <p className="text-xs text-blue-300 text-center">💡 Export automatically renders your full timeline with all presets, camera movements, and effects</p>
             </div>

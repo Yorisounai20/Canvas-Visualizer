@@ -1038,8 +1038,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   };
 
   const handleExportAndCloseModal = () => {
+    // Don't close modal - keep it open to show progress
     exportVideo();
-    setShowExportModal(false);
+    // Modal will stay open to display progress bar during export
   };
 
   const loadCustomFont = async (file: File) => {
@@ -2321,6 +2322,20 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       }
       
+      // Verify codec support
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        addLog(`Warning: ${mimeType} may not be fully supported, trying fallback...`, 'error');
+        // Try VP8 as fallback (broader support)
+        mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          // Last resort: plain WebM
+          mimeType = 'video/webm';
+        }
+        addLog(`Using fallback codec: ${mimeType}`, 'info');
+      } else {
+        addLog(`Using codec: ${mimeType}`, 'info');
+      }
+      
       // Calculate bitrate based on resolution for better quality
       const pixelCount = exportWidth * exportHeight;
       let videoBitrate = EXPORT_BITRATE_SD; // Default 8Mbps for 960x540
@@ -2334,10 +2349,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         videoBitrate = EXPORT_BITRATE_HD; // 12Mbps for 720p
       }
       
-      const recorder = new MediaRecorder(combinedStream, {
-        mimeType,
-        videoBitsPerSecond: videoBitrate
-      });
+      let recorder;
+      try {
+        recorder = new MediaRecorder(combinedStream, {
+          mimeType,
+          videoBitsPerSecond: videoBitrate
+        });
+      } catch (error) {
+        addLog(`Failed to create MediaRecorder with ${mimeType}, trying without codec specification`, 'error');
+        // Fallback without specific codec
+        try {
+          recorder = new MediaRecorder(combinedStream, {
+            videoBitsPerSecond: videoBitrate
+          });
+          addLog('MediaRecorder created with default settings', 'info');
+        } catch (fallbackError) {
+          addLog(`Export failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`, 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          return;
+        }
+      }
       
       recordedChunksRef.current = [];
       
@@ -2351,14 +2383,43 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Cleanup: disconnect the export gain node
         exportGainNode.disconnect();
         
+        // Check if we have any recorded data
+        if (recordedChunksRef.current.length === 0) {
+          addLog('Export failed: No video data recorded', 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          return;
+        }
+        
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        
+        // Verify blob has data
+        if (blob.size === 0) {
+          addLog('Export failed: Video file is empty', 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          return;
+        }
+        
+        addLog(`Video blob created: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+        
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `visualizer_${exportResolution}_${Date.now()}.${extension}`;
+        
+        // Trigger download
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
-        addLog(`Video exported successfully at ${exportResolution} as ${extension.toUpperCase()}!`, 'success');
+        
+        // Delay cleanup to ensure download starts
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          addLog(`Video exported successfully at ${exportResolution} as ${extension.toUpperCase()}!`, 'success');
+          addLog(`File size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+        }, 1000);
+        
         setIsExporting(false);
         setExportProgress(100);
         
@@ -2376,11 +2437,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setIsPlaying(false);
       };
       
+      // Add error handler for recorder
+      recorder.onerror = (event: any) => {
+        addLog(`MediaRecorder error: ${event.error?.message || 'Unknown error'}`, 'error');
+        console.error('MediaRecorder error:', event);
+        setIsExporting(false);
+        setExportProgress(0);
+        setIsRecording(false);
+      };
+      
       // Start recording with timeslice to capture data periodically
-      recorder.start(EXPORT_TIMESLICE_MS);
-      mediaRecorderRef.current = recorder;
-      setIsRecording(true);
-      addLog('Recording started', 'success');
+      try {
+        recorder.start(EXPORT_TIMESLICE_MS);
+        mediaRecorderRef.current = recorder;
+        setIsRecording(true);
+        addLog('Recording started', 'success');
+      } catch (error) {
+        addLog(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        setIsExporting(false);
+        setExportProgress(0);
+        return;
+      }
 
       // Track progress
       const AUDIO_END_THRESHOLD = 0.1;
