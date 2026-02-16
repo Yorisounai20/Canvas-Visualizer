@@ -2314,6 +2314,29 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const canvasStream = rendererRef.current.domElement.captureStream(30);
       const audioStream = audioDestination.stream;
       
+      // DIAGNOSTIC: Log video track state
+      const videoTrack = canvasStream.getVideoTracks()[0];
+      console.log('=== VIDEO EXPORT DIAGNOSTICS ===');
+      console.log('Canvas stream ID:', canvasStream.id);
+      console.log('Video tracks:', canvasStream.getVideoTracks().length);
+      console.log('Audio tracks:', audioStream.getAudioTracks().length);
+      console.log('Video track readyState:', videoTrack?.readyState);
+      console.log('Video track enabled:', videoTrack?.enabled);
+      console.log('Video track settings:', videoTrack?.getSettings());
+      addLog(`Video track state: ${videoTrack?.readyState}`, 'info');
+      
+      // Monitor video track throughout export
+      if (videoTrack) {
+        videoTrack.addEventListener('ended', () => {
+          console.error('❌ VIDEO TRACK ENDED UNEXPECTEDLY!');
+          addLog('ERROR: Video track ended unexpectedly', 'error');
+        });
+        videoTrack.addEventListener('mute', () => {
+          console.warn('⚠️ VIDEO TRACK MUTED!');
+          addLog('Warning: Video track muted', 'error');
+        });
+      }
+      
       const combinedStream = new MediaStream([
         ...canvasStream.getVideoTracks(),
         ...audioStream.getAudioTracks()
@@ -2543,6 +2566,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // FIX: Set isPlaying AFTER all setup is complete to prevent race conditions
       setIsPlaying(true);
       
+      // DIAGNOSTIC: Monitor video track state throughout export
+      const trackMonitor = setInterval(() => {
+        if (videoTrack) {
+          console.log('[TRACK MONITOR]', {
+            videoState: videoTrack.readyState,
+            enabled: videoTrack.enabled,
+            muted: videoTrack.muted,
+            isPlaying: isPlaying,
+            isExporting: isExporting
+          });
+        }
+      }, 2000);
+      
       // Request data periodically to ensure consistent recording (reduced frequency)
       const dataRequestInterval = setInterval(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -2574,6 +2610,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog(`Stopping recording - duration reached: ${elapsed.toFixed(2)}s`, 'info');
           clearInterval(progressInterval);
           clearInterval(dataRequestInterval);
+          clearInterval(trackMonitor); // Clear track monitoring
           setTimeout(() => {
             if (mediaRecorderRef.current) {
               addLog(`Final recorder state before stop: ${mediaRecorderRef.current.state}`, 'info');
@@ -3912,9 +3949,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   }, [cameraRigs, cameraRigKeyframes, duration]);
 
   useEffect(() => {
-    console.log('🎬 Animation useEffect triggered, isPlaying:', isPlaying, 'rendererRef:', !!rendererRef.current);
-    if (!isPlaying || !rendererRef.current) {
-      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'renderer:', !!rendererRef.current);
+    console.log('🎬 Animation useEffect triggered, isPlaying:', isPlaying, 'isExporting:', isExporting, 'rendererRef:', !!rendererRef.current);
+    // CRITICAL FIX: Animation must continue during export even if not playing
+    if ((!isPlaying && !isExporting) || !rendererRef.current) {
+      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'isExporting:', isExporting, 'renderer:', !!rendererRef.current);
       return;
     }
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -3927,8 +3965,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     console.log('✅ Starting animation loop');
     const anim = () => {
-      if (!isPlaying) {
-        console.log('⏸️ Animation frame cancelled - isPlaying is false');
+      // CRITICAL FIX: Continue animation during export
+      if (!isPlaying && !isExporting) {
+        console.log('⏸️ Animation frame cancelled - isPlaying:', isPlaying, 'isExporting:', isExporting);
         return;
       }
       animationRef.current = requestAnimationFrame(anim);
@@ -8808,7 +8847,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.log('🛑 Animation useEffect cleanup - cancelling animation frame');
       if (animationRef.current) cancelAnimationFrame(animationRef.current); 
     };
-  }, [isPlaying, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
+  }, [isPlaying, isExporting, sections, duration, bassColor, midsColor, highsColor, showSongName, vignetteStrength, vignetteSoftness, colorSaturation, colorContrast, colorGamma, colorTintR, colorTintG, colorTintB, cubeColor, octahedronColor, tetrahedronColor, sphereColor, textColor, textWireframe, textOpacity, cameraFXClips, cameraFXKeyframes, cameraFXAudioModulations, masks]);
 
   // Draw waveform on canvas - optimized with throttling
   useEffect(() => {
