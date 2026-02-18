@@ -638,7 +638,12 @@ export default function TimelineV2({
   }, []);
 
   // Auto-scroll to keep playhead visible
+  // PERFORMANCE FIX: Skip during playback to avoid 30-60 updates/sec
   useEffect(() => {
+    // CRITICAL: Skip auto-scroll during playback to prevent performance issues
+    // Timeline auto-scroll only needed when paused or seeking
+    if (isPlaying) return;
+    
     if (!scrollContainerRef.current) return;
 
     const container = scrollContainerRef.current;
@@ -654,7 +659,7 @@ export default function TimelineV2({
     else if (playheadPixelX > scrollLeft + viewportWidth) {
       container.scrollLeft = playheadPixelX - viewportWidth + 50; // 50px padding
     }
-  }, [currentTime, pixelsPerSecond]);
+  }, [currentTime, pixelsPerSecond, isPlaying]);
   
   // Persist zoom level to localStorage (Chunk 6.4)
   useEffect(() => {

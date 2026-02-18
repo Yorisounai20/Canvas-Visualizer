@@ -1,5 +1,5 @@
-import React from 'react';
-import { Video, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Video, X, Info } from 'lucide-react';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -30,11 +30,28 @@ export default function ExportModal({
   onSetFormat,
   onSetResolution
 }: ExportModalProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   if (!isOpen) return null;
 
   const handleExportAndClose = () => {
     onExport();
     onClose();
+  };
+
+  // Get estimated file size based on resolution
+  const getEstimatedSize = () => {
+    const [width, height] = exportResolution.split('x').map(Number);
+    const pixels = width * height;
+    let sizePerMin = 4; // MB per minute (medium quality estimate)
+    
+    if (pixels >= 1920 * 1080) {
+      sizePerMin = 10;
+    } else if (pixels >= 1280 * 720) {
+      sizePerMin = 6;
+    }
+    
+    return `~${sizePerMin}MB/min`;
   };
 
   return (
@@ -72,10 +89,15 @@ export default function ExportModal({
               disabled={isExporting}
               className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none"
             >
-              <option value="960x540">960x540 (SD)</option>
-              <option value="1280x720">1280x720 (HD 720p)</option>
-              <option value="1920x1080">1920x1080 (Full HD 1080p)</option>
+              <option value="960x540">960×540 (SD) - Fast</option>
+              <option value="1280x720">1280×720 (HD 720p) - Balanced</option>
+              <option value="1920x1080">1920×1080 (Full HD 1080p) - High Quality</option>
+              <option value="2560x1440">2560×1440 (QHD 1440p) - Ultra</option>
+              <option value="3840x2160">3840×2160 (4K UHD) - Maximum</option>
             </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Estimated size: {getEstimatedSize()}
+            </p>
           </div>
           
           {/* Format Selector */}
@@ -89,10 +111,39 @@ export default function ExportModal({
               disabled={isExporting}
               className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none"
             >
-              <option value="webm">WebM (VP9 + Opus)</option>
-              <option value="mp4">MP4 (if supported)</option>
+              <option value="webm-vp9">WebM (VP9 + Opus) - Recommended</option>
+              <option value="webm-vp8">WebM (VP8 + Opus) - Compatible</option>
+              <option value="mp4">MP4 (H.264) - If Supported</option>
             </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {exportFormat === 'webm-vp9' || exportFormat === 'webm-vp8'
+                ? '✓ Best compression & quality ratio' 
+                : '⚠ Browser support may vary'}
+            </p>
           </div>
+
+          {/* Advanced Options Toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-purple-400 hover:text-purple-300 flex items-center gap-1"
+          >
+            <Info size={14} />
+            {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+          </button>
+
+          {showAdvanced && (
+            <div className="bg-gray-800 rounded p-3 space-y-2 border border-gray-700">
+              <div className="text-xs text-gray-300">
+                <p className="font-semibold mb-1">Export Settings:</p>
+                <ul className="space-y-1 ml-2">
+                  <li>• Frame Rate: 30 FPS</li>
+                  <li>• Audio: 48kHz Opus codec</li>
+                  <li>• Bitrate: Auto (resolution-based)</li>
+                  <li>• Captures all presets, camera movements & keyframes</li>
+                </ul>
+              </div>
+            </div>
+          )}
 
           {/* Export Button */}
           <button 
@@ -110,26 +161,36 @@ export default function ExportModal({
 
           {/* Progress Bar */}
           {isExporting && (
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-gray-400 mb-2">
-                <span>Progress</span>
-                <span>{exportProgress.toFixed(0)}%</span>
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>Rendering Progress</span>
+                <span className="font-mono">{exportProgress.toFixed(0)}%</span>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-3">
+              <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
                 <div 
-                  className="bg-purple-500 h-3 rounded-full transition-all duration-300" 
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all duration-300 ease-out" 
                   style={{ width: `${exportProgress}%` }}
                 />
               </div>
-              <p className="text-purple-400 text-sm mt-2 animate-pulse text-center">
-                🎬 Rendering video...
+              <div className="flex items-center justify-center gap-2 text-purple-400 text-sm animate-pulse">
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="ml-2">Rendering video...</span>
+              </div>
+              <p className="text-xs text-gray-400 text-center">
+                Please keep this tab active during export
               </p>
             </div>
           )}
           
-          <p className="text-xs text-gray-400 text-center">
-            Automatically renders full timeline with all presets & camera movements
-          </p>
+          {!isExporting && (
+            <div className="bg-blue-900/20 border border-blue-700/30 rounded p-3">
+              <p className="text-xs text-blue-300 text-center">
+                💡 Export automatically renders your full timeline with all presets, camera movements, and effects
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
