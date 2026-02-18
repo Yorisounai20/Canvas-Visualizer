@@ -360,8 +360,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Video export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for better performance
-  const [exportResolution, setExportResolution] = useState('960x540'); // '960x540', '1280x720', '1920x1080'
+  const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for speed and reliability
+  const [exportResolution, setExportResolution] = useState('1920x1080'); // Default to 1080p for YouTube
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -1100,6 +1100,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     // Load default preset font on mount
     loadPresetFont('helvetiker_regular');
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Request notification permission for export completion alerts
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   }, []);
 
   // Load project from sessionStorage on mount
@@ -2550,6 +2557,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog(`🎬 Codec: ${mimeType}`, 'info');
           addLog(`⚡ Bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps`, 'info');
           addLog(`✨ Ready for upload to YouTube/streaming platforms!`, 'success');
+          
+          // Show browser notification if permitted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Export Complete! 🎉', {
+              body: `Your ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')} video is ready`,
+              icon: '/favicon.ico'
+            });
+          }
         }, 1000);
         
         setIsExporting(false);
@@ -4095,8 +4110,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       // Throttle timeline updates to 10 FPS (instead of 60 FPS) to improve performance
       // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS milliseconds
+      // CRITICAL: Skip timeline updates during export to prevent React re-renders
       const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
-      if (timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
+      if (!isExporting && timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
         setCurrentTime(t);
         lastTimelineUpdateRef.current = now;
       }
@@ -8920,8 +8936,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           }
         });
       } else {
+        // Diagnostic logging for export (can be removed after testing)
+        if (isExporting && Math.random() < 0.01) { // Log ~1% of frames during export
+          console.log('🎨 Export frame render:', {
+            usingComposer: !!(composerRef.current && !isExporting),
+            directRender: !composerRef.current || isExporting,
+            hasScene: !!scene,
+            hasCamera: !!cam
+          });
+        }
+        
         // Normal render (no FX active)
-        if (composerRef.current) {
+        // Direct render during export for better compatibility with canvas capture
+        if (composerRef.current && !isExporting) {
           composerRef.current.render();
         } else {
           rend.render(scene, cam);
