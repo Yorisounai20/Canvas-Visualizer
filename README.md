@@ -228,8 +228,8 @@ Reload the page after changing the flag. The new timeline includes:
 For detailed guides and technical documentation, see the `docs/` directory:
 - **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig guide
 - **[Quick Start Guide](QUICK_START.md)** - Getting started tutorial
-- **[Testing Guide](TESTING_GUIDE.md)** - Testing instructions
-- **[Database Setup](DATABASE_SETUP.md)** - PostgreSQL configuration
+- **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Testing instructions
+- **[Database Setup](docs/guides/DATABASE_SETUP.md)** - PostgreSQL configuration
 - **[More Documentation](docs/)** - Additional guides and references
 
 ## License & Info
