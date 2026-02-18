@@ -8936,16 +8936,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           }
         });
       } else {
-        // Diagnostic logging for export (can be removed after testing)
-        if (isExporting && Math.random() < 0.01) { // Log ~1% of frames during export
-          console.log('🎨 Export frame render:', {
-            usingComposer: !!(composerRef.current && !isExporting),
-            directRender: !composerRef.current || isExporting,
-            hasScene: !!scene,
-            hasCamera: !!cam
-          });
-        }
-        
         // Normal render (no FX active)
         // Direct render during export for better compatibility with canvas capture
         if (composerRef.current && !isExporting) {
