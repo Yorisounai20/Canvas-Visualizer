@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import fixWebmDuration from 'webm-duration-fix';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
@@ -2453,7 +2454,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         }
       };
       
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         // Cleanup: disconnect the export gain node
         exportGainNode.disconnect();
         
@@ -2468,7 +2469,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           return;
         }
         
-        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        let blob = new Blob(recordedChunksRef.current, { type: mimeType });
         
         // Verify blob has data
         if (blob.size === 0) {
@@ -2478,12 +2479,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           return;
         }
         
+        addLog(`Video file created: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+        
+        // FIX DURATION METADATA FOR WEBM - Critical for seeking/scrubbing
+        if (extension === 'webm') {
+          try {
+            addLog('Fixing WebM duration metadata...', 'info');
+            const durationMs = duration * 1000; // Convert seconds to milliseconds
+            blob = await fixWebmDuration(blob, durationMs, { logger: false });
+            addLog('✅ Duration metadata added successfully - video is now seekable', 'success');
+          } catch (error) {
+            console.error('Failed to fix WebM duration:', error);
+            addLog('⚠️ Warning: Could not add duration metadata', 'warning');
+            addLog('Video will still play but may not be seekable', 'warning');
+            // Continue anyway - video will still play, just can't seek
+          }
+        }
+        
         // QUALITY VERIFICATION - Check file size is reasonable for production
         const fileSizeMB = blob.size / 1024 / 1024;
         const expectedMinSize = (duration * videoBitrate / 8) / 1024 / 1024 * 0.7; // 70% of expected
         const expectedMaxSize = (duration * videoBitrate / 8) / 1024 / 1024 * 1.3; // 130% of expected
-        
-        addLog(`Video file created: ${fileSizeMB.toFixed(2)} MB`, 'info');
         
         // Validate file size is reasonable
         if (fileSizeMB < expectedMinSize) {
