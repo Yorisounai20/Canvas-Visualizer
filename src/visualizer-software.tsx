@@ -518,9 +518,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const fpsFrameCount = useRef(0);
   const fpsLastTime = useRef(0);
   
-  // Timeline update throttling (reduce from 60 FPS to 10 FPS for better performance)
+  // Timeline update throttling (reduce from 60 FPS to 5 FPS for better UI performance)
+  // Lower update frequency significantly improves general UI responsiveness
   const lastTimelineUpdateRef = useRef<number>(0);
-  const TIMELINE_UPDATE_INTERVAL_MS = 100; // 10 FPS (100ms between updates)
+  const TIMELINE_UPDATE_INTERVAL_MS = 200; // 5 FPS (200ms between updates)
   
   // Track preset changes for debugging
   const previousPresetRef = useRef<string>('(none)');
@@ -4108,8 +4109,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // FIX: Prevent NaN if duration is not set (safety check for export)
       const t = duration > 0 ? (el % duration) : el;
       
-      // Throttle timeline updates to 10 FPS (instead of 60 FPS) to improve performance
-      // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS milliseconds
+      // Throttle timeline updates to 5 FPS (instead of 60 FPS) to dramatically improve UI performance
+      // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS (200ms)
+      // Lower frequency significantly reduces React re-renders and improves general UI responsiveness
       // CRITICAL: Skip timeline updates during export to prevent React re-renders
       const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
       if (!isExporting && timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
