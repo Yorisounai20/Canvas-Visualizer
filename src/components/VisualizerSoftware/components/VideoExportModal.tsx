@@ -17,6 +17,7 @@ interface VideoExportModalProps {
   exportProgress: number;
   handleExportAndCloseModal: () => void;
   duration: number;
+  testAudioAnalysis: () => Promise<void>;
 }
 
 export function VideoExportModal({
@@ -34,7 +35,8 @@ export function VideoExportModal({
   audioReady,
   exportProgress,
   handleExportAndCloseModal,
-  duration
+  duration,
+  testAudioAnalysis
 }: VideoExportModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -211,6 +213,16 @@ export function VideoExportModal({
                 Keep this tab active and visible during the entire process.
               </p>
             </div>
+          )}
+
+          {/* Test Audio Analysis Button - Development/Testing */}
+          {audioReady && exportMode === 'frame-by-frame' && !isExporting && (
+            <button 
+              onClick={testAudioAnalysis} 
+              className="w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors border-2 border-blue-400">
+              <span className="text-lg">🧪</span>
+              Test Audio Analysis
+            </button>
           )}
 
           {/* Export Button */}

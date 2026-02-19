@@ -2904,6 +2904,60 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     return frequencyDataArray;
   };
 
+  // Test function for audio analysis verification
+  const testAudioAnalysis = async () => {
+    // Check if audio buffer exists
+    if (!audioBufferRef.current) {
+      console.error('❌ No audio loaded. Please load an audio file first.');
+      addLog('No audio loaded. Please load an audio file first.', 'error');
+      return;
+    }
+
+    console.log('🧪 Testing Audio Analysis...');
+    addLog('Testing audio analysis...', 'info');
+
+    // Measure analysis time
+    const startTime = performance.now();
+
+    try {
+      // Call the analysis function
+      const frequencyData = await analyzeAudioForExport(audioBufferRef.current);
+      
+      const endTime = performance.now();
+      const analysisTime = Math.round(endTime - startTime);
+
+      // Log results
+      console.log(`✅ Analyzed ${frequencyData.length} frames in ${analysisTime}ms`);
+      addLog(`Analyzed ${frequencyData.length} frames in ${analysisTime}ms`, 'success');
+
+      // Helper function to calculate average of Uint8Array
+      const getAverage = (arr: Uint8Array) => {
+        const sum = arr.reduce((a, b) => a + b, 0);
+        return (sum / arr.length / 255).toFixed(2);
+      };
+
+      // Show sample frames
+      const sampleFrames = [0, 100, 1000];
+      console.log('\n📊 Sample Frames:');
+      
+      sampleFrames.forEach(frameIndex => {
+        if (frameIndex < frequencyData.length) {
+          const frame = frequencyData[frameIndex];
+          const avgAll = getAverage(frame.all);
+          console.log(`Frame ${frameIndex}: { bass: ${frame.bass.toFixed(2)}, mids: ${frame.mids.toFixed(2)}, highs: ${frame.highs.toFixed(2)}, all: ${avgAll} }`);
+          addLog(`Frame ${frameIndex}: bass=${frame.bass.toFixed(2)}, mids=${frame.mids.toFixed(2)}, highs=${frame.highs.toFixed(2)}`, 'info');
+        }
+      });
+
+      console.log('\n✅ Audio analysis test complete! Check logs above.');
+      addLog('Audio analysis test complete!', 'success');
+
+    } catch (error) {
+      console.error('❌ Audio analysis test failed:', error);
+      addLog(`Audio analysis test failed: ${error}`, 'error');
+    }
+  };
+
   const getFreq = (d: Uint8Array) => ({
     bass: (d.slice(0,10).reduce((a,b)=>a+b,0)/10/255) * bassGain,
     mids: (d.slice(10,100).reduce((a,b)=>a+b,0)/90/255) * midsGain,
@@ -11197,6 +11251,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         exportProgress={exportProgress}
         handleExportAndCloseModal={handleExportAndCloseModal}
         duration={duration}
+        testAudioAnalysis={testAudioAnalysis}
       />
 
       {/* PHASE 4: Parameter Event Edit Modal */}
