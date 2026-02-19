@@ -2775,6 +2775,135 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
+  /**
+   * PHASE 1: Offline Audio Pre-Analysis for Frame-by-Frame Export
+   * 
+   * Analyzes the entire audio buffer offline to extract frequency data for each video frame.
+   * This enables frame-by-frame video rendering without real-time audio playback.
+   * 
+   * @param audioBuffer - The audio buffer to analyze
+   * @returns Promise resolving to an array of frequency data for each frame (30 FPS)
+   * 
+   * Each frame contains:
+   * - bass: Low frequency magnitude (0-1)
+   * - mids: Mid frequency magnitude (0-1)
+   * - highs: High frequency magnitude (0-1)
+   * - all: Complete frequency spectrum (Uint8Array, 0-255 per bin)
+   * 
+   * Progress is logged every 1000 frames to track analysis of long audio files.
+   * 
+   * @example
+   * const frequencyData = await analyzeAudioForExport(audioBufferRef.current);
+   * // frequencyData[0] = { bass: 0.5, mids: 0.3, highs: 0.2, all: Uint8Array(...) }
+   */
+  const analyzeAudioForExport = async (audioBuffer: AudioBuffer): Promise<Array<{
+    bass: number;
+    mids: number;
+    highs: number;
+    all: Uint8Array;
+  }>> => {
+    // Calculate total frames for 30 FPS
+    const totalFrames = Math.ceil(audioBuffer.duration * 30);
+    const frameDuration = 1 / 30; // 0.0333... seconds per frame
+    
+    addLog(`Starting audio pre-analysis for ${totalFrames} frames...`, 'info');
+    
+    // Create offline audio context for processing without playback
+    const offlineContext = new OfflineAudioContext(
+      audioBuffer.numberOfChannels,
+      audioBuffer.length,
+      audioBuffer.sampleRate
+    );
+    
+    // Create analyser node with same settings as live playback
+    const analyser = offlineContext.createAnalyser();
+    analyser.fftSize = 2048; // Match current implementation
+    analyser.smoothingTimeConstant = 0.8;
+    
+    // Create buffer source
+    const source = offlineContext.createBufferSource();
+    source.buffer = audioBuffer;
+    
+    // Connect: source -> analyser -> destination
+    source.connect(analyser);
+    analyser.connect(offlineContext.destination);
+    
+    // Start the source
+    source.start(0);
+    
+    // Array to store frequency data for each frame
+    const frequencyDataArray: Array<{
+      bass: number;
+      mids: number;
+      highs: number;
+      all: Uint8Array;
+    }> = [];
+    
+    // Process each frame
+    for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+      const frameTime = frameIndex * frameDuration;
+      
+      // Calculate the sample position for this frame
+      const samplePosition = Math.floor(frameTime * audioBuffer.sampleRate);
+      
+      // Get frequency data at this point in time
+      const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      
+      // We need to advance the context to this point in time
+      // Since we can't seek in OfflineAudioContext, we'll sample the buffer directly
+      // and perform a basic frequency analysis
+      
+      // Extract samples around this position for FFT analysis
+      const fftSize = 2048;
+      const samples = new Float32Array(fftSize);
+      const channelData = audioBuffer.getChannelData(0); // Use first channel
+      
+      for (let i = 0; i < fftSize; i++) {
+        const sampleIndex = samplePosition + i;
+        if (sampleIndex < channelData.length) {
+          samples[i] = channelData[sampleIndex];
+        }
+      }
+      
+      // Perform basic FFT-like frequency analysis
+      // For simplicity, we'll calculate frequency bands directly
+      // This is a simplified approach - in production you'd use a proper FFT library
+      for (let i = 0; i < frequencyData.length; i++) {
+        let magnitude = 0;
+        const frequency = (i * audioBuffer.sampleRate) / fftSize;
+        
+        // Calculate magnitude for this frequency bin
+        for (let j = 0; j < samples.length; j++) {
+          const angle = (2 * Math.PI * frequency * j) / audioBuffer.sampleRate;
+          magnitude += Math.abs(samples[j] * Math.cos(angle));
+        }
+        
+        // Normalize to 0-255 range
+        frequencyData[i] = Math.min(255, Math.floor((magnitude / samples.length) * 255 * 2));
+      }
+      
+      // Process with existing getFreq helper
+      const processedFreq = getFreq(frequencyData);
+      
+      // Store complete data including raw array
+      frequencyDataArray.push({
+        bass: processedFreq.bass,
+        mids: processedFreq.mids,
+        highs: processedFreq.highs,
+        all: new Uint8Array(frequencyData) // Copy the array
+      });
+      
+      // Log progress every 1000 frames
+      if (frameIndex > 0 && frameIndex % 1000 === 0) {
+        const progress = ((frameIndex / totalFrames) * 100).toFixed(1);
+        addLog(`Audio analysis progress: ${frameIndex}/${totalFrames} frames (${progress}%)`, 'info');
+      }
+    }
+    
+    addLog(`Audio pre-analysis complete! Processed ${totalFrames} frames.`, 'success');
+    return frequencyDataArray;
+  };
+
   const getFreq = (d: Uint8Array) => ({
     bass: (d.slice(0,10).reduce((a,b)=>a+b,0)/10/255) * bassGain,
     mids: (d.slice(10,100).reduce((a,b)=>a+b,0)/90/255) * midsGain,
