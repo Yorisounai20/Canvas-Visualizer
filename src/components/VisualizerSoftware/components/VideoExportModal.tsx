@@ -8,6 +8,10 @@ interface VideoExportModalProps {
   setExportResolution: (resolution: string) => void;
   exportFormat: string;
   setExportFormat: (format: string) => void;
+  exportMode: 'live' | 'frame-by-frame';
+  setExportMode: (mode: 'live' | 'frame-by-frame') => void;
+  exportFramerate: number;
+  setExportFramerate: (rate: number) => void;
   isExporting: boolean;
   audioReady: boolean;
   exportProgress: number;
@@ -22,6 +26,10 @@ export function VideoExportModal({
   setExportResolution,
   exportFormat,
   setExportFormat,
+  exportMode,
+  setExportMode,
+  exportFramerate,
+  setExportFramerate,
   isExporting,
   audioReady,
   exportProgress,
@@ -71,6 +79,47 @@ export function VideoExportModal({
         </div>
 
         <div className="space-y-4">
+          {/* Export Mode Selector - NEW */}
+          <div>
+            <label className="text-sm text-gray-300 block mb-2 font-semibold">Export Mode</label>
+            <select 
+              value={exportMode} 
+              onChange={(e) => setExportMode(e.target.value as 'live' | 'frame-by-frame')}
+              disabled={isExporting}
+              className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+              <option value="live">Live Recording (Real-time) - Default</option>
+              <option value="frame-by-frame">Frame-by-Frame (Offline) - Better for Weak Laptops</option>
+            </select>
+            {exportMode === 'frame-by-frame' ? (
+              <p className="text-xs text-green-400 mt-1">
+                ⚡ Recommended for weak hardware! Renders offline without performance issues.
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">
+                Real-time capture. May be choppy on weak hardware.
+              </p>
+            )}
+          </div>
+
+          {/* Frame Rate Selector - Only shown for frame-by-frame mode */}
+          {exportMode === 'frame-by-frame' && (
+            <div>
+              <label className="text-sm text-gray-300 block mb-2 font-semibold">Frame Rate</label>
+              <select 
+                value={exportFramerate} 
+                onChange={(e) => setExportFramerate(Number(e.target.value))}
+                disabled={isExporting}
+                className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
+                <option value="24">24 FPS (Cinematic)</option>
+                <option value="30">30 FPS (Standard)</option>
+                <option value="60">60 FPS (Smooth)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                Higher FPS = smoother but larger file size
+              </p>
+            </div>
+          )}
+
           {/* Resolution Selector */}
           <div>
             <label className="text-sm text-gray-300 block mb-2 font-semibold">Export Resolution</label>
@@ -98,12 +147,20 @@ export function VideoExportModal({
               onChange={(e) => setExportFormat(e.target.value)}
               disabled={isExporting}
               className="w-full px-3 py-2 bg-gray-700 rounded text-white border border-gray-600 focus:border-purple-500 focus:outline-none">
-              <option value="webm-vp8">WebM (VP8 + Opus) - Recommended for 1080p</option>
-              <option value="webm-vp9">WebM (VP9 + Opus) - Best Quality (slower)</option>
-              <option value="mp4">MP4 (H.264) - If Supported</option>
+              {exportMode === 'frame-by-frame' ? (
+                <option value="mp4">MP4 (H.264) - FFmpeg Output</option>
+              ) : (
+                <>
+                  <option value="webm-vp8">WebM (VP8 + Opus) - Recommended for 1080p</option>
+                  <option value="webm-vp9">WebM (VP9 + Opus) - Best Quality (slower)</option>
+                  <option value="mp4">MP4 (H.264) - If Supported</option>
+                </>
+              )}
             </select>
             <p className="text-xs text-gray-400 mt-1">
-              {exportFormat === 'webm-vp8' 
+              {exportMode === 'frame-by-frame'
+                ? '✓ Uses FFmpeg.wasm to combine frames + audio'
+                : exportFormat === 'webm-vp8' 
                 ? '✓ Fast encoding, great quality' 
                 : exportFormat === 'webm-vp9'
                 ? '✓ Best compression (slower encoding)'
@@ -124,12 +181,23 @@ export function VideoExportModal({
             <div className="bg-gray-800 rounded p-3 space-y-2 border border-gray-700">
               <div className="text-xs text-gray-300">
                 <p className="font-semibold mb-1">Export Settings:</p>
-                <ul className="space-y-1 ml-2">
-                  <li>• Frame Rate: 30 FPS</li>
-                  <li>• Audio: 48kHz Opus codec</li>
-                  <li>• Bitrate: Auto (resolution-based)</li>
-                  <li>• Captures all presets, camera movements & keyframes</li>
-                </ul>
+                {exportMode === 'frame-by-frame' ? (
+                  <ul className="space-y-1 ml-2">
+                    <li>• Mode: Offline frame-by-frame rendering</li>
+                    <li>• Frame Rate: {exportFramerate} FPS</li>
+                    <li>• Audio: Combined with FFmpeg.wasm</li>
+                    <li>• Performance: Independent of system speed</li>
+                    <li>• Perfect for weak hardware!</li>
+                  </ul>
+                ) : (
+                  <ul className="space-y-1 ml-2">
+                    <li>• Mode: Real-time live recording</li>
+                    <li>• Frame Rate: 30 FPS</li>
+                    <li>• Audio: 48kHz Opus codec</li>
+                    <li>• Bitrate: Auto (resolution-based)</li>
+                    <li>• Captures all presets, camera movements & keyframes</li>
+                  </ul>
+                )}
               </div>
             </div>
           )}
