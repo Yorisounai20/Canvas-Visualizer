@@ -2951,6 +2951,205 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   }
 
+  /**
+   * PHASE 2: Render Single Frame for Frame-by-Frame Export
+   * 
+   * Renders one frame of the animation using pre-analyzed audio data.
+   * This executes the same animation logic as the main loop but:
+   * - Uses pre-calculated frequencies instead of live audio
+   * - Uses provided time instead of Date.now()
+   * - Renders once instead of using requestAnimationFrame
+   * 
+   * @param frameNumber - Frame index in the sequence
+   * @param time - Exact time in seconds for this frame
+   * @param frequencies - Pre-analyzed frequency data for this frame
+   */
+  const renderSingleFrame = (
+    frameNumber: number,
+    time: number,
+    frequencies: { bass: number; mids: number; highs: number; all: Uint8Array }
+  ) => {
+    // Get refs
+    const scene = sceneRef.current;
+    const cam = cameraRef.current;
+    const rend = rendererRef.current;
+    const obj = objectsRef.current;
+    
+    // Safety checks
+    if (!scene || !cam || !rend || !obj) {
+      console.error('Cannot render frame: scene, camera, renderer or objects not initialized');
+      return;
+    }
+    
+    // Set startTimeRef to simulate being at this exact time
+    startTimeRef.current = Date.now() - (time * 1000);
+    
+    // Use provided frequencies
+    const f = frequencies;
+    
+    // Calculate elapsed time and modulo with duration
+    const el = time;
+    const t = duration > 0 ? (el % duration) : el;
+    
+    // Get current preset and speed
+    const type = getCurrentPreset(t);
+    const presetSpeed = getCurrentPresetSpeed(t);
+    const elScaled = el * presetSpeed;
+    
+    // Get camera settings
+    const activeCameraDistance = cameraDistance;
+    const activeCameraHeight = cameraHeight;
+    
+    // Initialize camera shake (from parameter events and camera FX)
+    let shakeX = 0;
+    let shakeY = 0;
+    let shakeZ = 0;
+    
+    // Handle preset transitions
+    if (prevAnimRef.current === null) {
+      prevAnimRef.current = type;
+      transitionRef.current = FULL_OPACITY;
+    } else if (type !== prevAnimRef.current) {
+      transitionRef.current = 0;
+      prevAnimRef.current = type;
+    }
+    if (transitionRef.current < FULL_OPACITY) {
+      transitionRef.current = Math.min(FULL_OPACITY, transitionRef.current + TRANSITION_SPEED);
+    }
+    const blend = transitionRef.current;
+    
+    // Apply preset animations (simplified version - using direct preset logic)
+    if (type === 'empty') {
+      // Empty preset
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+      obj.sphere.position.set(0, -1000, 0);
+      obj.cubes.forEach((c) => c.position.set(0, -1000, 0));
+      obj.octas.slice(0, 30).forEach((o) => o.position.set(0, -1000, 0));
+      obj.tetras.forEach((t) => t.position.set(0, -1000, 0));
+    } else if (type === 'orbit') {
+      orbitPreset.animate(obj, f, elScaled);
+      cam.position.set(
+        Math.cos(0) * activeCameraDistance + shakeX,
+        10 + activeCameraHeight + shakeY,
+        Math.sin(0) * activeCameraDistance + shakeZ
+      );
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'explosion') {
+      explosionPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance - f.bass*10 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'tunnel') {
+      tunnelPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'wave') {
+      wavePreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 8 + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'spiral') {
+      spiralPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'chill') {
+      chillPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'pulse') {
+      pulsePreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'vortex') {
+      vortexPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, 15 + activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'seiryu') {
+      seiryuPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 15 + shakeY, activeCameraDistance + 25 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'hammerhead') {
+      hammerheadPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 10 + shakeY, activeCameraDistance + 20 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'cosmic') {
+      cosmicPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + 30 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'cityscape') {
+      cityscapePreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 10 + shakeY, activeCameraDistance + 30 + shakeZ);
+      cam.lookAt(0, 5, 0);
+    } else if (type === 'oceanwaves') {
+      oceanwavesPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 5 + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'forest') {
+      forestPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 8 + shakeY, activeCameraDistance + 15 + shakeZ);
+      cam.lookAt(0, 5, 0);
+    } else if (type === 'portals') {
+      portalsPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'discoball') {
+      discoballPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'windturbines') {
+      windturbinesPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 10 + shakeY, activeCameraDistance + 20 + shakeZ);
+      cam.lookAt(0, 10, 0);
+    } else if (type === 'clockwork') {
+      clockworkPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'neontunnel') {
+      neontunnelPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'atommodel') {
+      atommodelPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + 15 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'carousel') {
+      carouselPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 10 + shakeY, activeCameraDistance + 20 + shakeZ);
+      cam.lookAt(0, 5, 0);
+    } else if (type === 'solarsystem') {
+      solarsystemPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 30 + shakeY, activeCameraDistance + 50 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'datastream') {
+      datastreamPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + 10 + shakeZ);
+      cam.lookAt(0, 0, 0);
+    } else if (type === 'ferriswheel') {
+      ferriswheelPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 15 + shakeY, activeCameraDistance + 30 + shakeZ);
+      cam.lookAt(0, 10, 0);
+    } else if (type === 'tornadovortex') {
+      tornadovortexPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 10 + shakeY, activeCameraDistance + 25 + shakeZ);
+      cam.lookAt(0, 5, 0);
+    } else if (type === 'stadium') {
+      stadiumPreset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + 20 + shakeY, activeCameraDistance + 40 + shakeZ);
+      cam.lookAt(0, 10, 0);
+    } else if (type === 'kaleidoscope2') {
+      kaleidoscope2Preset.animate(obj, f, elScaled);
+      cam.position.set(0 + shakeX, activeCameraHeight + shakeY, activeCameraDistance + shakeZ);
+      cam.lookAt(0, 0, 0);
+    }
+    
+    // Render the frame
+    // Use composer if available and not exporting, otherwise direct render
+    if (composerRef.current) {
+      composerRef.current.render();
+    } else {
+      rend.render(scene, cam);
+    }
+  };
+
   // Test function for audio analysis verification
   const testAudioAnalysis = async () => {
     // Check if audio buffer exists
