@@ -3210,303 +3210,132 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     highs: (d.slice(100,200).reduce((a,b)=>a+b,0)/100/255) * highsGain
   });
 
-  // Frame-by-frame export function
-  const exportVideoFrameByFrame = async () => {
-    if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
-      addLog('Cannot export: scene or audio not ready', 'error');
-      return;
+  /**
+   * PHASE 3: Complete Frame-by-Frame Export Workflow
+   * 
+   * Orchestrates the complete frame-by-frame rendering and capture process:
+   * 1. Pre-analyzes audio using Phase 1 (analyzeAudioForExport)
+   * 2. Renders each frame using Phase 2 (renderSingleFrame)
+   * 3. Captures frames as PNG blobs
+   * 4. Returns array of frame blobs for video assembly
+   * 
+   * @returns Promise<Blob[]> - Array of PNG frame blobs
+   */
+  const exportVideoFrameByFrame = async (): Promise<Blob[]> => {
+    // Safety checks
+    if (!rendererRef.current || !audioBufferRef.current) {
+      addLog('Cannot export: renderer or audio not ready', 'error');
+      return [];
     }
 
     if (!audioReady) {
       addLog('Please load an audio file first', 'error');
-      return;
+      return [];
     }
 
     try {
+      // 1. Set isExporting to true and show initial progress
       setIsExporting(true);
       setExportProgress(0);
-      addLog('Starting frame-by-frame video export...', 'info');
-      addLog('⚡ This method renders offline - no real-time performance needed!', 'info');
+      addLog('🎬 Starting frame-by-frame export...', 'info');
+      console.log('🎬 Starting frame-by-frame export...');
 
-      // Parse export resolution
+      // 2. Get export resolution from exportResolution state
       const [exportWidth, exportHeight] = exportResolution.split('x').map(Number);
-      const duration = audioBufferRef.current.duration;
-      const totalFrames = Math.ceil(duration * exportFramerate);
-      const frameDuration = 1 / exportFramerate;
-
-      addLog(`Rendering ${totalFrames} frames at ${exportFramerate} FPS...`, 'info');
-      addLog(`Resolution: ${exportWidth}x${exportHeight}`, 'info');
-
-      // Store original canvas size
+      addLog(`📐 Export resolution: ${exportWidth}x${exportHeight}`, 'info');
+      
+      // Store original canvas size for restoration
       const originalWidth = 960;
       const originalHeight = 540;
 
-      // Resize renderer to export resolution
+      // 3. Resize renderer to export resolution temporarily
       rendererRef.current.setSize(exportWidth, exportHeight);
       if (cameraRef.current) {
         cameraRef.current.aspect = exportWidth / exportHeight;
         cameraRef.current.updateProjectionMatrix();
       }
+      addLog(`✅ Canvas resized to ${exportWidth}x${exportHeight}`, 'info');
 
-      // Array to store frame blobs
+      // 4. Call analyzeAudioForExport to get frequency data for all frames
+      addLog('📊 Analyzing audio...', 'info');
+      console.log('📊 Analyzing audio...');
+      const frequencyData = await analyzeAudioForExport(audioBufferRef.current);
+      const totalFrames = frequencyData.length;
+      addLog(`✅ Audio analyzed: ${totalFrames} frames at 30 FPS`, 'success');
+      console.log(`✅ Audio analyzed: ${totalFrames} frames`);
+
+      // 5. Create an array to store frame blobs
       const frames: Blob[] = [];
+      addLog(`🎨 Starting frame rendering (${totalFrames} frames)...`, 'info');
+      console.log(`🎨 Rendering ${totalFrames} frames...`);
 
-      // Temporarily disable OrbitControls during export
-      const orbitControlsWasEnabled = orbitControlsRef.current?.enabled;
-      if (orbitControlsRef.current) {
-        orbitControlsRef.current.enabled = false;
-      }
-
-      // Render each frame
-      for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
-        const time = frameIndex * frameDuration;
-        const el = time;
-        const t = time;
-
-        // Calculate audio frequency data for this exact frame
-        const audioData = calculateAudioFrequencyAtTime(
-          audioBufferRef.current,
-          time,
-          2048,
-          bassGain,
-          midsGain,
-          highsGain
-        );
-
-        // Get current preset and settings
-        const type = getCurrentPreset(t);
-        const presetSpeed = getCurrentPresetSpeed(t);
-        const elScaled = el * presetSpeed;
-
-        // Camera settings
-        const activeCameraDistance = cameraDistance;
-        const activeCameraHeight = cameraHeight;
-
-        // Set up camera (copied from animation loop)
-        const cam = cameraRef.current!;
-        const scene = sceneRef.current!;
-        const obj = objectsRef.current;
-
-        if (!obj) continue;
-
-        // Apply camera rig if active
-        let cameraRigActive = false;
-        for (const rig of cameraRigs) {
-          if (!rig.enabled) continue;
-          const rigKeyframes = cameraRigKeyframes.filter(kf => kf.rigId === rig.id).sort((a, b) => a.time - b.time);
-          if (rigKeyframes.length === 0) continue;
-          
-          // Check if time is within rig's range
-          const firstKeyframeTime = rigKeyframes[0].time;
-          const lastKeyframeTime = rigKeyframes[rigKeyframes.length - 1].time;
-          if (t >= firstKeyframeTime && t <= lastKeyframeTime + 0.1) {
-            cameraRigActive = true;
-            // Camera rig interpolation logic would go here
-            // For simplicity, using basic camera positioning
-            break;
-          }
-        }
-
-        if (!cameraRigActive) {
-          // Simple orbital camera positioning
-          cam.position.set(
-            Math.cos(0) * activeCameraDistance,
-            10 + activeCameraHeight,
-            Math.sin(0) * activeCameraDistance
-          );
-          cam.lookAt(0, 0, 0);
-        }
-
-        // Run preset animation logic
-        try {
-          const f = audioData; // Use calculated audio data instead of live analyser
-
-          // Execute preset animations (simplified version of animation loop)
-          // This would include all the preset-specific animation code
-          // For now, we'll render the current state
-
-          // Update shapes based on preset
-          switch (type) {
-            case 'orbit':
-              orbitPreset.animate(obj, f, elScaled);
-              break;
-            case 'explosion':
-              explosionPreset.animate(obj, f, elScaled);
-              break;
-            case 'tunnel':
-              tunnelPreset.animate(obj, f, elScaled);
-              break;
-            case 'wave':
-              wavePreset.animate(obj, f, elScaled);
-              break;
-            case 'spiral':
-              spiralPreset.animate(obj, f, elScaled);
-              break;
-            case 'chill':
-              chillPreset.animate(obj, f, elScaled);
-              break;
-            case 'pulse':
-              pulsePreset.animate(obj, f, elScaled);
-              break;
-            case 'vortex':
-              vortexPreset.animate(obj, f, elScaled);
-              break;
-            case 'seiryu':
-              seiryuPreset.animate(obj, f, elScaled);
-              break;
-            case 'hammerhead':
-              hammerheadPreset.animate(obj, f, elScaled);
-              break;
-            case 'cosmic':
-              cosmicPreset.animate(obj, f, elScaled);
-              break;
-            case 'cityscape':
-              cityscapePreset.animate(obj, f, elScaled);
-              break;
-            case 'oceanwaves':
-              oceanwavesPreset.animate(obj, f, elScaled);
-              break;
-            case 'forest':
-              forestPreset.animate(obj, f, elScaled);
-              break;
-            case 'portals':
-              portalsPreset.animate(obj, f, elScaled);
-              break;
-            case 'discoball':
-              discoballPreset.animate(obj, f, elScaled);
-              break;
-            case 'windturbines':
-              windturbinesPreset.animate(obj, f, elScaled);
-              break;
-            case 'clockwork':
-              clockworkPreset.animate(obj, f, elScaled);
-              break;
-            case 'neontunnel':
-              neontunnelPreset.animate(obj, f, elScaled);
-              break;
-            case 'atommodel':
-              atommodelPreset.animate(obj, f, elScaled);
-              break;
-            case 'carousel':
-              carouselPreset.animate(obj, f, elScaled);
-              break;
-            case 'solarsystem':
-              solarsystemPreset.animate(obj, f, elScaled);
-              break;
-            case 'datastream':
-              datastreamPreset.animate(obj, f, elScaled);
-              break;
-            case 'ferriswheel':
-              ferriswheelPreset.animate(obj, f, elScaled);
-              break;
-            case 'tornadovortex':
-              tornadovortexPreset.animate(obj, f, elScaled);
-              break;
-            case 'stadium':
-              stadiumPreset.animate(obj, f, elScaled);
-              break;
-            case 'kaleidoscope2':
-              kaleidoscope2Preset.animate(obj, f, elScaled);
-              break;
-            case 'empty':
-              emptyPreset.animate(obj, f, elScaled);
-              break;
-          }
-        } catch (error) {
-          console.error('Error in preset animation:', error);
-        }
-
-        // Render the frame
-        rendererRef.current.render(scene, cam);
-
-        // Capture frame as blob
-        const frameBlob = await captureFrameAsBlob(rendererRef.current.domElement, 0.95);
-        frames.push(frameBlob);
-
-        // Update progress
-        const progress = Math.floor((frameIndex / totalFrames) * 50); // 0-50% for rendering
-        setExportProgress(progress);
-
-        // Log progress every 30 frames
-        if (frameIndex % 30 === 0 || frameIndex === totalFrames - 1) {
-          addLog(`Rendered frame ${frameIndex + 1}/${totalFrames} (${Math.floor((frameIndex / totalFrames) * 100)}%)`, 'info');
+      // 6. Loop through each frame
+      for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
+        // Calculate time = frameNumber / 30
+        const time = frameNumber / 30;
+        
+        // Call renderSingleFrame with pre-analyzed frequency data
+        renderSingleFrame(frameNumber, time, frequencyData[frameNumber]);
+        
+        // Capture canvas as PNG blob using canvas.toBlob()
+        const canvas = rendererRef.current.domElement;
+        const blob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((b) => {
+            if (b) resolve(b);
+          }, 'image/png');
+        });
+        
+        // Store blob in array
+        frames.push(blob);
+        
+        // Update progress every 100 frames
+        if (frameNumber % 100 === 0 || frameNumber === totalFrames - 1) {
+          const percentage = Math.floor((frameNumber / totalFrames) * 100);
+          addLog(`🎨 Rendered ${frameNumber} / ${totalFrames} frames (${percentage}%)`, 'info');
+          console.log(`Rendered ${frameNumber} / ${totalFrames} frames (${percentage}%)`);
+          setExportProgress(percentage);
         }
       }
 
-      addLog('All frames rendered! Assembling video with FFmpeg...', 'success');
-      setExportProgress(50);
+      // 7. After all frames rendered, log completion
+      addLog('✅ Frame rendering complete!', 'success');
+      console.log('✅ Frame rendering complete!');
+      addLog(`📦 Captured ${frames.length} frames`, 'success');
+      console.log(`Captured ${frames.length} frames`);
 
-      // Create audio blob
-      addLog('Encoding audio...', 'info');
-      const audioBlob = await createAudioBlob(audioBufferRef.current);
-
-      // Use FFmpeg to combine frames and audio
-      addLog('Loading FFmpeg...', 'info');
-      const exporter = new FrameByFrameExporter();
-      await exporter.load((msg) => addLog(`[FFmpeg] ${msg}`, 'info'));
-
-      addLog('Combining frames and audio into video...', 'info');
-      const videoBlob = await exporter.exportFramesToVideo(frames, audioBlob, {
-        width: exportWidth,
-        height: exportHeight,
-        framerate: exportFramerate,
-        duration: duration,
-        bitrate: '10M',
-        onProgress: (progress, status) => {
-          setExportProgress(50 + Math.floor(progress / 2)); // 50-100%
-          addLog(status, 'info');
-        },
-        onLog: addLog
-      });
-
-      // Download the video
-      const url = URL.createObjectURL(videoBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `canvas-visualizer-${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      addLog('✅ Frame-by-frame export complete!', 'success');
-      setExportProgress(100);
-
-      // Restore original canvas size
+      // 8. Restore original canvas size
       rendererRef.current.setSize(originalWidth, originalHeight);
       if (cameraRef.current) {
         cameraRef.current.aspect = originalWidth / originalHeight;
         cameraRef.current.updateProjectionMatrix();
       }
+      addLog(`✅ Canvas restored to ${originalWidth}x${originalHeight}`, 'info');
 
-      // Restore OrbitControls state
-      if (orbitControlsRef.current) {
-        orbitControlsRef.current.enabled = orbitControlsWasEnabled || false;
-      }
+      setIsExporting(false);
+      setExportProgress(100);
 
-      // Reset export state after a delay
-      setTimeout(() => {
-        setIsExporting(false);
-        setExportProgress(0);
-      }, 2000);
+      // 9. Return the array of frame blobs
+      return frames;
 
     } catch (error) {
       const err = error as Error;
-      addLog(`Frame-by-frame export failed: ${err.message}`, 'error');
+      addLog(`❌ Frame-by-frame export failed: ${err.message}`, 'error');
       console.error('Frame-by-frame export error:', error);
-      setIsExporting(false);
-      setExportProgress(0);
-
+      
       // Restore original canvas size on error
       const originalWidth = 960;
       const originalHeight = 540;
       if (rendererRef.current) {
         rendererRef.current.setSize(originalWidth, originalHeight);
+        if (cameraRef.current) {
+          cameraRef.current.aspect = originalWidth / originalHeight;
+          cameraRef.current.updateProjectionMatrix();
+        }
       }
-      if (cameraRef.current) {
-        cameraRef.current.aspect = originalWidth / originalHeight;
-        cameraRef.current.updateProjectionMatrix();
-      }
+      
+      setIsExporting(false);
+      setExportProgress(0);
+      return [];
     }
   };
 
