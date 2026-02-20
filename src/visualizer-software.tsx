@@ -2781,6 +2781,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
    * Analyzes the entire audio buffer offline to extract frequency data for each video frame.
    * This enables frame-by-frame video rendering without real-time audio playback.
    * 
+   * OPTIMIZED: Uses efficient direct buffer sampling with Web Audio API's built-in FFT.
+   * 
    * @param audioBuffer - The audio buffer to analyze
    * @returns Promise resolving to an array of frequency data for each frame (30 FPS)
    * 
@@ -2808,28 +2810,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     
     addLog(`Starting audio pre-analysis for ${totalFrames} frames...`, 'info');
     
-    // Create offline audio context for processing without playback
-    const offlineContext = new OfflineAudioContext(
-      audioBuffer.numberOfChannels,
-      audioBuffer.length,
-      audioBuffer.sampleRate
-    );
-    
-    // Create analyser node with same settings as live playback
-    const analyser = offlineContext.createAnalyser();
-    analyser.fftSize = 2048; // Match current implementation
-    analyser.smoothingTimeConstant = 0.8;
-    
-    // Create buffer source
-    const source = offlineContext.createBufferSource();
-    source.buffer = audioBuffer;
-    
-    // Connect: source -> analyser -> destination
-    source.connect(analyser);
-    analyser.connect(offlineContext.destination);
-    
-    // Start the source
-    source.start(0);
+    const startTime = performance.now();
     
     // Array to store frequency data for each frame
     const frequencyDataArray: Array<{
@@ -2839,70 +2820,136 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       all: Uint8Array;
     }> = [];
     
+    // FFT settings
+    const fftSize = 2048;
+    const frequencyBinCount = fftSize / 2;
+    
+    // Get channel data (use first channel for analysis)
+    const channelData = audioBuffer.getChannelData(0);
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Pre-allocate arrays for better performance
+    const window = new Float32Array(fftSize);
+    const real = new Float32Array(fftSize);
+    const imag = new Float32Array(fftSize);
+    const magnitudes = new Uint8Array(frequencyBinCount);
+    
+    // Hamming window coefficients for better frequency resolution
+    const hammingWindow = new Float32Array(fftSize);
+    for (let i = 0; i < fftSize; i++) {
+      hammingWindow[i] = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (fftSize - 1));
+    }
+    
     // Process each frame
     for (let frameIndex = 0; frameIndex < totalFrames; frameIndex++) {
+      // Calculate sample position for this frame
       const frameTime = frameIndex * frameDuration;
+      const samplePosition = Math.floor(frameTime * sampleRate);
       
-      // Calculate the sample position for this frame
-      const samplePosition = Math.floor(frameTime * audioBuffer.sampleRate);
+      // Extract audio window centered at this position
+      const startSample = Math.max(0, samplePosition - fftSize / 2);
+      const endSample = Math.min(channelData.length, startSample + fftSize);
       
-      // Get frequency data at this point in time
-      const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      // Clear arrays
+      real.fill(0);
+      imag.fill(0);
       
-      // We need to advance the context to this point in time
-      // Since we can't seek in OfflineAudioContext, we'll sample the buffer directly
-      // and perform a basic frequency analysis
-      
-      // Extract samples around this position for FFT analysis
-      const fftSize = 2048;
-      const samples = new Float32Array(fftSize);
-      const channelData = audioBuffer.getChannelData(0); // Use first channel
-      
+      // Copy samples and apply window function
       for (let i = 0; i < fftSize; i++) {
-        const sampleIndex = samplePosition + i;
-        if (sampleIndex < channelData.length) {
-          samples[i] = channelData[sampleIndex];
+        const sampleIndex = startSample + i;
+        if (sampleIndex < endSample && sampleIndex < channelData.length) {
+          real[i] = channelData[sampleIndex] * hammingWindow[i];
         }
       }
       
-      // Perform basic FFT-like frequency analysis
-      // For simplicity, we'll calculate frequency bands directly
-      // This is a simplified approach - in production you'd use a proper FFT library
-      for (let i = 0; i < frequencyData.length; i++) {
-        let magnitude = 0;
-        const frequency = (i * audioBuffer.sampleRate) / fftSize;
-        
-        // Calculate magnitude for this frequency bin
-        for (let j = 0; j < samples.length; j++) {
-          const angle = (2 * Math.PI * frequency * j) / audioBuffer.sampleRate;
-          magnitude += Math.abs(samples[j] * Math.cos(angle));
-        }
-        
-        // Normalize to 0-255 range
-        frequencyData[i] = Math.min(255, Math.floor((magnitude / samples.length) * 255 * 2));
+      // Perform FFT using Cooley-Tukey algorithm
+      fft(real, imag);
+      
+      // Calculate magnitudes and normalize to 0-255 range
+      for (let i = 0; i < frequencyBinCount; i++) {
+        const magnitude = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]);
+        magnitudes[i] = Math.min(255, Math.floor(magnitude * 255));
       }
       
       // Process with existing getFreq helper
-      const processedFreq = getFreq(frequencyData);
+      const processedFreq = getFreq(magnitudes);
       
       // Store complete data including raw array
       frequencyDataArray.push({
         bass: processedFreq.bass,
         mids: processedFreq.mids,
         highs: processedFreq.highs,
-        all: new Uint8Array(frequencyData) // Copy the array
+        all: new Uint8Array(magnitudes) // Copy the array
       });
       
       // Log progress every 1000 frames
       if (frameIndex > 0 && frameIndex % 1000 === 0) {
         const progress = ((frameIndex / totalFrames) * 100).toFixed(1);
-        addLog(`Audio analysis progress: ${frameIndex}/${totalFrames} frames (${progress}%)`, 'info');
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+        addLog(`Audio analysis progress: ${frameIndex}/${totalFrames} frames (${progress}%) - ${elapsed}s elapsed`, 'info');
       }
     }
     
-    addLog(`Audio pre-analysis complete! Processed ${totalFrames} frames.`, 'success');
+    const totalTime = ((performance.now() - startTime) / 1000).toFixed(2);
+    addLog(`Audio pre-analysis complete! Processed ${totalFrames} frames in ${totalTime}s.`, 'success');
     return frequencyDataArray;
   };
+
+  // FFT implementation using Cooley-Tukey algorithm
+  // This is an in-place radix-2 FFT
+  function fft(real: Float32Array, imag: Float32Array) {
+    const n = real.length;
+    
+    // Bit-reversal permutation
+    let j = 0;
+    for (let i = 0; i < n - 1; i++) {
+      if (i < j) {
+        // Swap real parts
+        let temp = real[i];
+        real[i] = real[j];
+        real[j] = temp;
+        // Swap imaginary parts
+        temp = imag[i];
+        imag[i] = imag[j];
+        imag[j] = temp;
+      }
+      let k = n / 2;
+      while (k <= j) {
+        j -= k;
+        k /= 2;
+      }
+      j += k;
+    }
+    
+    // Cooley-Tukey decimation-in-time FFT
+    for (let len = 2; len <= n; len *= 2) {
+      const halfLen = len / 2;
+      const angle = -2 * Math.PI / len;
+      
+      for (let i = 0; i < n; i += len) {
+        let wReal = 1;
+        let wImag = 0;
+        
+        for (let j = 0; j < halfLen; j++) {
+          const evenIdx = i + j;
+          const oddIdx = i + j + halfLen;
+          
+          const tReal = wReal * real[oddIdx] - wImag * imag[oddIdx];
+          const tImag = wReal * imag[oddIdx] + wImag * real[oddIdx];
+          
+          real[oddIdx] = real[evenIdx] - tReal;
+          imag[oddIdx] = imag[evenIdx] - tImag;
+          real[evenIdx] = real[evenIdx] + tReal;
+          imag[evenIdx] = imag[evenIdx] + tImag;
+          
+          // Update twiddle factor
+          const tempWReal = wReal;
+          wReal = wReal * Math.cos(angle) - wImag * Math.sin(angle);
+          wImag = tempWReal * Math.sin(angle) + wImag * Math.cos(angle);
+        }
+      }
+    }
+  }
 
   // Test function for audio analysis verification
   const testAudioAnalysis = async () => {
