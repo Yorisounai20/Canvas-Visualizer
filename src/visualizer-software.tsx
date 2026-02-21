@@ -3410,8 +3410,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Store body positions for attachments
       const bodyPositions: { x: number; y: number; z: number; rx: number; ry: number }[] = [];
       
-      // Guard against edge cases
-      if (totalBodySegments < 2) return;
+      // Guard against edge cases - skip complex calculations if segments invalid
+      if (totalBodySegments < 2) {
+        // Hide all objects and render empty frame
+        obj.cubes.forEach(c => c.position.set(0, -1000, 0));
+        obj.octas.forEach(o => o.position.set(0, -1000, 0));
+        obj.tetras.forEach(t => t.position.set(0, -1000, 0));
+        obj.sphere.position.set(0, -1000, 0);
+        for (let i = 0; i < obj.toruses.length; i++) obj.toruses[i].position.set(0, -1000, 0);
+        for (let i = 0; i < obj.planes.length; i++) obj.planes[i].position.set(0, -1000, 0);
+      } else {
       
       // Dynamic camera that follows the dragon's sweeping movement
       const camFollowX = Math.sin(elScaled * 0.25) * 8;
@@ -3629,6 +3637,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       for (let i = 0; i < obj.planes.length; i++) {
         obj.planes[i].position.set(0, -1000, 0); obj.planes[i].scale.set(0.001, 0.001, 0.001); obj.planes[i].material.opacity = 0;
+      }
       }
     } else if (type === 'hammerhead') {
       // Hammerhead Shark - Distinctive T-shaped head with smooth predatory swimming
@@ -5350,9 +5359,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         torus.material.opacity = (0.6 + f.mids * 0.3) * blend;
       });
       
-      obj.octas.forEach((octa, i) => { if (i >= 30) return; octa.position.set((Math.random() - 0.5) * 30, (Math.random() * 10), (Math.random() - 0.5) * 30); const scale = (0.3 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = 0.6 * blend; });
-      obj.tetras.forEach((tetra, i) => { const angle = cityTime * 2 + i; tetra.position.set(Math.cos(angle) * 15, 5 + Math.sin(cityTime + i) * 3, Math.sin(angle) * 15); tetra.scale.set(0.4, 0.4, 0.4); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.7 * blend; });
-      obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      obj.octas.forEach((octa, i) => {
+        if (i >= 30) return;
+        // Deterministic positioning based on index
+        const xOffset = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const yOffset = (Math.sin(i * 78.233) * 43758.5453) % 1;
+        const zOffset = (Math.sin(i * 45.164) * 43758.5453) % 1;
+        octa.position.set((xOffset - 0.5) * 30, yOffset * 10, (zOffset - 0.5) * 30);
+        const scale = (0.3 + f.highs * 0.3) * blend;
+        octa.scale.set(scale, scale, scale);
+        octa.material.color.setStyle(tetrahedronColor);
+        octa.material.opacity = 0.6 * blend;
+      });
+      obj.tetras.forEach((tetra, i) => {
+        const angle = cityTime * 2 + i;
+        tetra.position.set(Math.cos(angle) * 15, 5 + Math.sin(cityTime + i) * 3, Math.sin(angle) * 15);
+        tetra.scale.set(0.4, 0.4, 0.4);
+        tetra.material.color.setStyle(octahedronColor);
+        tetra.material.opacity = 0.7 * blend;
+      });
+      obj.sphere.position.set(0, -1000, 0);
+      obj.sphere.scale.set(0.01, 0.01, 0.01);
     } else if (type === 'oceanwaves') {
       // Ocean Waves - Undulating water surfaces
       const oceanTime = elScaled * 1.2;
@@ -5381,10 +5408,37 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         torus.material.opacity = (0.4 + f.highs * 0.3) * blend;
       });
       
-      obj.cubes.forEach((cube, i) => { cube.position.set((Math.random() - 0.5) * 20, -4, (Math.random() - 0.5) * 20); cube.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); cube.material.color.setStyle(cubeColor); cube.material.opacity = 0.6 * blend; });
-      obj.octas.forEach((octa, i) => { if (i >= 40) return; const angle = oceanTime + i; octa.position.set(Math.cos(angle) * 15, Math.sin(oceanTime * 3 + i) * 3, Math.sin(angle) * 15); const scale = (0.3 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = 0.5 * blend; });
-      obj.tetras.forEach((tetra, i) => { const angle = oceanTime * 1.5 + i; tetra.position.set(Math.cos(angle) * 12, Math.sin(oceanTime + i) * 3, Math.sin(angle) * 12); tetra.rotation.x = oceanTime + i; tetra.scale.set(0.5, 0.5, 0.5); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.7 * blend; });
-      obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      obj.cubes.forEach((cube, i) => {
+        // Deterministic positioning based on index
+        const xOffset = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const zOffset = (Math.sin(i * 45.164) * 43758.5453) % 1;
+        const scaleX = (Math.sin(i * 23.456) * 43758.5453) % 1;
+        const scaleY = (Math.sin(i * 34.567) * 43758.5453) % 1;
+        const scaleZ = (Math.sin(i * 56.789) * 43758.5453) % 1;
+        cube.position.set((xOffset - 0.5) * 20, -4, (zOffset - 0.5) * 20);
+        cube.scale.set(1 + scaleX, 1 + scaleY, 1 + scaleZ);
+        cube.material.color.setStyle(cubeColor);
+        cube.material.opacity = 0.6 * blend;
+      });
+      obj.octas.forEach((octa, i) => {
+        if (i >= 40) return;
+        const angle = oceanTime + i;
+        octa.position.set(Math.cos(angle) * 15, Math.sin(oceanTime * 3 + i) * 3, Math.sin(angle) * 15);
+        const scale = (0.3 + f.highs * 0.3) * blend;
+        octa.scale.set(scale, scale, scale);
+        octa.material.color.setStyle(tetrahedronColor);
+        octa.material.opacity = 0.5 * blend;
+      });
+      obj.tetras.forEach((tetra, i) => {
+        const angle = oceanTime * 1.5 + i;
+        tetra.position.set(Math.cos(angle) * 12, Math.sin(oceanTime + i) * 3, Math.sin(angle) * 12);
+        tetra.rotation.x = oceanTime + i;
+        tetra.scale.set(0.5, 0.5, 0.5);
+        tetra.material.color.setStyle(octahedronColor);
+        tetra.material.opacity = 0.7 * blend;
+      });
+      obj.sphere.position.set(0, -1000, 0);
+      obj.sphere.scale.set(0.01, 0.01, 0.01);
     } else if (type === 'forest') {
       // Forest Scene - Trees with leaves
       const forestTime = elScaled * 0.6;
@@ -5426,9 +5480,27 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         torus.material.opacity = 0.7 * blend;
       });
       
-      obj.octas.forEach((octa, i) => { if (i >= 25) return; octa.position.set((Math.random() - 0.5) * 25, 1 + Math.sin(forestTime * 2 + i) * 3, (Math.random() - 0.5) * 25); const scale = (0.2 + f.highs * 0.3) * blend; octa.scale.set(scale, scale, scale); octa.material.color.setStyle(tetrahedronColor); octa.material.opacity = (0.7 + f.highs * 0.3) * blend; });
-      obj.tetras.forEach((tetra, i) => { const angle = forestTime + i; tetra.position.set(Math.cos(angle) * 15, 3 + Math.sin(forestTime * 2 + i) * 2, Math.sin(angle) * 15); tetra.rotation.x = forestTime + i; tetra.scale.set(0.4, 0.4, 0.4); tetra.material.color.setStyle(octahedronColor); tetra.material.opacity = 0.6 * blend; });
-      obj.sphere.position.set(0, -1000, 0); obj.sphere.scale.set(0.01, 0.01, 0.01);
+      obj.octas.forEach((octa, i) => {
+        if (i >= 25) return;
+        // Deterministic positioning based on index
+        const xOffset = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+        const zOffset = (Math.sin(i * 45.164) * 43758.5453) % 1;
+        octa.position.set((xOffset - 0.5) * 25, 1 + Math.sin(forestTime * 2 + i) * 3, (zOffset - 0.5) * 25);
+        const scale = (0.2 + f.highs * 0.3) * blend;
+        octa.scale.set(scale, scale, scale);
+        octa.material.color.setStyle(tetrahedronColor);
+        octa.material.opacity = (0.7 + f.highs * 0.3) * blend;
+      });
+      obj.tetras.forEach((tetra, i) => {
+        const angle = forestTime + i;
+        tetra.position.set(Math.cos(angle) * 15, 3 + Math.sin(forestTime * 2 + i) * 2, Math.sin(angle) * 15);
+        tetra.rotation.x = forestTime + i;
+        tetra.scale.set(0.4, 0.4, 0.4);
+        tetra.material.color.setStyle(octahedronColor);
+        tetra.material.opacity = 0.6 * blend;
+      });
+      obj.sphere.position.set(0, -1000, 0);
+      obj.sphere.scale.set(0.01, 0.01, 0.01);
     } else if (type === 'portals') {
       // Portal Network: Spinning portal rings with energy swirls
       const t = elScaled;
