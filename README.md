@@ -9,6 +9,7 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 ## Features
 
 **Core Capabilities:**
+<<<<<<< HEAD
 - **43+ Animation Presets** - Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Azure Dragon, and more
 - **Real-time Audio Analysis** - Frequency detection (bass, mids, highs) with audio-reactive animations
 - **Advanced Timeline System** - Keyframe-based animation with smooth transitions and preset speed control
@@ -24,6 +25,17 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 - **Professional Video Export** - WebM (VP8/VP9) and MP4 formats, 960×540 to 4K resolution
 - **Project Save/Load** - Neon PostgreSQL with autosave (optional)
 - **Undo/Redo** - Full version history support
+=======
+- 43 animation presets (Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, and many more)
+- Real-time audio frequency analysis (bass, mids, highs)
+- Timeline-based animation with smooth transitions
+- Camera rig system with 7 rig types and cinematic shot presets
+- Skybox backgrounds (solid, gradient, image, stars, galaxy, nebula)
+- Professional material system (Basic, Standard PBR, Phong, Lambert)
+- High-quality video export with resolution-based bitrate scaling (8-20 Mbps)
+- Optimized UI performance with 5 FPS timeline updates for smooth interactions
+- Project save/load with Neon PostgreSQL
+>>>>>>> f433b9ec77394781638fc49f404b72e102c52269
 
 ## Quick Start (For Developers)
 
@@ -192,6 +204,46 @@ Additional features and improvements are in active development.
 - ✅ Safari - Full support (user interaction required for audio)
 - ❌ Internet Explorer - Not supported
 
+<<<<<<< HEAD
+=======
+## Performance
+
+- Target 30 FPS during recording, 60 FPS during playback
+- FFT size: 2048
+- Video bitrate: Resolution-adaptive (8 Mbps @ 540p, 12 Mbps @ 720p, 20 Mbps @ 1080p)
+- Timeline updates: 5 FPS (200ms intervals) for optimal UI responsiveness
+- Memory scales with audio file length
+- Timeslice recording every 1 second for improved export reliability
+
+## Recent Improvements (PR #88)
+
+**Export System Enhancements:**
+- ✅ Resolution-adaptive bitrate scaling for superior video quality
+- ✅ Timeslice recording with periodic buffer flush for better reliability
+- ✅ WebM duration metadata fix for proper video seeking
+- ✅ Error resilience with graceful degradation
+
+**Performance Optimizations:**
+- ✅ Timeline updates reduced to 5 FPS (50% fewer React re-renders)
+- ✅ Removed diagnostic logging overhead for smoother UI
+- ✅ Instant button response and modal rendering
+- ✅ Smooth 60 FPS playback with optimized animation loop
+
+**Timeline Improvements:**
+- ✅ Camera FX clips track fully restored in TimelineV2
+- ✅ Drag, resize, and snap-to-grid functionality
+- ✅ Per-track waveform visualization with RAF throttling
+
+## Documentation
+
+For detailed guides and technical documentation, see the `docs/` directory:
+- **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig guide
+- **[Quick Start Guide](QUICK_START.md)** - Getting started tutorial
+- **[Testing Guide](docs/guides/TESTING_GUIDE.md)** - Testing instructions
+- **[Database Setup](docs/guides/DATABASE_SETUP.md)** - PostgreSQL configuration
+- **[More Documentation](docs/)** - Additional guides and references
+
+>>>>>>> f433b9ec77394781638fc49f404b72e102c52269
 ## License & Info
 
 **License:** MIT  
