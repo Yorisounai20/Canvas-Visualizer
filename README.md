@@ -8,19 +8,22 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 
 ## Features
 
-**Two Workflow Modes:**
-- **🎬 Editor Mode** - Professional interface with After Effects-style layers, timeline, and advanced controls
-- **⚡ Software Mode** - Streamlined interface for quick visualizations
-
 **Core Capabilities:**
-- 43 animation presets (Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, and many more)
-- Real-time audio frequency analysis (bass, mids, highs)
-- Timeline-based animation with smooth transitions
-- Camera rig system with 7 rig types and cinematic shot presets
-- Skybox backgrounds (solid, gradient, image, stars, galaxy, nebula)
-- Professional material system (Basic, Standard PBR, Phong, Lambert)
-- Video export (WebM/MP4 at 720p-1080p)
-- Project save/load with Neon PostgreSQL
+- **43+ Animation Presets** - Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Azure Dragon, and more
+- **Real-time Audio Analysis** - Frequency detection (bass, mids, highs) with audio-reactive animations
+- **Advanced Timeline System** - Keyframe-based animation with smooth transitions and preset speed control
+- **Camera Rig System** - 7 rig types (Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom)
+- **CameraFX & Effects** - Shake events, handheld drift, FOV ramping, parameter-driven animations
+- **Particle System** - Timeline-based emitters with audio-reactive behavior
+- **Skybox Backgrounds** - Solid color, gradient, images, procedural stars/galaxy/nebula
+- **Material System** - Basic (unlit), Standard PBR, Phong, Lambert with per-shape customization
+- **Text Animation** - Dynamic text with character staggering and animation effects
+- **Letterbox & Overlays** - Animated overlay effects with smooth transitions
+- **Post-Processing** - Vignette, color correction, saturation, contrast, gamma, tint
+- **Frame-by-Frame Export** - Captures individual frames at 30 FPS for high-quality encoding
+- **Professional Video Export** - WebM (VP8/VP9) and MP4 formats, 960×540 to 4K resolution
+- **Project Save/Load** - Neon PostgreSQL with autosave (optional)
+- **Undo/Redo** - Full version history support
 
 ## Quick Start (For Developers)
 
@@ -43,27 +46,24 @@ Want to run locally or contribute? Here's how:
 
 ## Getting Started
 
-**Editor Mode Workflow:**
-1. Configure project resolution (720p-4K) and FPS
-2. Upload audio file
-3. Create timeline sections and assign presets
-4. Customize colors, camera, and effects
-5. Add keyframes for animations
-6. Export final video
+**Basic Workflow:**
+1. **Load Audio** - Upload MP3, WAV, OGG, M4A, or FLAC file
+2. **Choose Preset** - Select from 43+ animation presets
+3. **Create Timeline** - Add preset keyframes with smooth transitions
+4. **Customize** - Adjust colors, camera, effects, and parameters
+5. **Add Keyframes** - Create camera rig, text, and effect animations
+6. **Preview** - Test with Editor view (full interface) or Preview view (canvas only)
+7. **Export** - Render to WebM or MP4 at preferred resolution
 
-**Software Mode Workflow:**
-1. Upload audio in Waveforms tab
-2. Select animation preset
-3. Adjust colors and materials
-4. Configure camera or create camera rigs
-5. Add effects (skybox, letterbox, shake)
-6. Export video
-
-**Editor/Preview View Toggle (Software Mode):**
-- **Editor View** - Full editing interface with panels (Toolbox, Inspector) and timeline for complete control
-- **Preview View** - Distraction-free canvas-only view for reviewing visualizations and presentations
-- Toggle between views using buttons in the top bar or keyboard shortcuts (Ctrl+E / Ctrl+Shift+P)
-- Perfect for final review and video recording without UI elements
+**Timeline Keyframing:**
+- **Preset Keyframes** - Switch animation presets with fade transitions
+- **Preset Speed Keyframes** - Control animation speed over time
+- **Camera Rig Keyframes** - Animate camera with position, target, FOV, easing
+- **CameraFX Events** - Shake, drift, FOV ramping
+- **Text Animator** - Timed text with character stagger effects
+- **Letterbox Animation** - Smooth animated overlays
+- **Parameter Events** - Audio-triggered effects (flashes, pulses, bursts)
+- **Environment Keyframes** - Background and skybox changes
 
 ## Project Save/Load (Optional)
 
@@ -93,26 +93,45 @@ Canvas Visualizer can save projects to a Neon PostgreSQL database. This is **opt
 - **Neon PostgreSQL** - Optional project storage
 - **React Router DOM** - Client-side routing
 
-## Key Features Detail
+## Architecture Overview
 
-**43 Animation Presets:**
-Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Chill Vibes, Pulse Grid, Vortex Storm, Azure Dragon, Kaleidoscope, Meteor Shower, DNA Helix, Fireworks, Matrix Rain, Ripple Wave, Constellation, Pendulum, Blooming Flower, Tornado, Hypercube, Fractal Tree, Binary Stars, Ribbon Dance, Hourglass, Snowflake, Hammerhead Shark, Cosmic Rings, Cityscape, Ocean Waves, Forest Scene, Portal Network, Disco Ball, Wind Turbines, Clock Mechanism, Neon Tunnel, Atom Model, Carousel, Solar System, Data Stream, Ferris Wheel, Tornado Vortex, Stadium, Kaleidoscope Plus
+**Component Structure:**
+- `visualizer-software.tsx` - Main visualization engine with animation loop and Three.js logic
+- `components/` - UI components (Inspector tabs, timeline, export modal, panels)
+- `lib/` - Utilities (audio processing, preset transitions, project state, database)
+- `presets/` - Animation solver functions (modular preset implementations)
 
-**Camera Rig System:**
-- 7 rig types: Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom
-- Keyframe animation with easing functions
-- 3D path visualization
-- Shot presets: Close-Up, Wide Shot, Overhead, Low Angle, Dutch Angle, Tracking
-- Camera FX: shake, handheld drift, FOV ramping
-- Framing controls with rule of thirds
+**Animation System:**
+- 60 FPS real-time animation loop (30 FPS during frame-by-frame export)
+- Web Audio API frequency analysis with 2048-point FFT
+- Preset-based architecture with smooth transition blending (0.5s default)
+- Keyframe system for timeline control
+- 8 cubes, 30+ octahedrons, 30 tetrahedrons, 1 sphere, particle system
 
-**Skybox/Background Modes:**
-- Solid Color
-- Gradient (customizable top/bottom)
-- Image/Skybox (equirectangular, HDRI support)
-- Stars (procedural, 1k-10k stars)
-- Galaxy (spiral with color tint)
-- Nebula (shader-based gas clouds)
+**Export Pipeline:**
+- Frame-by-frame capture at 30 FPS
+- Canvas-to-blob rendering per frame
+- MediaRecorder API for video encoding
+- WebM duration metadata fixing for seeking support
+
+**Available Animation Presets:**
+Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Chill Vibes, Pulse Grid, Vortex Storm, Azure Dragon, Kaleidoscope, Meteor Shower, DNA Helix, Fireworks, Matrix Rain, Ripple Wave, Constellation, Pendulum, Blooming Flower, Tornado, Hypercube, Fractal Tree, Binary Stars, Ribbon Dance, Hourglass, Snowflake, Hammerhead Shark, Cosmic Rings, Cityscape, Ocean Waves, Forest Scene, Portal Network, Disco Ball, Wind Turbines, Clock Mechanism, Neon Tunnel, Atom Model, Carousel, Solar System, Data Stream, Ferris Wheel, Stadium, and more
+
+**Keyframing System:**
+- Preset keyframes with automatic fade transitions
+- Camera rig keyframes (Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom)
+- Text animator keyframes with character stagger
+- Letterbox animation with smooth easing
+- Parameter events for audio-triggered effects
+- Timeline-based particle emitters
+- Environment and skybox keyframes
+
+**Visual Effects:**
+- **Skybox Modes:** Solid color, gradient, image (HDRI), procedural stars, galaxy, nebula
+- **Particle System:** Timeline-based emitters with audio-reactive properties
+- **Camera Effects:** Shake, handheld drift, FOV ramping, parameter animations
+- **Post-Processing:** Vignette, color correction, saturation, contrast, gamma, tint
+- **Overlays:** Animated letterbox, text layers, mask system
 
 **Material System:**
 - Basic (unlit, flat)
@@ -132,34 +151,15 @@ npm run typecheck    # Run TypeScript checks
 npm run lint         # Run ESLint
 ```
 
-## Feature Flags
+Since this feature flag documentation is orphaned and no longer relevant, I recommend removing it entirely. The `$SELECTION_PLACEHOLDER$` should simply be deleted rather than replaced with updated content.
 
-Canvas Visualizer supports runtime feature flags for testing new features:
+If you'd like to keep a placeholder section, you could add a brief note about future development instead:
 
-**Scrollable Timeline (TimelineV2):**
-The new scrollable per-track timeline is available behind a feature flag:
+```markdown
+## Coming Soon
 
-```javascript
-// Quick enable/disable in browser console:
-window.enableNewTimeline()   // Enable new timeline
-window.disableNewTimeline()  // Revert to legacy timeline
-window.checkTimelineMode()   // Check current mode
-
-// Or use localStorage directly:
-localStorage.setItem('cv_use_scrollable_timeline', 'true');   // Enable
-localStorage.setItem('cv_use_scrollable_timeline', 'false');  // Disable
-
-// Or set via environment variable:
-REACT_APP_CV_USE_SCROLLABLE_TIMELINE=true
+Additional features and improvements are in active development.
 ```
-
-Reload the page after changing the flag. The new timeline includes:
-- Horizontal and vertical scrolling
-- Per-track waveforms
-- Smooth RAF-throttled interactions
-- Snap-to-grid and keyboard navigation
-- Context menu and marquee selection
-- Resizable keyframe bars
 
 ## Keyboard Shortcuts
 
@@ -172,8 +172,6 @@ Reload the page after changing the flag. The new timeline includes:
 - [ / ] - Previous/Next section
 - ← / → - Navigate timeline
 - See full list in app (? button)
-
-**Software Mode:**
 - Space - Play/Pause
 - G - Toggle camera rig visual hints
 - Ctrl/Cmd+E - Switch to Editor view (shows panels and timeline)
@@ -193,18 +191,6 @@ Reload the page after changing the flag. The new timeline includes:
 - ✅ Firefox - Full support
 - ✅ Safari - Full support (user interaction required for audio)
 - ❌ Internet Explorer - Not supported
-
-## Performance
-
-- Target 30 FPS during recording, 60 FPS during playback
-- FFT size: 2048
-- Video bitrate: 5 Mbps
-- Memory scales with audio file length
-
-## Documentation
-
-- **[Camera Rig System](CAMERA_RIG_DOCUMENTATION.md)** - Complete camera rig guide
-- **[Camera Rig Quick Reference](docs/CAMERA_RIG_QUICK_REFERENCE.md)** - Developer reference
 
 ## License & Info
 

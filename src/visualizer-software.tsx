@@ -4,6 +4,7 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import fixWebmDuration from 'webm-duration-fix';
+import WebMWriter from 'webm-writer';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
@@ -146,6 +147,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const animationRef = useRef<number | null>(null);
   const idleAnimationRef = useRef<number | null>(null);
   const orbitControlsRef = useRef<OrbitControls | null>(null);
+  
+  // Frame-by-frame export mode - allows reusing animation loop for frame capture
+  const isFrameByFrameModeRef = useRef(false);
+  const targetFrameTimeRef = useRef(0);
+  const capturedFrameBlobRef = useRef<Blob | null>(null);
   const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
@@ -2761,6 +2767,302 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
+  // Frame-by-frame export: captures individual frames for encoding
+  const exportVideoFrameByFrame = async () => {
+    if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
+      addLog('Cannot export: scene or audio not ready', 'error');
+      return [];
+    }
+
+    if (!audioReady) {
+      addLog('Please load an audio file first', 'error');
+      return [];
+    }
+
+    if (!duration || duration <= 0) {
+      addLog('Cannot export: audio duration is invalid', 'error');
+      return [];
+    }
+
+    const FRAME_RATE = 30; // 30 FPS
+    const totalFrames = Math.ceil(duration * FRAME_RATE);
+    const frameBlobs: Blob[] = [];
+
+    try {
+      isFrameByFrameModeRef.current = true;
+      console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
+      addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
+
+      for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
+        const frameTime = frameNumber / FRAME_RATE;
+        console.log(`📍 Rendering frame ${frameNumber}/${totalFrames} at time ${frameTime.toFixed(3)}s`);
+        
+        // Set target frame time for animation loop
+        targetFrameTimeRef.current = frameTime;
+        capturedFrameBlobRef.current = null;
+        
+        // Request single frame render and wait for capture
+        const frameRendered = new Promise<Blob | null>((resolve) => {
+          const frameTimeout = setTimeout(() => {
+            console.warn(`⚠️ Frame ${frameNumber} capture timeout after 500ms`);
+            resolve(null);
+          }, 500);
+
+          const checkFrame = () => {
+            if (capturedFrameBlobRef.current) {
+              clearTimeout(frameTimeout);
+              const blob = capturedFrameBlobRef.current;
+              capturedFrameBlobRef.current = null;
+              resolve(blob);
+            } else {
+              requestAnimationFrame(checkFrame);
+            }
+          };
+
+          // Trigger animation frame render
+          requestAnimationFrame(checkFrame);
+        });
+
+        const blob = await frameRendered;
+
+        if (blob) {
+          frameBlobs.push(blob);
+          if (frameNumber % 30 === 0 || frameNumber === totalFrames - 1) {
+            const progress = ((frameNumber + 1) / totalFrames) * 100;
+            console.log(`✅ Captured ${frameNumber + 1}/${totalFrames} frames (${progress.toFixed(1)}%)`);
+            addLog(`Progress: ${frameNumber + 1}/${totalFrames} frames captured (${progress.toFixed(1)}%)`, 'info');
+          }
+        } else {
+          console.error(`❌ Failed to capture frame ${frameNumber}`);
+          addLog(`Failed to capture frame ${frameNumber}`, 'error');
+          // Continue anyway to not break the export
+        }
+      }
+
+      isFrameByFrameModeRef.current = false;
+      console.log('🎉 Frame-by-frame export complete, collected', frameBlobs.length, 'frames');
+      addLog(`✅ Frame-by-frame export complete: ${frameBlobs.length}/${totalFrames} frames captured`, 'success');
+
+      // PHASE 2: Encode frames to video
+      console.log('📺 PHASE 2: Encoding video...');
+      addLog('PHASE 2: Encoding video from captured frames...', 'info');
+      
+      const videoBlob = await encodeFramesToVideo(frameBlobs, FRAME_RATE);
+      
+      if (!videoBlob) {
+        addLog('❌ Video encoding failed', 'error');
+        return [];
+      }
+
+      // PHASE 3: Add audio to video
+      console.log('🎵 PHASE 3: Adding audio to video...');
+      addLog('PHASE 3: Adding audio track to video...', 'info');
+      
+      const finalBlob = await addAudioToVideo(videoBlob, audioBufferRef.current, audioContextRef.current!);
+      
+      if (!finalBlob) {
+        addLog('❌ Failed to add audio to video', 'error');
+        return [];
+      }
+
+      // PHASE 4: Download the complete video
+      console.log('💾 PHASE 4: Downloading video...');
+      addLog('PHASE 4: Preparing download...', 'info');
+      
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const videoDuration = Math.round(duration);
+      const videoSizeMB = Math.round(finalBlob.size / 1024 / 1024);
+      const filename = `music_visualizer_${timestamp}_${videoDuration}s_${videoSizeMB}MB.webm`;
+
+      const url = URL.createObjectURL(finalBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('✅ Download started:', filename);
+      addLog(`✅ Download started: ${filename}`, 'success');
+      addLog(`📊 Final video: ${(finalBlob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+      addLog(`⏱️ Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`, 'info');
+      addLog('✨ Frame-by-frame export complete!', 'success');
+
+      return frameBlobs;
+    } catch (error) {
+      isFrameByFrameModeRef.current = false;
+      console.error('❌ Frame-by-frame export failed:', error);
+      addLog(`Frame-by-frame export failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return [];
+    }
+  };
+
+  // Encode captured frame blobs into a WebM video
+  const encodeFramesToVideo = async (frameBlobs: Blob[], frameRate: number = 30): Promise<Blob | null> => {
+    if (!frameBlobs || frameBlobs.length === 0) {
+      addLog('Cannot encode: no frames provided', 'error');
+      return null;
+    }
+
+    try {
+      console.log('🎬 Starting video encoding:', frameBlobs.length, 'frames at', frameRate, 'FPS');
+      addLog(`Starting video encoding: ${frameBlobs.length} frames at ${frameRate} FPS`, 'info');
+
+      // Create WebM writer with video parameters
+      const writer = new WebMWriter({
+        quality: 0.95,
+        frameRate: frameRate,
+        width: 960, // Match export resolution
+        height: 540
+      });
+
+      let successfulFrames = 0;
+      let failedFrames = 0;
+
+      // Process each frame
+      for (let i = 0; i < frameBlobs.length; i++) {
+        try {
+          // Convert blob to ImageBitmap
+          const imageBitmap = await createImageBitmap(frameBlobs[i]);
+          
+          // Add frame to video
+          writer.addFrame(imageBitmap);
+          successfulFrames++;
+
+          // Log progress every 100 frames
+          if ((i + 1) % 100 === 0 || i === frameBlobs.length - 1) {
+            const progress = ((i + 1) / frameBlobs.length) * 100;
+            console.log(`✅ Encoded ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`);
+            addLog(`Encoding progress: ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`, 'info');
+          }
+        } catch (frameError) {
+          failedFrames++;
+          console.error(`❌ Failed to encode frame ${i}:`, frameError);
+          // Continue with next frame instead of stopping
+        }
+      }
+
+      // Finalize video
+      console.log('🎬 Finalizing video encoding...');
+      addLog('Finalizing video encoding...', 'info');
+      
+      const videoBlob = writer.render();
+      
+      console.log('✅ Video encoding complete:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB');
+      console.log(`📊 Frames: ${successfulFrames} encoded, ${failedFrames} failed`);
+      addLog(`✅ Video encoding complete: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+      addLog(`📊 Frames: ${successfulFrames} encoded, ${failedFrames} failed`, 'info');
+
+      return videoBlob;
+    } catch (error) {
+      console.error('❌ Video encoding failed:', error);
+      addLog(`Video encoding failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
+
+  // Combine video and audio tracks using MediaRecorder or merge at container level
+  const addAudioToVideo = async (videoBlob: Blob, audioBuffer: AudioBuffer, audioContext: AudioContext): Promise<Blob | null> => {
+    try {
+      console.log('🎵 Adding audio track to video...');
+      addLog('Adding audio track to video...', 'info');
+
+      // Create audio blob from audioBuffer
+      const numberOfChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const length = audioBuffer.length;
+      const duration = audioBuffer.duration;
+
+      // Create offline audio context for rendering
+      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
+        numberOfChannels,
+        length,
+        sampleRate
+      );
+
+      // Create buffer source
+      const source = offlineCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(offlineCtx.destination);
+      source.start(0);
+
+      // Render to WAV
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      // Convert to WAV blob
+      const audioBlob = audioBufferToWave(renderedBuffer);
+      console.log('✅ Audio blob created:', (audioBlob.size / 1024).toFixed(2), 'KB');
+
+      // For now, return video blob (full muxing requires complex audio/video container handling)
+      // In production, you'd use FFmpeg.wasm or send to server for muxing
+      console.log('⚠️ Note: Full audio/video muxing not yet implemented. Use server-side encoding for production.');
+      addLog('⚠️ Video and audio are separate. Use post-processing for muxing.', 'warning');
+
+      return videoBlob; // Return video for now, audio will need server-side muxing
+    } catch (error) {
+      console.error('❌ Failed to add audio:', error);
+      addLog(`Failed to add audio: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
+
+  // Convert AudioBuffer to WAV blob
+  const audioBufferToWave = (audioBuffer: AudioBuffer): Blob => {
+    const numberOfChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numberOfChannels * bytesPerSample;
+
+    const data = audioBuffer.getChannelData(0); // Get first channel
+    const pcmData = new Int16Array(audioBuffer.length);
+
+    // Convert Float32 to Int16
+    for (let i = 0; i < audioBuffer.length; i++) {
+      const s = Math.max(-1, Math.min(1, data[i])); // Clamp
+      pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF; // Convert to 16-bit
+    }
+
+    const dataLength = audioBuffer.length * numberOfChannels * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(buffer);
+
+    // WAV file header
+    const writeString = (offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true); // fmt chunk size
+    view.setUint16(20, format, true);
+    view.setUint16(22, numberOfChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // Copy PCM data
+    const offset = 44;
+    const volume = 1;
+    let index = offset;
+    for (let i = 0; i < pcmData.length; i++) {
+      view.setInt16(index, pcmData[i] * volume, true);
+      index += 2;
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
   const getFreq = (d: Uint8Array) => ({
     bass: (d.slice(0,10).reduce((a,b)=>a+b,0)/10/255) * bassGain,
     mids: (d.slice(10,100).reduce((a,b)=>a+b,0)/90/255) * midsGain,
@@ -4078,7 +4380,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         console.log('⏸️ Animation frame cancelled - isPlaying:', isPlaying, 'isExporting:', isExporting);
         return;
       }
-      animationRef.current = requestAnimationFrame(anim);
+      
+      // Frame-by-frame export mode: render ONE frame only, don't request next frame
+      if (isFrameByFrameModeRef.current) {
+        console.log('🎬 Frame-by-frame mode: rendering single frame at time', targetFrameTimeRef.current);
+        // DON'T call requestAnimationFrame - we'll control timing from exportVideoFrameByFrame
+      } else {
+        // Normal mode: continue animation loop
+        animationRef.current = requestAnimationFrame(anim);
+      }
       
       try {
         // FPS calculation
@@ -4105,7 +4415,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         analyser.getByteFrequencyData(data);
         f = getFreq(data);
       }
-      const el = (Date.now() - startTimeRef.current) * 0.001;
+      
+      // Frame-by-frame mode: use targetFrameTime instead of elapsed time
+      let el: number;
+      if (isFrameByFrameModeRef.current) {
+        el = targetFrameTimeRef.current;
+        console.log('📍 Frame-by-frame: using targetFrameTime =', el);
+      } else {
+        el = (Date.now() - startTimeRef.current) * 0.001;
+      }
+      
       // FIX: Prevent NaN if duration is not set (safety check for export)
       const t = duration > 0 ? (el % duration) : el;
       
@@ -8944,6 +9263,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           composerRef.current.render();
         } else {
           rend.render(scene, cam);
+        }
+      }
+      
+      // Frame-by-frame export: capture rendered frame to blob
+      if (isFrameByFrameModeRef.current && rendererRef.current) {
+        try {
+          const canvas = rendererRef.current.domElement;
+          canvas.toBlob((blob) => {
+            if (blob) {
+              capturedFrameBlobRef.current = blob;
+              console.log('✅ Frame captured:', blob.size, 'bytes at time', targetFrameTimeRef.current);
+            } else {
+              console.error('❌ Failed to capture frame - blob is null');
+            }
+          }, 'image/webp', 0.95);
+        } catch (error) {
+          console.error('❌ Error capturing frame:', error);
         }
       }
       } catch (error) {

@@ -1,3 +1,6 @@
+
+# Might be helpful for GitHub Copilot to understand the project and provide better code suggestions. This file describes the architecture, coding conventions, and best practices for the Canvas Visualizer project. May be updated over time as the project evolves. Use this as a reference when contributing code or making changes to ensure consistency across the codebase. Most likely outdated, but may still contain useful information about the overall structure and design decisions of the project.
+
 # Canvas Visualizer - GitHub Copilot Instructions
 
 ## Project Overview
@@ -125,11 +128,9 @@ src/
 
 ## Constraints and Limitations
 
-- No localStorage/sessionStorage support (environment limitation)
 - Recording only works when audio is playing
 - Cannot access local filesystem directly (must use file inputs)
 - Font loading requires external CDN or user upload
-- No backend/database integration
 - All processing happens client-side
 
 ## Common Patterns
