@@ -8,6 +8,38 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
+/**
+ * Memory monitoring utilities
+ */
+export const memoryMonitor = {
+  getMemoryUsage(): number {
+    const perfAny = performance as any;
+    if (perfAny && perfAny.memory) {
+      return perfAny.memory.usedJSHeapSize / (1024 * 1024); // MB
+    }
+    return 0;
+  },
+  
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+  },
+  
+  checkMemoryWarning(frameCount: number, estimatedBytesPerFrame: number = 1000000): { warning: boolean; suggestion: string } {
+    const estimatedMB = (frameCount * estimatedBytesPerFrame) / (1024 * 1024);
+    if (estimatedMB > 1500) {
+      return {
+        warning: true,
+        suggestion: `Estimated frame data: ${this.formatBytes(frameCount * estimatedBytesPerFrame)}. Consider lower resolution or shorter duration.`
+      };
+    }
+    return { warning: false, suggestion: '' };
+  }
+};
+
 export interface FrameExportOptions {
   width: number;
   height: number;

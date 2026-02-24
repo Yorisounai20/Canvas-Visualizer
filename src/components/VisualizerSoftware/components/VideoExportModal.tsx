@@ -217,12 +217,20 @@ export function VideoExportModal({
 
           {/* Test Audio Analysis Button - Development/Testing */}
           {audioReady && exportMode === 'frame-by-frame' && !isExporting && (
-            <button 
-              onClick={testAudioAnalysis} 
-              className="w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors border-2 border-blue-400">
-              <span className="text-lg">🧪</span>
-              Test Audio Analysis
-            </button>
+            <div className="space-y-2">
+              <button 
+                onClick={testAudioAnalysis} 
+                className="w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors border-2 border-blue-400">
+                <span className="text-lg">🧪</span>
+                Test Audio Analysis
+              </button>
+              <button
+                onClick={() => { (window as any).testExport && (window as any).testExport(); }}
+                className="w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-black transition-colors border-2 border-yellow-400">
+                <span className="text-lg">⚡</span>
+                Test Export (10s)
+              </button>
+            </div>
           )}
 
           {/* Export Button */}

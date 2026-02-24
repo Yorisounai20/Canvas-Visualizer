@@ -631,6 +631,137 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
+  // Expose test export globally so the modal button can trigger it
+  // (Prefer explicit prop drilling, but global exposure keeps modal simple)
+  (window as any).testExport = testFrameByFrameExport;
+
+  // Test export: exports first 10 seconds (300 frames at 30 FPS) with detailed logging
+  const testFrameByFrameExport = async () => {
+    const TEST_DURATION = Math.min(10, duration || 10);
+    const FRAME_RATE = 30;
+    const totalFrames = Math.ceil(TEST_DURATION * FRAME_RATE);
+
+    addLog(`Starting TEST export: ${totalFrames} frames (${TEST_DURATION}s)`, 'info');
+    console.log('🧪 Test export started —', totalFrames, 'frames');
+
+    try {
+      // PHASE A: Audio analysis
+      addLog('Analyzing audio... (3s estimated)', 'info');
+      try {
+        if (!audioBufferRef.current) throw new Error('No audio loaded');
+        // Quick pass to ensure audio buffer is processable
+        calculateAudioFrequencyAtTime(audioBufferRef.current, 0);
+      } catch (audioErr) {
+        console.error('Audio analysis error:', audioErr);
+        addLog(`Audio analysis failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
+        return;
+      }
+
+      // PHASE B: Frame rendering
+      isFrameByFrameModeRef.current = true;
+      const frameBlobs: Blob[] = [];
+      const startTime = performance.now();
+
+      for (let i = 0; i < totalFrames; i++) {
+        const frameTime = i / FRAME_RATE;
+        targetFrameTimeRef.current = frameTime;
+        capturedFrameBlobRef.current = null;
+
+        const framePromise = new Promise<Blob | null>(resolve => {
+          const timeout = setTimeout(() => resolve(null), 1000);
+          const check = () => {
+            if (capturedFrameBlobRef.current) {
+              clearTimeout(timeout);
+              const b = capturedFrameBlobRef.current;
+              capturedFrameBlobRef.current = null;
+              resolve(b);
+            } else {
+              requestAnimationFrame(check);
+            }
+          };
+          requestAnimationFrame(check);
+        });
+
+        const blob = await framePromise;
+        if (!blob) {
+          addLog(`Failed to render frame ${i}`, 'error');
+          console.error('Frame render failed for', i);
+          // continue to next frame
+          continue;
+        }
+
+        frameBlobs.push(blob);
+
+        // Progress and ETA
+        const elapsed = (performance.now() - startTime) / 1000; // seconds
+        const done = i + 1;
+        const percent = (done / totalFrames) * 100;
+        const estTotal = (elapsed / done) * totalFrames;
+        const remaining = Math.max(0, estTotal - elapsed);
+        addLog(`Rendering frame ${done}/${totalFrames} (${percent.toFixed(1)}%) - ~${Math.round(remaining)}s remaining`, 'info');
+
+        // Memory monitoring every 100 frames
+        if (done % 100 === 0) {
+          const memMB = memoryMonitor.getMemoryUsage();
+          console.log(`Memory after ${done} frames: ${memMB.toFixed(2)} MB`);
+          addLog(`Memory: ${memMB.toFixed(2)} MB`, 'info');
+          const warn = memoryMonitor.checkMemoryWarning(done);
+          if (warn.warning) {
+            addLog(`Memory warning: ${warn.suggestion}`, 'warning');
+          }
+        }
+      }
+
+      isFrameByFrameModeRef.current = false;
+      addLog(`Captured ${frameBlobs.length}/${totalFrames} test frames`, 'info');
+
+      // PHASE C: Encoding
+      addLog('Encoding video... (30s estimated)', 'info');
+      let videoBlob: Blob | null = null;
+      try {
+        videoBlob = await encodeFramesToVideo(frameBlobs, FRAME_RATE);
+      } catch (encErr) {
+        console.error('Encoding error:', encErr);
+        addLog(`Encoding failed: ${encErr instanceof Error ? encErr.message : encErr}`, 'error');
+        return;
+      }
+
+      if (!videoBlob) {
+        addLog('Encoding returned no blob', 'error');
+        return;
+      }
+
+      addLog('Adding audio track...', 'info');
+      try {
+        const final = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
+        if (final) {
+          addLog('Download ready!', 'success');
+          const url = URL.createObjectURL(final);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `test_export_10s_${new Date().toISOString().slice(0,10)}.mp4`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } else {
+          addLog('Failed to add audio to test video', 'error');
+        }
+      } catch (audioErr) {
+        console.error('Audio muxing error:', audioErr);
+        addLog(`Audio processing failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
+      }
+
+      addLog('Test export complete', 'success');
+      return;
+    } catch (err) {
+      console.error('Test export error:', err);
+      addLog(`Test export failed: ${err instanceof Error ? err.message : err}`, 'error');
+    } finally {
+      isFrameByFrameModeRef.current = false;
+    }
+  };
+
   // Function to get current project state (used for both manual save and autosave)
   const getCurrentProjectState = (): ProjectState => {
     const projectSettings: ProjectSettings = {
