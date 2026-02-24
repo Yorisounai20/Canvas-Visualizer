@@ -27,7 +27,7 @@ export default function TemplatesPanel({
   const [exportName, setExportName] = useState('');
   const [exportSolver, setExportSolver] = useState('orbit');
   const availableSolvers = getAvailableSolvers();
-  const canExport = canExportWorkspace(workspaceObjects);
+  const canExport = canExportWorkspace(workspaceObjects).valid;
   const descriptors = listDescriptors();
 
   const handleExportWorkspace = () => {
@@ -42,18 +42,13 @@ export default function TemplatesPanel({
     }
 
     try {
-      const result = exportWorkspaceAsPreset({
-        workspaceObjects,
-        name: exportName.trim(),
-        solver: exportSolver,
-        metadata: {
-          description: 'Exported from workspace',
-          author: 'User',
-          tags: ['workspace', 'custom']
-        }
+      const result = exportWorkspaceAsPreset(workspaceObjects, {
+        presetName: exportName.trim(),
+        solverName: exportSolver,
+        includeParameters: true
       });
 
-      alert(`Exported preset: ${result.descriptor.name}\nPose: ${result.pose.name}`);
+      alert(`Exported preset: ${result.descriptor.name}\nPose ID: ${result.poseId}`);
       setExportName('');
       console.log('Workspace export successful:', result);
     } catch (error) {

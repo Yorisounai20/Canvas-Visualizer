@@ -186,9 +186,12 @@ export class FrameByFrameExporter {
       
       onProgress?.(90, 'Reading output...');
       
-      // Read the output file
+      // Read the output file (returns Uint8Array)
       const data = await this.ffmpeg.readFile('output.mp4');
-      const videoBlob = new Blob([data], { type: 'video/mp4' });
+      const outputUint8 = data as Uint8Array;
+      // Make a copy to ensure an ArrayBuffer-backed view (avoids SharedArrayBuffer typing)
+      const outputCopy = outputUint8.slice();
+      const videoBlob = new Blob([outputCopy.buffer], { type: 'video/mp4' });
       
       onProgress?.(100, 'Complete!');
       onLog?.('Video export complete!', 'success');

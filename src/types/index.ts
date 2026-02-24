@@ -5,6 +5,7 @@ export interface PoseSnapshot {
   id: string;
   name: string;
   timestamp: string;
+  objectCount?: number;
   objects: {
     objectId: string;
     position: [number, number, number];
@@ -13,7 +14,7 @@ export interface PoseSnapshot {
     visible: boolean;
     material: string;
     color: string;
-    opacity: number;
+    opacity?: number;
   }[];
 }
 
@@ -234,6 +235,39 @@ export interface CameraKeyframe {
   rotation: number;
   easing: EasingFunction;
   cameraId?: string; // Optional: ID of the camera object to use, if not specified uses main camera
+}
+
+// Additional small types referenced across the codebase
+export interface ColorTint {
+  r: number;
+  g: number;
+  b: number;
+  intensity: number;
+}
+
+export interface ParameterEvent {
+  id: string;
+  mode: 'manual' | 'automated';
+  startTime: number;
+  endTime: number;
+  threshold?: number; // for automated
+  audioTrackId?: string;
+  // Parameters control various effects; optional numeric values
+  parameters: {
+    backgroundFlash?: number;
+    cameraShake?: number;
+    vignettePulse?: number;
+    saturationBurst?: number;
+    vignetteStrengthPulseRef?: number;
+    contrastBurst?: number;
+    colorTintFlash?: ColorTint | undefined;
+    [key: string]: any;
+  };
+}
+
+export interface AudioTrack {
+  id: string;
+  name: string;
 }
 
 export interface PresetKeyframe {

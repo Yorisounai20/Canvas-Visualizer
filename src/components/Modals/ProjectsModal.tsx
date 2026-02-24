@@ -24,7 +24,7 @@ export default function ProjectsModal({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   
   // TODO: Get user from auth context when implemented
-  const user = undefined;
+  const user: { id: string } | null = null;
 
   useEffect(() => {
     loadProjects();
@@ -41,7 +41,7 @@ export default function ProjectsModal({
       setLoading(true);
       setError(null);
       // Filter projects by user ID
-      const userId = user?.id;
+      const userId = (user as any)?.id;
       const result = await listProjects(userId);
       setProjects(result);
     } catch (err) {
@@ -59,7 +59,7 @@ export default function ProjectsModal({
 
     try {
       setDeletingId(projectId);
-      const userId = user?.id;
+      const userId = (user as any)?.id;
       await deleteProject(projectId, userId);
       setProjects(projects.filter(p => p.id !== projectId));
     } catch (err) {

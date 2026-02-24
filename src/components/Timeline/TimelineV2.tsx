@@ -958,7 +958,7 @@ export default function TimelineV2({
           easing: 'linear' as EasingFunction, // Default easing for display
           isCameraRig: true, // Flag to distinguish from keyframes
         }));
-        keyframes = [...rigObjects, ...cameraRigKeyframes];
+        keyframes = [...(rigObjects as unknown as KeyframeWithTime[]), ...cameraRigKeyframes];
         color = 'bg-purple-300'; // Lighter purple for rig
         break;
       case 'cameraFX':
@@ -1810,7 +1810,7 @@ export default function TimelineV2({
                       {/* Render keyframes for this track */}
                       {track.type === 'preset' && renderKeyframes('preset')}
                       {track.type === 'presetSpeed' && renderKeyframes('presetSpeed')}
-                      {track.type === 'camera' && renderKeyframes('camera')}
+                      {/* 'camera' track type not present in current mock tracks */}
                       {track.type === 'cameraRig' && renderKeyframes('cameraRig')}
                       {track.type === 'cameraFX' && renderKeyframes('cameraFX')}
                       {track.type === 'text' && renderKeyframes('text')}

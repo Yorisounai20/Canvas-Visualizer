@@ -104,7 +104,7 @@ export function CanvasView({
     rendererRef.current = renderer;
 
     // Create shape pools if material configs are provided
-    let shapePools = { cubes: [], octas: [], tetras: [], toruses: [], planes: [] };
+    let shapePools: { cubes: never[]; octas: never[]; tetras: never[]; toruses: never[]; planes: never[]; } = { cubes: [], octas: [], tetras: [], toruses: [], planes: [] };
     if (cubeMaterial && octahedronMaterial && tetrahedronMaterial && shapeRequirements) {
       shapePools = createShapePools(
         scene,
@@ -112,7 +112,7 @@ export function CanvasView({
         octahedronMaterial,
         tetrahedronMaterial,
         shapeRequirements
-      );
+      ) as { cubes: never[]; octas: never[]; tetras: never[]; toruses: never[]; planes: never[]; };
     }
 
     // Create geometry pools

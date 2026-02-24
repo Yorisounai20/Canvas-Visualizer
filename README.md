@@ -9,23 +9,6 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 ## Features
 
 **Core Capabilities:**
-<<<<<<< HEAD
-- **43+ Animation Presets** - Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, Azure Dragon, and more
-- **Real-time Audio Analysis** - Frequency detection (bass, mids, highs) with audio-reactive animations
-- **Advanced Timeline System** - Keyframe-based animation with smooth transitions and preset speed control
-- **Camera Rig System** - 7 rig types (Orbit, Rotation, Dolly, Pan, Crane, Zoom, Custom)
-- **CameraFX & Effects** - Shake events, handheld drift, FOV ramping, parameter-driven animations
-- **Particle System** - Timeline-based emitters with audio-reactive behavior
-- **Skybox Backgrounds** - Solid color, gradient, images, procedural stars/galaxy/nebula
-- **Material System** - Basic (unlit), Standard PBR, Phong, Lambert with per-shape customization
-- **Text Animation** - Dynamic text with character staggering and animation effects
-- **Letterbox & Overlays** - Animated overlay effects with smooth transitions
-- **Post-Processing** - Vignette, color correction, saturation, contrast, gamma, tint
-- **Frame-by-Frame Export** - Captures individual frames at 30 FPS for high-quality encoding
-- **Professional Video Export** - WebM (VP8/VP9) and MP4 formats, 960×540 to 4K resolution
-- **Project Save/Load** - Neon PostgreSQL with autosave (optional)
-- **Undo/Redo** - Full version history support
-=======
 - 43 animation presets (Orbital Dance, Explosion, Tunnel Rush, Wave Motion, Spiral Galaxy, and many more)
 - Real-time audio frequency analysis (bass, mids, highs)
 - Timeline-based animation with smooth transitions
@@ -35,7 +18,6 @@ A web-based 3D music video creation tool that creates audio-reactive visualizati
 - High-quality video export with resolution-based bitrate scaling (8-20 Mbps)
 - Optimized UI performance with 5 FPS timeline updates for smooth interactions
 - Project save/load with Neon PostgreSQL
->>>>>>> f433b9ec77394781638fc49f404b72e102c52269
 
 ## Quick Start (For Developers)
 
@@ -204,8 +186,6 @@ Additional features and improvements are in active development.
 - ✅ Safari - Full support (user interaction required for audio)
 - ❌ Internet Explorer - Not supported
 
-<<<<<<< HEAD
-=======
 ## Performance
 
 - Target 30 FPS during recording, 60 FPS during playback
@@ -243,7 +223,6 @@ For detailed guides and technical documentation, see the `docs/` directory:
 - **[Database Setup](docs/guides/DATABASE_SETUP.md)** - PostgreSQL configuration
 - **[More Documentation](docs/)** - Additional guides and references
 
->>>>>>> f433b9ec77394781638fc49f404b72e102c52269
 ## License & Info
 
 **License:** MIT  

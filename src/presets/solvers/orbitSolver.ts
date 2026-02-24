@@ -9,6 +9,7 @@
  * Visual output should be IDENTICAL to the original inline implementation.
  */
 
+import * as THREE from 'three';
 import { SolverContext } from '../solverTypes';
 import { getDescriptorBySolver } from '../../lib/descriptorStore';
 
@@ -46,10 +47,14 @@ export function solveOrbit(ctx: SolverContext): void {
   sphere.rotation.y += 0.01 * speed;
   sphere.rotation.z = 0;
   if (colors?.sphere) {
-    sphere.material.color.setStyle(colors.sphere);
+    const _m = (Array.isArray(sphere.material) ? sphere.material[0] : sphere.material) as THREE.MeshStandardMaterial;
+    _m.color?.setStyle?.(colors.sphere as string);
   }
-  sphere.material.opacity = (0.9 + f.bass * 0.1 * audioReact) * blend;
-  sphere.material.wireframe = false;
+  {
+    const _m = (Array.isArray(sphere.material) ? sphere.material[0] : sphere.material) as THREE.MeshStandardMaterial;
+    _m.opacity = (0.9 + f.bass * 0.1 * audioReact) * blend;
+    _m.wireframe = false as any;
+  }
   
   // === PLANETS (8 CUBES) ===
   cubes.forEach((planet, i) => {
@@ -71,10 +76,15 @@ export function solveOrbit(ctx: SolverContext): void {
     planet.rotation.z = 0;
     
     if (colors?.cube) {
-      planet.material.color.setStyle(colors.cube);
+        const _m = (Array.isArray(planet.material) ? planet.material[0] : planet.material) as THREE.MeshStandardMaterial;
+      _m.color?.setStyle?.(colors.cube as string);
+      _m.opacity = (0.8 + f.bass * 0.2 * audioReact) * blend;
+      _m.wireframe = false as any;
+    } else {
+      const _m = (Array.isArray(planet.material) ? planet.material[0] : planet.material) as THREE.MeshStandardMaterial;
+      _m.opacity = (0.8 + f.bass * 0.2 * audioReact) * blend;
+      _m.wireframe = false as any;
     }
-    planet.material.opacity = (0.8 + f.bass * 0.2 * audioReact) * blend;
-    planet.material.wireframe = false;
   });
   
   // === MOONS (FIRST 24 OCTAHEDRONS) ===
@@ -97,10 +107,15 @@ export function solveOrbit(ctx: SolverContext): void {
     moon.rotation.z = 0;
     
     if (colors?.octahedron) {
-      moon.material.color.setStyle(colors.octahedron);
+      const _m = (Array.isArray(moon.material) ? moon.material[0] : moon.material) as THREE.MeshStandardMaterial;
+      _m.color?.setStyle?.(colors.octahedron as string);
+      _m.opacity = (0.6 + f.mids * 0.4 * audioReact) * blend;
+      _m.wireframe = false as any;
+    } else {
+      const _m = (Array.isArray(moon.material) ? moon.material[0] : moon.material) as THREE.MeshStandardMaterial;
+      _m.opacity = (0.6 + f.mids * 0.4 * audioReact) * blend;
+      _m.wireframe = false as any;
     }
-    moon.material.opacity = (0.6 + f.mids * 0.4 * audioReact) * blend;
-    moon.material.wireframe = false;
   });
   
   // === ROGUE OBJECTS (REMAINING 6 OCTAHEDRONS) ===
@@ -122,10 +137,15 @@ export function solveOrbit(ctx: SolverContext): void {
     rogue.rotation.z = 0;
     
     if (colors?.octahedron) {
-      rogue.material.color.setStyle(colors.octahedron);
+      const _m = (Array.isArray(rogue.material) ? rogue.material[0] : rogue.material) as THREE.MeshStandardMaterial;
+      _m.color?.setStyle?.(colors.octahedron as string);
+      _m.opacity = (0.4 + f.mids * 0.2 * audioReact) * blend;
+      _m.wireframe = true as any;
+    } else {
+      const _m = (Array.isArray(rogue.material) ? rogue.material[0] : rogue.material) as THREE.MeshStandardMaterial;
+      _m.opacity = (0.4 + f.mids * 0.2 * audioReact) * blend;
+      _m.wireframe = true as any;
     }
-    rogue.material.opacity = (0.4 + f.mids * 0.2 * audioReact) * blend;
-    rogue.material.wireframe = true;
   });
   
   // === ASTEROID BELT (30 TETRAHEDRONS) ===
@@ -147,10 +167,15 @@ export function solveOrbit(ctx: SolverContext): void {
     asteroid.scale.set(asteroidSize, asteroidSize, asteroidSize);
     
     if (colors?.tetrahedron) {
-      asteroid.material.color.setStyle(colors.tetrahedron);
+      const _m = (Array.isArray(asteroid.material) ? asteroid.material[0] : asteroid.material) as THREE.MeshStandardMaterial;
+      _m.color?.setStyle?.(colors.tetrahedron as string);
+      _m.opacity = (0.5 + f.highs * 0.4 * audioReact) * blend;
+      _m.wireframe = true as any;
+    } else {
+      const _m = (Array.isArray(asteroid.material) ? asteroid.material[0] : asteroid.material) as THREE.MeshStandardMaterial;
+      _m.opacity = (0.5 + f.highs * 0.4 * audioReact) * blend;
+      _m.wireframe = true as any;
     }
-    asteroid.material.opacity = (0.5 + f.highs * 0.4 * audioReact) * blend;
-    asteroid.material.wireframe = true;
   });
   
   // Toruses and planes are not used in this preset

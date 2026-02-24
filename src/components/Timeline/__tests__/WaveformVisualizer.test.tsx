@@ -33,7 +33,7 @@ function createMockAudioBuffer(duration: number, sampleRate: number = 44100): Au
       }
       return data;
     }),
-  } as AudioBuffer;
+  } as unknown as AudioBuffer;
   
   return mockBuffer;
 }

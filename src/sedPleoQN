@@ -1,0 +1,3017 @@
+import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
+import * as THREE from 'three';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
+import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import fixWebmDuration from 'webm-duration-fix';
+import WebMWriter from 'webm-writer';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { Trash2, Plus, Play, Pause, Square, X, ChevronDown } from 'lucide-react';
+import ProjectsModal from './components/Modals/ProjectsModal';
+import NewProjectModal from './components/Modals/NewProjectModal';
+import SettingsModal from './components/Modals/SettingsModal';
+import { saveProject, loadProject, isDatabaseAvailable } from './lib/database';
+import { autosaveService } from './lib/autosaveService';
+import { ProjectSettings, ProjectState, CameraFXClip, CameraFXKeyframe, CameraFXAudioModulation, WorkspaceObject } from './types';
+import { 
+  LogEntry, 
+  AudioTrack, 
+  ParameterEvent,
+  EnvironmentKeyframe,
+  DEFAULT_CAMERA_DISTANCE,
+  DEFAULT_CAMERA_HEIGHT,
+  DEFAULT_CAMERA_ROTATION,
+  KEYFRAME_ONLY_ROTATION_SPEED,
+  WAVEFORM_SAMPLES,
+  WAVEFORM_THROTTLE_MS,
+  FPS_UPDATE_INTERVAL_MS
+} from './components/VisualizerSoftware/types';
+import { 
+  formatTime, 
+  formatTimeInput, 
+  parseTime, 
+  parseTimeInput,
+  applyEasing,
+  animationTypes,
+  generateWaveformData
+} from './components/VisualizerSoftware/utils';
+import { PostFXShader } from './components/VisualizerSoftware/shaders/PostFXShader';
+import { VideoExportModal } from './components/VisualizerSoftware/components';
+import { ParticleEmitter, ParticleSystemManager } from './lib/particleSystem';
+import { createMaterial, createShapePools } from './visualizer/shapeFactory';
+import { 
+  FrameByFrameExporter, 
+  calculateAudioFrequencyAtTime, 
+  captureFrameAsBlob, 
+  createAudioBlob,
+  AudioFrameData
+} from './lib/frameByFrameExport';
+import hammerheadPreset from './presets/hammerhead';
+import orbitPreset from './presets/orbit';
+import explosionPreset from './presets/explosion';
+import tunnelPreset from './presets/tunnel';
+import wavePreset from './presets/wave';
+import spiralPreset from './presets/spiral';
+import chillPreset from './presets/chill';
+import pulsePreset from './presets/pulse';
+import vortexPreset from './presets/vortex';
+import seiryuPreset from './presets/seiryu';
+import cosmicPreset from './presets/cosmic';
+import cityscapePreset from './presets/cityscape';
+import oceanwavesPreset from './presets/oceanwaves';
+import forestPreset from './presets/forest';
+import portalsPreset from './presets/portals';
+import discoballPreset from './presets/discoball';
+import windturbinesPreset from './presets/windturbines';
+import clockworkPreset from './presets/clockwork';
+import neontunnelPreset from './presets/neontunnel';
+import atommodelPreset from './presets/atommodel';
+import carouselPreset from './presets/carousel';
+import solarsystemPreset from './presets/solarsystem';
+import datastreamPreset from './presets/datastream';
+import ferriswheelPreset from './presets/ferriswheel';
+import tornadovortexPreset from './presets/tornadovortex';
+import stadiumPreset from './presets/stadium';
+import kaleidoscope2Preset from './presets/kaleidoscope2';
+import emptyPreset from './presets/empty';
+// PR 4: Solver imports
+import { solveOrbit } from './presets/solvers/orbitSolver';
+import LayoutShell from './visualizer/LayoutShell';
+import TopBar from './visualizer/TopBar';
+import { 
+  AudioTab,
+  ControlsTab, 
+  CameraTab, 
+  PresetsTab, 
+  EffectsTab,
+  PostFXTab,
+  EnvironmentsTab, 
+  CameraFXTab, 
+  CameraRigTab 
+} from './components/Inspector';
+import DebugConsole from './components/Debug/DebugConsole';
+import { PerformanceOverlay } from './components/Performance/PerformanceOverlay';
+import { PerformanceMonitor } from './lib/performanceMonitor';
+import TimelineV2 from './components/Timeline/TimelineV2';
+import { SceneExplorer } from './components/Workspace/SceneExplorer';
+import WorkspaceControls from './components/Workspace/WorkspaceControls';
+import ObjectPropertiesPanel from './components/Workspace/ObjectPropertiesPanel';
+import WorkspaceLeftPanel from './components/Workspace/WorkspaceLeftPanel';
+import WorkspaceRightPanel from './components/Workspace/WorkspaceRightPanel';
+import WorkspaceLayout from './components/Workspace/WorkspaceLayout';
+import ScenePanel from './components/Workspace/ScenePanel';
+import SequencerPanel from './components/Workspace/SequencerPanel';
+import TemplatesPanel from './components/Workspace/TemplatesPanel';
+import AuthoringPanel from './components/Workspace/AuthoringPanel';
+import WorkspaceStatusBar from './components/Workspace/WorkspaceStatusBar';
+import { WorkspaceActions } from './components/Workspace/WorkspaceActions';
+
+// Export video quality constants (optimized for real-time encoding performance)
+// Production quality bitrates (optimized for music video releases)
+const EXPORT_BITRATE_SD = 5000000;      // 5 Mbps for SD (960x540)
+const EXPORT_BITRATE_HD = 8000000;      // 8 Mbps for HD (1280x720)
+const EXPORT_BITRATE_FULLHD = 10000000; // 10 Mbps for 1080p (YouTube quality - PRODUCTION)
+const EXPORT_BITRATE_QHD = 12000000;    // 12 Mbps for 1440p
+const EXPORT_BITRATE_4K = 16000000;     // 16 Mbps for 4K
+const EXPORT_PIXELS_HD = 1280 * 720;
+const EXPORT_PIXELS_FULLHD = 1920 * 1080;
+const EXPORT_PIXELS_QHD = 2560 * 1440;
+const EXPORT_PIXELS_4K = 3840 * 2160;
+const EXPORT_TIMESLICE_MS = 1000;       // Request data every 1 second
+const EXPORT_DATA_REQUEST_INTERVAL_MS = 2000; // Request data every 2 seconds
+
+// Preset fonts available from Three.js examples
+const PRESET_FONTS = [
+  { value: 'helvetiker_regular', label: 'Helvetiker Regular', url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json' },
+  { value: 'helvetiker_bold', label: 'Helvetiker Bold', url: 'https://threejs.org/examples/fonts/helvetiker_bold.typeface.json' },
+  { value: 'optimer_regular', label: 'Optimer Regular', url: 'https://threejs.org/examples/fonts/optimer_regular.typeface.json' },
+  { value: 'optimer_bold', label: 'Optimer Bold', url: 'https://threejs.org/examples/fonts/optimer_bold.typeface.json' },
+  { value: 'gentilis_regular', label: 'Gentilis Regular', url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json' },
+  { value: 'gentilis_bold', label: 'Gentilis Bold', url: 'https://threejs.org/examples/fonts/gentilis_bold.typeface.json' },
+  { value: 'droid_sans_regular', label: 'Droid Sans Regular', url: 'https://threejs.org/examples/fonts/droid/droid_sans_regular.typeface.json' },
+  { value: 'droid_sans_bold', label: 'Droid Sans Bold', url: 'https://threejs.org/examples/fonts/droid/droid_sans_bold.typeface.json' },
+  { value: 'droid_serif_regular', label: 'Droid Serif Regular', url: 'https://threejs.org/examples/fonts/droid/droid_serif_regular.typeface.json' },
+  { value: 'droid_serif_bold', label: 'Droid Serif Bold', url: 'https://threejs.org/examples/fonts/droid/droid_serif_bold.typeface.json' },
+];
+
+interface ThreeDVisualizerProps {
+  onBackToDashboard?: () => void;
+}
+
+export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizerProps = {}) {
+  // Get authenticated user - TODO: Implement when auth is configured
+  const user = undefined;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const composerRef = useRef<EffectComposer | null>(null);
+  const postFXPassRef = useRef<ShaderPass | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+  const idleAnimationRef = useRef<number | null>(null);
+  const orbitControlsRef = useRef<OrbitControls | null>(null);
+  
+  // Frame-by-frame export mode - allows reusing animation loop for frame capture
+  const isFrameByFrameModeRef = useRef(false);
+  const targetFrameTimeRef = useRef(0);
+  const capturedFrameBlobRef = useRef<Blob | null>(null);
+  const lightsRef = useRef<{ ambient: THREE.AmbientLight | null; directional: THREE.DirectionalLight | null }>({ ambient: null, directional: null });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const bufferSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const startTimeRef = useRef(0);
+  const pauseTimeRef = useRef(0);
+  const [audioFileName, setAudioFileName] = useState('');
+  const objectsRef = useRef<{
+    cubes: THREE.Mesh[];
+    octas: THREE.Mesh[];
+    tetras: THREE.Mesh[];
+    toruses: THREE.Mesh[];
+    planes: THREE.Mesh[];
+    sphere: THREE.Mesh;
+  } | null>(null);
+  
+  // Camera Rig Hint objects
+  const rigHintsRef = useRef<{
+    positionMarker: THREE.Mesh | null;
+    targetMarker: THREE.Mesh | null;
+    pathLine: THREE.Line | null;
+    gridHelper: THREE.GridHelper | null;
+    connectionLine: THREE.Line | null;
+  }>({
+    positionMarker: null,
+    targetMarker: null,
+    pathLine: null,
+    gridHelper: null,
+    connectionLine: null
+  });
+  
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [bassColor, setBassColor] = useState('#8a2be2');
+  const [midsColor, setMidsColor] = useState('#40e0d0');
+  const [highsColor, setHighsColor] = useState('#c8b4ff');
+  const [bassGain, setBassGain] = useState(1.0);
+  const [midsGain, setMidsGain] = useState(1.0);
+  const [highsGain, setHighsGain] = useState(1.0);
+  const [showSongName, setShowSongName] = useState(false);
+  const [customSongName, setCustomSongName] = useState('');
+  const [textColor, setTextColor] = useState('#ffffff'); // User-defined text color
+  const [textMaterialType, setTextMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [textWireframe, setTextWireframe] = useState(false);
+  const [textOpacity, setTextOpacity] = useState(0.9);
+  const [textMetalness, setTextMetalness] = useState(0.5);
+  const [textRoughness, setTextRoughness] = useState(0.5);
+  const [selectedPresetFont, setSelectedPresetFont] = useState('helvetiker_regular');
+  const songNameMeshesRef = useRef<THREE.Mesh[]>([]);
+  const fontRef = useRef<any>(null);
+  const [fontLoaded, setFontLoaded] = useState(false);
+  const [errorLog, setErrorLog] = useState<LogEntry[]>([]);
+  const [customFontName, setCustomFontName] = useState('Helvetiker (Default)');
+  const [cameraDistance, setCameraDistance] = useState(DEFAULT_CAMERA_DISTANCE);
+  const [cameraHeight, setCameraHeight] = useState(DEFAULT_CAMERA_HEIGHT);
+  const [cameraRotation, setCameraRotation] = useState(DEFAULT_CAMERA_ROTATION);
+  const [cameraAutoRotate, setCameraAutoRotate] = useState(false);
+  
+  // Camera Rig Visual Hints
+  const [showRigHints, setShowRigHints] = useState(false);
+  const [showRigPosition, setShowRigPosition] = useState(true);
+  const [showRigTarget, setShowRigTarget] = useState(true);
+  const [showRigPath, setShowRigPath] = useState(true);
+  const [showRigGrid, setShowRigGrid] = useState(true);
+  
+  // Camera Rig Path Visualization
+  const [showRigPaths, setShowRigPaths] = useState(true);
+  const [showRigKeyframeMarkers, setShowRigKeyframeMarkers] = useState(true);
+  const rigPathsRef = useRef<Map<string, {
+    pathLine: THREE.Line | null;
+    keyframeMarkers: THREE.Mesh[];
+  }>>(new Map());
+  
+  // NEW: HUD visibility controls
+  const [showPresetDisplay, setShowPresetDisplay] = useState(true);
+  const [showFilename, setShowFilename] = useState(true);
+  const [showBorder, setShowBorder] = useState(true);
+  
+  // NEW: Waveform mode control
+  const [waveformMode, setWaveformMode] = useState<'scrolling' | 'static'>('scrolling');
+  
+  // NEW: Visual effects controls
+  const DEFAULT_MAX_LETTERBOX_HEIGHT = 270; // Default maximum bar height for curtain mode
+  const [letterboxSize, setLetterboxSize] = useState(0); // 0-100 pixels (current animated value)
+  const [showLetterbox, setShowLetterbox] = useState(false);
+  const [useLetterboxAnimation, setUseLetterboxAnimation] = useState(false); // Toggle for animated vs manual mode
+  const [activeLetterboxInvert, setActiveLetterboxInvert] = useState(false); // Current active invert setting from keyframes
+  const [letterboxSettingsExpanded, setLetterboxSettingsExpanded] = useState(false); // Collapsible settings
+  const [maxLetterboxHeight, setMaxLetterboxHeight] = useState(DEFAULT_MAX_LETTERBOX_HEIGHT); // Maximum bar height for curtain mode (affects both top and bottom)
+  const [backgroundColor, setBackgroundColor] = useState('#0a0a14');
+  const [borderColor, setBorderColor] = useState('#9333ea'); // purple-600
+  
+  // View Mode: Editor (all panels visible) or Preview (canvas only)
+  const [viewMode, setViewMode] = useState<'editor' | 'preview'>('editor');
+  
+  // Workspace Mode: Manual 3D object creation and editing
+  const [workspaceMode, setWorkspaceMode] = useState(false);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showAxes, setShowAxes] = useState(false);
+  const [gridSize, setGridSize] = useState(40); // Grid size
+  const [gridDivisions, setGridDivisions] = useState(40); // Grid divisions
+  const [useWorkspaceObjects, setUseWorkspaceObjects] = useState(false); // Toggle between preset shapes and workspace objects
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const lastObjectCreationRef = useRef<{ type: string; time: number } | null>(null);
+  const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
+  
+  // PR 5: Preset Authoring Mode
+  const [presetAuthoringMode, setPresetAuthoringMode] = useState(false);
+  
+  // Performance monitoring (PR 9: Guardrails)
+  const [showPerformanceOverlay, setShowPerformanceOverlay] = useState(false);
+  const perfMonitorRef = useRef<PerformanceMonitor | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false); // Track if typing in input to prevent shortcuts
+  const [authoringPreset, setAuthoringPreset] = useState('orbit');
+  const [mockTime, setMockTime] = useState(0);
+  const [mockAudio, setMockAudio] = useState({ bass: 128, mids: 128, highs: 128 });
+  
+  // NEW: Skybox controls
+  const [skyboxType, setSkyboxType] = useState<'color' | 'gradient' | 'image' | 'stars' | 'galaxy' | 'nebula'>('color');
+  const [skyboxGradientTop, setSkyboxGradientTop] = useState('#1a1a3e');
+  const [skyboxGradientBottom, setSkyboxGradientBottom] = useState('#0a0a14');
+  const [skyboxImageUrl, setSkyboxImageUrl] = useState('');
+  const skyboxMeshRef = useRef<THREE.Mesh | null>(null);
+  const starFieldRef = useRef<THREE.Points | null>(null);
+  const [starCount, setStarCount] = useState(5000);
+  const [starSize, setStarSize] = useState(2.0);
+  const [starColor, setStarColor] = useState('#ffffff');
+  const [galaxyColor, setGalaxyColor] = useState('#8a2be2');
+  const [galaxyColor1, setGalaxyColor1] = useState('#8a2be2');
+  const [galaxyColor2, setGalaxyColor2] = useState('#4169e1');
+  const [galaxyRotationSpeed, setGalaxyRotationSpeed] = useState(0.5);
+  const [nebulaColor1, setNebulaColor1] = useState('#ff1493');
+  const [nebulaColor2, setNebulaColor2] = useState('#4169e1');
+  const [nebulaColor3, setNebulaColor3] = useState('#9370db');
+  const [gradientStart, setGradientStart] = useState('#1a1a3e');
+  const [gradientEnd, setGradientEnd] = useState('#0a0a14');
+  const [ambientLightIntensity, setAmbientLightIntensity] = useState(0.5);
+  const [directionalLightIntensity, setDirectionalLightIntensity] = useState(0.5);
+  
+  // NEW: Material controls for shapes
+  const [cubeWireframe, setCubeWireframe] = useState(true);
+  const [cubeOpacity, setCubeOpacity] = useState(0.6);
+  const [cubeColor, setCubeColor] = useState('#8a2be2');
+  const [cubeMaterialType, setCubeMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [cubeMetalness, setCubeMetalness] = useState(0.5);
+  const [cubeRoughness, setCubeRoughness] = useState(0.5);
+  const [octahedronWireframe, setOctahedronWireframe] = useState(true);
+  const [octahedronOpacity, setOctahedronOpacity] = useState(0.5);
+  const [octahedronColor, setOctahedronColor] = useState('#40e0d0');
+  const [octahedronMaterialType, setOctahedronMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [octahedronMetalness, setOctahedronMetalness] = useState(0.5);
+  const [octahedronRoughness, setOctahedronRoughness] = useState(0.5);
+  const [tetrahedronWireframe, setTetrahedronWireframe] = useState(false);
+  const [tetrahedronOpacity, setTetrahedronOpacity] = useState(0.7);
+  const [tetrahedronColor, setTetrahedronColor] = useState('#c8b4ff');
+  const [tetrahedronMaterialType, setTetrahedronMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [tetrahedronMetalness, setTetrahedronMetalness] = useState(0.5);
+  const [tetrahedronRoughness, setTetrahedronRoughness] = useState(0.5);
+  const [sphereWireframe, setSphereWireframe] = useState(true);
+  const [sphereOpacity, setSphereOpacity] = useState(0.4);
+  const [sphereColor, setSphereColor] = useState('#8a2be2');
+  const [sphereMaterialType, setSphereMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [sphereMetalness, setSphereMetalness] = useState(0.5);
+  const [sphereRoughness, setSphereRoughness] = useState(0.5);
+  
+  // Plane Materials
+  const [planeWireframe, setPlaneWireframe] = useState(false);
+  const [planeOpacity, setPlaneOpacity] = useState(0.7);
+  const [planeColor, setPlaneColor] = useState('#ff6b6b');
+  const [planeMaterialType, setPlaneMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [planeMetalness, setPlaneMetalness] = useState(0.5);
+  const [planeRoughness, setPlaneRoughness] = useState(0.5);
+  
+  // Torus Materials
+  const [torusWireframe, setTorusWireframe] = useState(true);
+  const [torusOpacity, setTorusOpacity] = useState(0.5);
+  const [torusColor, setTorusColor] = useState('#4ecdc4');
+  const [torusMaterialType, setTorusMaterialType] = useState<'basic' | 'standard' | 'phong' | 'lambert'>('basic');
+  const [torusMetalness, setTorusMetalness] = useState(0.5);
+  const [torusRoughness, setTorusRoughness] = useState(0.5);
+  
+  // NEW: Post-FX controls
+  const [blendMode, setBlendMode] = useState<'normal' | 'additive' | 'multiply' | 'screen'>('normal');
+  const [vignetteStrength, setVignetteStrength] = useState(0);
+  const [vignetteSoftness, setVignetteSoftness] = useState(0.5);
+  const [colorSaturation, setColorSaturation] = useState(1.0);
+  const [colorContrast, setColorContrast] = useState(1.0);
+  const [colorGamma, setColorGamma] = useState(1.0);
+  const [colorTintR, setColorTintR] = useState(1.0);
+  const [colorTintG, setColorTintG] = useState(1.0);
+  const [colorTintB, setColorTintB] = useState(1.0);
+  
+  // NEW: Letterbox animation keyframes
+  const [letterboxKeyframes, setLetterboxKeyframes] = useState<Array<{
+    id?: number;         // Unique ID for each keyframe
+    time: number;        // Time in seconds when this keyframe activates
+    targetSize: number;  // Target letterbox size (0-100px)
+    duration: number;    // Duration of the animation in seconds
+    mode: 'instant' | 'smooth'; // Animation mode
+    invert: boolean;     // Per-keyframe invert: true = curtain mode (100=closed, 0=open)
+  }>>([]);
+  const nextLetterboxKeyframeId = useRef(1); // Counter for generating unique IDs
+  // NEW: Camera shake events
+  const [cameraShakes, setCameraShakes] = useState<Array<{time: number, intensity: number, duration: number}>>([]);
+  
+  // NEW: Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  // NEW: Video export state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for speed and reliability
+  const [exportResolution, setExportResolution] = useState('1920x1080'); // Default to 1080p for YouTube
+  const [exportMode, setExportMode] = useState<'live' | 'frame-by-frame'>('live'); // Export mode selection
+  const [exportFramerate, setExportFramerate] = useState(30); // FPS for frame-by-frame export
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
+  // Save/Load project state
+  const [showProjectsModal, setShowProjectsModal] = useState(false);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [currentProjectId, setCurrentProjectId] = useState<string | undefined>(undefined);
+  const [lastAutosaveTime, setLastAutosaveTime] = useState<Date | null>(null);
+  const [isAutosaving, setIsAutosaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [projectName, setProjectName] = useState('Untitled Project');
+  
+  // NEW: Tab state
+  const [activeTab, setActiveTab] = useState('waveforms'); // PHASE 4: Start with waveforms tab
+  
+  // Debug console modal state
+  const [showDebugConsole, setShowDebugConsole] = useState(false);
+  
+  // Tab order for keyboard navigation (matches the order of tab buttons in the UI)
+  const TAB_ORDER = ['waveforms', 'presets', 'controls', 'camera', 'cameraRig', 'camerafx', 'effects', 'environments', 'postfx', 'textAnimator'] as const;
+  
+  // Golden angle constant for natural spiral patterns (used in hourglass preset)
+  const GOLDEN_ANGLE_DEGREES = 137.5;
+  
+  // Default frequency values when no audio is loaded (maintains visual rendering without audio response)
+  const DEFAULT_FREQUENCY_VALUES = { bass: 0, mids: 0, highs: 0 };
+  
+  // Preset transition opacity constants
+  const FULL_OPACITY = 1;
+  const TRANSITION_SPEED = 0.02; // Rate at which blend increases per frame
+  
+  // PHASE 4: Multi-audio track system
+  const [audioTracks, setAudioTracks] = useState<AudioTrack[]>([]);
+  const audioTracksRef = useRef<AudioTrack[]>([]);
+  
+  // PHASE 4: Parameter events for flash effects
+  const [parameterEvents, setParameterEvents] = useState<ParameterEvent[]>([]);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [parameterSettingsExpanded, setParameterSettingsExpanded] = useState(false); // Collapsible settings
+  
+  // Text Animator edit modal
+  const [showTextAnimatorModal, setShowTextAnimatorModal] = useState(false);
+  const [editingTextAnimatorId, setEditingTextAnimatorId] = useState<string | null>(null);
+  
+  // PHASE 4: Active parameter effect values (stored in refs for performance)
+  const activeBackgroundFlashRef = useRef(0);
+  const activeVignettePulseRef = useRef(0);
+  const activeSaturationBurstRef = useRef(0);
+  
+  // PHASE 4 (Enhanced): Active Post-FX parameter values
+  const activeVignetteStrengthPulseRef = useRef(0);
+  const activeContrastBurstRef = useRef(0);
+  const activeColorTintFlashRef = useRef({ r: 0, g: 0, b: 0 });
+  
+  // Environment system (similar to VisualizerEditor)
+  const [environmentKeyframes, setEnvironmentKeyframes] = useState<EnvironmentKeyframe[]>([]);
+  const [showEnvironmentSettings, setShowEnvironmentSettings] = useState(false);
+  const nextEnvironmentKeyframeId = useRef(1);
+  
+  // PHASE 4: Track active automated events
+  const activeAutomatedEventsRef = useRef<Map<string, number>>(new Map()); // eventId -> startTime
+  
+  // Particle system state - using only for template/defaults when creating new keyframes
+  const [particleEmissionRate, setParticleEmissionRate] = useState(50);
+  const [particleLifetime, setParticleLifetime] = useState(2.0);
+  const [particleMaxCount, setParticleMaxCount] = useState(300); // Reduced from 500 for better performance
+  const [particleSpawnX, setParticleSpawnX] = useState(0);
+  const [particleSpawnY, setParticleSpawnY] = useState(0);
+  const [particleSpawnZ, setParticleSpawnZ] = useState(0);
+  const [particleSpawnRadius, setParticleSpawnRadius] = useState(2);
+  const [particleStartColor, setParticleStartColor] = useState('#00ffff');
+  const [particleEndColor, setParticleEndColor] = useState('#0000ff');
+  const [particleStartSize, setParticleStartSize] = useState(0.5);
+  const [particleEndSize, setParticleEndSize] = useState(0.1);
+  const [particleAudioTrack, setParticleAudioTrack] = useState<'bass'|'mids'|'highs'|'all'>('highs');
+  const [particleAudioAffects, setParticleAudioAffects] = useState(['size']);
+  const [particleShape, setParticleShape] = useState<'sphere'|'cube'|'tetrahedron'|'octahedron'>('sphere');
+
+  const particleManagerRef = useRef<ParticleSystemManager | null>(null);
+  
+  // Multi-emitter timeline system
+  const [particleEmitterKeyframes, setParticleEmitterKeyframes] = useState<Array<{
+    id: number;
+    time: number; // start time in seconds
+    duration: number; // how long emitter stays active
+    emissionRate: number;
+    lifetime: number;
+    maxParticles: number;
+    spawnX: number;
+    spawnY: number;
+    spawnZ: number;
+    spawnRadius: number;
+    startColor: string;
+    endColor: string;
+    startSize: number;
+    endSize: number;
+    audioTrack: 'bass' | 'mids' | 'highs' | 'all';
+    shape: 'sphere' | 'cube' | 'tetrahedron' | 'octahedron';
+    enabled: boolean;
+  }>>([]);
+  const nextParticleEmitterKeyframeId = useRef(1);
+  const activeEmitterIds = useRef<Set<number>>(new Set()); // Track which emitters are currently active
+  
+  // NEW: Global camera keyframes (independent from presets)
+  // REMOVED: Camera keyframes (orphaned global camera feature - replaced by Camera Rig)
+  
+  // NEW: Preset switching keyframes (timeline-based) - Enhanced with segments
+  const [presetKeyframes, setPresetKeyframes] = useState<Array<{
+    id: number;
+    time: number; // start time
+    endTime: number; // end time (duration of this preset)
+    preset: string; // animation type (orbit, explosion, chill, etc.)
+    speed: number; // animation speed multiplier (0.1 to 3.0, default 1.0)
+  }>>([
+    { id: 1, time: 0, endTime: 20, preset: 'orbit', speed: 1.0 },
+    { id: 2, time: 20, endTime: 40, preset: 'explosion', speed: 1.0 },
+    { id: 3, time: 40, endTime: 60, preset: 'chill', speed: 1.0 }
+  ]);
+  const nextPresetKeyframeId = useRef(4); // Counter for generating unique IDs
+  const [presetSettingsExpanded, setPresetSettingsExpanded] = useState(false); // Collapsible settings
+  const [presetKeyframesExpanded, setPresetKeyframesExpanded] = useState(true); // Collapsible preset keyframes list
+  const [speedKeyframesExpanded, setSpeedKeyframesExpanded] = useState(true); // Collapsible speed keyframes list
+  
+  // NEW: Speed keyframes for dynamic speed changes within presets
+  const [presetSpeedKeyframes, setPresetSpeedKeyframes] = useState<Array<{
+    id: number;
+    time: number; // time in seconds
+    speed: number; // speed multiplier (0.1 to 3.0)
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
+  }>>([
+    { id: 1, time: 0, speed: 1.0, easing: 'linear' }
+  ]);
+  const nextSpeedKeyframeId = useRef(2); // Counter for generating unique IDs
+  
+  // Legacy sections system (kept for backward compatibility with existing code)
+  const [sections, setSections] = useState([
+    { id: 1, start: 0, end: 20, animation: 'orbit' },
+    { id: 2, start: 20, end: 40, animation: 'explosion' },
+    { id: 3, start: 40, end: 60, animation: 'chill' }
+  ]);
+  const [selectedSectionId, setSelectedSectionId] = useState<number | null>(null);
+  const [textKeyframes, setTextKeyframes] = useState<any[]>([]);
+  const [workspaceObjects, setWorkspaceObjects] = useState<WorkspaceObject[]>([]);
+  
+  // Start with null to prevent canvas disappearing on first preset
+  // (Previously initialized to 'orbit' which caused incorrect blend resets if first preset wasn't orbital)
+  const prevAnimRef = useRef<string | null>(null);
+  const transitionRef = useRef(FULL_OPACITY);
+  
+  // FPS tracking
+  const [fps, setFps] = useState<number>(0);
+  const fpsFrameCount = useRef(0);
+  const fpsLastTime = useRef(0);
+  
+  // Timeline update throttling (reduce from 60 FPS to 5 FPS for better UI performance)
+  // Lower update frequency significantly improves general UI responsiveness
+  const lastTimelineUpdateRef = useRef<number>(0);
+  const TIMELINE_UPDATE_INTERVAL_MS = 200; // 5 FPS (200ms between updates)
+  
+  // Track preset changes for debugging
+  const previousPresetRef = useRef<string>('(none)');
+  
+  // Waveform state
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastWaveformRenderRef = useRef<number>(0);
+  const waveformAnimationFrameRef = useRef<number | null>(null);
+
+  // PHASE 5: Text Animator state - NOW WITH DURATION SUPPORT
+  const [textAnimatorKeyframes, setTextAnimatorKeyframes] = useState<any[]>([]);
+  const [selectedTextKeyframeId, setSelectedTextKeyframeId] = useState<string | null>(null);
+  const textCharacterMeshesRef = useRef<Map<string, THREE.Mesh[]>>(new Map()); // keyframeId -> character meshes
+  
+  // REMOVED: Mask Reveals (orphaned feature)
+  
+  // PHASE 5: Camera Rig state
+  const [cameraRigs, setCameraRigs] = useState<any[]>([]);
+  const [cameraRigKeyframes, setCameraRigKeyframes] = useState<any[]>([]);
+  const [activeCameraRigIds, setActiveCameraRigIds] = useState<string[]>([]);
+  const [selectedRigId, setSelectedRigId] = useState<string | null>(null);
+  const cameraRigNullObjectsRef = useRef<Map<string, THREE.Object3D>>(new Map()); // rigId -> null object
+  
+  // Camera Rig Transitions (UI controls only - transition state for future enhancement)
+  const [rigTransitionDuration, setRigTransitionDuration] = useState(1.0); // seconds
+  const [rigTransitionEasing, setRigTransitionEasing] = useState<'linear' | 'easeIn' | 'easeOut' | 'easeInOut'>('easeInOut');
+  const [enableRigTransitions, setEnableRigTransitions] = useState(true);
+  const [enableSmoothTransitions, setEnableSmoothTransitions] = useState(true); // Alias for enableRigTransitions
+  
+  // Path Visualization
+  const [showPaths, setShowPaths] = useState(false);
+  const [showKeyframeMarkers, setShowKeyframeMarkers] = useState(false);
+  
+  // Framing Controls
+  const [lookAtOffsetX, setLookAtOffsetX] = useState(0); // -10 to 10
+  const [lookAtOffsetY, setLookAtOffsetY] = useState(0); // -10 to 10
+  const [enableFramingLock, setEnableFramingLock] = useState(false);
+  const [enableRuleOfThirds, setEnableRuleOfThirds] = useState(false);
+  const [ruleOfThirdsBias, setRuleOfThirdsBias] = useState(0.3); // 0-1, how strongly to follow rule of thirds
+  
+  // Camera FX Layer (existing camera shake)
+  const [cameraShakeIntensity, setCameraShakeIntensity] = useState(1.0); // multiplier for existing shake
+  const [shakeIntensity, setShakeIntensity] = useState(1.0); // Alias for cameraShakeIntensity
+  const [cameraShakeFrequency, setCameraShakeFrequency] = useState(50); // Hz
+  const [shakeFrequency, setShakeFrequency] = useState(50); // Alias for cameraShakeFrequency
+  const [enableHandheldDrift, setEnableHandheldDrift] = useState(false);
+  const [handheldDriftIntensity, setHandheldDriftIntensity] = useState(0.2);
+  const [enableFovRamping, setEnableFovRamping] = useState(false);
+  const [fovRamping, setFovRamping] = useState(false); // Alias for enableFovRamping
+  const [fovRampAmount, setFovRampAmount] = useState(5); // degrees
+  
+  // Camera FX System (Grid Tiling, Kaleidoscope, PIP)
+  const [cameraFXClips, setCameraFXClips] = useState<CameraFXClip[]>([]);
+  const [selectedFXClipId, setSelectedFXClipId] = useState<string | null>(null);
+  const [cameraFXKeyframes, setCameraFXKeyframes] = useState<CameraFXKeyframe[]>([]);
+  const [cameraFXAudioModulations, setCameraFXAudioModulations] = useState<CameraFXAudioModulation[]>([]);
+  const [showFXOverlays, setShowFXOverlays] = useState(true);
+  
+  // Shot Presets
+  const [selectedShotPreset, setSelectedShotPreset] = useState<string | null>(null);
+  
+  // PHASE 5: UI state for Phase 5 features
+  const [showTextAnimatorPanel, setShowTextAnimatorPanel] = useState(false);
+  const [showMaskPanel, setShowMaskPanel] = useState(false);
+  const [showCameraRigPanel, setShowCameraRigPanel] = useState(false);
+
+  // PHASE 5: Mask system state
+  const [masks, setMasks] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'circle' | 'rectangle' | 'custom';
+    enabled: boolean;
+  }>>([]);
+  const [maskRevealKeyframes, setMaskRevealKeyframes] = useState<Array<{
+    id: string;
+    time: number;
+    maskId: string;
+    animation: 'expand-circle' | 'wipe-left' | 'wipe-right' | 'fade';
+    duration: number;
+  }>>([]);
+
+  // Memoized sorted letterbox keyframes for performance
+  const sortedLetterboxKeyframes = useMemo(() => {
+    return [...letterboxKeyframes].sort((a, b) => a.time - b.time);
+  }, [letterboxKeyframes]);
+
+  const addLog = (message: string, type = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // Function to get current project state (used for both manual save and autosave)
+  const getCurrentProjectState = (): ProjectState => {
+    const projectSettings: ProjectSettings = {
+      name: projectName,
+      resolution: { width: 960, height: 540 },
+      fps: 30,
+      backgroundColor: backgroundColor || '#000000',
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
+    };
+
+    return {
+      settings: projectSettings,
+      sections: [], // Software mode doesn't use sections
+      presetKeyframes: presetKeyframes,
+      textKeyframes: textKeyframes,
+      environmentKeyframes: environmentKeyframes,
+      cameraDistance,
+      cameraHeight,
+      cameraRotation,
+      cameraAutoRotate,
+      ambientLightIntensity,
+      directionalLightIntensity,
+      showBorder,
+      borderColor,
+      showLetterbox,
+      letterboxSize,
+      bassColor,
+      midsColor,
+      highsColor,
+      showSongName,
+      customSongName,
+      manualMode: false,
+      // Post-FX properties
+      blendMode,
+      vignetteStrength,
+      vignetteSoftness,
+      colorSaturation,
+      colorContrast,
+      colorGamma,
+      colorTintR,
+      colorTintG,
+      colorTintB,
+      // Timeline features
+      letterboxKeyframes,
+      cameraShakes,
+      parameterEvents,
+      presetSpeedKeyframes,
+      textAnimatorKeyframes,
+      cameraRigs,
+      cameraRigKeyframes,
+      particleEmitterKeyframes,
+      cameraFXClips,
+      cameraFXKeyframes,
+      maskRevealKeyframes,
+      workspaceObjects,
+      // Workspace mode settings
+      workspaceMode,
+      useWorkspaceObjects,
+      // Shape-specific material properties
+      cubeWireframe,
+      cubeOpacity,
+      cubeColor,
+      cubeMaterialType,
+      cubeMetalness,
+      cubeRoughness,
+      octahedronWireframe,
+      octahedronOpacity,
+      octahedronColor,
+      octahedronMaterialType,
+      octahedronMetalness,
+      octahedronRoughness,
+      tetrahedronWireframe,
+      tetrahedronOpacity,
+      tetrahedronColor,
+      tetrahedronMaterialType,
+      tetrahedronMetalness,
+      tetrahedronRoughness,
+      sphereWireframe,
+      sphereOpacity,
+      sphereColor,
+      sphereMaterialType,
+      sphereMetalness,
+      sphereRoughness,
+      planeWireframe,
+      planeOpacity,
+      planeColor,
+      planeMaterialType,
+      planeMetalness,
+      planeRoughness,
+      torusWireframe,
+      torusOpacity,
+      torusColor,
+      torusMaterialType,
+      torusMetalness,
+      torusRoughness,
+      // Text properties
+      textColor,
+      textMaterialType,
+      textWireframe,
+      textOpacity,
+      textMetalness,
+      textRoughness,
+      // Skybox properties
+      skyboxType,
+      skyboxGradientTop,
+      skyboxGradientBottom,
+      skyboxImageUrl,
+      starCount,
+      galaxyColor,
+      nebulaColor1,
+      nebulaColor2,
+      // Audio gain properties
+      bassGain,
+      midsGain,
+      highsGain,
+      // Particle emitter default settings
+      particleEmissionRate,
+      particleLifetime,
+      particleMaxCount,
+      particleSpawnX,
+      particleSpawnY,
+      particleSpawnZ,
+      particleSpawnRadius,
+      particleStartColor,
+      particleEndColor,
+      particleStartSize,
+      particleEndSize,
+      particleAudioTrack,
+      particleAudioAffects,
+      particleShape
+    };
+  };
+
+  // Save/Load project functionality (Software mode)
+  const handleSaveProject = async () => {
+    if (!isDatabaseAvailable()) {
+      alert('Database is not configured. Please set VITE_DATABASE_URL in your .env file.');
+      addLog('Save failed: Database not configured', 'error');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      addLog('Saving project...', 'info');
+
+      const projectState = getCurrentProjectState();
+
+      // Save to database
+      const userId = user?.id;
+      const savedProject = await saveProject(projectState, currentProjectId, userId);
+      setCurrentProjectId(savedProject.id);
+      
+      addLog(`Project "${projectName}" saved successfully with all timeline features`, 'success');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      addLog('Failed to save project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to save project. Check console for details.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadProject = async (projectId: string) => {
+    try {
+      addLog('Loading project...', 'info');
+      
+      const userId = user?.id;
+      const projectState = await loadProject(projectId, userId);
+      
+      if (!projectState) {
+        addLog('Project not found or you don\'t have permission to access it', 'error');
+        alert('Project not found or you don\'t have permission to access it');
+        return;
+      }
+
+      // Apply loaded state - basic properties
+      setProjectName(projectState.settings.name);
+      setEnvironmentKeyframes(projectState.environmentKeyframes);
+      setPresetKeyframes(projectState.presetKeyframes || []);
+      setTextKeyframes(projectState.textKeyframes || []);
+      setCameraDistance(projectState.cameraDistance);
+      setCameraHeight(projectState.cameraHeight);
+      setCameraRotation(projectState.cameraRotation);
+      setCameraAutoRotate(projectState.cameraAutoRotate);
+      setShowBorder(projectState.showBorder);
+      setBorderColor(projectState.borderColor);
+      setShowLetterbox(projectState.showLetterbox);
+      setLetterboxSize(projectState.letterboxSize);
+      setBassColor(projectState.bassColor);
+      setMidsColor(projectState.midsColor);
+      setHighsColor(projectState.highsColor);
+      setShowSongName(projectState.showSongName);
+      setCustomSongName(projectState.customSongName);
+      setAmbientLightIntensity(projectState.ambientLightIntensity);
+      setDirectionalLightIntensity(projectState.directionalLightIntensity);
+      
+      // Restore Post-FX properties if they exist
+      if (projectState.blendMode !== undefined) setBlendMode(projectState.blendMode);
+      if (projectState.vignetteStrength !== undefined) setVignetteStrength(projectState.vignetteStrength);
+      if (projectState.vignetteSoftness !== undefined) setVignetteSoftness(projectState.vignetteSoftness);
+      if (projectState.colorSaturation !== undefined) setColorSaturation(projectState.colorSaturation);
+      if (projectState.colorContrast !== undefined) setColorContrast(projectState.colorContrast);
+      if (projectState.colorGamma !== undefined) setColorGamma(projectState.colorGamma);
+      if (projectState.colorTintR !== undefined) setColorTintR(projectState.colorTintR);
+      if (projectState.colorTintG !== undefined) setColorTintG(projectState.colorTintG);
+      if (projectState.colorTintB !== undefined) setColorTintB(projectState.colorTintB);
+      
+      // Restore ALL timeline features
+      if (projectState.letterboxKeyframes !== undefined) setLetterboxKeyframes(projectState.letterboxKeyframes);
+      if (projectState.cameraShakes !== undefined) setCameraShakes(projectState.cameraShakes);
+      if (projectState.parameterEvents !== undefined) setParameterEvents(projectState.parameterEvents);
+      if (projectState.presetSpeedKeyframes !== undefined) setPresetSpeedKeyframes(projectState.presetSpeedKeyframes);
+      if (projectState.textAnimatorKeyframes !== undefined) setTextAnimatorKeyframes(projectState.textAnimatorKeyframes);
+      if (projectState.cameraRigs !== undefined) setCameraRigs(projectState.cameraRigs);
+      if (projectState.cameraRigKeyframes !== undefined) setCameraRigKeyframes(projectState.cameraRigKeyframes);
+      if (projectState.particleEmitterKeyframes !== undefined) setParticleEmitterKeyframes(projectState.particleEmitterKeyframes);
+      if (projectState.cameraFXClips !== undefined) setCameraFXClips(projectState.cameraFXClips);
+      if (projectState.cameraFXKeyframes !== undefined) setCameraFXKeyframes(projectState.cameraFXKeyframes);
+      if (projectState.maskRevealKeyframes !== undefined) setMaskRevealKeyframes(projectState.maskRevealKeyframes);
+      if (projectState.workspaceObjects !== undefined) setWorkspaceObjects(projectState.workspaceObjects);
+      
+      // Restore workspace mode settings
+      if (projectState.workspaceMode !== undefined) setWorkspaceMode(projectState.workspaceMode);
+      if (projectState.useWorkspaceObjects !== undefined) setUseWorkspaceObjects(projectState.useWorkspaceObjects);
+      
+      // Restore shape-specific material properties
+      if (projectState.cubeWireframe !== undefined) setCubeWireframe(projectState.cubeWireframe);
+      if (projectState.cubeOpacity !== undefined) setCubeOpacity(projectState.cubeOpacity);
+      if (projectState.cubeColor !== undefined) setCubeColor(projectState.cubeColor);
+      if (projectState.cubeMaterialType !== undefined) setCubeMaterialType(projectState.cubeMaterialType);
+      if (projectState.cubeMetalness !== undefined) setCubeMetalness(projectState.cubeMetalness);
+      if (projectState.cubeRoughness !== undefined) setCubeRoughness(projectState.cubeRoughness);
+      if (projectState.octahedronWireframe !== undefined) setOctahedronWireframe(projectState.octahedronWireframe);
+      if (projectState.octahedronOpacity !== undefined) setOctahedronOpacity(projectState.octahedronOpacity);
+      if (projectState.octahedronColor !== undefined) setOctahedronColor(projectState.octahedronColor);
+      if (projectState.octahedronMaterialType !== undefined) setOctahedronMaterialType(projectState.octahedronMaterialType);
+      if (projectState.octahedronMetalness !== undefined) setOctahedronMetalness(projectState.octahedronMetalness);
+      if (projectState.octahedronRoughness !== undefined) setOctahedronRoughness(projectState.octahedronRoughness);
+      if (projectState.tetrahedronWireframe !== undefined) setTetrahedronWireframe(projectState.tetrahedronWireframe);
+      if (projectState.tetrahedronOpacity !== undefined) setTetrahedronOpacity(projectState.tetrahedronOpacity);
+      if (projectState.tetrahedronColor !== undefined) setTetrahedronColor(projectState.tetrahedronColor);
+      if (projectState.tetrahedronMaterialType !== undefined) setTetrahedronMaterialType(projectState.tetrahedronMaterialType);
+      if (projectState.tetrahedronMetalness !== undefined) setTetrahedronMetalness(projectState.tetrahedronMetalness);
+      if (projectState.tetrahedronRoughness !== undefined) setTetrahedronRoughness(projectState.tetrahedronRoughness);
+      if (projectState.sphereWireframe !== undefined) setSphereWireframe(projectState.sphereWireframe);
+      if (projectState.sphereOpacity !== undefined) setSphereOpacity(projectState.sphereOpacity);
+      if (projectState.sphereColor !== undefined) setSphereColor(projectState.sphereColor);
+      if (projectState.sphereMaterialType !== undefined) setSphereMaterialType(projectState.sphereMaterialType);
+      if (projectState.sphereMetalness !== undefined) setSphereMetalness(projectState.sphereMetalness);
+      if (projectState.sphereRoughness !== undefined) setSphereRoughness(projectState.sphereRoughness);
+      if (projectState.planeWireframe !== undefined) setPlaneWireframe(projectState.planeWireframe);
+      if (projectState.planeOpacity !== undefined) setPlaneOpacity(projectState.planeOpacity);
+      if (projectState.planeColor !== undefined) setPlaneColor(projectState.planeColor);
+      if (projectState.planeMaterialType !== undefined) setPlaneMaterialType(projectState.planeMaterialType);
+      if (projectState.planeMetalness !== undefined) setPlaneMetalness(projectState.planeMetalness);
+      if (projectState.planeRoughness !== undefined) setPlaneRoughness(projectState.planeRoughness);
+      if (projectState.torusWireframe !== undefined) setTorusWireframe(projectState.torusWireframe);
+      if (projectState.torusOpacity !== undefined) setTorusOpacity(projectState.torusOpacity);
+      if (projectState.torusColor !== undefined) setTorusColor(projectState.torusColor);
+      if (projectState.torusMaterialType !== undefined) setTorusMaterialType(projectState.torusMaterialType);
+      if (projectState.torusMetalness !== undefined) setTorusMetalness(projectState.torusMetalness);
+      if (projectState.torusRoughness !== undefined) setTorusRoughness(projectState.torusRoughness);
+      
+      // Restore text properties
+      if (projectState.textColor !== undefined) setTextColor(projectState.textColor);
+      if (projectState.textMaterialType !== undefined) setTextMaterialType(projectState.textMaterialType);
+      if (projectState.textWireframe !== undefined) setTextWireframe(projectState.textWireframe);
+      if (projectState.textOpacity !== undefined) setTextOpacity(projectState.textOpacity);
+      if (projectState.textMetalness !== undefined) setTextMetalness(projectState.textMetalness);
+      if (projectState.textRoughness !== undefined) setTextRoughness(projectState.textRoughness);
+      
+      // Restore skybox properties
+      if (projectState.skyboxType !== undefined) setSkyboxType(projectState.skyboxType);
+      if (projectState.skyboxGradientTop !== undefined) setSkyboxGradientTop(projectState.skyboxGradientTop);
+      if (projectState.skyboxGradientBottom !== undefined) setSkyboxGradientBottom(projectState.skyboxGradientBottom);
+      if (projectState.skyboxImageUrl !== undefined) setSkyboxImageUrl(projectState.skyboxImageUrl);
+      if (projectState.starCount !== undefined) setStarCount(projectState.starCount);
+      if (projectState.galaxyColor !== undefined) setGalaxyColor(projectState.galaxyColor);
+      if (projectState.nebulaColor1 !== undefined) setNebulaColor1(projectState.nebulaColor1);
+      if (projectState.nebulaColor2 !== undefined) setNebulaColor2(projectState.nebulaColor2);
+      
+      // Restore audio gain properties
+      if (projectState.bassGain !== undefined) setBassGain(projectState.bassGain);
+      if (projectState.midsGain !== undefined) setMidsGain(projectState.midsGain);
+      if (projectState.highsGain !== undefined) setHighsGain(projectState.highsGain);
+      
+      // Restore particle emitter default settings
+      if (projectState.particleEmissionRate !== undefined) setParticleEmissionRate(projectState.particleEmissionRate);
+      if (projectState.particleLifetime !== undefined) setParticleLifetime(projectState.particleLifetime);
+      if (projectState.particleMaxCount !== undefined) setParticleMaxCount(projectState.particleMaxCount);
+      if (projectState.particleSpawnX !== undefined) setParticleSpawnX(projectState.particleSpawnX);
+      if (projectState.particleSpawnY !== undefined) setParticleSpawnY(projectState.particleSpawnY);
+      if (projectState.particleSpawnZ !== undefined) setParticleSpawnZ(projectState.particleSpawnZ);
+      if (projectState.particleSpawnRadius !== undefined) setParticleSpawnRadius(projectState.particleSpawnRadius);
+      if (projectState.particleStartColor !== undefined) setParticleStartColor(projectState.particleStartColor);
+      if (projectState.particleEndColor !== undefined) setParticleEndColor(projectState.particleEndColor);
+      if (projectState.particleStartSize !== undefined) setParticleStartSize(projectState.particleStartSize);
+      if (projectState.particleEndSize !== undefined) setParticleEndSize(projectState.particleEndSize);
+      if (projectState.particleAudioTrack !== undefined) setParticleAudioTrack(projectState.particleAudioTrack);
+      if (projectState.particleAudioAffects !== undefined) setParticleAudioAffects(projectState.particleAudioAffects);
+      if (projectState.particleShape !== undefined) setParticleShape(projectState.particleShape);
+      
+      setCurrentProjectId(projectId);
+      setShowProjectsModal(false);
+      
+      // Force update visualization source after a short delay to ensure scene is ready
+      setTimeout(() => {
+        if (projectState.useWorkspaceObjects !== undefined) {
+          console.log('🔄 Force applying visualization source:', projectState.useWorkspaceObjects ? 'workspace' : 'presets');
+          setUseWorkspaceObjects(projectState.useWorkspaceObjects);
+        }
+      }, 100);
+      
+      addLog(`Project "${projectState.settings.name}" loaded successfully with all timeline features`, 'success');
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      addLog('Failed to load project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+      alert('Failed to load project. Check console for details.');
+    }
+  };
+
+  const handleNewProject = () => {
+    // Show the New Project modal
+    setShowNewProjectModal(true);
+  };
+
+  const handleCreateNewProject = (settings: ProjectSettings, audioFile?: File) => {
+    try {
+      addLog('Creating new project...', 'info');
+      
+      // Stop playback
+      if (isPlaying) {
+        if (audioTracks.length > 0) stopMultiTrackAudio();
+        else stopAudio();
+      }
+      
+      // Set project name from settings
+      setProjectName(settings.name);
+      setCurrentProjectId(undefined);
+      
+      // Reset camera settings
+      setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+      setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+      setCameraRotation(DEFAULT_CAMERA_ROTATION);
+      setCameraAutoRotate(false);
+      
+      // Reset colors
+      setBassColor('#8a2be2');
+      setMidsColor('#40e0d0');
+      setHighsColor('#c8b4ff');
+      
+      // Reset visual settings
+      setShowBorder(true);
+      setBorderColor('#9333ea');
+      setShowLetterbox(false);
+      setLetterboxSize(0);
+      setShowSongName(false);
+      setCustomSongName('');
+      setBackgroundColor(settings.backgroundColor || '#0a0a14');
+      
+      // Reset lighting
+      setAmbientLightIntensity(0.5);
+      setDirectionalLightIntensity(0.5);
+      
+      // Reset Post-FX
+      setBlendMode('normal');
+      setVignetteStrength(0);
+      setVignetteSoftness(0.5);
+      setColorSaturation(1.0);
+      setColorContrast(1.0);
+      setColorGamma(1.0);
+      setColorTintR(1.0);
+      setColorTintG(1.0);
+      setColorTintB(1.0);
+      
+      // Reset keyframes and events
+      setEnvironmentKeyframes([]);
+      setPresetKeyframes([]);
+      setLetterboxKeyframes([]);
+      setCameraShakes([]);
+      setParameterEvents([]);
+      
+      // Reset audio (clear all tracks)
+      setAudioTracks([]);
+      audioTracksRef.current = [];
+      setAudioReady(false);
+      setAudioFileName('');
+      setCurrentTime(0);
+      setDuration(0);
+      
+      // Load audio file if provided
+      if (audioFile) {
+        addAudioTrack(audioFile);
+      }
+      
+      // Close the modal
+      setShowNewProjectModal(false);
+      
+      addLog('New project created successfully', 'success');
+    } catch (error) {
+      console.error('Failed to create new project:', error);
+      addLog('Failed to create new project: ' + (error instanceof Error ? error.message : 'Unknown error'), 'error');
+    }
+  };
+
+  const handleWaveformClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const seekPosition = (x / rect.width) * duration;
+    if (audioTracks.length > 0) {
+      seekMultiTrack(seekPosition);
+    } else {
+      seekTo(seekPosition);
+    }
+  };
+
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      const f = e.target.files[0];
+      setAudioFileName(f.name.replace(/\.[^/.]+$/, ''));
+      // Use multi-track system for all audio loading
+      addAudioTrack(f);
+    }
+  };
+
+  const handleExportAndCloseModal = () => {
+    // Don't close modal - keep it open to show progress
+    // Route to appropriate export method based on mode
+    if (exportMode === 'frame-by-frame') {
+      exportVideoFrameByFrame();
+    } else {
+      exportVideo();
+    }
+    // Modal will stay open to display progress bar during export
+  };
+
+  const loadCustomFont = async (file: File) => {
+    try {
+      addLog(`Loading custom font: ${file.name}`, 'info');
+      const text = await file.text();
+      const fontData = JSON.parse(text);
+      const loader = new FontLoader();
+      const font = loader.parse(fontData);
+      fontRef.current = font;
+      setFontLoaded(true);
+      setCustomFontName(file.name);
+      setSelectedPresetFont(''); // Clear preset selection when custom font is loaded
+      addLog(`Custom font "${file.name}" loaded successfully!`, 'success');
+    } catch (e) {
+      const error = e as Error;
+      addLog(`Custom font load error: ${error.message}`, 'error');
+      console.error('Font load error:', e);
+    }
+  };
+
+  const loadPresetFont = useCallback((fontValue: string) => {
+    const presetFont = PRESET_FONTS.find(f => f.value === fontValue);
+    if (!presetFont) return;
+
+    addLog(`Loading preset font: ${presetFont.label}...`, 'info');
+    setFontLoaded(false);
+    
+    const loader = new FontLoader();
+    loader.load(
+      presetFont.url,
+      (font: any) => {
+        fontRef.current = font;
+        setFontLoaded(true);
+        setSelectedPresetFont(fontValue);
+        setCustomFontName(presetFont.label);
+        addLog(`Preset font "${presetFont.label}" loaded successfully!`, 'success');
+      },
+      (progress: any) => {
+        if (progress.total > 0) {
+          const percent = Math.round((progress.loaded / progress.total) * 100);
+          addLog(`Loading ${presetFont.label}: ${percent}%`, 'info');
+        }
+      },
+      (error: Error) => {
+        console.error('Preset font loading error:', error);
+        addLog(`Failed to load ${presetFont.label}`, 'error');
+        setFontLoaded(false);
+      }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - state setters are stable, addLog is non-critical
+
+  useEffect(() => {
+    // Load default preset font on mount
+    loadPresetFont('helvetiker_regular');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Request notification permission for export completion alerts
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Load project from sessionStorage on mount
+  useEffect(() => {
+    const loadInitialProject = async () => {
+      const projectId = sessionStorage.getItem('currentProjectId');
+      if (projectId && isDatabaseAvailable()) {
+        // Clear the sessionStorage to prevent loading on every refresh
+        sessionStorage.removeItem('currentProjectId');
+        
+        try {
+          // Load the project
+          await handleLoadProject(projectId);
+        } catch (error) {
+          console.error('Failed to load project on mount:', error);
+          addLog('Failed to load project automatically. Please try opening it again.', 'error');
+        }
+      }
+    };
+    
+    loadInitialProject();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only on mount
+
+  const toggleSongName = () => {
+    const scene = sceneRef.current;
+    if (!scene) {
+      addLog('Scene not ready!', 'error');
+      return;
+    }
+
+    if (showSongName) {
+      // Clean up existing text meshes
+      songNameMeshesRef.current.forEach(mesh => {
+        scene.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+      });
+      songNameMeshesRef.current = [];
+      setShowSongName(false);
+      addLog('Song name hidden', 'info');
+    } else {
+      if (!fontRef.current) {
+        alert('Font not loaded yet, please wait...');
+        addLog('Font not ready yet!', 'error');
+        return;
+      }
+
+      try {
+        const text = customSongName || audioFileName || 'SONG NAME';
+        addLog(`Creating 3D text: "${text}"`, 'info');
+        const words = text.toUpperCase().split(' ');
+        const meshes: THREE.Mesh[] = [];
+
+        words.forEach((word, wordIndex) => {
+          [...word].forEach((char, charIndex) => {
+            const textGeo = new TextGeometry(char, {
+              font: fontRef.current,
+              size: 1.5,
+              height: 0.3,
+              curveSegments: 8
+            });
+            
+            textGeo.computeBoundingBox();
+            
+            const freqIndex = (wordIndex + charIndex) % 3;
+            
+            // Create material based on selected type
+            let material: THREE.Material;
+            const baseColor = new THREE.Color(textColor);
+            const commonProps = {
+              color: baseColor,
+              wireframe: textWireframe,
+              transparent: true,
+              opacity: textOpacity
+            };
+            
+            switch (textMaterialType) {
+              case 'standard':
+                material = new THREE.MeshStandardMaterial({
+                  ...commonProps,
+                  metalness: textMetalness,
+                  roughness: textRoughness
+                });
+                break;
+              case 'phong':
+                material = new THREE.MeshPhongMaterial({
+                  ...commonProps,
+                  shininess: 30
+                });
+                break;
+              case 'lambert':
+                material = new THREE.MeshLambertMaterial(commonProps);
+                break;
+              case 'basic':
+              default:
+                material = new THREE.MeshBasicMaterial(commonProps);
+            }
+            
+            const mesh = new THREE.Mesh(textGeo, material);
+            
+            const xPos = (charIndex - word.length / 2) * 2 + (wordIndex - words.length / 2) * (word.length * 2 + 3);
+            mesh.position.set(xPos, -6, 5);
+            mesh.userData.baseY = -6;
+            mesh.userData.baseX = xPos;
+            mesh.userData.baseZ = 5;
+            mesh.userData.isText = true;
+            mesh.userData.charIndex = charIndex + wordIndex * 10;
+            mesh.userData.freqIndex = freqIndex;
+            
+            mesh.scale.set(2, 2, 2);
+            
+            scene.add(mesh);
+            meshes.push(mesh);
+          });
+        });
+        
+        songNameMeshesRef.current = meshes;
+        setShowSongName(true);
+        addLog(`Created ${meshes.length} text meshes`, 'success');
+      } catch (e) {
+        const error = e as Error;
+        addLog(`Text creation error: ${error.message}`, 'error');
+      }
+    }
+  };
+
+  // Helper function to recreate text when properties change
+  const recreateSongNameText = () => {
+    const scene = sceneRef.current;
+    if (!scene || !showSongName || !fontRef.current) {
+      return;
+    }
+
+    // Clean up existing meshes
+    songNameMeshesRef.current.forEach(mesh => {
+      scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) mesh.material.dispose();
+    });
+    songNameMeshesRef.current = [];
+
+    try {
+      const text = customSongName || audioFileName || 'SONG NAME';
+      const words = text.toUpperCase().split(' ');
+      const meshes: THREE.Mesh[] = [];
+
+      words.forEach((word, wordIndex) => {
+        [...word].forEach((char, charIndex) => {
+          const textGeo = new TextGeometry(char, {
+            font: fontRef.current,
+            size: 1.5,
+            height: 0.3,
+            curveSegments: 8
+          });
+          
+          textGeo.computeBoundingBox();
+          
+          const freqIndex = (wordIndex + charIndex) % 3;
+          
+          // Create material based on selected type
+          let material: THREE.Material;
+          const baseColor = new THREE.Color(textColor);
+          const commonProps = {
+            color: baseColor,
+            wireframe: textWireframe,
+            transparent: true,
+            opacity: textOpacity
+          };
+          
+          switch (textMaterialType) {
+            case 'standard':
+              material = new THREE.MeshStandardMaterial({
+                ...commonProps,
+                metalness: textMetalness,
+                roughness: textRoughness
+              });
+              break;
+            case 'phong':
+              material = new THREE.MeshPhongMaterial({
+                ...commonProps,
+                shininess: 30
+              });
+              break;
+            case 'lambert':
+              material = new THREE.MeshLambertMaterial(commonProps);
+              break;
+            case 'basic':
+            default:
+              material = new THREE.MeshBasicMaterial(commonProps);
+          }
+          
+          const mesh = new THREE.Mesh(textGeo, material);
+          
+          const xPos = (charIndex - word.length / 2) * 2 + (wordIndex - words.length / 2) * (word.length * 2 + 3);
+          mesh.position.set(xPos, -6, 5);
+          mesh.userData.baseY = -6;
+          mesh.userData.baseX = xPos;
+          mesh.userData.baseZ = 5;
+          mesh.userData.isText = true;
+          mesh.userData.charIndex = charIndex + wordIndex * 10;
+          mesh.userData.freqIndex = freqIndex;
+          
+          mesh.scale.set(2, 2, 2);
+          
+          scene.add(mesh);
+          meshes.push(mesh);
+        });
+      });
+      
+      songNameMeshesRef.current = meshes;
+      addLog(`Recreated ${meshes.length} text meshes with updated properties`, 'info');
+    } catch (e) {
+      const error = e as Error;
+      addLog(`Text recreation error: ${error.message}`, 'error');
+    }
+  };
+
+  // Recreate text when properties change (but only if text is already showing)
+  useEffect(() => {
+    if (showSongName && fontRef.current && sceneRef.current) {
+      recreateSongNameText();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customSongName, textColor, textMaterialType, textWireframe, textOpacity, textMetalness, textRoughness]);
+
+  const getCurrentSection = () => sections.find(s => currentTime >= s.start && currentTime < s.end);
+  
+  // Get current preset from keyframes (finds active preset segment at current time)
+  const getCurrentPreset = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    
+    // Debug: Log keyframes periodically (every 2 seconds of playback)
+    if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+      console.log('🎬 Current time:', t.toFixed(2), 'Keyframes:', sorted.map(kf => `${kf.preset} (${kf.time}-${kf.endTime})`).join(', '));
+    }
+    
+    // Find the preset segment that contains current time
+    for (let i = 0; i < sorted.length; i++) {
+      if (t >= sorted[i].time && t < sorted[i].endTime) {
+        return sorted[i].preset;
+      }
+    }
+    // If after all segments or before first, use the first or last preset
+    if (t < sorted[0]?.time) {
+      return sorted[0]?.preset || 'orbit';
+    }
+    // After all segments, use the last preset
+    return sorted[sorted.length - 1]?.preset || 'orbit';
+  };
+  
+  // Get current preset speed multiplier with keyframe interpolation
+  const getCurrentPresetSpeed = (time?: number) => {
+    const t = time !== undefined ? time : currentTime;
+    // Sort speed keyframes by time
+    const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
+    
+    // If no keyframes or before first keyframe, return first keyframe speed or default
+    if (sorted.length === 0) return 1.0;
+    if (t <= sorted[0].time) return sorted[0].speed;
+    
+    // If after last keyframe, return last keyframe speed
+    if (t >= sorted[sorted.length - 1].time) {
+      return sorted[sorted.length - 1].speed;
+    }
+    
+    // Find the two keyframes we're between
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const kf1 = sorted[i];
+      const kf2 = sorted[i + 1];
+      
+      if (t >= kf1.time && t < kf2.time) {
+        // Interpolate between the two keyframes
+        const tProgress = (t - kf1.time) / (kf2.time - kf1.time);
+        const easedT = applyEasing(tProgress, kf1.easing);
+        return kf1.speed + (kf2.speed - kf1.speed) * easedT;
+      }
+    }
+    
+    // Fallback to last keyframe speed
+    return sorted[sorted.length - 1].speed;
+  };
+
+  const addSection = () => {
+    const last = sections[sections.length-1];
+    const startTime = last ? last.end : 0;
+    const endTime = startTime + 20;
+    setSections([...sections, {
+      id: Date.now(), 
+      start: startTime, 
+      end: endTime, 
+      animation: 'orbit'
+    }]);
+  };
+
+  const deleteSection = (id: number) => setSections(sections.filter(s => s.id !== id));
+  const updateSection = (id: number, f: string, v: any) => setSections(sections.map(s => s.id===id ? {...s,[f]:v} : s));
+  
+  // Section handlers for Timeline
+  const handleSelectSection = (id: number) => setSelectedSectionId(id);
+  const handleUpdateSection = (id: number, field: string, value: any) => updateSection(id, field, value);
+  const handleAddSection = () => {
+    const lastSection = sections[sections.length - 1];
+    const newId = Math.max(...sections.map(s => s.id), 0) + 1;
+    setSections([...sections, {
+      id: newId,
+      start: lastSection ? lastSection.end : 0,
+      end: lastSection ? lastSection.end + 20 : 20,
+      animation: 'orbit'
+    }]);
+  };
+  
+  // Wrapper functions for Timeline keyframe handlers
+  const addPresetKeyframe = (time?: number) => {
+    if (time !== undefined) {
+      const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+      const nextKeyframe = sorted.find(kf => kf.time > time);
+      const defaultEndTime = nextKeyframe ? nextKeyframe.time : time + 20;
+      
+      const newKeyframe = {
+        id: nextPresetKeyframeId.current++,
+        time: time,
+        endTime: Math.max(time + 1, Math.min(defaultEndTime, duration || time + 20)),
+        preset: 'orbit',
+        speed: 1.0
+      };
+      setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    } else {
+      handleAddPresetKeyframe();
+    }
+  };
+  const deletePresetKeyframe = (id: number) => handleDeletePresetKeyframe(id);
+  const updatePresetKeyframe = (id: number, preset: string) => handleUpdatePresetKeyframe(id, 'preset', preset);
+  const movePresetKeyframe = (id: number, newTime: number) => handleUpdatePresetKeyframe(id, 'time', newTime);
+  
+  // REMOVED: Camera keyframe handlers (orphaned global camera feature)
+  
+  const addTextKeyframe = (time?: number) => {
+    const useTime = time !== undefined ? time : currentTime;
+    const newKeyframe = {
+      id: Date.now(),
+      time: useTime,
+      show: true,
+      text: 'Sample Text'
+    };
+    setTextKeyframes([...textKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  const deleteTextKeyframe = (id: number) => {
+    setTextKeyframes(textKeyframes.filter(kf => kf.id !== id));
+  };
+  const updateTextKeyframe = (id: number, show: boolean, text?: string) => {
+    setTextKeyframes(textKeyframes.map(kf =>
+      kf.id === id ? { ...kf, show, ...(text !== undefined && { text }) } : kf
+    ));
+  };
+  const moveTextKeyframe = (id: number, newTime: number) => {
+    setTextKeyframes(textKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const addEnvironmentKeyframe = (time?: number) => {
+    const useTime = time !== undefined ? time : currentTime;
+    handleAddEnvironmentKeyframe();
+    // Update the last added keyframe's time
+    if (time !== undefined) {
+      setEnvironmentKeyframes(prev => {
+        const updated = [...prev];
+        if (updated.length > 0) {
+          updated[updated.length - 1].time = useTime;
+        }
+        return updated.sort((a, b) => a.time - b.time);
+      });
+    }
+  };
+  const deleteEnvironmentKeyframe = (id: number) => handleDeleteEnvironmentKeyframe(id);
+  const updateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) =>
+    handleUpdateEnvironmentKeyframe(id, type, intensity, color);
+  const moveEnvironmentKeyframe = (id: number, newTime: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Preset keyframe handlers
+  const handleAddPresetKeyframe = () => {
+    // Find a good default end time: either 20 seconds from current time, or until next keyframe
+    const sorted = [...presetKeyframes].sort((a, b) => a.time - b.time);
+    const nextKeyframe = sorted.find(kf => kf.time > currentTime);
+    const defaultEndTime = nextKeyframe ? nextKeyframe.time : currentTime + 20;
+    
+    const newKeyframe = {
+      id: nextPresetKeyframeId.current++,
+      time: currentTime,
+      endTime: Math.max(currentTime + 1, Math.min(defaultEndTime, duration || currentTime + 20)), // At least 1 second duration
+      preset: 'orbit', // Default preset
+      speed: 1.0 // Default speed
+    };
+    setPresetKeyframes([...presetKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeletePresetKeyframe = (id: number) => {
+    // Keep at least one keyframe
+    if (presetKeyframes.length > 1) {
+      setPresetKeyframes(presetKeyframes.filter(kf => kf.id !== id));
+    }
+  };
+  
+  const handleUpdatePresetKeyframe = (id: number, field: string, value: any) => {
+    setPresetKeyframes(presetKeyframes.map(kf => {
+      if (kf.id === id) {
+        const updated = { ...kf, [field]: value };
+        // When moving the start time, maintain the segment duration
+        if (field === 'time') {
+          const originalDuration = kf.endTime - kf.time;
+          updated.endTime = value + originalDuration;
+        }
+        // Ensure endTime is always after time
+        if (updated.endTime <= updated.time) {
+          updated.endTime = updated.time + 1;
+        }
+        return updated;
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time)); // Re-sort after time update
+  };
+  
+  // Speed keyframe handlers
+  const handleAddSpeedKeyframe = () => {
+    // Calculate current speed from existing keyframes to use as default
+    const sorted = [...presetSpeedKeyframes].sort((a, b) => a.time - b.time);
+    let defaultSpeed = 1.0;
+    
+    if (sorted.length > 0) {
+      if (currentTime <= sorted[0].time) {
+        defaultSpeed = sorted[0].speed;
+      } else if (currentTime >= sorted[sorted.length - 1].time) {
+        defaultSpeed = sorted[sorted.length - 1].speed;
+      } else {
+        // Find interpolated speed at current time
+        for (let i = 0; i < sorted.length - 1; i++) {
+          const kf1 = sorted[i];
+          const kf2 = sorted[i + 1];
+          if (currentTime >= kf1.time && currentTime < kf2.time) {
+            const t = (currentTime - kf1.time) / (kf2.time - kf1.time);
+            const easedT = applyEasing(t, kf1.easing);
+            defaultSpeed = kf1.speed + (kf2.speed - kf1.speed) * easedT;
+            break;
+          }
+        }
+      }
+    }
+    
+    const newKeyframe = {
+      id: nextSpeedKeyframeId.current++,
+      time: currentTime,
+      speed: defaultSpeed,
+      easing: 'linear' as const
+    };
+    setPresetSpeedKeyframes([...presetSpeedKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeleteSpeedKeyframe = (id: number) => {
+    // Keep at least one keyframe
+    if (presetSpeedKeyframes.length > 1) {
+      setPresetSpeedKeyframes(presetSpeedKeyframes.filter(kf => kf.id !== id));
+    }
+  };
+  
+  const handleUpdateSpeedKeyframe = (id: number, field: 'time' | 'speed' | 'easing', value: number | string) => {
+    setPresetSpeedKeyframes(presetSpeedKeyframes.map(kf => {
+      if (kf.id === id) {
+        // Validate speed values to ensure they stay within valid range
+        if (field === 'speed') {
+          const speedValue = typeof value === 'number' ? value : parseFloat(value);
+          const clampedSpeed = Math.max(0.1, Math.min(3.0, isNaN(speedValue) ? kf.speed : speedValue));
+          return { ...kf, [field]: clampedSpeed };
+        }
+        return { ...kf, [field]: value };
+      }
+      return kf;
+    }).sort((a, b) => a.time - b.time)); // Re-sort after time update
+  };
+  
+  // Letterbox keyframe handlers
+  const handleAddLetterboxKeyframe = () => {
+    const newKeyframe = {
+      id: nextLetterboxKeyframeId.current++,
+      time: currentTime,
+      targetSize: letterboxSize,
+      duration: 1.0,
+      mode: 'smooth' as const,
+      invert: false
+    };
+    setLetterboxKeyframes([...letterboxKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+  
+  const handleDeleteLetterboxKeyframe = (id: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.filter(kf => kf.id !== id));
+  };
+  
+  const handleUpdateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Move handlers for all keyframe types (for timeline dragging)
+  const moveSpeedKeyframe = (id: number, newTime: number) => {
+    handleUpdateSpeedKeyframe(id, 'time', newTime);
+  };
+  
+  const moveLetterboxKeyframe = (id: number, newTime: number) => {
+    setLetterboxKeyframes(letterboxKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Update handler for letterbox keyframe fields (including duration) - legacy alias
+  const updateLetterboxKeyframe = (id: number, field: string, value: number | boolean | string) => {
+    handleUpdateLetterboxKeyframe(id, field, value);
+  };
+  
+  const moveTextAnimatorKeyframe = (id: string, newTime: number) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Update handler for text animator fields - supports both field-based and object-based updates
+  const updateTextAnimatorKeyframe = (id: string, fieldOrUpdate: string | Partial<TextAnimatorKeyframe>, value?: any) => {
+    setTextAnimatorKeyframes(textAnimatorKeyframes.map(kf => {
+      if (kf.id !== id) return kf;
+      
+      // If fieldOrUpdate is a string, it's the old field-based API
+      if (typeof fieldOrUpdate === 'string') {
+        return { ...kf, [fieldOrUpdate]: value };
+      }
+      
+      // Otherwise it's the new object-based API
+      return { ...kf, ...fieldOrUpdate };
+    }).sort((a, b) => a.time - b.time));
+  };
+  
+  // REMOVED: Mask reveal handler (orphaned feature)
+  
+  const moveCameraRigKeyframe = (id: string, newTime: number) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  // Move a Camera Rig (preserves duration)
+  const moveCameraRig = (id: string, newStartTime: number, newEndTime: number) => {
+    setCameraRigs(prev => prev.map(rig =>
+      rig.id === id ? { ...rig, startTime: newStartTime, endTime: newEndTime } : rig
+    ));
+    addLog(`Moved camera rig to ${newStartTime.toFixed(2)}s - ${newEndTime.toFixed(2)}s`, 'info');
+  };
+  
+  const updateCameraRigKeyframeField = (id: string, field: string, value: any) => {
+    setCameraRigKeyframes(cameraRigKeyframes.map(kf =>
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ));
+  };
+  
+  const moveCameraFXKeyframe = (id: string, newTime: number) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParticleEmitterKeyframe = (id: number, newTime: number) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.map(kf =>
+      kf.id === id ? { ...kf, time: newTime } : kf
+    ).sort((a, b) => a.time - b.time));
+  };
+  
+  const moveParameterEvent = (id: string, newTime: number) => {
+    // Note: ParameterEvent uses 'startTime' field, not 'time'
+    setParameterEvents(parameterEvents.map(event =>
+      event.id === id ? { ...event, startTime: newTime } : event
+    ).sort((a, b) => a.startTime - b.startTime));
+  };
+
+  const resetCamera = () => {
+    setCameraDistance(DEFAULT_CAMERA_DISTANCE);
+    setCameraHeight(DEFAULT_CAMERA_HEIGHT);
+    // Rotation is now keyframe-only, don't reset it here
+  };
+
+  // REMOVED: Global keyframe management (orphaned camera feature)
+
+  // Camera shake event management
+  const addCameraShake = () => {
+    const newTime = currentTime > 0 ? currentTime : 0;
+    setCameraShakes([...cameraShakes, { time: newTime, intensity: 5, duration: 0.2 }].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteCameraShake = (index) => {
+    setCameraShakes(cameraShakes.filter((_, i) => i !== index));
+  };
+
+  const updateCameraShake = (index, field, value) => {
+    setCameraShakes(cameraShakes.map((shake, i) => 
+      i === index ? { ...shake, [field]: value } : shake
+    ));
+  };
+
+  // Particle emitter keyframe management
+  const addParticleEmitterKeyframe = () => {
+    const newKeyframe = {
+      id: nextParticleEmitterKeyframeId.current++,
+      time: currentTime > 0 ? currentTime : 0,
+      duration: 5.0, // 5 second default duration
+      emissionRate: particleEmissionRate,
+      lifetime: particleLifetime,
+      maxParticles: particleMaxCount,
+      spawnX: particleSpawnX,
+      spawnY: particleSpawnY,
+      spawnZ: particleSpawnZ,
+      spawnRadius: particleSpawnRadius,
+      startColor: particleStartColor,
+      endColor: particleEndColor,
+      startSize: particleStartSize,
+      endSize: particleEndSize,
+      audioTrack: particleAudioTrack,
+      shape: particleShape,
+      enabled: true
+    };
+    setParticleEmitterKeyframes([...particleEmitterKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+  };
+
+  const deleteParticleEmitterKeyframe = (id: number) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.filter(kf => kf.id !== id));
+  };
+
+  const updateParticleEmitterKeyframe = (id: number, field: string, value: any) => {
+    setParticleEmitterKeyframes(particleEmitterKeyframes.map(kf => 
+      kf.id === id ? { ...kf, [field]: value } : kf
+    ));
+  };
+
+  const initAudio = async (file) => {
+    try {
+      addLog(`Loading audio: ${file.name}`, 'info');
+      if (audioContextRef.current) audioContextRef.current.close();
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+      audioBufferRef.current = buf;
+      audioContextRef.current = ctx;
+      analyserRef.current = analyser;
+      setDuration(buf.duration);
+      setAudioReady(true);
+      
+      // Generate waveform data
+      const waveform = generateWaveformData(buf);
+      setWaveformData(waveform);
+      
+      addLog('Audio loaded successfully!', 'success');
+    } catch (e) { 
+      console.error(e);
+      const error = e as Error;
+      addLog(`Audio load error: ${error.message}`, 'error');
+    }
+  };
+
+  const playAudio = () => {
+    console.log('🎵 playAudio() called');
+    if (!audioContextRef.current || !audioBufferRef.current || !analyserRef.current) {
+      console.log('❌ playAudio: Missing audio context, buffer, or analyser');
+      return;
+    }
+    
+    // Stop and clean up any existing audio source to prevent duplicates
+    if (bufferSourceRef.current) {
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
+      bufferSourceRef.current = null;
+    }
+    
+    const src = audioContextRef.current.createBufferSource();
+    src.buffer = audioBufferRef.current;
+    src.connect(analyserRef.current);
+    analyserRef.current.connect(audioContextRef.current.destination);
+    
+    // Add onended handler to stop playback when audio finishes
+    src.onended = () => {
+      if (bufferSourceRef.current === src) {
+        bufferSourceRef.current = null;
+        pauseTimeRef.current = 0; // Reset to beginning
+        setCurrentTime(0);
+        setIsPlaying(false);
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+          animationRef.current = null;
+        }
+      }
+    };
+    
+    src.start(0, pauseTimeRef.current);
+    bufferSourceRef.current = src;
+    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+    console.log('✅ playAudio: Setting isPlaying to true');
+    setIsPlaying(true);
+  };
+
+  const stopAudio = () => {
+    if (bufferSourceRef.current) {
+      pauseTimeRef.current = currentTime;
+      try {
+        bufferSourceRef.current.stop();
+      } catch (e) {
+        // Source may already be stopped, ignore error
+      }
+      bufferSourceRef.current = null;
+    }
+    if (animationRef.current) {
+      cancelAnimationFrame(animationRef.current);
+      animationRef.current = null;
+    }
+    setIsPlaying(false);
+  };
+
+  const seekTo = (t: number) => {
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop audio to prevent duplicates
+    if (wasPlaying) {
+      stopAudio();
+    }
+    
+    // Set new position
+    pauseTimeRef.current = t;
+    setCurrentTime(t);
+    
+    // Restart if it was playing, using microtask to ensure cleanup completes
+    if (wasPlaying) {
+      Promise.resolve().then(() => {
+        playAudio();
+      });
+    }
+  };
+
+  // PHASE 4: Multi-track audio functions
+  const addAudioTrack = async (file: File) => {
+    try {
+      addLog(`Loading audio track: ${file.name}`, 'info');
+      
+      // Initialize AudioContext if not exists
+      if (!audioContextRef.current) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = ctx;
+      }
+      
+      const ctx = audioContextRef.current;
+      const buffer = await ctx.decodeAudioData(await file.arrayBuffer());
+      
+      // Create audio nodes for this track
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      
+      const gainNode = ctx.createGain();
+      gainNode.gain.value = 1.0; // Default volume at 100%
+      
+      const trackId = `track-${Date.now()}-${Math.random()}`;
+      const newTrack: AudioTrack = {
+        id: trackId,
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        buffer: buffer,
+        source: null,
+        analyser: analyser,
+        gainNode: gainNode,
+        volume: 1.0,
+        muted: false,
+        active: audioTracks.length === 0 // First track is active by default
+      };
+      
+      const updatedTracks = [...audioTracks, newTrack];
+      setAudioTracks(updatedTracks);
+      audioTracksRef.current = updatedTracks;
+      
+      // Set duration from the first track or the longest track
+      if (audioTracks.length === 0) {
+        setDuration(buffer.duration);
+        setAudioReady(true);
+        // For backward compatibility, set the first track to the old refs
+        audioBufferRef.current = buffer;
+        analyserRef.current = analyser;
+        // Generate waveform data for the main waveform display
+        const waveform = generateWaveformData(buffer);
+        setWaveformData(waveform);
+      } else {
+        setDuration(Math.max(duration, buffer.duration));
+      }
+      
+      addLog(`Track "${newTrack.name}" loaded successfully!`, 'success');
+    } catch (e) {
+      console.error(e);
+      const error = e as Error;
+      addLog(`Track load error: ${error.message}`, 'error');
+    }
+  };
+
+  const removeAudioTrack = (trackId: string) => {
+    const track = audioTracks.find(t => t.id === trackId);
+    if (track?.source) {
+      track.source.stop();
+      track.source.disconnect();
+    }
+    
+    let updatedTracks = audioTracks.filter(t => t.id !== trackId);
+    
+    // If we removed the active track, make the first remaining track active
+    if (track?.active && updatedTracks.length > 0) {
+      updatedTracks = updatedTracks.map((t, i) => ({
+        ...t,
+        active: i === 0
+      }));
+    }
+    
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // Update refs for backward compatibility
+    if (updatedTracks.length > 0) {
+      const activeTrack = updatedTracks.find(t => t.active) || updatedTracks[0];
+      audioBufferRef.current = activeTrack.buffer;
+      analyserRef.current = activeTrack.analyser;
+    } else {
+      audioBufferRef.current = null;
+      analyserRef.current = null;
+      setAudioReady(false);
+    }
+    
+    addLog(`Track removed`, 'info');
+  };
+
+  const updateTrackVolume = (trackId: string, volume: number) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        track.gainNode.gain.value = track.muted ? 0 : volume;
+        return { ...track, volume };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const toggleTrackMute = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => {
+      if (track.id === trackId) {
+        const newMuted = !track.muted;
+        track.gainNode.gain.value = newMuted ? 0 : track.volume;
+        return { ...track, muted: newMuted };
+      }
+      return track;
+    });
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+  };
+
+  const setActiveTrack = (trackId: string) => {
+    const updatedTracks = audioTracks.map(track => ({
+      ...track,
+      active: track.id === trackId
+    }));
+    setAudioTracks(updatedTracks);
+    audioTracksRef.current = updatedTracks;
+    
+    // Update refs for visualization
+    const activeTrack = updatedTracks.find(t => t.active);
+    if (activeTrack) {
+      analyserRef.current = activeTrack.analyser;
+      audioBufferRef.current = activeTrack.buffer;
+    }
+  };
+
+  const playMultiTrackAudio = () => {
+    if (!audioContextRef.current) return;
+    
+    // Use ref to get current tracks
+    const tracks = audioTracksRef.current;
+    if (tracks.length === 0) return;
+    
+    const ctx = audioContextRef.current;
+    const startOffset = pauseTimeRef.current;
+    
+    // Track which sources have ended using a Set to avoid race conditions
+    const endedSources = new Set<AudioBufferSourceNode>();
+    const totalTracks = tracks.filter(t => t.buffer).length;
+    
+    // Start all tracks synchronized
+    tracks.forEach(track => {
+      if (!track.buffer) return;
+      
+      // Stop existing source if any to prevent duplicates
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors from already stopped sources
+        }
+        track.source = null;
+      }
+      
+      // Create new source
+      const source = ctx.createBufferSource();
+      source.buffer = track.buffer;
+      
+      // Connect: source -> gain -> analyser -> destination
+      source.connect(track.gainNode);
+      track.gainNode.connect(track.analyser);
+      track.analyser.connect(ctx.destination);
+      
+      // Set gain based on mute state
+      track.gainNode.gain.value = track.muted ? 0 : track.volume;
+      
+      // Add onended handler - stop playback when all tracks finish
+      source.onended = () => {
+        endedSources.add(source);
+        // When all tracks have ended, stop playback
+        if (endedSources.size >= totalTracks) {
+          pauseTimeRef.current = 0; // Reset to beginning
+          setCurrentTime(0);
+          setIsPlaying(false);
+          if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+          }
+        }
+      };
+      
+      // Start playback
+      source.start(0, startOffset);
+      track.source = source;
+    });
+    
+    startTimeRef.current = Date.now() - (startOffset * 1000);
+    setIsPlaying(true);
+  };
+
+  const stopMultiTrackAudio = () => {
+    // Use ref to get current tracks with their sources
+    const tracks = audioTracksRef.current;
+    tracks.forEach(track => {
+      if (track.source) {
+        try {
+          track.source.stop();
+          track.source.disconnect();
+        } catch (e) {
+          // Ignore errors from already stopped sources
+        }
+        track.source = null;
+      }
+    });
+    
+    pauseTimeRef.current = currentTime;
+    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    setIsPlaying(false);
+  };
+
+  const seekMultiTrack = (t: number) => {
+    // Save playing state before stopping
+    const wasPlaying = isPlaying;
+    
+    // Stop all tracks to prevent duplicates
+    if (wasPlaying) {
+      stopMultiTrackAudio();
+    }
+    
+    // Set new position
+    pauseTimeRef.current = t;
+    setCurrentTime(t);
+    
+    // Restart if it was playing
+    if (wasPlaying) {
+      // Need to use a microtask to ensure state updates have propagated
+      Promise.resolve().then(() => {
+        playMultiTrackAudio();
+      });
+    }
+  };
+
+  // PHASE 4: Parameter event functions
+  const addParameterEvent = () => {
+    const start = currentTime > 0 ? currentTime : 0;
+    const newEvent: ParameterEvent = {
+      id: `event-${Date.now()}-${Math.random()}`,
+      startTime: start,
+      endTime: start + 0.2, // Default 200ms duration
+      mode: 'manual', // Default to manual mode
+      audioTrackId: audioTracks.length > 0 ? audioTracks.find(t => t.active)?.id : undefined,
+      threshold: 0.5, // Default threshold for automated mode
+      parameters: {
+        backgroundFlash: 0.5,
+        cameraShake: 0,
+        vignettePulse: 0,
+        saturationBurst: 0
+      }
+    };
+    setParameterEvents([...parameterEvents, newEvent].sort((a, b) => a.startTime - b.startTime));
+    setEditingEventId(newEvent.id);
+    setShowEventModal(true);
+  };
+
+  const updateParameterEvent = (eventId: string, updates: Partial<ParameterEvent>) => {
+    setParameterEvents(parameterEvents.map(event => 
+      event.id === eventId ? { ...event, ...updates } : event
+    ).sort((a, b) => a.startTime - b.startTime));
+  };
+
+  const deleteParameterEvent = (eventId: string) => {
+    setParameterEvents(parameterEvents.filter(e => e.id !== eventId));
+    if (editingEventId === eventId) {
+      setShowEventModal(false);
+      setEditingEventId(null);
+    }
+  };
+
+  // Environment keyframe handlers (similar to VisualizerEditor)
+  const handleAddEnvironmentKeyframe = () => {
+    const time = currentTime;
+    const newKeyframe: EnvironmentKeyframe = {
+      id: nextEnvironmentKeyframeId.current++,
+      time,
+      type: 'ocean',
+      intensity: 0.5
+    };
+    setEnvironmentKeyframes([...environmentKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added environment keyframe at ${formatTime(time)}`, 'success');
+  };
+
+  const handleDeleteEnvironmentKeyframe = (id: number) => {
+    setEnvironmentKeyframes(environmentKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted environment keyframe', 'info');
+  };
+
+  const handleUpdateEnvironmentKeyframe = (id: number, type: string, intensity: number, color?: string) => {
+    setEnvironmentKeyframes(environmentKeyframes.map(kf => 
+      kf.id === id ? { ...kf, type: type as EnvironmentKeyframe['type'], intensity, color } : kf
+    ));
+    addLog('Updated environment keyframe', 'success');
+  };
+
+  // Camera FX handlers
+  const addCameraFXClip = (type: 'grid' | 'kaleidoscope' | 'pip') => {
+    const startTime = currentTime;
+    const newClip: CameraFXClip = {
+      id: `fx-${Date.now()}`,
+      name: `${type} FX`,
+      type,
+      startTime: parseFloat(startTime.toFixed(2)),
+      endTime: parseFloat((startTime + 5).toFixed(2)),
+      enabled: true,
+      ...(type === 'grid' && { gridRows: 2, gridColumns: 2 }),
+      ...(type === 'kaleidoscope' && { kaleidoscopeSegments: 6, kaleidoscopeRotation: 0 }),
+      ...(type === 'pip' && { pipScale: 0.25, pipPositionX: 0.65, pipPositionY: 0.65, pipBorderWidth: 2, pipBorderColor: '#ffffff' })
+    };
+    setCameraFXClips([...cameraFXClips, newClip].sort((a, b) => a.startTime - b.startTime));
+    setSelectedFXClipId(newClip.id);
+    addLog(`Added ${type} FX clip at ${formatTime(startTime)}`, 'success');
+  };
+
+  const updateCameraFXClip = (id: string, updates: Partial<CameraFXClip>) => {
+    setCameraFXClips(cameraFXClips.map(clip => 
+      clip.id === id ? { ...clip, ...updates } : clip
+    ));
+  };
+
+  const deleteCameraFXClip = (id: string) => {
+    setCameraFXClips(cameraFXClips.filter(clip => clip.id !== id));
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.clipId !== id));
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.clipId !== id));
+    if (selectedFXClipId === id) setSelectedFXClipId(null);
+    addLog('Deleted Camera FX clip', 'info');
+  };
+
+  const addCameraFXKeyframe = (clipId: string, parameter: string, value: number) => {
+    const time = currentTime;
+    const newKeyframe: CameraFXKeyframe = {
+      id: `kf-${Date.now()}`,
+      clipId,
+      time: parseFloat(time.toFixed(2)),
+      parameter,
+      value,
+      easing: 'linear'
+    };
+    setCameraFXKeyframes([...cameraFXKeyframes, newKeyframe].sort((a, b) => a.time - b.time));
+    addLog(`Added keyframe for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXKeyframe = (id: string, updates: Partial<CameraFXKeyframe>) => {
+    setCameraFXKeyframes(cameraFXKeyframes.map(kf => 
+      kf.id === id ? { ...kf, ...updates } : kf
+    ));
+  };
+
+  const deleteCameraFXKeyframe = (id: string) => {
+    setCameraFXKeyframes(cameraFXKeyframes.filter(kf => kf.id !== id));
+    addLog('Deleted Camera FX keyframe', 'info');
+  };
+
+  const addCameraFXAudioModulation = (clipId: string, parameter: string, audioTrack: 'bass' | 'mids' | 'highs', amount: number) => {
+    const newModulation: CameraFXAudioModulation = {
+      id: `mod-${Date.now()}`,
+      clipId,
+      parameter,
+      audioTrack,
+      amount
+    };
+    setCameraFXAudioModulations([...cameraFXAudioModulations, newModulation]);
+    addLog(`Added audio modulation for ${parameter}`, 'success');
+  };
+
+  const updateCameraFXAudioModulation = (id: string, updates: Partial<CameraFXAudioModulation>) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.map(mod => 
+      mod.id === id ? { ...mod, ...updates } : mod
+    ));
+  };
+
+  const deleteCameraFXAudioModulation = (id: string) => {
+    setCameraFXAudioModulations(cameraFXAudioModulations.filter(mod => mod.id !== id));
+    addLog('Deleted audio modulation', 'info');
+  };
+
+  // NEW: Recording functions
+  const startRecording = () => {
+    if (!rendererRef.current || !audioContextRef.current || !analyserRef.current) {
+      addLog('Cannot record: scene or audio not ready', 'error');
+      return;
+    }
+    // Recording logic would go here if needed
+    addLog('Recording feature not fully implemented', 'info');
+  };
+
+  // NEW: Automated video export functions
+  const exportVideo = async () => {
+    if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
+      addLog('Cannot export: scene or audio not ready', 'error');
+      return;
+    }
+
+    if (!audioReady) {
+      addLog('Please load an audio file first', 'error');
+      return;
+    }
+
+    try {
+      // MODE SWITCHING DISABLED - Export in current mode for reliability
+      // (Mode switching can cause animation loop issues during export)
+      
+      setIsExporting(true);
+      setExportProgress(0);
+      addLog('Starting automated video export...', 'info');
+
+      // Request wake lock to prevent screen sleep during long exports (8+ minutes)
+      let wakeLock: any = null;
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+          addLog('Screen wake lock active - display will stay on during export', 'info');
+        } catch (e) {
+          // Wake lock failed, but continue anyway
+          console.log('Wake lock not available or denied:', e);
+        }
+      }
+
+      // Get audio duration and update state to prevent animation loop issues
+      const duration = audioBufferRef.current.duration;
+      
+      // IMPORTANT: Check if duration is valid
+      if (!duration || duration <= 0) {
+        addLog('Export failed: Audio duration is invalid or zero', 'error');
+        setIsExporting(false);
+        setExportProgress(0);
+        return;
+      }
+      
+      addLog(`Audio duration: ${duration.toFixed(2)} seconds`, 'info');
+      setDuration(duration);
+      
+      // Parse export resolution
+      const [exportWidth, exportHeight] = exportResolution.split('x').map(Number);
+      
+      // Store original canvas size
+      const originalWidth = 960;
+      const originalHeight = 540;
+      
+      // Temporarily resize renderer to export resolution
+      rendererRef.current.setSize(exportWidth, exportHeight);
+      if (cameraRef.current) {
+        cameraRef.current.aspect = exportWidth / exportHeight;
+        cameraRef.current.updateProjectionMatrix();
+      }
+      addLog(`Rendering at ${exportResolution} for export`, 'info');
+
+      // FIX: Create a SEPARATE gain node to split the audio signal properly
+      // This prevents the analyser connection conflict that was causing the 8-second freeze
+      const exportGainNode = audioContextRef.current.createGain();
+      exportGainNode.gain.value = 1.0;
+      
+      // Create audio destination for recording (separate from analyser)
+      const audioDestination = audioContextRef.current.createMediaStreamDestination();
+      
+      // Connect: source → exportGain → audioDestination (for recording)
+      // The analyser will be connected separately from the buffer source below
+      exportGainNode.connect(audioDestination);
+      
+      // Set up video stream
+      const canvasStream = rendererRef.current.domElement.captureStream(30);
+      const audioStream = audioDestination.stream;
+      
+      // DIAGNOSTIC: Log video track state
+      const videoTrack = canvasStream.getVideoTracks()[0];
+      console.log('=== VIDEO EXPORT DIAGNOSTICS ===');
+      console.log('Canvas stream ID:', canvasStream.id);
+      console.log('Video tracks:', canvasStream.getVideoTracks().length);
+      console.log('Audio tracks:', audioStream.getAudioTracks().length);
+      console.log('Video track readyState:', videoTrack?.readyState);
+      console.log('Video track enabled:', videoTrack?.enabled);
+      console.log('Video track settings:', videoTrack?.getSettings());
+      addLog(`Video track state: ${videoTrack?.readyState}`, 'info');
+      
+      // Monitor video track throughout export
+      if (videoTrack) {
+        videoTrack.addEventListener('ended', () => {
+          console.error('❌ VIDEO TRACK ENDED UNEXPECTEDLY!');
+          addLog('ERROR: Video track ended unexpectedly', 'error');
+        });
+        videoTrack.addEventListener('mute', () => {
+          console.warn('⚠️ VIDEO TRACK MUTED!');
+          addLog('Warning: Video track muted', 'error');
+        });
+      }
+      
+      const combinedStream = new MediaStream([
+        ...canvasStream.getVideoTracks(),
+        ...audioStream.getAudioTracks()
+      ]);
+      
+      // Production codec selection: VP8 default for reliability, VP9 optional for quality
+      let mimeType = 'video/webm;codecs=vp8,opus'; // Default to VP8 (faster, reliable)
+      let extension = 'webm';
+      
+      // Allow VP9 if user explicitly selected it
+      if (exportFormat === 'webm-vp9') {
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
+          mimeType = 'video/webm;codecs=vp9,opus';
+          addLog('Using VP9 codec (slower encoding, better quality)', 'info');
+        } else {
+          addLog('VP9 not supported, falling back to VP8', 'warning');
+          mimeType = 'video/webm;codecs=vp8,opus';
+        }
+      } else if (exportFormat === 'webm-vp8') {
+        mimeType = 'video/webm;codecs=vp8,opus';
+        addLog('Using VP8 codec (faster encoding, good quality)', 'info');
+      } else if (exportFormat === 'mp4') {
+        if (MediaRecorder.isTypeSupported('video/mp4')) {
+          mimeType = 'video/mp4';
+          extension = 'mp4';
+          addLog('Using MP4 format', 'info');
+        } else {
+          addLog('MP4 not supported, using WebM VP8', 'warning');
+          mimeType = 'video/webm;codecs=vp8,opus';
+        }
+      }
+      
+      // Verify codec support
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        addLog(`${mimeType} not supported, trying VP8 fallback`, 'error');
+        mimeType = 'video/webm;codecs=vp8,opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          // Last resort: plain WebM
+          mimeType = 'video/webm';
+          addLog('Using basic WebM (no codec specified)', 'warning');
+        }
+      }
+      
+      addLog(`Final codec: ${mimeType}`, 'info');
+      
+      // Calculate bitrate based on resolution for better quality
+      const pixelCount = exportWidth * exportHeight;
+      let videoBitrate = EXPORT_BITRATE_SD; // Default 8Mbps for 960x540
+      if (pixelCount >= EXPORT_PIXELS_4K) {
+        videoBitrate = EXPORT_BITRATE_4K; // 50Mbps for 4K
+      } else if (pixelCount >= EXPORT_PIXELS_QHD) {
+        videoBitrate = EXPORT_BITRATE_QHD; // 30Mbps for 1440p
+      } else if (pixelCount >= EXPORT_PIXELS_FULLHD) {
+        videoBitrate = EXPORT_BITRATE_FULLHD; // 20Mbps for 1080p
+      } else if (pixelCount >= EXPORT_PIXELS_HD) {
+        videoBitrate = EXPORT_BITRATE_HD; // 12Mbps for 720p
+      }
+      
+      let recorder;
+      try {
+        recorder = new MediaRecorder(combinedStream, {
+          mimeType,
+          videoBitsPerSecond: videoBitrate
+        });
+      } catch (error) {
+        addLog(`Failed to create MediaRecorder with ${mimeType}, trying without codec specification`, 'error');
+        // Fallback without specific codec
+        try {
+          recorder = new MediaRecorder(combinedStream, {
+            videoBitsPerSecond: videoBitrate
+          });
+          addLog('MediaRecorder created with default settings', 'info');
+        } catch (fallbackError) {
+          addLog(`Export failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`, 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          // Restore original mode on error
+          // MODE RESTORATION REMOVED
+          return;
+        }
+      }
+      
+      recordedChunksRef.current = [];
+      
+      // Memory monitoring for long exports (8+ minutes)
+      let chunkCount = 0;
+      let totalBytes = 0;
+      const MAX_SAFE_SIZE = 1500000000; // 1.5 GB warning threshold
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+          chunkCount++;
+          totalBytes += e.data.size;
+          
+          // Log for monitoring (useful for debugging long exports)
+          const chunkSizeMB = (e.data.size / 1024 / 1024).toFixed(2);
+          const totalSizeMB = (totalBytes / 1024 / 1024).toFixed(2);
+          
+          console.log(`[Export Chunk ${chunkCount}] ${chunkSizeMB} MB | Total: ${totalSizeMB} MB`);
+          
+          // Warning if approaching browser memory limits
+          if (totalBytes > MAX_SAFE_SIZE) {
+            console.warn('⚠️ Export size exceeding 1.5 GB - may approach browser limits');
+            addLog('Large file size - this is normal for long videos', 'warning');
+          }
+        }
+      };
+      
+      recorder.onstop = async () => {
+        // Cleanup: disconnect the export gain node
+        exportGainNode.disconnect();
+        
+        // RESTORE ORIGINAL MODE
+        // MODE RESTORATION DISABLED (mode switching removed from export flow)
+        
+        // Check if we have any recorded data
+        if (recordedChunksRef.current.length === 0) {
+          addLog('Export failed: No video data recorded', 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          return;
+        }
+        
+        let blob = new Blob(recordedChunksRef.current, { type: mimeType });
+        
+        // Verify blob has data
+        if (blob.size === 0) {
+          addLog('Export failed: Video file is empty', 'error');
+          setIsExporting(false);
+          setExportProgress(0);
+          return;
+        }
+        
+        addLog(`Video file created: ${(blob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+        
+        // FIX DURATION METADATA FOR WEBM - Critical for seeking/scrubbing
+        if (extension === 'webm') {
+          try {
+            addLog('Fixing WebM duration metadata...', 'info');
+            const durationMs = duration * 1000; // Convert seconds to milliseconds
+            blob = await fixWebmDuration(blob, durationMs, { logger: false });
+            addLog('✅ Duration metadata added successfully - video is now seekable', 'success');
+          } catch (error) {
+            console.error('Failed to fix WebM duration:', error);
+            addLog('⚠️ Warning: Could not add duration metadata', 'warning');
+            addLog('Video will still play but may not be seekable', 'warning');
+            // Continue anyway - video will still play, just can't seek
+          }
+        }
+        
+        // QUALITY VERIFICATION - Check file size is reasonable for production
+        const fileSizeMB = blob.size / 1024 / 1024;
+        const expectedMinSize = (duration * videoBitrate / 8) / 1024 / 1024 * 0.7; // 70% of expected
+        const expectedMaxSize = (duration * videoBitrate / 8) / 1024 / 1024 * 1.3; // 130% of expected
+        
+        // Validate file size is reasonable
+        if (fileSizeMB < expectedMinSize) {
+          addLog(`⚠️ Warning: File size smaller than expected (${expectedMinSize.toFixed(0)} MB minimum)`, 'warning');
+          addLog('Video may be incomplete or corrupted - please review before publishing', 'warning');
+        } else if (fileSizeMB > expectedMaxSize) {
+          addLog(`ℹ️ File size larger than expected (${expectedMaxSize.toFixed(0)} MB maximum)`, 'info');
+          addLog('This usually indicates high quality - file is fine', 'info');
+        } else {
+          addLog(`✅ File size validated: ${fileSizeMB.toFixed(2)} MB (within expected range)`, 'success');
+        }
+        
+        // Verify chunk count for production quality
+        const expectedChunks = Math.max(Math.floor(duration / 5), 1); // Roughly every 5 seconds
+        if (recordedChunksRef.current.length < expectedChunks) {
+          addLog(`⚠️ Warning: Received ${recordedChunksRef.current.length} chunks (expected ~${expectedChunks})`, 'warning');
+          addLog('Video may have gaps or frame drops - review carefully', 'warning');
+        } else {
+          addLog(`✅ Received ${recordedChunksRef.current.length} video chunks (healthy)`, 'success');
+        }
+        
+        // Better filename with metadata for production use
+        const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        const resolutionTag = exportResolution.replace('x', 'p').replace('1920p1080', '1080p').replace('1280p720', '720p'); 
+        const fileSizeMBRounded = Math.round(blob.size / 1024 / 1024);
+        const durationSec = Math.round(duration);
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `music_visualizer_${timestamp}_${resolutionTag}_${durationSec}s_${fileSizeMBRounded}MB.${extension}`;
+        
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+        
+        // Delay cleanup to ensure download starts
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Export completion summary for production
+          addLog(`✅ Export Complete!`, 'success');
+          addLog(`📁 Filename: ${a.download}`, 'info');
+          addLog(`📊 Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`, 'info');
+          addLog(`📐 Resolution: ${exportResolution}`, 'info');
+          addLog(`💾 File Size: ${fileSizeMB.toFixed(2)} MB`, 'info');
+          addLog(`🎬 Codec: ${mimeType}`, 'info');
+          addLog(`⚡ Bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps`, 'info');
+          addLog(`✨ Ready for upload to YouTube/streaming platforms!`, 'success');
+          
+          // Show browser notification if permitted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Export Complete! 🎉', {
+              body: `Your ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')} video is ready`,
+              icon: '/favicon.ico'
+            });
+          }
+        }, 1000);
+        
+        setIsExporting(false);
+        setExportProgress(100);
+        
+        // Release wake lock
+        if (wakeLock) {
+          wakeLock.release();
+          addLog('Screen wake lock released', 'info');
+        }
+        
+        // Restore original canvas size
+        if (rendererRef.current) {
+          rendererRef.current.setSize(originalWidth, originalHeight);
+        }
+        if (cameraRef.current) {
+          cameraRef.current.aspect = originalWidth / originalHeight;
+          cameraRef.current.updateProjectionMatrix();
+        }
+        
+        // FIX: Don't reset playback state - keep current position
+        // This prevents camera distortion and preserves user's timeline position
+        setIsPlaying(false);
+      };
+      
+      // Add error handler for recorder
+      recorder.onerror = (event: any) => {
+        addLog(`MediaRecorder error: ${event.error?.message || 'Unknown error'}`, 'error');
+        console.error('MediaRecorder error:', event);
+        setIsExporting(false);
+        setExportProgress(0);
+        setIsRecording(false);
+        // MODE RESTORATION REMOVED
+      };
+      
+      // Start recording (removed timeslice parameter for smoother encoding)
+      try {
+        recorder.start(); // Let browser manage chunk timing
+        mediaRecorderRef.current = recorder;
+        setIsRecording(true);
+        addLog('Recording started successfully', 'success');
+        addLog(`Recorder state: ${recorder.state}`, 'info');
+      } catch (error) {
+        addLog(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        setIsExporting(false);
+        setExportProgress(0);
+        // MODE RESTORATION REMOVED
+        return;
+      }
+
+      // Track progress
+      const AUDIO_END_THRESHOLD = 0.1;
+      const FINAL_FRAME_DELAY = 500;
+      
+      addLog(`Will record for ${duration.toFixed(2)} seconds`, 'info');
+      
+      // FIX: Create audio source with proper routing to avoid analyser conflicts
+      // Connect: bufferSource → analyser → destination (for visualization)
+      //                       → exportGain → audioDestination (for recording)
+      const src = audioContextRef.current.createBufferSource();
+      src.buffer = audioBufferRef.current;
+      
+      // Connect to analyser for visualization (existing path)
+      src.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      
+      // ALSO connect to export gain for recording (new separate path)
+      src.connect(exportGainNode);
+      
+      // Add onended handler to ensure recording stops
+      src.onended = () => {
+        setTimeout(() => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          if (bufferSourceRef.current === src) {
+            bufferSourceRef.current = null;
+          }
+        }, FINAL_FRAME_DELAY);
+      };
+      
+      // FIX: Reset timing BEFORE starting playback to prevent camera distortion
+      pauseTimeRef.current = 0;
+      setCurrentTime(0);
+      startTimeRef.current = Date.now();
+      
+      // Start audio playback
+      src.start(0, 0);
+      bufferSourceRef.current = src;
+      
+      // FIX: Set isPlaying AFTER all setup is complete to prevent race conditions
+      setIsPlaying(true);
+      
+      // DIAGNOSTIC: Monitor video track state throughout export
+      const trackMonitor = setInterval(() => {
+        if (videoTrack) {
+          console.log('[TRACK MONITOR]', {
+            videoState: videoTrack.readyState,
+            enabled: videoTrack.enabled,
+            muted: videoTrack.muted,
+            isPlaying: isPlaying,
+            isExporting: isExporting
+          });
+        }
+      }, 2000);
+      
+      // Request data periodically to ensure consistent recording (reduced frequency)
+      const dataRequestInterval = setInterval(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          try {
+            mediaRecorderRef.current.requestData();
+          } catch (e) {
+            console.warn('Failed to request data from recorder:', e);
+          }
+        }
+      }, 5000); // 5 seconds instead of 2 seconds for less encoding interruption
+      
+      let lastUpdatePercent = 0;
+      let lastLoggedPercent = -1;
+      const progressInterval = setInterval(() => {
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        const progress = (elapsed / duration) * 100;
+        const currentPercent = Math.floor(progress);
+        
+        // Only update when whole percentage changes (reduces React re-renders)
+        if (currentPercent !== lastUpdatePercent) {
+          setExportProgress(Math.min(currentPercent, 99));
+          lastUpdatePercent = currentPercent;
+        }
+        
+        // Log every 10% for long exports (helps track progress on 8+ minute videos)
+        if (currentPercent % 10 === 0 && currentPercent !== lastLoggedPercent && currentPercent > 0) {
+          const timeRemaining = duration - elapsed;
+          const minutesRemaining = Math.floor(timeRemaining / 60);
+          const secondsRemaining = Math.floor(timeRemaining % 60);
+          
+          addLog(
+            `Export ${currentPercent}% complete - ${minutesRemaining}:${secondsRemaining.toString().padStart(2, '0')} remaining`,
+            'info'
+          );
+          lastLoggedPercent = currentPercent;
+        }
+        
+        // Don't update currentTime during export to avoid triggering timeline
+        // setCurrentTime(elapsed); // Commented out to reduce UI overhead
+        
+        // Stop when audio ends
+        if (elapsed >= duration - AUDIO_END_THRESHOLD) {
+          addLog(`Stopping recording - duration reached: ${elapsed.toFixed(2)}s`, 'info');
+          clearInterval(progressInterval);
+          clearInterval(dataRequestInterval);
+          clearInterval(trackMonitor); // Clear track monitoring
+          setTimeout(() => {
+            if (mediaRecorderRef.current) {
+              addLog(`Final recorder state before stop: ${mediaRecorderRef.current.state}`, 'info');
+              mediaRecorderRef.current.stop();
+              if (bufferSourceRef.current) {
+                bufferSourceRef.current.stop();
+                bufferSourceRef.current = null;
+              }
+            }
+          }, FINAL_FRAME_DELAY);
+        }
+      }, 500); // 500ms instead of 100ms for less frequent updates
+
+      addLog(`Exporting ${duration.toFixed(1)}s video at ${exportResolution} as ${extension.toUpperCase()}...`, 'info');
+      addLog(`Video bitrate: ${(videoBitrate / 1000000).toFixed(1)} Mbps, Frame rate: 30 FPS`, 'info');
+
+    } catch (e) {
+      const error = e as Error;
+      addLog(`Export error: ${error.message}`, 'error');
+      console.error('Export error:', e);
+      setIsExporting(false);
+      setExportProgress(0);
+      
+      // Release wake lock on error
+      if (wakeLock) {
+        wakeLock.release();
+      }
+      
+      // MODE RESTORATION REMOVED
+      
+      // Restore original canvas size on error
+      const originalWidth = 960;
+      const originalHeight = 540;
+      if (rendererRef.current) {
+        rendererRef.current.setSize(originalWidth, originalHeight);
+      }
+      if (cameraRef.current) {
+        cameraRef.current.aspect = originalWidth / originalHeight;
+        cameraRef.current.updateProjectionMatrix();
+      }
+    }
+  };
+
+  // Frame-by-frame export: captures individual frames for encoding
+  const exportVideoFrameByFrame = async () => {
+    if (!rendererRef.current || !audioContextRef.current || !audioBufferRef.current) {
+      addLog('Cannot export: scene or audio not ready', 'error');
+      return [];
+    }
+
+    if (!audioReady) {
+      addLog('Please load an audio file first', 'error');
+      return [];
+    }
+
+    if (!duration || duration <= 0) {
+      addLog('Cannot export: audio duration is invalid', 'error');
+      return [];
+    }
+
+    const FRAME_RATE = 30; // 30 FPS
+    const totalFrames = Math.ceil(duration * FRAME_RATE);
+    const frameBlobs: Blob[] = [];
+
+    try {
+      isFrameByFrameModeRef.current = true;
+      console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
+      addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
+
+      for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
+        const frameTime = frameNumber / FRAME_RATE;
+        console.log(`📍 Rendering frame ${frameNumber}/${totalFrames} at time ${frameTime.toFixed(3)}s`);
+        
+        // Set target frame time for animation loop
+        targetFrameTimeRef.current = frameTime;
+        capturedFrameBlobRef.current = null;
+        
+        // Request single frame render and wait for capture
+        const frameRendered = new Promise<Blob | null>((resolve) => {
+          const frameTimeout = setTimeout(() => {
+            console.warn(`⚠️ Frame ${frameNumber} capture timeout after 500ms`);
+            resolve(null);
+          }, 500);
+
+          const checkFrame = () => {
+            if (capturedFrameBlobRef.current) {
+              clearTimeout(frameTimeout);
+              const blob = capturedFrameBlobRef.current;
+              capturedFrameBlobRef.current = null;
+              resolve(blob);
+            } else {
+              requestAnimationFrame(checkFrame);
+            }
+          };
+
+          // Trigger animation frame render
+          requestAnimationFrame(checkFrame);
+        });
+
+        const blob = await frameRendered;
+
+        if (blob) {
+          frameBlobs.push(blob);
+          if (frameNumber % 30 === 0 || frameNumber === totalFrames - 1) {
+            const progress = ((frameNumber + 1) / totalFrames) * 100;
+            console.log(`✅ Captured ${frameNumber + 1}/${totalFrames} frames (${progress.toFixed(1)}%)`);
+            addLog(`Progress: ${frameNumber + 1}/${totalFrames} frames captured (${progress.toFixed(1)}%)`, 'info');
+          }
+        } else {
+          console.error(`❌ Failed to capture frame ${frameNumber}`);
+          addLog(`Failed to capture frame ${frameNumber}`, 'error');
+          // Continue anyway to not break the export
+        }
+      }
+
+      isFrameByFrameModeRef.current = false;
+      console.log('🎉 Frame-by-frame export complete, collected', frameBlobs.length, 'frames');
+      addLog(`✅ Frame-by-frame export complete: ${frameBlobs.length}/${totalFrames} frames captured`, 'success');
+
+      // PHASE 2: Encode frames to video
+      console.log('📺 PHASE 2: Encoding video...');
+      addLog('PHASE 2: Encoding video from captured frames...', 'info');
+      
+      const videoBlob = await encodeFramesToVideo(frameBlobs, FRAME_RATE);
+      
+      if (!videoBlob) {
+        addLog('❌ Video encoding failed', 'error');
+        return [];
+      }
+
+      // PHASE 3: Add audio to video
+      console.log('🎵 PHASE 3: Adding audio to video...');
+      addLog('PHASE 3: Adding audio track to video...', 'info');
+      
+      const finalBlob = await addAudioToVideo(videoBlob, audioBufferRef.current, audioContextRef.current!);
+      
+      if (!finalBlob) {
+        addLog('❌ Failed to add audio to video', 'error');
+        return [];
+      }
+
+      // PHASE 4: Download the complete video
+      console.log('💾 PHASE 4: Downloading video...');
+      addLog('PHASE 4: Preparing download...', 'info');
+      
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const videoDuration = Math.round(duration);
+      const videoSizeMB = Math.round(finalBlob.size / 1024 / 1024);
+      const filename = `music_visualizer_${timestamp}_${videoDuration}s_${videoSizeMB}MB.webm`;
+
+      const url = URL.createObjectURL(finalBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('✅ Download started:', filename);
+      addLog(`✅ Download started: ${filename}`, 'success');
+      addLog(`📊 Final video: ${(finalBlob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
+      addLog(`⏱️ Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`, 'info');
+      addLog('✨ Frame-by-frame export complete!', 'success');
+
+      return frameBlobs;
+    } catch (error) {
+      isFrameByFrameModeRef.current = false;
+      console.error('❌ Frame-by-frame export failed:', error);
+      addLog(`Frame-by-frame export failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return [];
+    }
+  };
+
+  // Encode captured frame blobs into a WebM video
+  const encodeFramesToVideo = async (frameBlobs: Blob[], frameRate: number = 30): Promise<Blob | null> => {
+    if (!frameBlobs || frameBlobs.length === 0) {
+      addLog('Cannot encode: no frames provided', 'error');
+      return null;
+    }
+
+    try {
+      console.log('🎬 Starting video encoding:', frameBlobs.length, 'frames at', frameRate, 'FPS');
+      addLog(`Starting video encoding: ${frameBlobs.length} frames at ${frameRate} FPS`, 'info');
+
+      // Create WebM writer with video parameters
+      const writer = new WebMWriter({
+        quality: 0.95,
+        frameRate: frameRate,
+        width: 960, // Match export resolution
+        height: 540
+      });
+
+      let successfulFrames = 0;
+      let failedFrames = 0;
+
+      // Process each frame
+      for (let i = 0; i < frameBlobs.length; i++) {
+        try {
+          // Convert blob to ImageBitmap
+          const imageBitmap = await createImageBitmap(frameBlobs[i]);
+          
+          // Add frame to video
+          writer.addFrame(imageBitmap);
+          successfulFrames++;
+
+          // Log progress every 100 frames
+          if ((i + 1) % 100 === 0 || i === frameBlobs.length - 1) {
+            const progress = ((i + 1) / frameBlobs.length) * 100;
+            console.log(`✅ Encoded ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`);
+            addLog(`Encoding progress: ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`, 'info');
+          }
+        } catch (frameError) {
+          failedFrames++;
+          console.error(`❌ Failed to encode frame ${i}:`, frameError);
+          // Continue with next frame instead of stopping
+        }
+      }
+
+      // Finalize video
+      console.log('🎬 Finalizing video encoding...');
+      addLog('Finalizing video encoding...', 'info');
+      
+      const videoBlob = writer.render();
+      
+      console.log('✅ Video encoding complete:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB');
+      console.log(`📊 Frames: ${successfulFrames} encoded, ${failedFrames} failed`);
+      addLog(`✅ Video encoding complete: ${(videoBlob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+      addLog(`📊 Frames: ${successfulFrames} encoded, ${failedFrames} failed`, 'info');
+
+      return videoBlob;
+    } catch (error) {
+      console.error('❌ Video encoding failed:', error);
+      addLog(`Video encoding failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
+
+  // Combine video and audio tracks using MediaRecorder or merge at container level
+  const addAudioToVideo = async (videoBlob: Blob, audioBuffer: AudioBuffer, audioContext: AudioContext): Promise<Blob | null> => {
+    try {
+      console.log('🎵 Adding audio track to video...');
+      addLog('Adding audio track to video...', 'info');
+
+      // Create audio blob from audioBuffer
+      const numberOfChannels = audioBuffer.numberOfChannels;
+      const sampleRate = audioBuffer.sampleRate;
+      const length = audioBuffer.length;
+      const duration = audioBuffer.duration;
+
+      // Create offline audio context for rendering
+      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
+        numberOfChannels,
+        length,
+        sampleRate
+      );
+
+      // Create buffer source
+      const source = offlineCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(offlineCtx.destination);
+      source.start(0);
+
+      // Render to WAV
+      const renderedBuffer = await offlineCtx.startRendering();
+      
+      // Convert to WAV blob
+      const audioBlob = audioBufferToWave(renderedBuffer);
+      console.log('✅ Audio blob created:', (audioBlob.size / 1024).toFixed(2), 'KB');
+
+      // For now, return video blob (full muxing requires complex audio/video container handling)
+      // In production, you'd use FFmpeg.wasm or send to server for muxing
+      console.log('⚠️ Note: Full audio/video muxing not yet implemented. Use server-side encoding for production.');
+      addLog('⚠️ Video and audio are separate. Use post-processing for muxing.', 'warning');
+
+      return videoBlob; // Return video for now, audio will need server-side muxing
+    } catch (error) {

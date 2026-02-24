@@ -46,16 +46,16 @@ export default function SequencerPanel({
       }))
     };
 
-    savePoseToStore(pose);
+    savePoseToStore(pose.name, pose);
     setPoses(listPoses());
     setPoseName('');
     console.log(`Saved pose: ${pose.name} with ${pose.objects.length} objects`);
   };
 
   const handleLoadPose = (pose: PoseSnapshot) => {
-    const result = applyPose(pose, blendAmount, workspaceObjects);
-    onUpdateObjects(result.updatedObjects);
-    console.log(`Loaded pose: ${pose.name}, applied to ${result.appliedCount} objects`);
+    const updatedCount = applyPose(pose, blendAmount, workspaceObjects);
+    onUpdateObjects([...workspaceObjects]);
+    console.log(`Loaded pose: ${pose.name}, applied to ${updatedCount} objects`);
   };
 
   const handleDeletePose = (poseId: string) => {

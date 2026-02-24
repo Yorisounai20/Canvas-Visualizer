@@ -5,6 +5,7 @@
  * Solvers read poses, write transforms, create no objects.
  */
 
+import * as THREE from 'three';
 import { WorkspaceObject, PoseSnapshot } from '../types';
 
 /**

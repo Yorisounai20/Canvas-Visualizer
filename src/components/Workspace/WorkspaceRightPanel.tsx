@@ -73,18 +73,17 @@ export default function WorkspaceRightPanel({
       {/* Actions Bar */}
       <div className="border-b border-gray-800 p-2">
         <WorkspaceActions
-          selectedObjectId={selectedObjectId}
-          objectCount={workspaceObjects.length}
-          onDuplicateObject={onDuplicateObject}
-          onDeleteObject={onDeleteSelectedObject}
-          onSelectAll={onSelectAll}
-          onDeselectAll={onDeselectAll}
-          onToggleObjectVisibility={onToggleObjectVisibility}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={onUndo}
-          onRedo={onRedo}
-        />
+            selectedObjectId={selectedObjectId}
+            workspaceObjects={workspaceObjects}
+            canUndo={!!canUndo}
+            canRedo={!!canRedo}
+            onDuplicate={onDuplicateObject ?? (() => {})}
+            onDelete={onDeleteSelectedObject ?? (() => {})}
+            onSelectAll={onSelectAll ?? (() => {})}
+            onDeselectAll={onDeselectAll ?? (() => {})}
+            onToggleVisibility={onToggleObjectVisibility ?? (() => {})}
+            onUndo={onUndo ?? (() => {})}
+            onRedo={onRedo ?? (() => {})}          onShowHelp={() => console.log('Help requested')}        />
       </div>
 
       {/* Object Properties */}
