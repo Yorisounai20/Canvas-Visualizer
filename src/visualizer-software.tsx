@@ -631,9 +631,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
   };
 
-  // Expose test export globally so the modal button can trigger it
-  // (Prefer explicit prop drilling, but global exposure keeps modal simple)
-  (window as any).testExport = testFrameByFrameExport;
+  // testFrameByFrameExport is available for props; avoid global exposure
 
   // Test export: exports first 10 seconds (300 frames at 30 FPS) with detailed logging
   const testFrameByFrameExport = async () => {
@@ -11239,6 +11237,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         handleExportAndCloseModal={handleExportAndCloseModal}
         duration={duration}
         testAudioAnalysis={testAudioAnalysis}
+        testFrameByFrameExport={testFrameByFrameExport}
       />
 
       {/* PHASE 4: Parameter Event Edit Modal */}

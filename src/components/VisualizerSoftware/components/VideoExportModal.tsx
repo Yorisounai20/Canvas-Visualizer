@@ -18,6 +18,7 @@ interface VideoExportModalProps {
   handleExportAndCloseModal: () => void;
   duration: number;
   testAudioAnalysis: () => Promise<void>;
+  testFrameByFrameExport?: () => Promise<void>;
 }
 
 export function VideoExportModal({
@@ -36,7 +37,8 @@ export function VideoExportModal({
   exportProgress,
   handleExportAndCloseModal,
   duration,
-  testAudioAnalysis
+  testAudioAnalysis,
+  testFrameByFrameExport
 }: VideoExportModalProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
