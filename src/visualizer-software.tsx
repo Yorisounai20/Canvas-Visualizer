@@ -4523,11 +4523,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     console.log('✅ Starting animation loop');
     const anim = () => {
-      // Define camera variables at the beginning to ensure they're available throughout
-      const activeCameraDistance = cameraDistance;
-      const activeCameraHeight = cameraHeight;
-      const activeCameraRotation = 0;
-      
       // CRITICAL FIX: Continue animation during export
       if (!isPlaying && !isExporting) {
         console.log('⏸️ Animation frame cancelled - isPlaying:', isPlaying, 'isExporting:', isExporting);
@@ -4544,6 +4539,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       
       try {
+        // Define camera variables at the beginning of try block to ensure they're available throughout
+        const activeCameraDistance = cameraDistance;
+        const activeCameraHeight = cameraHeight;
+        const activeCameraRotation = 0;
+        
         // FPS calculation
         fpsFrameCount.current++;
         const now = performance.now();
@@ -4619,12 +4619,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           console.log('  ParamEvents:', parameterEvents.length);
           console.log('  Environment keyframes:', environmentKeyframes.length, '(endTime not used - always active when found)');
         }
-      } catch (error) {
-        // Log error but continue animation to prevent export from breaking
-        console.error('Animation loop error:', error);
-      }
 
-      // Animate letterbox based on keyframes (only if animation is enabled)
+        // Animate letterbox based on keyframes (only if animation is enabled)
       if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
         // Find the current keyframe (most recent one that has passed)
         let currentKeyframeIndex = -1;
@@ -9432,6 +9428,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         } catch (error) {
           console.error('❌ Error capturing frame:', error);
         }
+      }
+      } catch (error) {
+        // Log error but continue animation to prevent export from breaking
+        console.error('Animation loop error:', error);
       }
     };
 
