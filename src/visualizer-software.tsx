@@ -4619,6 +4619,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           console.log('  ParamEvents:', parameterEvents.length);
           console.log('  Environment keyframes:', environmentKeyframes.length, '(endTime not used - always active when found)');
         }
+      } catch (error) {
+        // Log error but continue animation to prevent export from breaking
+        console.error('Animation loop error:', error);
+      }
 
       // Animate letterbox based on keyframes (only if animation is enabled)
       if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
@@ -9428,10 +9432,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         } catch (error) {
           console.error('❌ Error capturing frame:', error);
         }
-      }
-      } catch (error) {
-        // Log error but continue animation to prevent export from breaking
-        console.error('Animation loop error:', error);
       }
     };
 
