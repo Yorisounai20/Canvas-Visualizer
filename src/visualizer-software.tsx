@@ -4537,6 +4537,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       
       try {
+        // Define camera variables at the beginning of try block to ensure they're available throughout
+        const activeCameraDistance = cameraDistance;
+        const activeCameraHeight = cameraHeight;
+        const activeCameraRotation = 0;
+        
         // FPS calculation
         fpsFrameCount.current++;
         const now = performance.now();
@@ -4558,68 +4563,62 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         let f = DEFAULT_FREQUENCY_VALUES;
         if (analyser) {
           const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        f = getFreq(data);
-      }
+          analyser.getByteFrequencyData(data);
+          f = getFreq(data);
+        }
       
-      // Frame-by-frame mode: use targetFrameTime instead of elapsed time
-      let el: number;
-      if (isFrameByFrameModeRef.current) {
-        el = targetFrameTimeRef.current;
-        console.log('📍 Frame-by-frame: using targetFrameTime =', el);
-      } else {
-        el = (Date.now() - startTimeRef.current) * 0.001;
-      }
+        // Frame-by-frame mode: use targetFrameTime instead of elapsed time
+        let el: number;
+        if (isFrameByFrameModeRef.current) {
+          el = targetFrameTimeRef.current;
+          console.log('📍 Frame-by-frame: using targetFrameTime =', el);
+        } else {
+          el = (Date.now() - startTimeRef.current) * 0.001;
+        }
       
-      // FIX: Prevent NaN if duration is not set (safety check for export)
-      const t = duration > 0 ? (el % duration) : el;
+        // FIX: Prevent NaN if duration is not set (safety check for export)
+        const t = duration > 0 ? (el % duration) : el;
       
-      // Throttle timeline updates to 5 FPS (instead of 60 FPS) to dramatically improve UI performance
-      // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS (200ms)
-      // Lower frequency significantly reduces React re-renders and improves general UI responsiveness
-      // CRITICAL: Skip timeline updates during export to prevent React re-renders
-      const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
-      if (!isExporting && timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
-        setCurrentTime(t);
-        lastTimelineUpdateRef.current = now;
-      }
+        // Throttle timeline updates to 5 FPS (instead of 60 FPS) to dramatically improve UI performance
+        // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS (200ms)
+        // Lower frequency significantly reduces React re-renders and improves general UI responsiveness
+        // CRITICAL: Skip timeline updates during export to prevent React re-renders
+        const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
+        if (!isExporting && timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
+          setCurrentTime(t);
+          lastTimelineUpdateRef.current = now;
+        }
       
-      const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
-      const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
-      const elScaled = el * presetSpeed; // Apply speed multiplier to animations
+        const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
+        const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
+        const elScaled = el * presetSpeed; // Apply speed multiplier to animations
       
-      // Track and log preset changes
-      if (previousPresetRef.current !== type) {
-        console.log('🔄 PRESET CHANGED from', previousPresetRef.current, 'to', type, 'at time', t.toFixed(2) + 's');
-        previousPresetRef.current = type;
-      }
+        // Track and log preset changes
+        if (previousPresetRef.current !== type) {
+          console.log('🔄 PRESET CHANGED from', previousPresetRef.current, 'to', type, 'at time', t.toFixed(2) + 's');
+          previousPresetRef.current = type;
+        }
       
-      // Debug: Comprehensive keyframe status logging every 2 seconds
-      if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
-        console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's:');
-        console.log('  Preset:', type, '(speed:', presetSpeed + ')');
-        console.log('  Preset keyframes:', presetKeyframes.length, presetKeyframes.map(kf => `${kf.preset}@${kf.time}-${kf.endTime}`).join(', '));
-        console.log('  PresetSpeed keyframes:', presetSpeedKeyframes.length);
-        console.log('  Camera: direct settings (no keyframes)');
-        console.log('  CameraRig keyframes:', cameraRigKeyframes.length);
-        console.log('  CameraFX clips:', cameraFXClips.length, '(' + cameraFXClips.filter(c => c.enabled && t >= c.startTime && t < c.endTime).length + ' active)');
-        console.log('  Text keyframes:', textKeyframes.length);
-        console.log('  TextAnimator keyframes:', textAnimatorKeyframes.length, '(' + textAnimatorKeyframes.filter(kf => {
-          const endTime = kf.time + kf.duration + (kf.text.length * kf.stagger);
-          return t >= kf.time && t <= endTime;
-        }).length + ' active)');
-        console.log('  Letterbox keyframes:', letterboxKeyframes.length);
-        console.log('  ParamEvents:', parameterEvents.length);
-        console.log('  Environment keyframes:', environmentKeyframes.length, '(endTime not used - always active when found)');
-      }
-      
-      // REMOVED: Global camera keyframes interpolation (orphaned feature)
-      // Use direct camera settings
-      const activeCameraDistance = cameraDistance;
-      const activeCameraHeight = cameraHeight;
-      const activeCameraRotation = 0;
+        // Debug: Comprehensive keyframe status logging every 2 seconds
+        if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
+          console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's:');
+          console.log('  Preset:', type, '(speed:', presetSpeed + ')');
+          console.log('  Preset keyframes:', presetKeyframes.length, presetKeyframes.map(kf => `${kf.preset}@${kf.time}-${kf.endTime}`).join(', '));
+          console.log('  PresetSpeed keyframes:', presetSpeedKeyframes.length);
+          console.log('  Camera: direct settings (no keyframes)');
+          console.log('  CameraRig keyframes:', cameraRigKeyframes.length);
+          console.log('  CameraFX clips:', cameraFXClips.length, '(' + cameraFXClips.filter(c => c.enabled && t >= c.startTime && t < c.endTime).length + ' active)');
+          console.log('  Text keyframes:', textKeyframes.length);
+          console.log('  TextAnimator keyframes:', textAnimatorKeyframes.length, '(' + textAnimatorKeyframes.filter(kf => {
+            const endTime = kf.time + kf.duration + (kf.text.length * kf.stagger);
+            return t >= kf.time && t <= endTime;
+          }).length + ' active)');
+          console.log('  Letterbox keyframes:', letterboxKeyframes.length);
+          console.log('  ParamEvents:', parameterEvents.length);
+          console.log('  Environment keyframes:', environmentKeyframes.length, '(endTime not used - always active when found)');
+        }
 
-      // Animate letterbox based on keyframes (only if animation is enabled)
+        // Animate letterbox based on keyframes (only if animation is enabled)
       if (showLetterbox && useLetterboxAnimation && sortedLetterboxKeyframes.length > 0) {
         // Find the current keyframe (most recent one that has passed)
         let currentKeyframeIndex = -1;
