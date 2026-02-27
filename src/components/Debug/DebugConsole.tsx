@@ -20,7 +20,7 @@ export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsolePro
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col">
+    <div className="fixed bottom-4 right-4 z-50 w-96 max-h-96 lg:max-h-[70vh] bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-700 bg-gray-800">
         <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsolePro
       <div className="px-4 py-2 border-t border-gray-700 bg-gray-800">
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500">
-            Showing last {Math.min(logs.length, 50)} messages
+            Showing last {Math.min(logs.length, 50)} messages (scroll for more)
           </p>
           <p className="text-xs text-gray-500">
             Press <kbd className="px-1 py-0.5 bg-gray-700 rounded text-cyan-400">`</kbd> to toggle

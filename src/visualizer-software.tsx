@@ -48,7 +48,8 @@ import {
   captureFrameAsBlob, 
   createAudioBlob,
   AudioFrameData,
-  analyzeAudioForExport
+  analyzeAudioForExport,
+  memoryMonitor
 } from './lib/frameByFrameExport';
 import hammerheadPreset from './presets/hammerhead';
 import orbitPreset from './presets/orbit';
@@ -695,6 +696,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       isFrameByFrameModeRef.current = true;
       const frameBlobs: Blob[] = [];
       const startTime = performance.now();
+      let consecutiveFailures = 0;
+      let aborted = false;
 
       for (let i = 0; i < totalFrames; i++) {
         const frameTime = i / FRAME_RATE;
@@ -718,14 +721,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
         const blob = await framePromise;
         if (!blob) {
+          consecutiveFailures++;
           addLog(`Failed to render frame ${i}`, 'error');
           console.error('Frame render failed for', i);
-          // abort test export early; remaining frames will also fail if the
-          // animation loop isn't updating correctly.
-          addLog('Aborting test export due to repeated failures', 'error');
-          break;
+          if (consecutiveFailures >= 3) {
+            aborted = true;
+            addLog('Aborting test export due to repeated frame failures', 'error');
+            break;
+          }
+          continue;
         }
 
+        // success
+        consecutiveFailures = 0;
         frameBlobs.push(blob);
 
         // Progress and ETA
@@ -738,17 +746,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
         // Memory monitoring every 100 frames
         if (done % 100 === 0) {
-          const memMB = memoryMonitor.getMemoryUsage();
-          console.log(`Memory after ${done} frames: ${memMB.toFixed(2)} MB`);
-          addLog(`Memory: ${memMB.toFixed(2)} MB`, 'info');
-          const warn = memoryMonitor.checkMemoryWarning(done);
-          if (warn.warning) {
-            addLog(`Memory warning: ${warn.suggestion}`, 'warning');
+          try {
+            const memMB = memoryMonitor.getMemoryUsage();
+            console.log(`Memory after ${done} frames: ${memMB.toFixed(2)} MB`);
+            addLog(`Memory: ${memMB.toFixed(2)} MB`, 'info');
+            const warn = memoryMonitor.checkMemoryWarning(done);
+            if (warn.warning) {
+              addLog(`Memory warning: ${warn.suggestion}`, 'warning');
+            }
+          } catch (memErr) {
+            console.warn('Memory monitor error in test export:', memErr);
           }
         }
       }
 
       isFrameByFrameModeRef.current = false;
+      if (aborted) {
+        setIsExporting(false);
+        addLog(`Captured ${frameBlobs.length}/${totalFrames} test frames (aborted)`, 'info');
+        return;
+      }
       addLog(`Captured ${frameBlobs.length}/${totalFrames} test frames`, 'info');
 
       // PHASE C: Encoding
@@ -789,7 +806,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       addLog('Test export complete', 'success');
-      setIsExporting(false);
       return;
     } catch (err) {
       console.error('Test export error:', err);
@@ -1551,7 +1567,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     return sorted[sorted.length - 1]?.preset || 'orbit';
   };
   
-  // Get current preset speed multiplier with keyframe interpolation
+  // Get current preset speed multiplier with keyframe interpolation (times are in raw timeline seconds)
   const getCurrentPresetSpeed = (time?: number) => {
     const t = time !== undefined ? time : currentTime;
     // Sort speed keyframes by time
@@ -1582,6 +1598,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     // Fallback to last keyframe speed
     return sorted[sorted.length - 1].speed;
   };
+
 
   const addSection = () => {
     const last = sections[sections.length-1];
@@ -4652,8 +4669,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   useEffect(() => {
     console.log('🎬 Animation useEffect triggered, isPlaying:', isPlaying, 'isExporting:', isExporting, 'rendererRef:', !!rendererRef.current);
     // CRITICAL FIX: Animation must continue during export even if not playing
-    if ((!isPlaying && !isExporting) || !rendererRef.current) {
-      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'isExporting:', isExporting, 'renderer:', !!rendererRef.current);
+    // Allow animation to continue when frame-by-frame export mode is active
+    if ((!isPlaying && !isExporting && !isFrameByFrameModeRef.current) || !rendererRef.current) {
+      console.log('⏸️ Animation useEffect early return - isPlaying:', isPlaying, 'isExporting:', isExporting, 'isFrameByFrameMode:', isFrameByFrameModeRef.current, 'renderer:', !!rendererRef.current);
       return;
     }
     const scene = sceneRef.current, cam = cameraRef.current, rend = rendererRef.current;
@@ -4721,8 +4739,18 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           el = (Date.now() - startTimeRef.current) * 0.001;
         }
       
-        // FIX: Prevent NaN if duration is not set (safety check for export)
+        // Raw timeline position (unscaled) used for some lookups and preset selection
         const t = duration > 0 ? (el % duration) : el;
+
+        // Determine instantaneous speed from keyframes at raw time
+        const presetSpeed = getCurrentPresetSpeed(t);
+
+        // Scale elapsed time for object animations only
+        const elScaled = el * presetSpeed;
+        // Override the base `el` variable so existing preset code that references
+        // `el` (many presets still do) automatically benefits from the speed
+        // multiplier without requiring a mass rewrite.
+        el = elScaled;
       
         // Throttle timeline updates to 5 FPS (instead of 60 FPS) to dramatically improve UI performance
         // Only update currentTime state every TIMELINE_UPDATE_INTERVAL_MS (200ms)
@@ -4734,14 +4762,15 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           // the debug console shows progress; otherwise we suppress updates to
           // avoid excessive React re-renders.
           if (!isExporting || isFrameByFrameModeRef.current) {
-            setCurrentTime(t);
+            // maintain the timeline at raw time so UI/events stay synced to audio
+            setCurrentTime(rawT);
             lastTimelineUpdateRef.current = now;
           }
         }
       
-        const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
-        const presetSpeed = getCurrentPresetSpeed(t); // Get speed multiplier for current preset with exact time
-        const elScaled = el * presetSpeed; // Apply speed multiplier to animations
+        // Use scaled time when selecting presets so that speed keyframes
+        // actually affect when transitions occur
+        const type = getCurrentPreset(t);
       
         // Track and log preset changes
         if (previousPresetRef.current !== type) {
@@ -4751,7 +4780,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
         // Debug: Comprehensive keyframe status logging every 2 seconds
         if (Math.floor(t) % 2 === 0 && Math.floor(t * 10) % 20 === 0) {
-          console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's:');
+          console.log('⏰ KEYFRAME STATUS at time', t.toFixed(2) + 's (raw), elScaled', elScaled.toFixed(2) + 's:');
           console.log('  Preset:', type, '(speed:', presetSpeed + ')');
           console.log('  Preset keyframes:', presetKeyframes.length, presetKeyframes.map(kf => `${kf.preset}@${kf.time}-${kf.endTime}`).join(', '));
           console.log('  PresetSpeed keyframes:', presetSpeedKeyframes.length);
