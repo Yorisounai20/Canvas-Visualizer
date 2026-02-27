@@ -629,7 +629,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
-    setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+    setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-50));
   };
 
   // helper used by export testing and diagnostics
@@ -675,6 +675,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     addLog(`Starting TEST export: ${totalFrames} frames (${TEST_DURATION}s)`, 'info');
     console.log('🧪 Test export started —', totalFrames, 'frames');
 
+    // flag export state so animation loop doesn't early-return
+    setIsExporting(true);
+
     try {
       // PHASE A: Audio analysis
       addLog('Analyzing audio... (3s estimated)', 'info');
@@ -699,7 +702,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         capturedFrameBlobRef.current = null;
 
         const framePromise = new Promise<Blob | null>(resolve => {
-          const timeout = setTimeout(() => resolve(null), 1000);
+          const timeout = setTimeout(() => resolve(null), 2000);
           const check = () => {
             if (capturedFrameBlobRef.current) {
               clearTimeout(timeout);
@@ -717,8 +720,10 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         if (!blob) {
           addLog(`Failed to render frame ${i}`, 'error');
           console.error('Frame render failed for', i);
-          // continue to next frame
-          continue;
+          // abort test export early; remaining frames will also fail if the
+          // animation loop isn't updating correctly.
+          addLog('Aborting test export due to repeated failures', 'error');
+          break;
         }
 
         frameBlobs.push(blob);
@@ -784,12 +789,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       addLog('Test export complete', 'success');
+      setIsExporting(false);
       return;
     } catch (err) {
       console.error('Test export error:', err);
       addLog(`Test export failed: ${err instanceof Error ? err.message : err}`, 'error');
     } finally {
       isFrameByFrameModeRef.current = false;
+      setIsExporting(false);
     }
   };
 
@@ -3030,6 +3037,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     const frameBlobs: Blob[] = [];
 
     try {
+      // mark exporting so animation loop and UI behave correctly
+      setIsExporting(true);
+      setExportProgress(0);
       isFrameByFrameModeRef.current = true;
       console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
       addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
@@ -3047,6 +3057,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       const startTime = performance.now();
+      let consecutiveFailures = 0;
       for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
         const frameTime = frameNumber / FRAME_RATE;
         console.log(`📍 Rendering frame ${frameNumber}/${totalFrames} at time ${frameTime.toFixed(3)}s`);
@@ -3058,9 +3069,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Request single frame render and wait for capture
         const frameRendered = new Promise<Blob | null>((resolve) => {
           const frameTimeout = setTimeout(() => {
-            console.warn(`⚠️ Frame ${frameNumber} capture timeout after 500ms`);
+            console.warn(`⚠️ Frame ${frameNumber} capture timeout after 2000ms`);
             resolve(null);
-          }, 500);
+          }, 2000);
 
           const checkFrame = () => {
             if (capturedFrameBlobRef.current) {
@@ -3081,6 +3092,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
         if (blob) {
           frameBlobs.push(blob);
+          // reset consecutive failure counter on success
+          consecutiveFailures = 0;
           // progress + ETA calculation
           const done = frameNumber + 1;
           const elapsed = (performance.now() - startTime) / 1000; // secs
@@ -3101,13 +3114,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         } else {
           console.error(`❌ Failed to capture frame ${frameNumber}`);
           addLog(`Failed to capture frame ${frameNumber}`, 'error');
-          // Continue anyway to not break the export
+          consecutiveFailures++;
+          // If we get three failures in a row, abort entire export; it's likely
+          // the animation loop has stopped or the renderer is unusable.
+          if (consecutiveFailures >= 3) {
+            addLog('Aborting export due to repeated frame capture failures', 'error');
+            break;
+          }
+          // otherwise, continue but don't reset success counter
         }
       }
 
       isFrameByFrameModeRef.current = false;
       console.log('🎉 Frame-by-frame export complete, collected', frameBlobs.length, 'frames');
       addLog(`✅ Frame-by-frame export complete: ${frameBlobs.length}/${totalFrames} frames captured`, 'success');
+
+      // reset exporting flag once finished
+      setIsExporting(false);
 
       // PHASE 2: Encode frames to video
       console.log('📺 PHASE 2: Encoding video...');
@@ -3160,6 +3183,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       isFrameByFrameModeRef.current = false;
       console.error('❌ Frame-by-frame export failed:', error);
       addLog(`Frame-by-frame export failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      setIsExporting(false);
       return [];
     }
   };
@@ -4648,14 +4672,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
       
-      // Frame-by-frame export mode: render ONE frame only, don't request next frame
+      // Frame-by-frame export mode: use target time but continue looping so that
+      // each frame request will pick up the latest `targetFrameTimeRef.current`.
       if (isFrameByFrameModeRef.current) {
-        console.log('🎬 Frame-by-frame mode: rendering single frame at time', targetFrameTimeRef.current);
-        // DON'T call requestAnimationFrame - we'll control timing from exportVideoFrameByFrame
-      } else {
-        // Normal mode: continue animation loop
-        animationRef.current = requestAnimationFrame(anim);
+        console.log('🎬 Frame-by-frame mode: rendering frame at time', targetFrameTimeRef.current);
       }
+      // Regardless of mode we keep the loop running – exportVideoFrameByFrame
+      // will decide when to stop by setting `isFrameByFrameModeRef.current=false`.
+      animationRef.current = requestAnimationFrame(anim);
       
       try {
         // Define camera variables at the beginning of try block to ensure they're available throughout
@@ -4705,9 +4729,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         // Lower frequency significantly reduces React re-renders and improves general UI responsiveness
         // CRITICAL: Skip timeline updates during export to prevent React re-renders
         const timeSinceLastTimelineUpdate = now - lastTimelineUpdateRef.current;
-        if (!isExporting && timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
-          setCurrentTime(t);
-          lastTimelineUpdateRef.current = now;
+        if (timeSinceLastTimelineUpdate >= TIMELINE_UPDATE_INTERVAL_MS) {
+          // During a frame-by-frame export we *do* want the timeline to move so
+          // the debug console shows progress; otherwise we suppress updates to
+          // avoid excessive React re-renders.
+          if (!isExporting || isFrameByFrameModeRef.current) {
+            setCurrentTime(t);
+            lastTimelineUpdateRef.current = now;
+          }
         }
       
         const type = getCurrentPreset(t); // Use keyframe-based preset switching with exact time
@@ -9543,7 +9572,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             } else {
               console.error('❌ Failed to capture frame - blob is null');
             }
-          }, 'image/webp', 0.95);
+          }, 'image/png');
         } catch (error) {
           console.error('❌ Error capturing frame:', error);
         }

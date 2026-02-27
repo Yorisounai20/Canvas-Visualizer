@@ -11,7 +11,7 @@ interface DebugConsoleProps {
 /**
  * DebugConsole Component - Collapsible debug log panel
  * Displays timestamped log entries with color-coded types
- * Shows last 10 messages
+ * Shows recent messages (default 50)
  * Toggle with ` (backtick) key
  */
 export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsoleProps) {
@@ -63,7 +63,7 @@ export default function DebugConsole({ logs, isOpen, onToggle }: DebugConsolePro
       <div className="px-4 py-2 border-t border-gray-700 bg-gray-800">
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500">
-            Showing last {Math.min(logs.length, 10)} messages
+            Showing last {Math.min(logs.length, 50)} messages
           </p>
           <p className="text-xs text-gray-500">
             Press <kbd className="px-1 py-0.5 bg-gray-700 rounded text-cyan-400">`</kbd> to toggle

@@ -626,7 +626,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
-    setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+    setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-50));
   };
 
   // Function to get current project state (used for both manual save and autosave)
