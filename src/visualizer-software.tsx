@@ -47,7 +47,8 @@ import {
   calculateAudioFrequencyAtTime, 
   captureFrameAsBlob, 
   createAudioBlob,
-  AudioFrameData
+  AudioFrameData,
+  analyzeAudioForExport
 } from './lib/frameByFrameExport';
 import hammerheadPreset from './presets/hammerhead';
 import orbitPreset from './presets/orbit';
@@ -629,6 +630,38 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const addLog = (message: string, type = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
     setErrorLog(prev => [...prev, { message, type, timestamp }].slice(-10));
+  };
+
+  // helper used by export testing and diagnostics
+  const testAudioAnalysis = async () => {
+    // 1. ensure we have audio
+    if (!audioBufferRef.current) {
+      console.error('❌ No audio loaded');
+      addLog('Test audio analysis failed: no audio loaded', 'error');
+      return;
+    }
+
+    try {
+      const startTime = performance.now();
+      // 2. call the full analyser helper (may take a few seconds on long files)
+      const frequencyData = await analyzeAudioForExport(audioBufferRef.current);
+      const elapsed = Math.round(performance.now() - startTime);
+
+      console.log(`✅ Analyzed ${frequencyData.length} frames in ${elapsed}ms`);
+      addLog(`Audio analysis test complete: ${frequencyData.length} frames in ${elapsed}ms`, 'success');
+
+      // show a few sample entries
+      [0, 100, 1000].forEach(idx => {
+        if (idx < frequencyData.length) {
+          const frame = frequencyData[idx];
+          const avgAll = ((frame.bass + frame.mids + frame.highs) / 3).toFixed(2);
+          console.log(`Frame ${idx}: ${JSON.stringify(frame)} | avg ${avgAll}`);
+        }
+      });
+    } catch (err) {
+      console.error('Audio analysis test error:', err);
+      addLog(`Audio analysis test error: ${err instanceof Error ? err.message : err}`, 'error');
+    }
   };
 
   // testFrameByFrameExport is available for props; avoid global exposure

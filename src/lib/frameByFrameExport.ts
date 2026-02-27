@@ -57,6 +57,34 @@ export interface AudioFrameData {
 }
 
 /**
+ * Perform a full sweep of the audio buffer and return an array of frequency
+ * data objects, one entry for each frame at the supplied frame rate.  This is
+ * used by the "test audio analysis" feature and by the export pipeline to
+ * avoid re‑calculating FFT data during rendering.
+ *
+ * The implementation is intentionally simple: it just samples the buffer at
+ * regular intervals and calls `calculateAudioFrequencyAtTime` for each.
+ *
+ * @param audioBuffer - decoded audio data
+ * @param fps - frames per second to analyse at (default 30)
+ */
+export async function analyzeAudioForExport(
+  audioBuffer: AudioBuffer,
+  fps: number = 30
+): Promise<AudioFrameData[]> {
+  const duration = audioBuffer.duration;
+  const totalFrames = Math.ceil(duration * fps);
+  const result: AudioFrameData[] = [];
+
+  for (let i = 0; i < totalFrames; i++) {
+    const time = i / fps;
+    result.push(calculateAudioFrequencyAtTime(audioBuffer, time));
+  }
+
+  return result;
+}
+
+/**
  * Calculate audio frequency data for a specific frame timestamp
  * without needing real-time playback
  */
