@@ -1906,8 +1906,35 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const initAudio = async (file) => {
     try {
       addLog(`Loading audio: ${file.name}`, 'info');
-      if (audioContextRef.current) audioContextRef.current.close();
+      if (audioContextRef.current) {
+        try {
+          await audioContextRef.current.close();
+        } catch (_e) {
+          // ignore
+        }
+      }
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // listen for state changes that could indicate a device error
+      ctx.onstatechange = () => {
+        console.warn('🔇 AudioContext state changed to', ctx.state);
+        if (ctx.state === 'suspended') {
+          addLog(
+            `AudioContext state is suspended. ` +
+              'This may indicate autoplay policy or a temporary glitch; interact with the page to resume.',
+            'warning'
+          );
+        }
+        if (ctx.state === 'closed') {
+          addLog(
+            'AudioContext has closed unexpectedly. ' +
+              'Audio will no longer play – please reload the page or reconnect your audio device.',
+            'error'
+          );
+          setAudioReady(false);
+        }
+      };
+
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 2048;
       const buf = await ctx.decodeAudioData(await file.arrayBuffer());
@@ -1926,6 +1953,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.error(e);
       const error = e as Error;
       addLog(`Audio load error: ${error.message}`, 'error');
+      if (error.message.includes('AudioContext') || error.message.includes('device')) {
+        addLog(
+          'The AudioContext encountered an error from the audio device or the WebAudio renderer. ' +
+            'Try reloading the page or checking your system audio settings.',
+          'error'
+        );
+      }
     }
   };
 
@@ -1935,41 +1969,70 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.log('❌ playAudio: Missing audio context, buffer, or analyser');
       return;
     }
-    
-    // Stop and clean up any existing audio source to prevent duplicates
-    if (bufferSourceRef.current) {
-      try {
-        bufferSourceRef.current.stop();
-      } catch (e) {
-        // Source may already be stopped, ignore error
-      }
-      bufferSourceRef.current = null;
+
+    const ctx = audioContextRef.current;
+    // ensure context is running
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(err => {
+        console.error('Failed to resume AudioContext:', err);
+        addLog(
+          'Unable to resume audio context. ' +
+            'Audio may be blocked by the browser or system. Try interacting with the page or reloading.',
+          'error'
+        );
+      });
+    }
+    if (ctx.state === 'closed') {
+      addLog(
+        'Audio context is closed. Reload the page to reinitialize audio.',
+        'error'
+      );
+      return;
     }
     
-    const src = audioContextRef.current.createBufferSource();
-    src.buffer = audioBufferRef.current;
-    src.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
-    
-    // Add onended handler to stop playback when audio finishes
-    src.onended = () => {
-      if (bufferSourceRef.current === src) {
-        bufferSourceRef.current = null;
-        pauseTimeRef.current = 0; // Reset to beginning
-        setCurrentTime(0);
-        setIsPlaying(false);
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-          animationRef.current = null;
+    try {
+      // Stop and clean up any existing audio source to prevent duplicates
+      if (bufferSourceRef.current) {
+        try {
+          bufferSourceRef.current.stop();
+        } catch (e) {
+          // Source may already be stopped, ignore error
         }
+        bufferSourceRef.current = null;
       }
-    };
-    
-    src.start(0, pauseTimeRef.current);
-    bufferSourceRef.current = src;
-    startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
-    console.log('✅ playAudio: Setting isPlaying to true');
-    setIsPlaying(true);
+      
+      const src = ctx.createBufferSource();
+      src.buffer = audioBufferRef.current!;
+      src.connect(analyserRef.current!);
+      analyserRef.current!.connect(ctx.destination);
+      
+      // Add onended handler to stop playback when audio finishes
+      src.onended = () => {
+        if (bufferSourceRef.current === src) {
+          bufferSourceRef.current = null;
+          pauseTimeRef.current = 0; // Reset to beginning
+          setCurrentTime(0);
+          setIsPlaying(false);
+          if (animationRef.current) {
+            cancelAnimationFrame(animationRef.current);
+            animationRef.current = null;
+          }
+        }
+      };
+      
+      src.start(0, pauseTimeRef.current);
+      bufferSourceRef.current = src;
+      startTimeRef.current = Date.now() - (pauseTimeRef.current * 1000);
+      console.log('✅ playAudio: Setting isPlaying to true');
+      setIsPlaying(true);
+    } catch (err) {
+      console.error('Audio playback error:', err);
+      addLog(
+        'Audio playback error: The AudioContext encountered an error from the audio device or the WebAudio renderer. ' +
+          'Please check your audio output and reload the page.',
+        'error'
+      );
+    }
   };
 
   const stopAudio = () => {
@@ -2938,6 +3001,19 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
       addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
 
+      // optional quick audio analysis check (helps catch corrupted buffers early)
+      addLog('Analyzing audio... (1s)', 'info');
+      try {
+        if (audioBufferRef.current) {
+          calculateAudioFrequencyAtTime(audioBufferRef.current, 0);
+        }
+      } catch (audioErr) {
+        console.error('Audio analysis error during export:', audioErr);
+        addLog(`Audio analysis failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
+        throw audioErr;
+      }
+
+      const startTime = performance.now();
       for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
         const frameTime = frameNumber / FRAME_RATE;
         console.log(`📍 Rendering frame ${frameNumber}/${totalFrames} at time ${frameTime.toFixed(3)}s`);
@@ -2972,10 +3048,22 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
         if (blob) {
           frameBlobs.push(blob);
-          if (frameNumber % 30 === 0 || frameNumber === totalFrames - 1) {
-            const progress = ((frameNumber + 1) / totalFrames) * 100;
-            console.log(`✅ Captured ${frameNumber + 1}/${totalFrames} frames (${progress.toFixed(1)}%)`);
-            addLog(`Progress: ${frameNumber + 1}/${totalFrames} frames captured (${progress.toFixed(1)}%)`, 'info');
+          // progress + ETA calculation
+          const done = frameNumber + 1;
+          const elapsed = (performance.now() - startTime) / 1000; // secs
+          const percent = (done / totalFrames) * 100;
+          const estTotal = (elapsed / done) * totalFrames;
+          const remaining = Math.max(0, estTotal - elapsed);
+          addLog(`Rendering frame ${done}/${totalFrames} (${percent.toFixed(1)}%) - ~${Math.round(remaining)}s remaining`, 'info');
+
+          if (done % 100 === 0 || frameNumber === totalFrames - 1) {
+            const warn = memoryMonitor.checkMemoryWarning(done);
+            const memMB = memoryMonitor.getMemoryUsage();
+            console.log(`Memory after ${done} frames: ${memMB.toFixed(2)} MB`);
+            addLog(`Memory: ${memMB.toFixed(2)} MB`, 'info');
+            if (warn.warning) {
+              addLog(`Memory warning: ${warn.suggestion}`, 'warning');
+            }
           }
         } else {
           console.error(`❌ Failed to capture frame ${frameNumber}`);

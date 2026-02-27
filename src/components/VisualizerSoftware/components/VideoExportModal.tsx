@@ -227,8 +227,19 @@ export function VideoExportModal({
                 Test Audio Analysis
               </button>
               <button
-                onClick={() => { (window as any).testExport && (window as any).testExport(); }}
-                className="w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-black transition-colors border-2 border-yellow-400">
+                onClick={() => {
+                  if (testFrameByFrameExport) {
+                    testFrameByFrameExport();
+                  } else {
+                    console.warn('Test export callback not provided');
+                  }
+                }}
+                disabled={!testFrameByFrameExport}
+                className={`w-full px-4 py-2 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                  testFrameByFrameExport ? 'bg-yellow-600 hover:bg-yellow-700 text-black' : 'bg-gray-600 cursor-not-allowed text-gray-300'
+                } transition-colors border-2 ${
+                  testFrameByFrameExport ? 'border-yellow-400' : 'border-gray-500'
+                }`}>
                 <span className="text-lg">⚡</span>
                 Test Export (10s)
               </button>
