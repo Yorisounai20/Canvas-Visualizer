@@ -808,21 +808,34 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       if (audioBlob) {
-        addLog('Muxing audio/video using FFmpeg...', 'info');
-        const combined = await muxAudioVideo(videoBlob, audioBlob);
-        if (combined) {
-          addLog('Download ready!', 'success');
-          const url = URL.createObjectURL(combined);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `test_export_10s_${new Date().toISOString().slice(0,10)}.webm`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        } else {
-          addLog('Failed to mux audio/video for test video', 'error');
-        }
+        // Skip FFmpeg muxing - just download video and audio separately
+        addLog('Preparing downloads...', 'info');
+        
+        // Download video
+        const videoUrl = URL.createObjectURL(videoBlob);
+        const videoLink = document.createElement('a');
+        videoLink.href = videoUrl;
+        videoLink.download = `visualizer_video_${new Date().toISOString().slice(0,10)}.webm`;
+        document.body.appendChild(videoLink);
+        videoLink.click();
+        document.body.removeChild(videoLink);
+        URL.revokeObjectURL(videoUrl);
+        addLog('✅ Video downloaded! (visualizer_video_*.webm)', 'success');
+        
+        // Small delay before audio download
+        setTimeout(() => {
+          // Download audio
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audioLink = document.createElement('a');
+          audioLink.href = audioUrl;
+          audioLink.download = `visualizer_audio_${new Date().toISOString().slice(0,10)}.wav`;
+          document.body.appendChild(audioLink);
+          audioLink.click();
+          document.body.removeChild(audioLink);
+          URL.revokeObjectURL(audioUrl);
+          addLog('✅ Audio downloaded! (visualizer_audio_*.wav)', 'success');
+          addLog('📝 Combine video + audio in your video editor (FFmpeg, DaVinci Resolve, etc.)', 'info');
+        }, 500);
       }
 
       addLog('Test export complete', 'success');
@@ -3238,11 +3251,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
       // encoded successfully, bump progress and move to muxing
       setExportProgress(90);
-      setExportPhase('muxing');
+      setExportPhase('encoding');
 
       // PHASE 3: Create audio blob (WAV)
       console.log('🎵 PHASE 3: Generating audio track...');
-      addLog('PHASE 3: Generating audio blob from buffer...', 'info');
+      addLog('PHASE 3: Generating audio blog from buffer...', 'info');
 
       const audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
       if (!audioBlob) {
@@ -3250,46 +3263,47 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return [];
       }
 
-      // PHASE 4: Mux audio and video via FFmpeg
-      console.log('🔗 PHASE 4: Muxing audio/video with FFmpeg...');
-      addLog('PHASE 4: Muxing audio/video using FFmpeg.wasm (this may take a few seconds)...', 'info');
-      const muxed = await muxAudioVideo(videoBlob, audioBlob);
-      if (!muxed) {
-        addLog('❌ Failed to mux audio and video', 'error');
-        return [];
-      }
-      const finalBlob = muxed;
-
-      // PHASE 5: Download the complete video
-      console.log('💾 PHASE 5: Preparing download...');
-      addLog('PHASE 5: Preparing download...', 'info');
+      // PHASE 4: Download video and audio separately (no FFmpeg muxing)
+      console.log('💾 PHASE 4: Preparing downloads...');
+      addLog('PHASE 4: Preparing separate downloads for video + audio...', 'info');
+      
+      setExportProgress(95);
       
       const timestamp = new Date().toISOString().slice(0, 10);
       const videoDuration = Math.round(duration);
-      const videoSizeMB = Math.round(finalBlob.size / 1024 / 1024);
-      const filename = `music_visualizer_${timestamp}_${videoDuration}s_${videoSizeMB}MB.webm`;
-
-      // Store blob and filename for download button in modal
-      setExportedBlob(finalBlob);
-      setExportedFilename(filename);
+      const videoSizeMB = Math.round(videoBlob.size / 1024 / 1024);
+      const audioSizeMB = Math.round(audioBlob.size / 1024 / 1024);
+      
+      // Download video
+      const videoFilename = `visualizer_video_${timestamp}.webm`;
+      const videoUrl = URL.createObjectURL(videoBlob);
+      const videoLink = document.createElement('a');
+      videoLink.href = videoUrl;
+      videoLink.download = videoFilename;
+      document.body.appendChild(videoLink);
+      videoLink.click();
+      document.body.removeChild(videoLink);
+      URL.revokeObjectURL(videoUrl);
+      addLog(`✅ Video downloaded: ${videoFilename} (${videoSizeMB} MB)`, 'success');
+      
+      // Download audio with small delay
+      setTimeout(() => {
+        const audioFilename = `visualizer_audio_${timestamp}.wav`;
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audioLink = document.createElement('a');
+        audioLink.href = audioUrl;
+        audioLink.download = audioFilename;
+        document.body.appendChild(audioLink);
+        audioLink.click();
+        document.body.removeChild(audioLink);
+        URL.revokeObjectURL(audioUrl);
+        addLog(`✅ Audio downloaded: ${audioFilename} (${audioSizeMB} MB)`, 'success');
+      }, 500);
+      
       setExportProgress(100);
       setExportPhase('done');
-
-      // Auto-download
-      const url = URL.createObjectURL(finalBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      console.log('✅ Download started:', filename);
-      addLog(`✅ Download started: ${filename}`, 'success');
-      addLog(`📊 Final video: ${(finalBlob.size / 1024 / 1024).toFixed(2)} MB`, 'info');
-      addLog(`⏱️ Duration: ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`, 'info');
-      addLog('✨ Frame-by-frame export complete!', 'success');
+      addLog('📝 Combine with: ffmpeg -i visualizer_video_*.webm -i visualizer_audio_*.wav -c:v copy -c:a aac output.mp4', 'info');
+      addLog('✨ Frame-by-frame export complete! Video + audio ready to combine.', 'success');
 
       return frameBlobs;
     } catch (error) {
