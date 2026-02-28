@@ -4763,7 +4763,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           // avoid excessive React re-renders.
           if (!isExporting || isFrameByFrameModeRef.current) {
             // maintain the timeline at raw time so UI/events stay synced to audio
-            setCurrentTime(rawT);
+            setCurrentTime(t);
             lastTimelineUpdateRef.current = now;
           }
         }
