@@ -3233,8 +3233,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           // Convert blob to ImageBitmap
           const imageBitmap = await createImageBitmap(frameBlobs[i]);
           
+          // WebMWriter expects a canvas element or something with toDataURL();
+          // ImageBitmap doesn’t implement toDataURL in some browsers, which
+          // results in the runtime error seen in production builds.
+          // Draw the bitmap onto an offscreen canvas first.
+          let frameSource: HTMLCanvasElement | ImageBitmap = imageBitmap;
+          if (!(imageBitmap as any).toDataURL) {
+            console.warn('📐 Converting ImageBitmap to canvas for WebMWriter compatibility');
+            const offscreen = document.createElement('canvas');
+            offscreen.width = writer.opts.width;
+            offscreen.height = writer.opts.height;
+            const ctx = offscreen.getContext('2d');
+            if (ctx) ctx.drawImage(imageBitmap, 0, 0, offscreen.width, offscreen.height);
+            frameSource = offscreen;
+          }
+          
           // Add frame to video
-          writer.addFrame(imageBitmap);
+          writer.addFrame(frameSource);
           successfulFrames++;
 
           // Log progress every 100 frames
