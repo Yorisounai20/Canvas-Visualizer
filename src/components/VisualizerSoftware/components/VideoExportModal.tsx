@@ -15,6 +15,7 @@ interface VideoExportModalProps {
   isExporting: boolean;
   audioReady: boolean;
   exportProgress: number;
+  exportPhase?: 'idle'|'capturing'|'encoding'|'muxing'|'done';
   handleExportAndCloseModal: () => void;
   duration: number;
   testAudioAnalysis: () => Promise<void>;
@@ -35,6 +36,7 @@ export function VideoExportModal({
   isExporting,
   audioReady,
   exportProgress,
+  exportPhase,
   handleExportAndCloseModal,
   duration,
   testAudioAnalysis,
@@ -266,7 +268,15 @@ export function VideoExportModal({
               </div>
               
               <div className="flex justify-between text-xs text-gray-400">
-                <span>Rendering Progress</span>
+                <span>
+                  {exportPhase === 'capturing'
+                    ? 'Capturing frames'
+                    : exportPhase === 'encoding'
+                    ? 'Encoding video'
+                    : exportPhase === 'muxing'
+                    ? 'Muxing audio/video'
+                    : 'Rendering Progress'}
+                </span>
                 <span className="font-mono">{exportProgress.toFixed(0)}%</span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">

@@ -1,5 +1,10 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
+// @ts-nocheck
+// This file is a long-form backup of the visualizer component used for
+// experimentation. It's not compiled in the normal build and triggers dozens
+// of TypeScript diagnostics in the editor. We disable checking so the IDE won't
+// nag about the many legacy or incomplete types.
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
@@ -375,6 +380,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Video export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [exportPhase, setExportPhase] = useState<'idle'|'capturing'|'encoding'|'muxing'|'done'>('idle');
   const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for speed and reliability
   const [exportResolution, setExportResolution] = useState('1920x1080'); // Default to 1080p for YouTube
   const [exportMode, setExportMode] = useState<'live' | 'frame-by-frame'>('live'); // Export mode selection
@@ -619,6 +625,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     maskId: string;
     animation: 'expand-circle' | 'wipe-left' | 'wipe-right' | 'fade';
     duration: number;
+    easing: 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
   }>>([]);
 
   // Memoized sorted letterbox keyframes for performance
@@ -2806,6 +2813,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     try {
       isFrameByFrameModeRef.current = true;
+      setExportPhase('capturing');
       console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
       addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
 
@@ -2847,6 +2855,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             const progress = ((frameNumber + 1) / totalFrames) * 100;
             console.log(`✅ Captured ${frameNumber + 1}/${totalFrames} frames (${progress.toFixed(1)}%)`);
             addLog(`Progress: ${frameNumber + 1}/${totalFrames} frames captured (${progress.toFixed(1)}%)`, 'info');
+            setExportProgress(Math.floor(((frameNumber + 1) / totalFrames) * 60));
           }
         } else {
           console.error(`❌ Failed to capture frame ${frameNumber}`);
@@ -2858,6 +2867,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       isFrameByFrameModeRef.current = false;
       console.log('🎉 Frame-by-frame export complete, collected', frameBlobs.length, 'frames');
       addLog(`✅ Frame-by-frame export complete: ${frameBlobs.length}/${totalFrames} frames captured`, 'success');
+      setExportProgress(60);
+      setExportPhase('encoding');
 
       // PHASE 2: Encode frames to video
       console.log('📺 PHASE 2: Encoding video...');
@@ -2960,6 +2971,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             const progress = ((i + 1) / frameBlobs.length) * 100;
             console.log(`✅ Encoded ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`);
             addLog(`Encoding progress: ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`, 'info');
+            setExportProgress(60 + Math.floor(((i + 1) / frameBlobs.length) * 30));
           }
         } catch (frameError) {
           failedFrames++;
@@ -2971,6 +2983,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Finalize video
       console.log('🎬 Finalizing video encoding...');
       addLog('Finalizing video encoding...', 'info');
+      setExportProgress(90);
       
       const videoBlob = writer.render();
       
@@ -3029,6 +3042,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       ffmpeg.setProgress(({ ratio }) => {
         addLog(`Muxing progress: ${(ratio * 100).toFixed(1)}%`, 'info');
+        setExportProgress(90 + Math.floor(ratio * 10));
       });
 
       ffmpeg.FS('writeFile', 'video.webm', await ffmpeg.fetchFile(videoBlob));

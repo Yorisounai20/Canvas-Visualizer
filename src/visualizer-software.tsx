@@ -379,6 +379,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // NEW: Video export state
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  // Track which phase of export we are in for better UX
+  const [exportPhase, setExportPhase] = useState<'idle'|'capturing'|'encoding'|'muxing'|'done'>('idle');
   const [exportFormat, setExportFormat] = useState('webm-vp8'); // VP8 for speed and reliability
   const [exportResolution, setExportResolution] = useState('1920x1080'); // Default to 1080p for YouTube
   const [exportMode, setExportMode] = useState<'live' | 'frame-by-frame'>('live'); // Export mode selection
@@ -680,6 +682,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
     // flag export state so animation loop doesn't early-return
     setIsExporting(true);
+    setExportProgress(0);
+    setExportPhase('capturing');
 
     try {
       // PHASE A: Audio analysis
@@ -705,6 +709,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         const frameTime = i / FRAME_RATE;
         targetFrameTimeRef.current = frameTime;
         capturedFrameBlobRef.current = null;
+        // update simple capture progress (0-60%)
+        setExportProgress(Math.floor(((i + 1) / totalFrames) * 60));
 
         const framePromise = new Promise<Blob | null>(resolve => {
           const timeout = setTimeout(() => resolve(null), 2000);
@@ -771,6 +777,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       addLog(`Captured ${frameBlobs.length}/${totalFrames} test frames`, 'info');
 
       // PHASE C: Encoding
+      setExportPhase('encoding');
       addLog('Encoding video... (30s estimated)', 'info');
       let videoBlob: Blob | null = null;
       try {
@@ -817,6 +824,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       }
 
       addLog('Test export complete', 'success');
+      setExportPhase('done');
       return;
     } catch (err) {
       console.error('Test export error:', err);
@@ -1327,6 +1335,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       Notification.requestPermission();
     }
   }, []);
+
+  // Reset progress/phase when export modal closes so each export starts fresh
+  useEffect(() => {
+    if (!showExportModal) {
+      setExportProgress(0);
+      setExportPhase('idle');
+    }
+  }, [showExportModal]);
 
   // Load project from sessionStorage on mount
   useEffect(() => {
@@ -2553,6 +2569,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       
       setIsExporting(true);
       setExportProgress(0);
+      setExportPhase('capturing');
       addLog('Starting automated video export...', 'info');
 
       // Request wake lock to prevent screen sleep during long exports (8+ minutes)
@@ -2711,6 +2728,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog(`Export failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`, 'error');
           setIsExporting(false);
           setExportProgress(0);
+          setExportPhase('done');
           // Restore original mode on error
           // MODE RESTORATION REMOVED
           return;
@@ -2756,6 +2774,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog('Export failed: No video data recorded', 'error');
           setIsExporting(false);
           setExportProgress(0);
+          setExportPhase('done');
           return;
         }
         
@@ -2766,6 +2785,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           addLog('Export failed: Video file is empty', 'error');
           setIsExporting(false);
           setExportProgress(0);
+          setExportPhase('done');
           return;
         }
         
@@ -2852,6 +2872,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         setIsExporting(false);
         setExportProgress(100);
+        setExportPhase('done');
         
         // Release wake lock
         if (wakeLock) {
@@ -2879,6 +2900,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         console.error('MediaRecorder error:', event);
         setIsExporting(false);
         setExportProgress(0);
+        setExportPhase('done');
         setIsRecording(false);
         // MODE RESTORATION REMOVED
       };
@@ -2893,6 +2915,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       } catch (error) {
         addLog(`Failed to start recording: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         setIsExporting(false);
+        setExportPhase('done');
         setExportProgress(0);
         // MODE RESTORATION REMOVED
         return;
@@ -3068,6 +3091,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // mark exporting so animation loop and UI behave correctly
       setIsExporting(true);
       setExportProgress(0);
+      setExportPhase('capturing');
       isFrameByFrameModeRef.current = true;
       console.log('🎬 Starting frame-by-frame export, total frames:', totalFrames);
       addLog(`Starting frame-by-frame export: ${totalFrames} frames at 30 FPS`, 'info');
@@ -3129,6 +3153,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           const estTotal = (elapsed / done) * totalFrames;
           const remaining = Math.max(0, estTotal - elapsed);
           addLog(`Rendering frame ${done}/${totalFrames} (${percent.toFixed(1)}%) - ~${Math.round(remaining)}s remaining`, 'info');
+          // update progress bar (capture occupies 0-60%)
+          setExportProgress(Math.floor((done / totalFrames) * 60));
 
           if (done % 100 === 0 || frameNumber === totalFrames - 1) {
             const warn = memoryMonitor.checkMemoryWarning(done);
@@ -3157,7 +3183,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.log('🎉 Frame-by-frame export complete, collected', frameBlobs.length, 'frames');
       addLog(`✅ Frame-by-frame export complete: ${frameBlobs.length}/${totalFrames} frames captured`, 'success');
 
-      // reset exporting flag once finished
+      // move progress into encoding phase
+      setExportProgress(60);
+      setExportPhase('encoding');
+
+      // reset exporting flag once finished capturing (encoding/muxing will continue)
       setIsExporting(false);
 
       // PHASE 2: Encode frames to video
@@ -3170,6 +3200,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         addLog('❌ Video encoding failed', 'error');
         return [];
       }
+      // encoded successfully, bump progress and move to muxing
+      setExportProgress(90);
+      setExportPhase('muxing');
 
       // PHASE 3: Create audio blob (WAV)
       console.log('🎵 PHASE 3: Generating audio track...');
@@ -3280,6 +3313,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             const progress = ((i + 1) / frameBlobs.length) * 100;
             console.log(`✅ Encoded ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`);
             addLog(`Encoding progress: ${i + 1}/${frameBlobs.length} frames (${progress.toFixed(1)}%)`, 'info');
+            // update progress bar (encoding occupies 60-90%)
+            const encPortion = ((i + 1) / frameBlobs.length) * 30; // 0..30
+            setExportProgress(60 + Math.floor(encPortion));
           }
         } catch (frameError) {
           failedFrames++;
@@ -3291,6 +3327,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Finalize video
       console.log('🎬 Finalizing video encoding...');
       addLog('Finalizing video encoding...', 'info');
+      // make sure progress reflects the end of encoding
+      setExportProgress(90);
       
       // WebMWriter.complete() returns a Promise<Blob>
       const videoBlob = await writer.complete();
@@ -3306,6 +3344,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       addLog(`Video encoding failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       return null;
     }
+  };
+
+  // FFmpeg instance loader (lazy dynamic import)
+  let _ffmpeg: any = null;
+  const getFFmpeg = async () => {
+    if (!_ffmpeg) {
+      const ffmpegModule = await import('@ffmpeg/ffmpeg');
+      _ffmpeg = ffmpegModule.createFFmpeg({ log: true });
+      _ffmpeg.fetchFile = ffmpegModule.fetchFile;
+    }
+    return _ffmpeg;
   };
 
   // Generate a WAV audio blob from the supplied AudioBuffer.
@@ -3342,6 +3391,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       ffmpeg.setProgress(({ ratio }) => {
         addLog(`Muxing progress: ${(ratio * 100).toFixed(1)}%`, 'info');
+        // map 0-1 to 90-100
+        setExportProgress(90 + Math.floor(ratio * 10));
       });
 
       // write inputs to FS
@@ -3352,6 +3403,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       const data = ffmpeg.FS('readFile', 'output.webm');
       const result = new Blob([data.buffer], { type: 'video/webm' });
+      // progress is now complete
+      setExportProgress(100);
+      setExportPhase('done');
       // remove temporary files from ffmpeg FS
       try {
         ffmpeg.FS('unlink', 'video.webm');
@@ -11467,6 +11521,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         isExporting={isExporting}
         audioReady={audioReady}
         exportProgress={exportProgress}
+        exportPhase={exportPhase}
         handleExportAndCloseModal={handleExportAndCloseModal}
         duration={duration}
         testAudioAnalysis={testAudioAnalysis}
