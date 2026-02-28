@@ -6,7 +6,7 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import fixWebmDuration from 'webm-duration-fix';
 import WebMWriter from 'webm-writer';
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+// ffmpeg is imported dynamically inside helper to avoid build-time bundling issues
 
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
@@ -1312,7 +1312,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         setFontLoaded(false);
       }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []); // Empty deps - state setters are stable, addLog is non-critical
 
   useEffect(() => {
@@ -3329,6 +3329,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   // Use FFmpeg.wasm to mux video and audio blobs into a single WebM file.
   const muxAudioVideo = async (videoBlob: Blob, audioBlob: Blob): Promise<Blob | null> => {
     try {
+      const ffmpeg = await getFFmpeg();
       if (!ffmpeg.isSupported || !(ffmpeg as any).isSupported()) {
         addLog('⚠️ FFmpeg.wasm is not supported in this browser.', 'error');
         return null;
@@ -3344,8 +3345,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       });
 
       // write inputs to FS
-      ffmpeg.FS('writeFile', 'video.webm', await fetchFile(videoBlob));
-      ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(audioBlob));
+      ffmpeg.FS('writeFile', 'video.webm', await ffmpeg.fetchFile(videoBlob));
+      ffmpeg.FS('writeFile', 'audio.wav', await ffmpeg.fetchFile(audioBlob));
 
       await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c', 'copy', 'output.webm');
 
@@ -4943,7 +4944,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // Reset Post-FX event accumulation values
       let vignetteStrengthPulse = 0;
       let contrastBurst = 0;
-      let colorTintFlash = { r: 0, g: 0, b: 0 };
+      const colorTintFlash = { r: 0, g: 0, b: 0 };
       
       for (const event of parameterEvents) {
         let shouldTrigger = false;
@@ -8979,7 +8980,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
             
             case 'slide': {
               const distance = 3;
-              let slideOffset = { x: 0, y: 0, z: 0 };
+              const slideOffset = { x: 0, y: 0, z: 0 };
               switch (textKf.direction) {
                 case 'up': slideOffset.y = -distance; break;
                 case 'down': slideOffset.y = distance; break;
@@ -9030,8 +9031,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         if (activeRigs.length > 0) {
           // Initialize combined position and rotation
-          let combinedPosition = { x: 0, y: 0, z: 0 };
-          let combinedRotation = { x: 0, y: 0, z: 0 };
+          const combinedPosition = { x: 0, y: 0, z: 0 };
+          const combinedRotation = { x: 0, y: 0, z: 0 };
           
           // Process each active rig
           activeRigs.forEach(activeRig => {
@@ -9188,7 +9189,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           rigCameraOffset.applyEuler(combinedNullObject.rotation);
           
           // Calculate base camera position from rig
-          let finalCameraPosition = rigWorldPos.clone().add(rigCameraOffset);
+          const finalCameraPosition = rigWorldPos.clone().add(rigCameraOffset);
           
           // Apply Camera FX Layer
           // 1. Handheld drift using noise
@@ -9223,7 +9224,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           cam.position.copy(finalCameraPosition);
           
           // Framing controls - adjust look-at target
-          let lookAtTarget = new THREE.Vector3(0, 0, 0);
+          const lookAtTarget = new THREE.Vector3(0, 0, 0);
           
           if (enableFramingLock || lookAtOffsetX !== 0 || lookAtOffsetY !== 0) {
             // Apply look-at offset

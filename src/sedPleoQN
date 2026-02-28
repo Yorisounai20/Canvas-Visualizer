@@ -5,7 +5,7 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import fixWebmDuration from 'webm-duration-fix';
 import WebMWriter from 'webm-writer';
-import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+// ffmpeg imported dynamically in helper to avoid bundling issues
 
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
@@ -2987,8 +2987,16 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  // FFmpeg instance for client-side muxing (singleton)
-  const ffmpeg = createFFmpeg({ log: true });
+  // FFmpeg instance loader (lazy dynamic import)
+  let _ffmpeg: any = null;
+  const getFFmpeg = async () => {
+    if (!_ffmpeg) {
+      const ffmpegModule = await import('@ffmpeg/ffmpeg');
+      _ffmpeg = ffmpegModule.createFFmpeg({ log: true });
+      _ffmpeg.fetchFile = ffmpegModule.fetchFile;
+    }
+    return _ffmpeg;
+  };
 
   // Generate a WAV audio blob;Muxing performed separately via FFmpeg
   const addAudioToVideo = async (videoBlob: Blob, audioBuffer: AudioBuffer, audioContext: AudioContext): Promise<Blob | null> => {
@@ -3005,22 +3013,45 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-      // Create buffer source
-      const source = offlineCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(offlineCtx.destination);
-      source.start(0);
+  // Helper to mux with FFmpeg (same as main file)
+  const muxAudioVideo = async (videoBlob: Blob, audioBlob: Blob): Promise<Blob | null> => {
+    try {
+      const ffmpeg = await getFFmpeg();
+      if (!ffmpeg.isSupported || !(ffmpeg as any).isSupported()) {
+        addLog('⚠️ FFmpeg.wasm is not supported in this browser.', 'error');
+        return null;
+      }
+      addLog('Preparing FFmpeg for muxing...', 'info');
+      if (!ffmpeg.isLoaded()) {
+        await ffmpeg.load();
+        addLog('FFmpeg loaded', 'info');
+      }
 
-      // Render to WAV
-      const renderedBuffer = await offlineCtx.startRendering();
-      
-      // Convert to WAV blob
-      const audioBlob = audioBufferToWave(renderedBuffer);
-      console.log('✅ Audio blob created:', (audioBlob.size / 1024).toFixed(2), 'KB');
+      ffmpeg.setProgress(({ ratio }) => {
+        addLog(`Muxing progress: ${(ratio * 100).toFixed(1)}%`, 'info');
+      });
 
-      // For now, return video blob (full muxing requires complex audio/video container handling)
-      // In production, you'd use FFmpeg.wasm or send to server for muxing
-      console.log('⚠️ Note: Full audio/video muxing not yet implemented. Use server-side encoding for production.');
+      ffmpeg.FS('writeFile', 'video.webm', await ffmpeg.fetchFile(videoBlob));
+      ffmpeg.FS('writeFile', 'audio.wav', await ffmpeg.fetchFile(audioBlob));
 
-      return videoBlob; // Return video for now, audio will need server-side muxing
+      await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c', 'copy', 'output.webm');
+
+      const data = ffmpeg.FS('readFile', 'output.webm');
+      const result = new Blob([data.buffer], { type: 'video/webm' });
+      try {
+        ffmpeg.FS('unlink', 'video.webm');
+        ffmpeg.FS('unlink', 'audio.wav');
+        ffmpeg.FS('unlink', 'output.webm');
+      } catch (cleanupErr) {
+        console.warn('FFmpeg FS cleanup error:', cleanupErr);
+      }
+      addLog('Muxing complete', 'success');
+      return result;
+    } catch (error) {
+      console.error('❌ FFmpeg muxing failed:', error);
+      addLog(`FFmpeg muxing failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
+
     } catch (error) {

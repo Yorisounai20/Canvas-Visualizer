@@ -16,7 +16,7 @@ export const generateWaveformData = (buffer: AudioBuffer, samples = WAVEFORM_SAM
     const waveform: number[] = [];
     
     for (let i = 0; i < samples; i++) {
-      let blockStart = blockSize * i;
+      const blockStart = blockSize * i;
       let sum = 0;
       for (let j = 0; j < blockSize; j++) {
         sum += Math.abs(rawData[blockStart + j]);
