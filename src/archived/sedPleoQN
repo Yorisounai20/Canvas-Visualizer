@@ -3005,8 +3005,12 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const getFFmpeg = async () => {
     if (!_ffmpeg) {
       const ffmpegModule = await import('@ffmpeg/ffmpeg');
-      _ffmpeg = ffmpegModule.createFFmpeg({ log: true });
-      _ffmpeg.fetchFile = ffmpegModule.fetchFile;
+      const ffmpegNS: any = (ffmpegModule && 'createFFmpeg' in ffmpegModule)
+        ? ffmpegModule
+        : (ffmpegModule && (ffmpegModule as any).default) || ffmpegModule;
+      console.log('FFmpeg module loaded:', ffmpegNS);
+      _ffmpeg = ffmpegNS.createFFmpeg({ log: true });
+      _ffmpeg.fetchFile = ffmpegNS.fetchFile;
     }
     return _ffmpeg;
   };

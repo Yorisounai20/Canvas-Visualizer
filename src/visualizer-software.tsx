@@ -3351,8 +3351,41 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const getFFmpeg = async () => {
     if (!_ffmpeg) {
       const ffmpegModule = await import('@ffmpeg/ffmpeg');
-      _ffmpeg = ffmpegModule.createFFmpeg({ log: true });
-      _ffmpeg.fetchFile = ffmpegModule.fetchFile;
+      // Normalise possible shapes produced by different bundlers:
+      // - direct exports: { createFFmpeg, fetchFile }
+      // - default export: { default: { createFFmpeg, fetchFile } }
+      // - namespaced: { FFmpeg: { createFFmpeg }, fetchFile }
+      const modAny: any = ffmpegModule;
+      const nsCandidate = modAny && modAny.default ? modAny.default : modAny;
+
+      // locate createFFmpeg and fetchFile across possible locations
+      const createFn = nsCandidate.createFFmpeg
+        || (nsCandidate.FFmpeg && nsCandidate.FFmpeg.createFFmpeg)
+        || (modAny && modAny.createFFmpeg)
+        || (modAny && modAny.FFmpeg && modAny.FFmpeg.createFFmpeg);
+
+      const fetchFileFn = nsCandidate.fetchFile || modAny.fetchFile || (nsCandidate.FFmpeg && nsCandidate.FFmpeg.fetchFile);
+
+      console.log('FFmpeg import shapes:', { modAny, nsCandidate, hasCreate: !!createFn, hasFetchFile: !!fetchFileFn });
+
+      if (!createFn) {
+        throw new Error('FFmpeg loader: createFFmpeg not found on imported module');
+      }
+
+      // create ffmpeg instance using discovered factory
+      _ffmpeg = createFn({ log: true });
+
+      // attach fetchFile if available; otherwise provide a lightweight fallback
+      if (fetchFileFn) {
+        _ffmpeg.fetchFile = fetchFileFn;
+      } else {
+        _ffmpeg.fetchFile = async (input: Blob | string) => {
+          if (input instanceof Blob) return new Uint8Array(await input.arrayBuffer());
+          const res = await fetch(input as string);
+          const ab = await res.arrayBuffer();
+          return new Uint8Array(ab);
+        };
+      }
     }
     return _ffmpeg;
   };

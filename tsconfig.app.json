@@ -21,5 +21,8 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/visualizer-software.tsx", "src/archived/**"]
+  "exclude": [
+    "src/visualizer-software.tsx", // explicitly compiled via Vite, not tsc
+    "src/archived/**"              // archived backups and experiments
+  ]
 }
