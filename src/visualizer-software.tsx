@@ -3217,11 +3217,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       addLog(`Starting video encoding: ${frameBlobs.length} frames at ${frameRate} FPS`, 'info');
 
       // Create WebM writer with video parameters
+      const EXPORT_WIDTH = 960; // mirror constants used elsewhere
+      const EXPORT_HEIGHT = 540;
+
       const writer = new WebMWriter({
         quality: 0.95,
         frameRate: frameRate,
-        width: 960, // Match export resolution
-        height: 540
+        width: EXPORT_WIDTH,
+        height: EXPORT_HEIGHT
       });
 
       let successfulFrames = 0;
@@ -3241,8 +3244,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
           if (!(imageBitmap as any).toDataURL) {
             console.warn('📐 Converting ImageBitmap to canvas for WebMWriter compatibility');
             const offscreen = document.createElement('canvas');
-            offscreen.width = writer.opts.width;
-            offscreen.height = writer.opts.height;
+            offscreen.width = EXPORT_WIDTH;
+            offscreen.height = EXPORT_HEIGHT;
             const ctx = offscreen.getContext('2d');
             if (ctx) ctx.drawImage(imageBitmap, 0, 0, offscreen.width, offscreen.height);
             frameSource = offscreen;
@@ -3269,7 +3272,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.log('🎬 Finalizing video encoding...');
       addLog('Finalizing video encoding...', 'info');
       
-      const videoBlob = writer.render();
+      // WebMWriter.complete() returns a Promise<Blob>
+      const videoBlob = await writer.complete();
       
       console.log('✅ Video encoding complete:', (videoBlob.size / 1024 / 1024).toFixed(2), 'MB');
       console.log(`📊 Frames: ${successfulFrames} encoded, ${failedFrames} failed`);
