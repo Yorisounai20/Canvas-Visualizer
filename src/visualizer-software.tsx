@@ -6,6 +6,8 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import fixWebmDuration from 'webm-duration-fix';
 import WebMWriter from 'webm-writer';
+import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
@@ -784,25 +786,34 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return;
       }
 
-      addLog('Adding audio track...', 'info');
+      addLog('Generating audio blob...', 'info');
+      let audioBlob: Blob | null = null;
       try {
-        const final = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
-        if (final) {
+        audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
+        if (!audioBlob) {
+          addLog('Failed to generate audio blob', 'error');
+        }
+      } catch (audioErr) {
+        console.error('Audio generation error:', audioErr);
+        addLog(`Audio processing failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
+      }
+
+      if (audioBlob) {
+        addLog('Muxing audio/video using FFmpeg...', 'info');
+        const combined = await muxAudioVideo(videoBlob, audioBlob);
+        if (combined) {
           addLog('Download ready!', 'success');
-          const url = URL.createObjectURL(final);
+          const url = URL.createObjectURL(combined);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `test_export_10s_${new Date().toISOString().slice(0,10)}.mp4`;
+          a.download = `test_export_10s_${new Date().toISOString().slice(0,10)}.webm`;
           document.body.appendChild(a);
           a.click();
           a.remove();
           URL.revokeObjectURL(url);
         } else {
-          addLog('Failed to add audio to test video', 'error');
+          addLog('Failed to mux audio/video for test video', 'error');
         }
-      } catch (audioErr) {
-        console.error('Audio muxing error:', audioErr);
-        addLog(`Audio processing failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
       }
 
       addLog('Test export complete', 'success');
@@ -3160,20 +3171,29 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return [];
       }
 
-      // PHASE 3: Add audio to video
-      console.log('🎵 PHASE 3: Adding audio to video...');
-      addLog('PHASE 3: Adding audio track to video...', 'info');
-      
-      const finalBlob = await addAudioToVideo(videoBlob, audioBufferRef.current, audioContextRef.current!);
-      
-      if (!finalBlob) {
-        addLog('❌ Failed to add audio to video', 'error');
+      // PHASE 3: Create audio blob (WAV)
+      console.log('🎵 PHASE 3: Generating audio track...');
+      addLog('PHASE 3: Generating audio blob from buffer...', 'info');
+
+      const audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
+      if (!audioBlob) {
+        addLog('❌ Failed to generate audio blob', 'error');
         return [];
       }
 
-      // PHASE 4: Download the complete video
-      console.log('💾 PHASE 4: Downloading video...');
-      addLog('PHASE 4: Preparing download...', 'info');
+      // PHASE 4: Mux audio and video via FFmpeg
+      console.log('🔗 PHASE 4: Muxing audio/video with FFmpeg...');
+      addLog('PHASE 4: Muxing audio/video using FFmpeg.wasm (this may take a few seconds)...', 'info');
+      const muxed = await muxAudioVideo(videoBlob, audioBlob);
+      if (!muxed) {
+        addLog('❌ Failed to mux audio and video', 'error');
+        return [];
+      }
+      const finalBlob = muxed;
+
+      // PHASE 5: Download the complete video
+      console.log('💾 PHASE 5: Downloading video...');
+      addLog('PHASE 5: Preparing download...', 'info');
       
       const timestamp = new Date().toISOString().slice(0, 10);
       const videoDuration = Math.round(duration);
@@ -3288,52 +3308,67 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  // Combine video and audio tracks using MediaRecorder or merge at container level
+  // Generate a WAV audio blob from the supplied AudioBuffer.
+  // This no longer attempts to mux; muxing is handled separately via ffmpeg.wasm.
   const addAudioToVideo = async (videoBlob: Blob, audioBuffer: AudioBuffer, audioContext: AudioContext): Promise<Blob | null> => {
     try {
-      console.log('🎵 Adding audio track to video...');
-      addLog('Adding audio track to video...', 'info');
+      console.log('🎵 Generating audio blob from buffer...');
+      addLog('Generating audio blob...', 'info');
 
-      // Create audio blob from audioBuffer
-      const numberOfChannels = audioBuffer.numberOfChannels;
-      const sampleRate = audioBuffer.sampleRate;
-      const length = audioBuffer.length;
-      const duration = audioBuffer.duration;
-
-      // Create offline audio context for rendering
-      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
-        numberOfChannels,
-        length,
-        sampleRate
-      );
-
-      // Create buffer source
-      const source = offlineCtx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(offlineCtx.destination);
-      source.start(0);
-
-      // Render to WAV
-      const renderedBuffer = await offlineCtx.startRendering();
-      
-      // Convert to WAV blob
-      const audioBlob = audioBufferToWave(renderedBuffer);
-      console.log('✅ Audio blob created:', (audioBlob.size / 1024).toFixed(2), 'KB');
-
-      // For now, return video blob (full muxing requires complex audio/video container handling)
-      // In production, you'd use FFmpeg.wasm or send to server for muxing
-      console.log('⚠️ Note: Full audio/video muxing not yet implemented. Use server-side encoding for production.');
-      addLog('⚠️ Video and audio are separate. Use post-processing for muxing.', 'warning');
-
-      return videoBlob; // Return video for now, audio will need server-side muxing
+      // Use helper from frameByFrameExport (which already handles offline rendering)
+      const audioBlob = await createAudioBlob(audioBuffer);
+      console.log('✅ Audio blob created:', ((audioBlob.size || 0) / 1024).toFixed(2), 'KB');
+      return audioBlob;
     } catch (error) {
-      console.error('❌ Failed to add audio:', error);
-      addLog(`Failed to add audio: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      console.error('❌ Failed to create audio blob:', error);
+      addLog(`Failed to create audio blob: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       return null;
     }
   };
 
-  // Convert AudioBuffer to WAV blob
+  // Use FFmpeg.wasm to mux video and audio blobs into a single WebM file.
+  const muxAudioVideo = async (videoBlob: Blob, audioBlob: Blob): Promise<Blob | null> => {
+    try {
+      if (!ffmpeg.isSupported || !(ffmpeg as any).isSupported()) {
+        addLog('⚠️ FFmpeg.wasm is not supported in this browser.', 'error');
+        return null;
+      }
+      addLog('Preparing FFmpeg for muxing...', 'info');
+      if (!ffmpeg.isLoaded()) {
+        await ffmpeg.load();
+        addLog('FFmpeg loaded', 'info');
+      }
+
+      ffmpeg.setProgress(({ ratio }) => {
+        addLog(`Muxing progress: ${(ratio * 100).toFixed(1)}%`, 'info');
+      });
+
+      // write inputs to FS
+      ffmpeg.FS('writeFile', 'video.webm', await fetchFile(videoBlob));
+      ffmpeg.FS('writeFile', 'audio.wav', await fetchFile(audioBlob));
+
+      await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c', 'copy', 'output.webm');
+
+      const data = ffmpeg.FS('readFile', 'output.webm');
+      const result = new Blob([data.buffer], { type: 'video/webm' });
+      // remove temporary files from ffmpeg FS
+      try {
+        ffmpeg.FS('unlink', 'video.webm');
+        ffmpeg.FS('unlink', 'audio.wav');
+        ffmpeg.FS('unlink', 'output.webm');
+      } catch (cleanupErr) {
+        console.warn('FFmpeg FS cleanup error:', cleanupErr);
+      }
+      addLog('Muxing complete', 'success');
+      return result;
+    } catch (error) {
+      console.error('❌ FFmpeg muxing failed:', error);
+      addLog(`FFmpeg muxing failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
+
+  // Convert AudioBuffer to WAV blob (fallback used only by older code)
   const audioBufferToWave = (audioBuffer: AudioBuffer): Blob => {
     const numberOfChannels = audioBuffer.numberOfChannels;
     const sampleRate = audioBuffer.sampleRate;

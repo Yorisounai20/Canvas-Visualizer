@@ -17,8 +17,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@ffmpeg/ffmpeg": "^0.12.10",
-    "@ffmpeg/util": "^0.12.1",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@neondatabase/serverless": "^1.0.2",
     "@stackframe/stack": "^2.8.56",
     "@supabase/supabase-js": "^2.57.4",

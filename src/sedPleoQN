@@ -5,6 +5,8 @@ import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import fixWebmDuration from 'webm-duration-fix';
 import WebMWriter from 'webm-writer';
+import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
@@ -2868,20 +2870,29 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return [];
       }
 
-      // PHASE 3: Add audio to video
-      console.log('🎵 PHASE 3: Adding audio to video...');
-      addLog('PHASE 3: Adding audio track to video...', 'info');
-      
-      const finalBlob = await addAudioToVideo(videoBlob, audioBufferRef.current, audioContextRef.current!);
-      
-      if (!finalBlob) {
-        addLog('❌ Failed to add audio to video', 'error');
+      // PHASE 3: Generate audio blob
+      console.log('🎵 PHASE 3: Generating audio blob...');
+      addLog('PHASE 3: Generating audio blob from buffer...', 'info');
+
+      const audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
+      if (!audioBlob) {
+        addLog('❌ Failed to generate audio blob', 'error');
         return [];
       }
 
-      // PHASE 4: Download the complete video
-      console.log('💾 PHASE 4: Downloading video...');
-      addLog('PHASE 4: Preparing download...', 'info');
+      // PHASE 4: Mux with FFmpeg
+      console.log('🔗 PHASE 4: Muxing audio/video...');
+      addLog('PHASE 4: Muxing audio/video using FFmpeg...', 'info');
+      const muxed = await muxAudioVideo(videoBlob, audioBlob);
+      if (!muxed) {
+        addLog('❌ Failed to mux audio and video', 'error');
+        return [];
+      }
+      const finalBlob = muxed;
+
+      // PHASE 5: Download the complete video
+      console.log('💾 PHASE 5: Downloading video...');
+      addLog('PHASE 5: Preparing download...', 'info');
       
       const timestamp = new Date().toISOString().slice(0, 10);
       const videoDuration = Math.round(duration);
@@ -2976,24 +2987,23 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
     }
   };
 
-  // Combine video and audio tracks using MediaRecorder or merge at container level
+  // FFmpeg instance for client-side muxing (singleton)
+  const ffmpeg = createFFmpeg({ log: true });
+
+  // Generate a WAV audio blob;Muxing performed separately via FFmpeg
   const addAudioToVideo = async (videoBlob: Blob, audioBuffer: AudioBuffer, audioContext: AudioContext): Promise<Blob | null> => {
     try {
-      console.log('🎵 Adding audio track to video...');
-      addLog('Adding audio track to video...', 'info');
-
-      // Create audio blob from audioBuffer
-      const numberOfChannels = audioBuffer.numberOfChannels;
-      const sampleRate = audioBuffer.sampleRate;
-      const length = audioBuffer.length;
-      const duration = audioBuffer.duration;
-
-      // Create offline audio context for rendering
-      const offlineCtx = new (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext)(
-        numberOfChannels,
-        length,
-        sampleRate
-      );
+      console.log('🎵 Generating audio blob from buffer...');
+      addLog('Generating audio blob...', 'info');
+      const audioBlob = await createAudioBlob(audioBuffer);
+      console.log('✅ Audio blob created:', ((audioBlob.size || 0) / 1024).toFixed(2), 'KB');
+      return audioBlob;
+    } catch (error) {
+      console.error('❌ Failed to create audio blob:', error);
+      addLog(`Failed to create audio blob: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      return null;
+    }
+  };
 
       // Create buffer source
       const source = offlineCtx.createBufferSource();
@@ -3011,7 +3021,6 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       // For now, return video blob (full muxing requires complex audio/video container handling)
       // In production, you'd use FFmpeg.wasm or send to server for muxing
       console.log('⚠️ Note: Full audio/video muxing not yet implemented. Use server-side encoding for production.');
-      addLog('⚠️ Video and audio are separate. Use post-processing for muxing.', 'warning');
 
       return videoBlob; // Return video for now, audio will need server-side muxing
     } catch (error) {
