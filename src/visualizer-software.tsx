@@ -385,6 +385,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
   const [exportResolution, setExportResolution] = useState('1920x1080'); // Default to 1080p for YouTube
   const [exportMode, setExportMode] = useState<'live' | 'frame-by-frame'>('live'); // Export mode selection
   const [exportFramerate, setExportFramerate] = useState(30); // FPS for frame-by-frame export
+  const [exportedBlob, setExportedBlob] = useState<Blob | null>(null); // Store the final exported blob
+  const [exportedFilename, setExportedFilename] = useState(''); // Store the export filename for manual download
   const [showExportModal, setShowExportModal] = useState(false);
   const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -1270,6 +1272,24 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       exportVideo();
     }
     // Modal will stay open to display progress bar during export
+  };
+
+  const handleDownloadExportedVideo = () => {
+    if (!exportedBlob || !exportedFilename) {
+      addLog('No video available to download', 'error');
+      return;
+    }
+
+    const url = URL.createObjectURL(exportedBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = exportedFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    addLog(`Download triggered: ${exportedFilename}`, 'success');
   };
 
   const loadCustomFont = async (file: File) => {
@@ -2840,7 +2860,14 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `music_visualizer_${timestamp}_${resolutionTag}_${durationSec}s_${fileSizeMBRounded}MB.${extension}`;
+        const filename = `music_visualizer_${timestamp}_${resolutionTag}_${durationSec}s_${fileSizeMBRounded}MB.${extension}`;
+        a.download = filename;
+
+        // Store for manual download button
+        setExportedBlob(blob);
+        setExportedFilename(filename);
+        setExportProgress(100);
+        setExportPhase('done');
         
         // Trigger download
         document.body.appendChild(a);
@@ -3120,17 +3147,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         
         // Request single frame render and wait for capture
         const frameRendered = new Promise<Blob | null>((resolve) => {
+          let resolved = false;
+          
           const frameTimeout = setTimeout(() => {
-            console.warn(`⚠️ Frame ${frameNumber} capture timeout after 2000ms`);
-            resolve(null);
-          }, 2000);
+            if (!resolved) {
+              console.warn(`⚠️ Frame ${frameNumber} capture timeout after 5000ms`);
+              resolved = true;
+              resolve(null);
+            }
+          }, 5000);
 
           const checkFrame = () => {
             if (capturedFrameBlobRef.current) {
               clearTimeout(frameTimeout);
-              const blob = capturedFrameBlobRef.current;
-              capturedFrameBlobRef.current = null;
-              resolve(blob);
+              if (!resolved) {
+                resolved = true;
+                const blob = capturedFrameBlobRef.current;
+                capturedFrameBlobRef.current = null;
+                console.log(`✅ Frame ${frameNumber} captured successfully`);
+                resolve(blob);
+              }
             } else {
               requestAnimationFrame(checkFrame);
             }
@@ -3225,7 +3261,7 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const finalBlob = muxed;
 
       // PHASE 5: Download the complete video
-      console.log('💾 PHASE 5: Downloading video...');
+      console.log('💾 PHASE 5: Preparing download...');
       addLog('PHASE 5: Preparing download...', 'info');
       
       const timestamp = new Date().toISOString().slice(0, 10);
@@ -3233,6 +3269,13 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       const videoSizeMB = Math.round(finalBlob.size / 1024 / 1024);
       const filename = `music_visualizer_${timestamp}_${videoDuration}s_${videoSizeMB}MB.webm`;
 
+      // Store blob and filename for download button in modal
+      setExportedBlob(finalBlob);
+      setExportedFilename(filename);
+      setExportProgress(100);
+      setExportPhase('done');
+
+      // Auto-download
       const url = URL.createObjectURL(finalBlob);
       const link = document.createElement('a');
       link.href = url;
@@ -3254,6 +3297,8 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       console.error('❌ Frame-by-frame export failed:', error);
       addLog(`Frame-by-frame export failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       setIsExporting(false);
+      setExportProgress(0);
+      setExportPhase('idle');
       return [];
     }
   };
@@ -9770,14 +9815,38 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       if (isFrameByFrameModeRef.current && rendererRef.current) {
         try {
           const canvas = rendererRef.current.domElement;
-          canvas.toBlob((blob) => {
-            if (blob) {
-              capturedFrameBlobRef.current = blob;
-              console.log('✅ Frame captured:', blob.size, 'bytes at time', targetFrameTimeRef.current);
-            } else {
-              console.error('❌ Failed to capture frame - blob is null');
-            }
-          }, 'image/png');
+          
+          // Use async blob conversion with timeout guard
+          // Try convertToBlob first (might be faster), fallback to toBlob
+          if ('convertToBlob' in canvas && typeof canvas.convertToBlob === 'function') {
+            (canvas.convertToBlob({ type: 'image/png' }) as Promise<Blob>)
+              .then((blob) => {
+                if (blob && !capturedFrameBlobRef.current) {
+                  capturedFrameBlobRef.current = blob;
+                  console.log(`✅ Frame captured via convertToBlob at time ${targetFrameTimeRef.current.toFixed(3)}s:`, blob.size, 'bytes');
+                }
+              })
+              .catch((err) => {
+                console.error('❌ convertToBlob failed, trying fallback:', err);
+                // Fallback to toBlob
+                canvas.toBlob((blob) => {
+                  if (blob && !capturedFrameBlobRef.current) {
+                    capturedFrameBlobRef.current = blob;
+                    console.log(`✅ Frame captured via fallback toBlob at time ${targetFrameTimeRef.current.toFixed(3)}s:`, blob.size, 'bytes');
+                  }
+                }, 'image/png');
+              });
+          } else {
+            // Direct toBlob call
+            canvas.toBlob((blob) => {
+              if (blob && !capturedFrameBlobRef.current) {
+                capturedFrameBlobRef.current = blob;
+                console.log(`✅ Frame captured via toBlob at time ${targetFrameTimeRef.current.toFixed(3)}s:`, blob.size, 'bytes');
+              } else if (!blob) {
+                console.error('❌ Failed to capture frame - blob is null');
+              }
+            }, 'image/png');
+          }
         } catch (error) {
           console.error('❌ Error capturing frame:', error);
         }
@@ -11590,6 +11659,9 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         exportProgress={exportProgress}
         exportPhase={exportPhase}
         handleExportAndCloseModal={handleExportAndCloseModal}
+        handleDownloadExportedVideo={handleDownloadExportedVideo}
+        exportedBlob={exportedBlob}
+        exportedFilename={exportedFilename}
         duration={duration}
         testAudioAnalysis={testAudioAnalysis}
         testFrameByFrameExport={testFrameByFrameExport}
