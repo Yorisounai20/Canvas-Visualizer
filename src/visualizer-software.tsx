@@ -3417,8 +3417,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
         return null;
       }
       addLog('Preparing FFmpeg for muxing...', 'info');
+      // Helper: retry with exponential backoff
+      const retryAsync = async <T,>(fn: () => Promise<T>, attempts = 3, baseDelay = 500): Promise<T> => {
+        let lastErr: any = null;
+        for (let i = 0; i < attempts; i++) {
+          try {
+            if (i > 0) addLog(`Retry #${i}...`, 'info');
+            return await fn();
+          } catch (err) {
+            lastErr = err;
+            const delay = baseDelay * Math.pow(2, i);
+            console.warn(`Retry ${i + 1} failed, delaying ${delay}ms`, err);
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise(res => setTimeout(res, delay));
+          }
+        }
+        throw lastErr;
+      };
+
       if (!ffmpeg.isLoaded()) {
-        await ffmpeg.load();
+        await retryAsync(() => ffmpeg.load(), 3, 1000);
         addLog('FFmpeg loaded', 'info');
       }
 
@@ -3429,10 +3447,26 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       });
 
       // write inputs to FS
-      ffmpeg.FS('writeFile', 'video.webm', await ffmpeg.fetchFile(videoBlob));
-      ffmpeg.FS('writeFile', 'audio.wav', await ffmpeg.fetchFile(audioBlob));
+      try {
+        ffmpeg.FS('writeFile', 'video.webm', await ffmpeg.fetchFile(videoBlob));
+        ffmpeg.FS('writeFile', 'audio.wav', await ffmpeg.fetchFile(audioBlob));
+      } catch (fsErr) {
+        console.warn('FFmpeg FS write failed:', fsErr);
+        throw fsErr;
+      }
 
-      await ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c', 'copy', 'output.webm');
+      // run ffmpeg with retry/backoff
+      try {
+        await retryAsync(() => ffmpeg.run('-i', 'video.webm', '-i', 'audio.wav', '-c', 'copy', 'output.webm'), 3, 1500);
+      } catch (runErr) {
+        console.error('FFmpeg run failed after retries:', runErr);
+        addLog('FFmpeg muxing failed after retries. Falling back to video-only export.', 'error');
+        // best-effort fallback: return original video blob (no audio)
+        setExportProgress(100);
+        setExportPhase('done');
+        addLog('Export completed without audio. Download the audio separately to mux offline.', 'warning');
+        return videoBlob;
+      }
 
       const data = ffmpeg.FS('readFile', 'output.webm');
       const result = new Blob([data.buffer], { type: 'video/webm' });
