@@ -797,46 +797,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
 
       addLog('Generating audio blob...', 'info');
       let audioBlob: Blob | null = null;
-      try {
-        audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
-        if (!audioBlob) {
-          addLog('Failed to generate audio blob', 'error');
-        }
-      } catch (audioErr) {
-        console.error('Audio generation error:', audioErr);
-        addLog(`Audio processing failed: ${audioErr instanceof Error ? audioErr.message : audioErr}`, 'error');
-      }
-
-      if (audioBlob) {
-        // Skip FFmpeg muxing - just download video and audio separately
-        addLog('Preparing downloads...', 'info');
-        
-        // Download video
-        const videoUrl = URL.createObjectURL(videoBlob);
-        const videoLink = document.createElement('a');
-        videoLink.href = videoUrl;
-        videoLink.download = `visualizer_video_${new Date().toISOString().slice(0,10)}.webm`;
-        document.body.appendChild(videoLink);
-        videoLink.click();
-        document.body.removeChild(videoLink);
-        URL.revokeObjectURL(videoUrl);
-        addLog('✅ Video downloaded! (visualizer_video_*.webm)', 'success');
-        
-        // Small delay before audio download
-        setTimeout(() => {
-          // Download audio
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audioLink = document.createElement('a');
-          audioLink.href = audioUrl;
-          audioLink.download = `visualizer_audio_${new Date().toISOString().slice(0,10)}.wav`;
-          document.body.appendChild(audioLink);
-          audioLink.click();
-          document.body.removeChild(audioLink);
-          URL.revokeObjectURL(audioUrl);
-          addLog('✅ Audio downloaded! (visualizer_audio_*.wav)', 'success');
-          addLog('📝 Combine video + audio in your video editor (FFmpeg, DaVinci Resolve, etc.)', 'info');
-        }, 500);
-      }
+      // Skip audio generation - user already has the audio they uploaded
+      // Just download the video
+      const videoUrl = URL.createObjectURL(videoBlob);
+      const videoLink = document.createElement('a');
+      videoLink.href = videoUrl;
+      videoLink.download = `visualizer_video_${new Date().toISOString().slice(0,10)}.webm`;
+      document.body.appendChild(videoLink);
+      videoLink.click();
+      document.body.removeChild(videoLink);
+      URL.revokeObjectURL(videoUrl);
+      addLog('✅ Video downloaded!', 'success');
 
       addLog('Test export complete', 'success');
       setExportPhase('done');
@@ -3253,29 +3224,17 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       setExportProgress(90);
       setExportPhase('encoding');
 
-      // PHASE 3: Create audio blob (WAV)
-      console.log('🎵 PHASE 3: Generating audio track...');
-      addLog('PHASE 3: Generating audio blog from buffer...', 'info');
-
-      const audioBlob = await addAudioToVideo(videoBlob, audioBufferRef.current!, audioContextRef.current!);
-      if (!audioBlob) {
-        addLog('❌ Failed to generate audio blob', 'error');
-        return [];
-      }
-
-      // PHASE 4: Download video and audio separately (no FFmpeg muxing)
-      console.log('💾 PHASE 4: Preparing downloads...');
-      addLog('PHASE 4: Preparing separate downloads for video + audio...', 'info');
+      // PHASE 3: Download video (no audio needed - user already has it)
+      console.log('💾 PHASE 3: Preparing download...');
+      addLog('PHASE 3: Downloading video...', 'info');
       
       setExportProgress(95);
       
       const timestamp = new Date().toISOString().slice(0, 10);
       const videoDuration = Math.round(duration);
       const videoSizeMB = Math.round(videoBlob.size / 1024 / 1024);
-      const audioSizeMB = Math.round(audioBlob.size / 1024 / 1024);
       
-      // Download video
-      const videoFilename = `visualizer_video_${timestamp}.webm`;
+      const videoFilename = `visualizer_${timestamp}_${videoDuration}s.webm`;
       const videoUrl = URL.createObjectURL(videoBlob);
       const videoLink = document.createElement('a');
       videoLink.href = videoUrl;
@@ -3284,26 +3243,11 @@ export default function ThreeDVisualizer({ onBackToDashboard }: ThreeDVisualizer
       videoLink.click();
       document.body.removeChild(videoLink);
       URL.revokeObjectURL(videoUrl);
-      addLog(`✅ Video downloaded: ${videoFilename} (${videoSizeMB} MB)`, 'success');
-      
-      // Download audio with small delay
-      setTimeout(() => {
-        const audioFilename = `visualizer_audio_${timestamp}.wav`;
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audioLink = document.createElement('a');
-        audioLink.href = audioUrl;
-        audioLink.download = audioFilename;
-        document.body.appendChild(audioLink);
-        audioLink.click();
-        document.body.removeChild(audioLink);
-        URL.revokeObjectURL(audioUrl);
-        addLog(`✅ Audio downloaded: ${audioFilename} (${audioSizeMB} MB)`, 'success');
-      }, 500);
       
       setExportProgress(100);
       setExportPhase('done');
-      addLog('📝 Combine with: ffmpeg -i visualizer_video_*.webm -i visualizer_audio_*.wav -c:v copy -c:a aac output.mp4', 'info');
-      addLog('✨ Frame-by-frame export complete! Video + audio ready to combine.', 'success');
+      addLog(`✅ Video downloaded: ${videoFilename} (${videoSizeMB} MB)`, 'success');
+      addLog('✨ Export complete!', 'success');
 
       return frameBlobs;
     } catch (error) {
